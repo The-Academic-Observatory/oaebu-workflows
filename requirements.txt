@@ -1,2 +1,2 @@
-This file is required so that when python3 setup.py sdist is run, pbr will copy the requirements.txt files in
-observatory-dags, observatory-platform and observatory-reports into the respective builds.
+beautifulsoup4>=4.9.3,<5
+faker>=8.12.1,<9
