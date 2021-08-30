@@ -38,7 +38,8 @@ jobs:
           pip install -e observatory-api
           pip install -e observatory-platform
           cd ..
-
+          
+          cd oaebu-workflows
           pip install -e .[tests]
         
       - name: Set up JDK 11
