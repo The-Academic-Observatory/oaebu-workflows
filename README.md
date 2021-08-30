@@ -10,7 +10,7 @@ Oapen Metadata, Onix, UCL Discovery and an Onix Workflow for combining all of th
 [![Python Version](https://img.shields.io/badge/python-3.8-blue)](https://img.shields.io/badge/python-3.8-blue)
 ![Python package](https://github.com/The-Academic-Observatory/oaebu-workflows/workflows/Unit%20Tests/badge.svg)
 [![Documentation Status](https://readthedocs.org/projects/oaebu-workflows/badge/?version=latest)](https://oaebu-workflows.readthedocs.io/en/latest/?badge=latest)
-[![codecov](https://codecov.io/gh/The-Academic-Observatory/oaebu-workflows/branch/develop/graph/badge.svg)](https://codecov.io/gh/The-Academic-Observatory/oaebu-workflows)
+[![codecov](https://codecov.io/gh/The-Academic-Observatory/oaebu-workflows/branch/develop/graph/badge.svg?token=YEB00O777L)](https://codecov.io/gh/The-Academic-Observatory/oaebu-workflows)
 
 ## Documentation
 For detailed documentation about the Oaebu Workflows see the Read the Docs website [https://oaebu-workflows.readthedocs.io](https://oaebu-workflows.readthedocs.io)
