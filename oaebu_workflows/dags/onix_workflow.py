@@ -19,9 +19,10 @@
 
 
 from observatory.api.client.identifiers import TelescopeTypes
+from observatory.platform.utils.workflow_utils import make_observatory_api
+
 from oaebu_workflows.workflows.oaebu_partners import OaebuPartnerName, OaebuPartners
 from oaebu_workflows.workflows.onix_workflow import OnixWorkflow
-from observatory.platform.utils.workflow_utils import make_observatory_api
 
 
 # Temporary function. Create oaebu partner metadata.
@@ -118,6 +119,7 @@ def get_oaebu_partner_data(project_id, org_name):
             OaebuPartnerName.jstor_institution,
             OaebuPartnerName.oapen_irus_uk,
         ],
+        "Wits University Press": [OaebuPartnerName.oapen_irus_uk,],
     }
 
     publisher_data_partners = list()
@@ -143,10 +145,7 @@ for telescope in telescopes:
     data_partners = get_oaebu_partner_data(gcp_project_id, org_name)
 
     onix_workflow = OnixWorkflow(
-        org_name=org_name,
-        gcp_project_id=gcp_project_id,
-        gcp_bucket_name=gcp_bucket_name,
-        data_partners=data_partners,
+        org_name=org_name, gcp_project_id=gcp_project_id, gcp_bucket_name=gcp_bucket_name, data_partners=data_partners,
     )
 
     globals()[onix_workflow.dag_id] = onix_workflow.make_dag()
