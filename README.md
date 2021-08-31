@@ -1,6 +1,6 @@
-# Oaebu Workflows
+# OAeBU Workflows
 
-Oaebu Workflows provides Apache Airflow workflows for fetching, processing and analysing data about Open Access Books.
+OAeBU Workflows provides Apache Airflow workflows for fetching, processing and analysing data about Open Access Books.
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python Version](https://img.shields.io/badge/python-3.7-blue)](https://img.shields.io/badge/python-3.7-blue)

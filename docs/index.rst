@@ -1,7 +1,7 @@
 ==============================
-Oaebu Workflows
+OAeBU Workflows
 ==============================
-Oaebu Workflows provides Apache Airflow workflows for fetching, processing and analysing data about Open Access Books.
+OAeBU Workflows provides Apache Airflow workflows for fetching, processing and analysing data about Open Access Books.
 
 The workflows include: Directory of Open Access Books (DOAB), Google Analytics, Google Books, JSTOR, Oapen IRUS UK,
 Oapen Metadata, Onix, UCL Discovery and an Onix Workflow for combining all of this data.
