@@ -1,4 +1,4 @@
-{# Copyright 2020 Curtin University
+# Copyright 2021 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,19 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Author: Richard Hosking #}
+# Author: Richard Hosking
 
-SELECT
-    ISBN13 as product_id,
-    work_id,
-    work_family_id,
-    onix.ProductForm,
-    onix.EditionNumber,
-    DATE(CAST(onix.published_year as INT64), 12, 31) AS time_field,
-    CAST(onix.published_year as INT64) as published_year,
-    onix.title,
-    onix.bic_subjects,
-    onix.bisac_subjects,
-    onix.thema_subjects,
-    onix.keywords
-FROM `{{ project_id }}.{{ dataset_id }}.book_product{{ release.strftime('%Y%m%d') }}`
+# The keywords airflow and DAG are required to load the DAGs from this file, see bullet 2 in the Apache Airflow FAQ:
+# https://airflow.apache.org/docs/stable/faq.html
+
+from oaebu_workflows.workflows.oapen_workflow import OapenWorkflow
+
+oapen_workflow = OapenWorkflow()
+globals()[oapen_workflow.dag_id] = oapen_workflow.make_dag()

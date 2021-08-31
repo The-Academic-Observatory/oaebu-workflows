@@ -617,6 +617,14 @@ class OnixWorkflow(Workflow):
 
         table_id = bigquery_sharded_table_id(output_table, release_date)
 
+        # Identify latest Book release from the Academic Observatory
+        public_book_release_date = select_table_shard_dates(
+            project_id='academic-observatory',
+            dataset_id='observatory',
+            table_id='book',
+            end_date=release.release_date,
+        )[0]
+
         sql = render_template(
             template_path,
             project_id=release.project_id,
@@ -629,11 +637,14 @@ class OnixWorkflow(Workflow):
             jstor=include_jstor,
             oapen=include_oapen,
             ucl=include_ucl,
+            onix_workflow=True,
+            onix_workflow_dataset=release.workflow_dataset,
             google_analytics_dataset=google_analytics_dataset,
             google_books_dataset=google_books_dataset,
             jstor_dataset=jstor_dataset,
             oapen_dataset=oapen_dataset,
             ucl_dataset=ucl_dataset,
+            public_book_release_date=public_book_release_date,
         )
 
         create_bigquery_dataset(project_id=release.project_id, dataset_id=output_dataset, location=data_location)
@@ -1400,6 +1411,7 @@ class OnixWorkflow(Workflow):
             orig_dataset_id=data_partner.gcp_dataset_id,
             orig_table=data_partner.gcp_table_id,
             orig_isbn=data_partner.isbn_field_name,
+            orig_title=data_partner.title_field_name,
         )
 
         # Populate the __name__ attribute of the partial object (it lacks one by default).
@@ -1418,6 +1430,7 @@ class OnixWorkflow(Workflow):
         orig_dataset_id: str,
         orig_table: str,
         orig_isbn: str,
+        orig_title: str,
         *args,
         **kwargs,
     ):
@@ -1427,6 +1440,7 @@ class OnixWorkflow(Workflow):
         :param orig_dataset_id: Dataset ID of the original partner data.
         :param orig_table: Original table name for the partner data.
         :param orig_isbn: Name of the ISBN field we're checking.
+        :param orig_title: Name of the title field we're including.
         """
 
         template_file = "oaebu_intermediate_metrics.sql.jinja2"
@@ -1446,6 +1460,7 @@ class OnixWorkflow(Workflow):
             dataset_id=release.oaebu_intermediate_dataset,
             table_id=intermediate_table_id,
             isbn=orig_isbn,
+            title=orig_title,
         )
 
         create_bigquery_dataset(
