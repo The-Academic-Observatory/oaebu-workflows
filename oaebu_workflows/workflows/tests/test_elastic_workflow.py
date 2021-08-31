@@ -142,7 +142,7 @@ class TestElasticImportWorkflow(ObservatoryTestCase):
         with env.create():
             expected_dag_ids = [
                 make_dag_id("elastic_import", suffix)
-                for suffix in ["anu_press", "ucl_press", "wits_press", "university_of_michigan_press"]
+                for suffix in ["anu_press", "ucl_press", "wits_university_press", "university_of_michigan_press"]
             ]
 
             dag_file = os.path.join(module_file_path("oaebu_workflows.dags"), "elastic_import_workflow.py")
