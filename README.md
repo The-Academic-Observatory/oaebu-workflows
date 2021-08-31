@@ -25,7 +25,7 @@ Oapen Metadata, Onix, UCL Discovery and an Onix Workflow for combining all of th
 | <img src="docs/logos/oapen_irus_uk.png" alt="Oapen IRUS UK" width="150" /> |   |
 | <img src="docs/logos/oapen.png" alt="Oapen Metadata" width="150" /> |   |
 | <img src="docs/logos/onix.svg" alt="Onix" width="150" /> |   |
-| <img src="docs/logos/ucl_discovery.png" alt="UCL Discovery" width="150" /> |   |
+| <img src="docs/logos/ucl.svg" alt="UCL Discovery" width="150" /> |   |
 
 ## Documentation
 For detailed documentation about the Oaebu Workflows see the Read the Docs website [https://oaebu-workflows.readthedocs.io](https://oaebu-workflows.readthedocs.io)
