@@ -28,4 +28,4 @@ Oapen Metadata, Onix, UCL Discovery and an Onix Workflow for combining all of th
 | <img src="docs/logos/ucl.svg" alt="UCL Discovery" width="150" /> |   |
 
 ## Documentation
-For detailed documentation about the Oaebu Workflows see the Read the Docs website [https://oaebu-workflows.readthedocs.io](https://oaebu-workflows.readthedocs.io)
+For detailed documentation about the OAeBU Workflows see the Read the Docs website [https://oaebu-workflows.readthedocs.io](https://oaebu-workflows.readthedocs.io)
