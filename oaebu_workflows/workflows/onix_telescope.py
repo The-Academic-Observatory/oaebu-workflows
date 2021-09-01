@@ -41,7 +41,6 @@ from observatory.platform.utils.workflow_utils import (
     blob_name,
     bq_load_shard_v2,
     table_ids_from_path,
-    upload_files_from_list,
 )
 from observatory.platform.workflows.snapshot_telescope import (
     SnapshotRelease,
