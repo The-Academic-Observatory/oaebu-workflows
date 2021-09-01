@@ -21,7 +21,7 @@ from unittest.mock import MagicMock, patch
 import pendulum
 from click.testing import CliRunner
 
-from observatory.dags.workflows.oapen_workflow import OapenWorkflow, OapenWorkflowRelease
+from oaebu_workflows.workflows.oapen_workflow import OapenWorkflow, OapenWorkflowRelease
 
 from observatory.platform.utils.gc_utils import (
     run_bigquery_query,
