@@ -16,7 +16,8 @@
 
 # The keywords airflow and DAG are required to load the DAGs from this file, see bullet 2 in the Apache Airflow FAQ:
 # https://airflow.apache.org/docs/stable/faq.html
-from oaebu_workflows.config import TelescopeTypes
+
+from oaebu_workflows.utils.identifiers import TelescopeTypes
 from oaebu_workflows.workflows.google_analytics_telescope import GoogleAnalyticsTelescope
 from observatory.platform.utils.workflow_utils import make_observatory_api
 

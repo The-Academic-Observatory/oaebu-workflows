@@ -25,7 +25,7 @@ from airflow.models.connection import Connection
 from croniter import croniter
 from googleapiclient.discovery import build
 from googleapiclient.http import HttpMockSequence
-from oaebu_workflows.config import TelescopeTypes
+from oaebu_workflows.utils.identifiers import TelescopeTypes
 from observatory.api.client.model.organisation import Organisation
 from observatory.api.server import orm
 from oaebu_workflows.workflows.google_analytics_telescope import (
