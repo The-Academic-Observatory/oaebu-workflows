@@ -221,7 +221,7 @@ class OnixTelescope(SnapshotTelescope):
         schedule_interval: str = "@weekly",
         dataset_id: str = "onix",
         schema_folder: str = default_schema_folder(),
-        source_format: str = SourceFormat.NEWLINE_DELIMITED_JSON,
+        source_format: SourceFormat = SourceFormat.NEWLINE_DELIMITED_JSON,
         catchup: bool = False,
         airflow_vars: List = None,
         airflow_conns: List = None,
@@ -370,17 +370,6 @@ class OnixTelescope(SnapshotTelescope):
 
         for release in releases:
             release.download()
-
-    def upload_downloaded(self, releases: List[OnixRelease], **kwargs):
-        """Task to upload the downloaded ONIX releases.
-
-        :param releases: a list of ONIX releases.
-        :return: None.
-        """
-
-        for release in releases:
-            print(f"release download files: {release.download_files}, download bucket: {release.download_bucket}")
-            upload_files_from_list(release.download_files, release.download_bucket)
 
     def transform(self, releases: List[OnixRelease], **kwargs):
         """Task to transform the ONIX releases.

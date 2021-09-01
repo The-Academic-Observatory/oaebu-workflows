@@ -33,18 +33,10 @@ from oaebu_workflows.config import schema_folder as default_schema_folder
 from observatory.platform.utils.airflow_utils import AirflowConns, AirflowVars
 from observatory.platform.utils.file_utils import list_to_jsonl_gz
 from observatory.platform.utils.workflow_utils import add_partition_date, make_dag_id
-from observatory.platform.utils.workflow_utils import (
-    blob_name,
-    bq_load_partition,
-    table_ids_from_path,
-)
-from observatory.platform.workflows.snapshot_telescope import (
-    SnapshotRelease,
-    SnapshotTelescope,
-)
+from observatory.platform.workflows.organisation_telescope import OrganisationRelease, OrganisationTelescope
 
 
-class GoogleAnalyticsRelease(SnapshotRelease):
+class GoogleAnalyticsRelease(OrganisationRelease):
     def __init__(
         self, dag_id: str, start_date: pendulum.DateTime, end_date: pendulum.DateTime, organisation: Organisation
     ):
@@ -59,25 +51,11 @@ class GoogleAnalyticsRelease(SnapshotRelease):
         self.dag_id_prefix = GoogleAnalyticsTelescope.DAG_ID_PREFIX
         transform_files_regex = f"{self.dag_id_prefix}.jsonl.gz"
 
-        super().__init__(dag_id=dag_id, release_date=end_date, transform_files_regex=transform_files_regex)
-
-        self.organisation = organisation
+        super().__init__(
+            dag_id=dag_id, release_date=end_date, organisation=organisation, transform_files_regex=transform_files_regex
+        )
         self.start_date = start_date
         self.end_date = end_date
-
-    @property
-    def download_bucket(self):
-        """The download bucket name.
-        :return: the download bucket name.
-        """
-        return self.organisation.gcp_download_bucket
-
-    @property
-    def transform_bucket(self):
-        """The transform bucket name.
-        :return: the transform bucket name.
-        """
-        return self.organisation.gcp_transform_bucket
 
     @property
     def transform_path(self) -> str:
@@ -110,7 +88,7 @@ class GoogleAnalyticsRelease(SnapshotRelease):
             return False
 
 
-class GoogleAnalyticsTelescope(SnapshotTelescope):
+class GoogleAnalyticsTelescope(OrganisationTelescope):
     """Google Analytics Telescope."""
 
     DAG_ID_PREFIX = "google_analytics"
@@ -165,6 +143,7 @@ class GoogleAnalyticsTelescope(SnapshotTelescope):
             schema_prefix = "anu_press_" if organisation.name == self.ANU_ORG_NAME else ""
 
         super().__init__(
+            organisation,
             dag_id,
             start_date,
             schedule_interval,
@@ -176,9 +155,6 @@ class GoogleAnalyticsTelescope(SnapshotTelescope):
             schema_prefix=schema_prefix,
         )
 
-        self.organisation = organisation
-        self.project_id = organisation.gcp_project_id
-        self.dataset_location = "us"  # TODO: add to API
         self.view_id = view_id
         self.pagepath_regex = pagepath_regex
 
@@ -219,45 +195,12 @@ class GoogleAnalyticsTelescope(SnapshotTelescope):
     def download_transform(self, releases: List[GoogleAnalyticsRelease], **kwargs):
         """Task to download and transform the google analytics release for a given month.
 
-        :param releases: a list with one google analyics release.
+        :param releases: a list with one google analytics release.
         :return: None.
         """
         results = releases[0].download_transform(self.view_id, self.pagepath_regex)
         if not results:
             raise AirflowSkipException("No Google Analytics data available to download.")
-
-    def bq_load_partition(self, releases: List[SnapshotRelease], **kwargs):
-        """Task to load each transformed release to BigQuery.
-        The table_id is set to the file name without the extension.
-
-        :param releases: a list of releases.
-        :return: None.
-        """
-
-        # Load each transformed release
-        for release in releases:
-            for transform_path in release.transform_files:
-                transform_blob = blob_name(transform_path)
-                table_id, _ = table_ids_from_path(transform_path)
-                table_description = self.table_descriptions.get(table_id, "")
-                bq_load_partition(
-                    self.schema_folder,
-                    self.project_id,
-                    release.transform_bucket,
-                    transform_blob,
-                    self.dataset_id,
-                    self.dataset_location,
-                    table_id,
-                    release.release_date,
-                    self.source_format,
-                    bigquery.table.TimePartitioningType.MONTH,
-                    prefix=self.schema_prefix,
-                    schema_version=self.schema_version,
-                    dataset_description=self.dataset_description,
-                    table_description=table_description,
-                    **self.load_bigquery_table_kwargs,
-                )
-
 
 def initialize_analyticsreporting() -> Resource:
     """Initializes an Analytics Reporting API V4 service object.

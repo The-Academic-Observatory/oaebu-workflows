@@ -41,27 +41,13 @@ from observatory.api.client.model.organisation import Organisation
 from oaebu_workflows.config import schema_folder as default_schema_folder
 from observatory.platform.utils.airflow_utils import AirflowConns, AirflowVars
 from observatory.platform.utils.file_utils import list_to_jsonl_gz
+from observatory.platform.utils.workflow_utils import add_partition_date, convert, make_dag_id
+from observatory.platform.utils.workflow_utils import SubFolder, workflow_path
 from observatory.platform.utils.url_utils import get_user_agent
-from observatory.platform.utils.workflow_utils import (
-    SubFolder,
-    blob_name,
-    bq_load_partition,
-    table_ids_from_path,
-    workflow_path,
-    upload_files_from_list,
-)
-from observatory.platform.utils.workflow_utils import (
-    add_partition_date,
-    convert,
-    make_dag_id,
-)
-from observatory.platform.workflows.snapshot_telescope import (
-    SnapshotRelease,
-    SnapshotTelescope,
-)
+from observatory.platform.workflows.organisation_telescope import OrganisationRelease, OrganisationTelescope
 
 
-class JstorRelease(SnapshotRelease):
+class JstorRelease(OrganisationRelease):
     def __init__(
         self, dag_id: str, release_date: pendulum.DateTime, reports_info: List[dict], organisation: Organisation
     ):
@@ -75,22 +61,13 @@ class JstorRelease(SnapshotRelease):
         download_files_regex = f"^{JstorTelescope.DAG_ID_PREFIX}_(country|institution)\.tsv$"
         transform_files_regex = f"^{JstorTelescope.DAG_ID_PREFIX}_(country|institution)\.jsonl.gz"
 
-        super().__init__(dag_id, release_date, download_files_regex, transform_files_regex)
-        self.organisation = organisation
-
-    @property
-    def download_bucket(self):
-        """The download bucket name.
-        :return: the download bucket name.
-        """
-        return self.organisation.gcp_download_bucket
-
-    @property
-    def transform_bucket(self):
-        """The transform bucket name.
-        :return: the transform bucket name.
-        """
-        return self.organisation.gcp_transform_bucket
+        super().__init__(
+            dag_id,
+            release_date,
+            organisation,
+            download_files_regex=download_files_regex,
+            transform_files_regex=transform_files_regex,
+        )
 
     def download_path(self, report_type: str) -> str:
         """Creates full download path
@@ -149,7 +126,7 @@ class JstorRelease(SnapshotRelease):
                 raise AirflowException(f"Unsuccessful adding label to GMAIL message, message_id: {message_id}")
 
 
-class JstorTelescope(SnapshotTelescope):
+class JstorTelescope(OrganisationTelescope):
     """
     The JSTOR telescope.
 
@@ -214,6 +191,7 @@ class JstorTelescope(SnapshotTelescope):
             dag_id = make_dag_id(self.DAG_ID_PREFIX, organisation.name)
 
         super().__init__(
+            organisation,
             dag_id,
             start_date,
             schedule_interval,
@@ -226,9 +204,6 @@ class JstorTelescope(SnapshotTelescope):
             airflow_conns=airflow_conns,
             max_active_runs=max_active_runs,
         )
-        self.organisation = organisation
-        self.project_id = organisation.gcp_project_id
-        self.dataset_location = "us"  # TODO: add to API
         self.publisher_id = publisher_id
 
         self.add_setup_task_chain([self.check_dependencies, self.list_reports, self.download_reports])
@@ -330,60 +305,14 @@ class JstorTelescope(SnapshotTelescope):
         ti.xcom_push(JstorTelescope.RELEASE_INFO, available_releases)
         return True
 
-    def upload_downloaded(self, releases: List[JstorRelease], **kwargs):
-        """Task to upload the downloaded Jstor releases for a given month.
-
-        :param releases: a list of Jstor releases.
-        :return: None.
-        """
-
-        # Upload each downloaded release
-        for release in releases:
-            upload_files_from_list(release.download_files, release.download_bucket)
-
     def transform(self, releases: List[JstorRelease], **kwargs):
         """Task to transform the Jstor releases for a given month.
 
         :param releases: a list of Jstor releases.
         :return: None.
         """
-
-        # Transform each release
         for release in releases:
             release.transform()
-
-    def bq_load_partition(self, releases: List[JstorRelease], **kwargs):
-        """Task to load each transformed release to BigQuery.
-        The table_id is set to the file name without the extension.
-        :param releases: a list of releases.
-        :return: None.
-        """
-
-        # Load each transformed release
-        for release in releases:
-            for transform_path in release.transform_files:
-                transform_blob = blob_name(transform_path)
-                table_id, _ = table_ids_from_path(transform_path)
-                table_description = self.table_descriptions.get(table_id, "")
-
-                bq_load_partition(
-                    self.schema_folder,
-                    self.project_id,
-                    release.transform_bucket,
-                    transform_blob,
-                    self.dataset_id,
-                    self.dataset_location,
-                    table_id,
-                    release.release_date,
-                    self.source_format,
-                    bigquery.table.TimePartitioningType.MONTH,
-                    prefix=self.schema_prefix,
-                    schema_version=self.schema_version,
-                    dataset_description=self.dataset_description,
-                    table_description=table_description,
-                    **self.load_bigquery_table_kwargs,
-                )
-
 
 def create_headers() -> dict:
     """Create a headers dict that can be used to make a request

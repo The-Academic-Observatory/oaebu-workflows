@@ -45,26 +45,19 @@ from observatory.platform.utils.gc_utils import (
     upload_file_to_cloud_storage,
 )
 from observatory.platform.utils.workflow_utils import (
-    SubFolder,
-    blob_name,
-    bq_load_partition,
-    table_ids_from_path,
-    workflow_path,
-)
-from observatory.platform.utils.workflow_utils import (
     add_partition_date,
     make_dag_id,
     make_org_id,
+    SubFolder,
+    blob_name,
+    workflow_path,
 )
-from observatory.platform.workflows.snapshot_telescope import (
-    SnapshotRelease,
-    SnapshotTelescope,
-)
+from observatory.platform.workflows.organisation_telescope import OrganisationRelease, OrganisationTelescope
 
 
-class OapenIrusUkRelease(SnapshotRelease):
+class OapenIrusUkRelease(OrganisationRelease):
     def __init__(self, dag_id: str, release_date: pendulum.DateTime, organisation: Organisation):
-        """Create a OapenIrusUkReleaes instance.
+        """Create a OapenIrusUkRelease instance.
 
         :param dag_id: the DAG id.
         :param release_date: the date of the release.
@@ -72,8 +65,7 @@ class OapenIrusUkRelease(SnapshotRelease):
         """
 
         transform_files_regex = f"{OapenIrusUkTelescope.DAG_ID_PREFIX}.jsonl.gz"
-        super().__init__(dag_id, release_date, transform_files_regex=transform_files_regex)
-        self.organisation = organisation
+        super().__init__(dag_id, release_date, organisation, transform_files_regex=transform_files_regex)
         self.organisation_id = make_org_id(organisation.name)
 
     @property
@@ -85,20 +77,6 @@ class OapenIrusUkRelease(SnapshotRelease):
         return blob_name(
             os.path.join(self.download_folder, f'{self.release_date.strftime("%Y_%m")}_{self.organisation_id}.jsonl.gz')
         )
-
-    @property
-    def download_bucket(self):
-        """The download bucket name.
-        :return: the download bucket name.
-        """
-        return self.organisation.gcp_download_bucket
-
-    @property
-    def transform_bucket(self):
-        """The transform bucket name.
-        :return: the transform bucket name.
-        """
-        return self.organisation.gcp_transform_bucket
 
     @property
     def download_path(self) -> str:
@@ -228,7 +206,7 @@ class OapenIrusUkRelease(SnapshotRelease):
         list_to_jsonl_gz(self.transform_path, results)
 
 
-class OapenIrusUkTelescope(SnapshotTelescope):
+class OapenIrusUkTelescope(OrganisationTelescope):
     DAG_ID_PREFIX = "oapen_irus_uk"
 
     OAPEN_PROJECT_ID = "oapen-usage-data-gdpr-proof"  # The oapen project id.
@@ -306,6 +284,7 @@ class OapenIrusUkTelescope(SnapshotTelescope):
             dag_id = make_dag_id(self.DAG_ID_PREFIX, organisation.name)
 
         super().__init__(
+            organisation,
             dag_id,
             start_date,
             schedule_interval,
@@ -319,9 +298,6 @@ class OapenIrusUkTelescope(SnapshotTelescope):
             table_descriptions=table_descriptions,
         )
         self.max_cloud_function_instances = max_cloud_function_instances
-        self.organisation = organisation
-        self.project_id = organisation.gcp_project_id
-        self.dataset_location = "us"  # TODO: add to API
         self.publisher_id = publisher_id
 
         self.add_setup_task(self.check_dependencies)
@@ -392,39 +368,6 @@ class OapenIrusUkTelescope(SnapshotTelescope):
         """
         for release in releases:
             release.download_transform()
-
-    def bq_load_partition(self, releases: List[OapenIrusUkRelease], **kwargs):
-        """Task to load each transformed release to BigQuery.
-        The table_id is set to the file name without the extension.
-        :param releases: a list of releases.
-        :return: None.
-        """
-
-        # Load each transformed release
-        for release in releases:
-            for transform_path in release.transform_files:
-                transform_blob = blob_name(transform_path)
-                table_id, _ = table_ids_from_path(transform_path)
-                table_description = self.table_descriptions.get(table_id, "")
-
-                bq_load_partition(
-                    self.schema_folder,
-                    self.project_id,
-                    release.transform_bucket,
-                    transform_blob,
-                    self.dataset_id,
-                    self.dataset_location,
-                    table_id,
-                    release.release_date,
-                    self.source_format,
-                    bigquery.table.TimePartitioningType.MONTH,
-                    prefix=self.schema_prefix,
-                    schema_version=self.schema_version,
-                    dataset_description=self.dataset_description,
-                    table_description=table_description,
-                    **self.load_bigquery_table_kwargs,
-                )
-
 
 def get_publisher_uuid(publisher_name: str) -> str:
     """Get the publisher UUID from the OAPEN API using the publisher name.
