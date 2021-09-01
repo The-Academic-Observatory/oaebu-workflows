@@ -24,6 +24,15 @@ CREATE TEMP FUNCTION group_items(items ARRAY<STRUCT<name STRING, value INT64>>) 
   )
 );
 
+CREATE TEMP FUNCTION group_items_google_books_sales(items ARRAY<STRUCT<Country_of_Sale STRING, qty INT64>>) as (
+  ARRAY(
+    (SELECT AS STRUCT
+      Country_of_Sale,
+      SUM(qty) as qty,
+    FROM UNNEST(items)
+    GROUP BY Country_of_Sale)
+  )
+
 CREATE TEMP FUNCTION group_items_jstor_country(items ARRAY<STRUCT<Country_name STRING, Total_Item_Requests INT64>>) as (
   ARRAY(
     (SELECT AS STRUCT
@@ -158,7 +167,8 @@ empty_google_books_sales as (
         CAST(NULL as STRING) as Title,
         CAST(NULL as STRING) as Author,
         CAST(NULL as DATE) as release_date,
-        CAST(NULL as INT64) as qty
+        CAST(NULL as INT64) as qty,
+        [STRUCT(CAST(NULL as STRING) as Country_of_Sale, CAST(null as INT64) as qty)] as country
 ),
 
 empty_google_analytics as (
@@ -267,7 +277,7 @@ google_analytics_metrics as (
 # Google Books
 google_books_sales_metrics as (
     SELECT
-        Primary_ISBN as ISBN13, release_date, STRUCT(SUM(qty) as qty) as metrics
+        Primary_ISBN as ISBN13, release_date, STRUCT(SUM(qty) as qty, group_items_google_books_sales(ARRAY_AGG(STRUCT(Country_of_Sale, qty))) as countries) as metrics
     FROM {% if google_books %} `{{ project_id }}.{{ dataset_id }}.{{ google_books_dataset }}_google_books_sales_matched{{ release_date.strftime('%Y%m%d') }}` {% else %} empty_google_books_sales {% endif %} as google_books
     GROUP BY Primary_ISBN, release_date
 ),
