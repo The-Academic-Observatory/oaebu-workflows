@@ -16,35 +16,26 @@
 # Author: Richard Hosking
 
 import os
-import shutil
 from functools import partial, update_wrapper
-from pathlib import Path
 from typing import List, Optional
 
 import pendulum
 from airflow.exceptions import AirflowException
 from airflow.models import Variable
 from airflow.sensors.external_task import ExternalTaskSensor
-from google.cloud.bigquery import SourceFormat
-from observatory.dags.config import sql_folder
+from oaebu_workflows.config import sql_folder
 
 from observatory.platform.workflows.workflow import AbstractRelease, Workflow
 from observatory.platform.utils.gc_utils import (
     bigquery_sharded_table_id,
     create_bigquery_dataset,
     create_bigquery_table_from_query,
-    run_bigquery_query,
     select_table_shard_dates,
     copy_bigquery_table
 )
 from observatory.platform.utils.jinja2_utils import render_template
 from observatory.platform.utils.airflow_utils import AirflowVars
-from observatory.platform.utils.workflow_utils import (
-    bq_load_shard_v2,
-    table_ids_from_path,
-    make_dag_id,
-)
-
+from observatory.platform.utils.workflow_utils import make_dag_id
 
 class OapenWorkflowRelease(AbstractRelease):
     """
