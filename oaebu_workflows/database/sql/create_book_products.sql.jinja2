@@ -32,6 +32,7 @@ CREATE TEMP FUNCTION group_items_google_books_sales(items ARRAY<STRUCT<Country_o
     FROM UNNEST(items)
     GROUP BY Country_of_Sale)
   )
+);
 
 CREATE TEMP FUNCTION group_items_jstor_country(items ARRAY<STRUCT<Country_name STRING, Total_Item_Requests INT64>>) as (
   ARRAY(
