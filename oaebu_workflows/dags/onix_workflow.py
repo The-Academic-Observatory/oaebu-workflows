@@ -18,7 +18,7 @@
 # https://airflow.apache.org/docs/stable/faq.html
 
 
-from observatory.api.client.identifiers import TelescopeTypes
+from oaebu_workflows.config import TelescopeTypes
 from observatory.platform.utils.workflow_utils import make_observatory_api
 
 from oaebu_workflows.workflows.oaebu_partners import OaebuPartnerName, OaebuPartners

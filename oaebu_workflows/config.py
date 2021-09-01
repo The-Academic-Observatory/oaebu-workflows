@@ -18,6 +18,20 @@ from observatory.platform.utils.config_utils import module_file_path
 import os
 
 
+class TelescopeTypes:
+    """ The type_id's for known TelescopeTypes """
+
+    fulcrum = "fulcrum"
+    google_analytics = "google_analytics"
+    google_books = "google_books"
+    jstor = "jstor"
+    oapen_irus_uk = "oapen_irus_uk"
+    onix = "onix"
+    onix_workflow = "onix_workflow"
+    ucl_discovery = "ucl_discovery"
+    wos = "wos"
+
+
 def test_fixtures_folder(*subdirs) -> str:
     """Get the path to the Academic Observatory Workflows test data directory.
 

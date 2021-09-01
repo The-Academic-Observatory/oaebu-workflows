@@ -31,7 +31,7 @@ from oaebu_workflows.config import schema_folder as default_schema_folder
 from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.workflows.oaebu_partners import OaebuPartnerName, OaebuPartners
 from oaebu_workflows.workflows.onix_workflow import OnixWorkflow, OnixWorkflowRelease
-from observatory.api.client.identifiers import TelescopeTypes
+from oaebu_workflows.config import TelescopeTypes
 from observatory.api.server.orm import Organisation
 from observatory.platform.utils.airflow_utils import AirflowConns
 from observatory.platform.utils.gc_utils import (
