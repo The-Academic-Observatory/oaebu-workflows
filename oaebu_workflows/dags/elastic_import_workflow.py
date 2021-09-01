@@ -19,8 +19,10 @@
 
 import json
 import os
+import re
 from typing import Dict
 
+from airflow.exceptions import AirflowException
 from observatory.platform.elastic.kibana import TimeField
 from observatory.platform.utils.jinja2_utils import render_template
 from observatory.platform.utils.workflow_utils import make_dag_id
@@ -42,7 +44,7 @@ OAEBU_KIBANA_TIME_FIELDS = [
 
 
 def load_elastic_mappings_oaebu(path: str, table_prefix: str) -> Dict:
-    """For the OAEBU project, load the Elastic mappings for a given table_prefix.
+    """ For the OAEBU project, load the Elastic mappings for a given table_prefix.
     :param path: the path to the mappings files.
     :param table_prefix: the table_id prefix (without shard date).
     :return: the rendered mapping as a Dict.
@@ -54,10 +56,18 @@ def load_elastic_mappings_oaebu(path: str, table_prefix: str) -> Dict:
         mappings_path = os.path.join(path, "oaebu-unmatched-metrics-mappings.json.jinja2")
         return json.loads(render_template(mappings_path))
     else:
-        parts = table_prefix.split("_")[3:]
-        mappings_file_name = "oaebu" + "-" + "-".join(parts[2:]) + "-mappings.json.jinja2"
+        # Aggregation level
+        aggregation_level_search = re.search(r"(?<=book_)(.*?)(?=_)", table_prefix)
+        if aggregation_level_search:
+            aggregation_level = aggregation_level_search.group(1)
+        else:
+            raise AirflowException(f"Aggregation Level not found in table_prefix: {table_prefix}")
+
+        # Make mappings path
+        suffix = re.search(f"_book_{aggregation_level}_(.*)", table_prefix).group(1)
+        mappings_file_name = f"oaebu-{suffix}-mappings.json.jinja2".replace("_", "-")
         mappings_path = os.path.join(path, mappings_file_name)
-        aggregation_level = parts[1]
+
         return json.loads(render_template(mappings_path, aggregation_level=aggregation_level))
 
 
@@ -89,13 +99,13 @@ configs = [
         kibana_time_fields=OAEBU_KIBANA_TIME_FIELDS,
     ),
     ElasticImportConfig(
-        dag_id=make_dag_id(DAG_PREFIX, "wits_press"),
+        dag_id=make_dag_id(DAG_PREFIX, "wits_university_press"),
         project_id="oaebu-witts-press",
         dataset_id=DATASET_ID,
         bucket_name="oaebu-witts-press-transform",
         data_location=DATA_LOCATION,
         file_type=FILE_TYPE_JSONL,
-        sensor_dag_ids=[make_dag_id(DAG_ONIX_WORKFLOW_PREFIX, "wits_press")],
+        sensor_dag_ids=[make_dag_id(DAG_ONIX_WORKFLOW_PREFIX, "wits_university_press")],
         elastic_mappings_path=ELASTIC_MAPPINGS_PATH,
         elastic_mappings_func=load_elastic_mappings_oaebu,
         kibana_spaces=["oaebu-wits-press", "dev-oaebu-wits-press"],
