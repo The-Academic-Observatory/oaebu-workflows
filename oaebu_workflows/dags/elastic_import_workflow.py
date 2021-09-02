@@ -20,15 +20,18 @@
 import json
 import os
 import re
-from typing import Dict
+from typing import Callable, Dict, List
 
 from airflow.exceptions import AirflowException
+from oaebu_workflows.config import elastic_mappings_folder
+from observatory.platform.elastic.elastic import KeepInfo, KeepOrder
 from observatory.platform.elastic.kibana import TimeField
 from observatory.platform.utils.jinja2_utils import render_template
 from observatory.platform.utils.workflow_utils import make_dag_id
-from observatory.platform.workflows.elastic_import_workflow import ElasticImportWorkflow, ElasticImportConfig
-
-from oaebu_workflows.config import elastic_mappings_folder
+from observatory.platform.workflows.elastic_import_workflow import (
+    ElasticImportConfig,
+    ElasticImportWorkflow,
+)
 
 DATASET_ID = "data_export"
 DATA_LOCATION = "us"
@@ -42,9 +45,15 @@ OAEBU_KIBANA_TIME_FIELDS = [
     TimeField("^oaebu-.*$", "month"),
 ]
 
+# These can be customised per DAG.  Just using some generic settings for now.
+index_keep_info = {
+    "": KeepInfo(ordering=KeepOrder.newest, num=3),
+    "oaebu": KeepInfo(ordering=KeepOrder.newest, num=3),
+}
+
 
 def load_elastic_mappings_oaebu(path: str, table_prefix: str) -> Dict:
-    """ For the OAEBU project, load the Elastic mappings for a given table_prefix.
+    """For the OAEBU project, load the Elastic mappings for a given table_prefix.
     :param path: the path to the mappings files.
     :param table_prefix: the table_id prefix (without shard date).
     :return: the rendered mapping as a Dict.
@@ -84,6 +93,7 @@ configs = [
         elastic_mappings_func=load_elastic_mappings_oaebu,
         kibana_spaces=["oaebu-anu-press", "dev-oaebu-anu-press"],
         kibana_time_fields=OAEBU_KIBANA_TIME_FIELDS,
+        index_keep_info=index_keep_info,
     ),
     ElasticImportConfig(
         dag_id=make_dag_id(DAG_PREFIX, "ucl_press"),
@@ -97,6 +107,7 @@ configs = [
         elastic_mappings_func=load_elastic_mappings_oaebu,
         kibana_spaces=["oaebu-ucl-press", "dev-oaebu-ucl-press"],
         kibana_time_fields=OAEBU_KIBANA_TIME_FIELDS,
+        index_keep_info=index_keep_info,
     ),
     ElasticImportConfig(
         dag_id=make_dag_id(DAG_PREFIX, "wits_university_press"),
@@ -110,6 +121,7 @@ configs = [
         elastic_mappings_func=load_elastic_mappings_oaebu,
         kibana_spaces=["oaebu-wits-press", "dev-oaebu-wits-press"],
         kibana_time_fields=OAEBU_KIBANA_TIME_FIELDS,
+        index_keep_info=index_keep_info,
     ),
     ElasticImportConfig(
         dag_id=make_dag_id(DAG_PREFIX, "university_of_michigan_press"),
@@ -123,6 +135,7 @@ configs = [
         elastic_mappings_func=load_elastic_mappings_oaebu,
         kibana_spaces=["oaebu-umich-press", "dev-oaebu-umich-press"],
         kibana_time_fields=OAEBU_KIBANA_TIME_FIELDS,
+        index_keep_info=index_keep_info,
     ),
 ]
 
@@ -139,5 +152,6 @@ for config in configs:
         elastic_mappings_func=config.elastic_mappings_func,
         kibana_spaces=config.kibana_spaces,
         kibana_time_fields=config.kibana_time_fields,
+        index_keep_info=config.index_keep_info,
     ).make_dag()
     globals()[dag.dag_id] = dag
