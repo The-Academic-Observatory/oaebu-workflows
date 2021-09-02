@@ -199,6 +199,10 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
                 )
                 self.assertEqual(expected_state, ti.state)
 
+                # Check dependencies
+                ti = env.run_task("check_dependencies", workflow_dag, execution_date=execution_date)
+                self.assertEqual(expected_state, ti.state)
+
                 # Mock make_release
                 workflow.make_release = MagicMock(
                     return_value=OapenWorkflowRelease(
