@@ -173,30 +173,6 @@ class OapenWorkflowRelease(AbstractRelease):
         """
         pass
 
-
-def make_table_id(*, project_id: str, dataset_id: str, table_id: str, end_date: pendulum.datetime, sharded: bool):
-    """
-    Make a BQ table ID.
-    :param project_id: GCP Project ID.
-    :param dataset_id: GCP Dataset ID.
-    :param table_id: Table name to convert to the suitable BQ table ID.
-    :param end_date: Latest date considered.
-    :param sharded: whether the table is sharded or not.
-    """
-
-    new_table_id = table_id
-    if sharded:
-        table_date = select_table_shard_dates(
-            project_id=project_id,
-            dataset_id=dataset_id,
-            table_id=table_id,
-            end_date=end_date,
-        )[0]
-        new_table_id = f"{table_id}{table_date.strftime('%Y%m%d')}"
-
-    return new_table_id
-
-
 class OapenWorkflow(Workflow):
     """
     Workflow for processing the OAPEN metadata and IRUS-UK metrics data
@@ -232,11 +208,8 @@ class OapenWorkflow(Workflow):
 
         if airflow_vars is None:
             airflow_vars = [
-                AirflowVars.DATA_PATH,
                 AirflowVars.PROJECT_ID,
                 AirflowVars.DATA_LOCATION,
-                AirflowVars.DOWNLOAD_BUCKET,
-                AirflowVars.TRANSFORM_BUCKET,
             ]
 
         self.org_name = self.ORG_NAME
@@ -251,6 +224,9 @@ class OapenWorkflow(Workflow):
         ext_dag_id = make_dag_id(irus_uk_dag_id_prefix, self.ORG_NAME)
         sensor = ExternalTaskSensor(task_id=f"{ext_dag_id}_sensor", external_dag_id=ext_dag_id, mode="reschedule")
         self.add_sensor(sensor)
+
+        # Setup tasks
+        self.add_setup_task(self.check_dependencies)
 
         # Format OAPEN Metadata like ONIX to enable the next steps
         self.add_task(
@@ -482,7 +458,6 @@ class OapenWorkflow(Workflow):
 
     def create_oaebu_export_tasks(self):
         """Create tasks for exporting final metrics from our OAEBU data.  It will create output tables in the oaebu_elastic dataset.
-        :param data_partners: Oapen workflow release information.
         """
 
         export_tables = [

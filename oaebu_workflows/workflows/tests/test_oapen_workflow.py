@@ -77,7 +77,8 @@ class TestOapenWorkflow(ObservatoryTestCase):
             dag = wf.make_dag()
             self.assert_dag_structure(
                 {
-                    "oapen_irus_uk_oapen_sensor": ["create_onix_formatted_metadata_output_tasks"],
+                    "oapen_irus_uk_oapen_sensor": ["check_dependencies"],
+                    "check_dependencies": ["create_onix_formatted_metadata_output_tasks"],
                     "create_onix_formatted_metadata_output_tasks": ["copy_irus_uk_release"],
                     "copy_irus_uk_release": ["create_oaebu_book_product_table"],
                     "create_oaebu_book_product_table": ["export_oaebu_table.book_product_list"],
@@ -132,7 +133,7 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
         self.public_book_metadata_dataset_id = "observatory"
         self.public_book_metadata_table_id = "book"
 
-        self.org_name = "OAPEN"
+        self.org_name = OapenWorkflow.ORG_NAME
         self.gcp_project_id = os.getenv("TEST_GCP_PROJECT_ID")
 
         self.gcp_dataset_id = "oaebu"
