@@ -37,7 +37,7 @@ from oaebu_workflows.workflows.oapen_irus_uk_telescope import (
     create_cloud_function,
     upload_source_code_to_bucket,
 )
-from observatory.api.client.identifiers import TelescopeTypes
+from oaebu_workflows.identifiers import TelescopeTypes
 from observatory.api.client.model.organisation import Organisation
 from observatory.api.server import orm
 from observatory.platform.utils.airflow_utils import AirflowConns

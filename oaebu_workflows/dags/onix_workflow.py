@@ -17,12 +17,11 @@
 # The keywords airflow and DAG are required to load the DAGs from this file, see bullet 2 in the Apache Airflow FAQ:
 # https://airflow.apache.org/docs/stable/faq.html
 
-
-from observatory.api.client.identifiers import TelescopeTypes
-from observatory.platform.utils.workflow_utils import make_observatory_api
-
+from oaebu_workflows.identifiers import TelescopeTypes
 from oaebu_workflows.workflows.oaebu_partners import OaebuPartnerName, OaebuPartners
 from oaebu_workflows.workflows.onix_workflow import OnixWorkflow
+
+from observatory.platform.utils.workflow_utils import make_observatory_api
 
 
 # Temporary function. Create oaebu partner metadata.
