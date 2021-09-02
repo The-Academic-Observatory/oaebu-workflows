@@ -204,11 +204,11 @@ class TestUclDiscoveryTelescope(ObservatoryTestCase):
                 self.assert_cleanup(download_folder, extract_folder, transform_folder)
 
     @patch("oaebu_workflows.workflows.ucl_discovery_telescope.retry_session")
-    @patch("observatory.platform.utils.workflow_utils.AirflowVariable.get")
+    @patch("observatory.platform.utils.workflow_utils.Variable.get")
     def test_download(self, mock_variable_get, mock_retry_session):
         """Test download method of UCL Discovery release
 
-        :param mock_variable_get: Mock AirflowVariable get
+        :param mock_variable_get: Mock Variable get
         :param mock_retry_session: Mock retry_session
         :return: None.
         """

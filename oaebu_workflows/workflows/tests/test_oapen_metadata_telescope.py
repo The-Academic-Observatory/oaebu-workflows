@@ -81,7 +81,7 @@ def side_effect(arg):
     return values[arg]
 
 
-@patch("observatory.platform.utils.workflow_utils.AirflowVariable.get")
+@patch("observatory.platform.utils.workflow_utils.Variable.get")
 class TestOapenMetadataTelescope(unittest.TestCase):
     """Tests for the functions used by the OapenMetadata telescope"""
 
@@ -110,7 +110,7 @@ class TestOapenMetadataTelescope(unittest.TestCase):
         self.transform_crc = "415144d7"
 
         # Create release instance that is used to test download/transform
-        with patch("observatory.platform.utils.workflow_utils.AirflowVariable.get") as mock_variable_get:
+        with patch("observatory.platform.utils.workflow_utils.Variable.get") as mock_variable_get:
             mock_variable_get.side_effect = side_effect
 
             self.release = OapenMetadataRelease(
