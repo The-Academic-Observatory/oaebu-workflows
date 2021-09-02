@@ -27,7 +27,7 @@ from googleapiclient.http import HttpMockSequence
 
 from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.workflows.jstor_telescope import JstorRelease, JstorTelescope, get_label_id
-from oaebu_workflows.utils.identifiers import TelescopeTypes
+from oaebu_workflows.identifiers import TelescopeTypes
 from observatory.api.client.model.organisation import Organisation
 from observatory.api.server import orm
 from observatory.platform.utils.airflow_utils import AirflowConns

@@ -24,7 +24,7 @@ from airflow.utils.state import State
 import observatory.api.server.orm as orm
 from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.workflows.onix_telescope import OnixTelescope
-from oaebu_workflows.utils.identifiers import TelescopeTypes
+from oaebu_workflows.identifiers import TelescopeTypes
 from observatory.platform.utils.airflow_utils import AirflowConns
 from observatory.platform.utils.file_utils import _hash_file
 from observatory.platform.utils.gc_utils import bigquery_sharded_table_id
