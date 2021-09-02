@@ -52,8 +52,8 @@ class TestOapenWorkflow(ObservatoryTestCase):
         self.oapen_metadata_table_id = "metadata"
 
 
-    @patch("observatory.dags.workflows.oapen_workflow.OapenWorkflow.make_release")
-    @patch("observatory.dags.workflows.oapen_workflow.select_table_shard_dates")
+    @patch("oaebu_workflows.workflows.oapen_workflow.OapenWorkflow.make_release")
+    @patch("oaebu_workflows.workflows.oapen_workflow.select_table_shard_dates")
     def test_cleanup(self, mock_sel_table_suffixes, mock_mr):
         mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
         with CliRunner().isolated_filesystem():
