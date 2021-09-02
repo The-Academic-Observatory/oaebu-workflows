@@ -49,7 +49,6 @@ OAEBU_KIBANA_TIME_FIELDS = [
 index_keep_info = {
     "": KeepInfo(ordering=KeepOrder.newest, num=3),
     "oaebu": KeepInfo(ordering=KeepOrder.newest, num=3),
-    "dois-doi": KeepInfo(ordering=KeepOrder.newest, num=1),
 }
 
 
@@ -153,6 +152,6 @@ for config in configs:
         elastic_mappings_func=config.elastic_mappings_func,
         kibana_spaces=config.kibana_spaces,
         kibana_time_fields=config.kibana_time_fields,
-        index_keep_info=index_keep_info,
+        index_keep_info=config.index_keep_info,
     ).make_dag()
     globals()[dag.dag_id] = dag
