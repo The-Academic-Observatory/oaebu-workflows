@@ -164,6 +164,7 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
                         oaebu_dataset=oaebu_output_dataset_id,
                         oaebu_intermediate_dataset=oaebu_intermediate_dataset_id,
                         oaebu_elastic_dataset=oaebu_elastic_dataset_id,
+                        irus_uk_dataset_id=self.irus_uk_dataset_id,
                         start_date=start_date)
 
             # Make DAG
