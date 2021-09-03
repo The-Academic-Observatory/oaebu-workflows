@@ -110,21 +110,29 @@ class TestOnixWorkflow(ObservatoryTestCase):
             "RelatedWorks": [
                 {
                     "WorkRelationCode": "Manifestation of",
-                    "WorkIdentifiers": [{"WorkIDType": "ISBN-13", "IDValue": "112"},],
+                    "WorkIdentifiers": [
+                        {"WorkIDType": "ISBN-13", "IDValue": "112"},
+                    ],
                 },
                 {
                     "WorkRelationCode": "Manifestation of",
-                    "WorkIdentifiers": [{"WorkIDType": "ISBN-13", "IDValue": "113"},],
+                    "WorkIdentifiers": [
+                        {"WorkIDType": "ISBN-13", "IDValue": "113"},
+                    ],
                 },
             ],
-            "RelatedProducts": [{"ProductRelationCodes": ["Replaces", "something random"], "ISBN13": "211"},],
+            "RelatedProducts": [
+                {"ProductRelationCodes": ["Replaces", "something random"], "ISBN13": "211"},
+            ],
         },
         {
             "ISBN13": "112",
             "RelatedWorks": [
                 {
                     "WorkRelationCode": "Manifestation of",
-                    "WorkIdentifiers": [{"WorkIDType": "ISBN-13", "IDValue": "112"},],
+                    "WorkIdentifiers": [
+                        {"WorkIDType": "ISBN-13", "IDValue": "112"},
+                    ],
                 },
             ],
             "RelatedProducts": [],
@@ -134,7 +142,9 @@ class TestOnixWorkflow(ObservatoryTestCase):
             "RelatedWorks": [
                 {
                     "WorkRelationCode": "Manifestation of",
-                    "WorkIdentifiers": [{"WorkIDType": "ISBN-13", "IDValue": "211"},],
+                    "WorkIdentifiers": [
+                        {"WorkIDType": "ISBN-13", "IDValue": "211"},
+                    ],
                 },
             ],
             "RelatedProducts": [],
@@ -143,7 +153,10 @@ class TestOnixWorkflow(ObservatoryTestCase):
 
     class MockTelescopeResponse:
         def __init__(self):
-            self.organisation = Organisation(name="test", gcp_project_id="project_id",)
+            self.organisation = Organisation(
+                name="test",
+                gcp_project_id="project_id",
+            )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1796,15 +1809,27 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                     self.assertEqual(expected_state, ti.state)
 
                 # Create oaebu output tables
-                ti = env.run_task(telescope.create_oaebu_book_product_table.__name__, workflow_dag, execution_date,)
+                ti = env.run_task(
+                    telescope.create_oaebu_book_product_table.__name__,
+                    workflow_dag,
+                    execution_date,
+                )
                 self.assertEqual(expected_state, ti.state)
 
                 # ONIX isbn check
-                ti = env.run_task(telescope.create_oaebu_data_qa_onix_isbn.__name__, workflow_dag, execution_date,)
+                ti = env.run_task(
+                    telescope.create_oaebu_data_qa_onix_isbn.__name__,
+                    workflow_dag,
+                    execution_date,
+                )
                 self.assertEqual(expected_state, ti.state)
 
                 # ONIX aggregate metrics
-                ti = env.run_task(telescope.create_oaebu_data_qa_onix_aggregate.__name__, workflow_dag, execution_date,)
+                ti = env.run_task(
+                    telescope.create_oaebu_data_qa_onix_aggregate.__name__,
+                    workflow_dag,
+                    execution_date,
+                )
                 self.assertEqual(expected_state, ti.state)
 
                 # JSTOR country isbn check
@@ -1841,7 +1866,9 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
 
                 # Google Books Sales isbn check
                 ti = env.run_task(
-                    telescope.create_oaebu_data_qa_google_books_sales_isbn.__name__, workflow_dag, execution_date,
+                    telescope.create_oaebu_data_qa_google_books_sales_isbn.__name__,
+                    workflow_dag,
+                    execution_date,
                 )
                 self.assertEqual(expected_state, ti.state)
 
@@ -1855,7 +1882,9 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
 
                 # Google Books Traffic isbn check
                 ti = env.run_task(
-                    telescope.create_oaebu_data_qa_google_books_traffic_isbn.__name__, workflow_dag, execution_date,
+                    telescope.create_oaebu_data_qa_google_books_traffic_isbn.__name__,
+                    workflow_dag,
+                    execution_date,
                 )
                 self.assertEqual(expected_state, ti.state)
 
@@ -1869,7 +1898,9 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
 
                 # OAPEN IRUS UK isbn check
                 ti = env.run_task(
-                    telescope.create_oaebu_data_qa_oapen_irus_uk_isbn.__name__, workflow_dag, execution_date,
+                    telescope.create_oaebu_data_qa_oapen_irus_uk_isbn.__name__,
+                    workflow_dag,
+                    execution_date,
                 )
                 self.assertEqual(expected_state, ti.state)
 
@@ -1884,7 +1915,9 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 if include_google_analytics:
                     # Google Analytics isbn check
                     env.run_task(
-                        telescope.create_oaebu_data_qa_google_analytics_isbn.__name__, workflow_dag, execution_date,
+                        telescope.create_oaebu_data_qa_google_analytics_isbn.__name__,
+                        workflow_dag,
+                        execution_date,
                     )
 
                     # Google Books Analytics unmatched isbns
@@ -1914,11 +1947,19 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 ]
 
                 for table in export_tables:
-                    ti = env.run_task(f"{telescope.export_oaebu_table.__name__}.{table}", workflow_dag, execution_date,)
+                    ti = env.run_task(
+                        f"{telescope.export_oaebu_table.__name__}.{table}",
+                        workflow_dag,
+                        execution_date,
+                    )
                     self.assertEqual(expected_state, ti.state)
 
                 # Export oaebu elastic qa table
-                ti = env.run_task(telescope.export_oaebu_qa_metrics.__name__, workflow_dag, execution_date,)
+                ti = env.run_task(
+                    telescope.export_oaebu_qa_metrics.__name__,
+                    workflow_dag,
+                    execution_date,
+                )
                 self.assertEqual(expected_state, ti.state)
 
                 # Test conditions

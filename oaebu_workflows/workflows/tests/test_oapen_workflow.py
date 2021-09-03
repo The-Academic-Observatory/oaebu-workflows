@@ -42,14 +42,12 @@ class TestOapenWorkflow(ObservatoryTestCase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.org_name = "OAPEN"
+        self.org_name = "OAPEN Press"
         self.gcp_project_id = "project_id"
         self.data_location = os.getenv("TESTS_DATA_LOCATION")
 
         # Release Object Defaults for reference
         self.ao_gcp_project_id = "academic-observatory"
-
-
 
     @patch("oaebu_workflows.workflows.oapen_workflow.OapenWorkflow.make_release")
     @patch("oaebu_workflows.workflows.oapen_workflow.select_table_shard_dates")
@@ -113,7 +111,7 @@ class TestOapenWorkflow(ObservatoryTestCase):
 
 
 class TestOapenWorkflowFunctional(ObservatoryTestCase):
-    """Functionally test the workflow. """
+    """Functionally test the workflow."""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -138,7 +136,6 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
 
         self.irus_uk_dataset_id = "fixtures"
 
-
     def test_run_workflow_tests(self):
         """Functional test of the OAPEN workflow"""
 
@@ -152,7 +149,6 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
         oaebu_onix_dataset_id = env.add_dataset(prefix="oaebu_onix_dataset")
         oaebu_elastic_dataset_id = env.add_dataset(prefix="data_export")
 
-
         # Create the Observatory environment and run tests
         with env.create(task_logging=True):
             self.gcp_bucket_name = env.transform_bucket
@@ -160,12 +156,13 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
             # Setup workflow
             start_date = pendulum.datetime(year=2021, month=5, day=9)
             workflow = OapenWorkflow(
-                        oaebu_onix_dataset=oaebu_onix_dataset_id,
-                        oaebu_dataset=oaebu_output_dataset_id,
-                        oaebu_intermediate_dataset=oaebu_intermediate_dataset_id,
-                        oaebu_elastic_dataset=oaebu_elastic_dataset_id,
-                        irus_uk_dataset_id=self.irus_uk_dataset_id,
-                        start_date=start_date)
+                oaebu_onix_dataset=oaebu_onix_dataset_id,
+                oaebu_dataset=oaebu_output_dataset_id,
+                oaebu_intermediate_dataset=oaebu_intermediate_dataset_id,
+                oaebu_elastic_dataset=oaebu_elastic_dataset_id,
+                irus_uk_dataset_id=self.irus_uk_dataset_id,
+                start_date=start_date,
+            )
 
             # Make DAG
             workflow_dag = workflow.make_dag()
@@ -174,7 +171,9 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
             expected_state = "up_for_reschedule"
             with env.create_dag_run(workflow_dag, start_date):
                 ti = env.run_task(
-                    f"{make_dag_id(self.irus_uk_dag_id_prefix, org_name)}_sensor", workflow_dag, execution_date=start_date
+                    f"{make_dag_id(self.irus_uk_dag_id_prefix, org_name)}_sensor",
+                    workflow_dag,
+                    execution_date=start_date,
                 )
                 self.assertEqual(expected_state, ti.state)
 
@@ -193,7 +192,9 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
             with env.create_dag_run(workflow_dag, execution_date):
                 # Test that sensors go into 'success' state as the DAGs that they are waiting for have finished
                 ti = env.run_task(
-                    f"{make_dag_id(self.irus_uk_dag_id_prefix, org_name)}_sensor", workflow_dag, execution_date=execution_date
+                    f"{make_dag_id(self.irus_uk_dag_id_prefix, org_name)}_sensor",
+                    workflow_dag,
+                    execution_date=execution_date,
                 )
                 self.assertEqual(expected_state, ti.state)
 
@@ -257,12 +258,13 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
                     )
                     self.assertEqual(expected_state, ti.state)
 
-
                 # Test conditions
                 release_suffix = release_date.strftime("%Y%m%d")
 
                 # Check records in book_product and book_product_list match
-                sql = f"SELECT COUNT(*) from {self.gcp_project_id}.{oaebu_output_dataset_id}.book_product{release_suffix}"
+                sql = (
+                    f"SELECT COUNT(*) from {self.gcp_project_id}.{oaebu_output_dataset_id}.book_product{release_suffix}"
+                )
                 records = run_bigquery_query(sql)
                 count_book_product = len(records)
 

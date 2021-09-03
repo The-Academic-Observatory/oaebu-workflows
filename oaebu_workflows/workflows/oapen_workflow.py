@@ -25,19 +25,20 @@ from airflow.models import Variable
 from airflow.sensors.external_task import ExternalTaskSensor
 from oaebu_workflows.config import sql_folder
 
-from observatory.platform.workflows.workflow import AbstractRelease, Workflow
+from observatory.platform.workflows.workflow import Workflow
 from observatory.platform.utils.gc_utils import (
     bigquery_sharded_table_id,
     create_bigquery_dataset,
     create_bigquery_table_from_query,
     select_table_shard_dates,
-    copy_bigquery_table
+    copy_bigquery_table,
 )
 from observatory.platform.utils.jinja2_utils import render_template
 from observatory.platform.utils.airflow_utils import AirflowVars
 from observatory.platform.utils.workflow_utils import make_dag_id
 
-class OapenWorkflowRelease(AbstractRelease):
+
+class OapenWorkflowRelease:
     """
     Release information for OapenWorkflow.
     """
@@ -58,75 +59,13 @@ class OapenWorkflowRelease(AbstractRelease):
         self.gcp_project_id = gcp_project_id
 
 
-    @property
-    def transform_bucket(self) -> str:
-        """Not used.
-        :return: Empty string.
-        """
-        return str()
-
-    @property
-    def transform_folder(self) -> str:
-        """Not used.
-        :return: Empty string.
-        """
-        return str()
-
-    @property
-    def transform_files(self) -> List[str]:
-        """Not used.
-        :return: Empty list.
-        """
-        return list()
-
-    @property
-    def download_bucket(self) -> str:
-        """Not used.
-        :return: Empty string.
-        """
-        return str()
-
-    @property
-    def download_files(self) -> List[str]:
-        """Not used.
-        :return: Empty list.
-        """
-        return list()
-
-    @property
-    def extract_files(self) -> List[str]:
-        """Not used.
-        :return: Empty list.
-        """
-        return list()
-
-    @property
-    def download_folder(self) -> str:
-        """Not used.
-        :return: Empty string.
-        """
-        return str()
-
-    @property
-    def extract_folder(self) -> str:
-        """Not used.
-        :return: Empty string.
-        """
-        return str()
-
-    def cleanup(self):
-        """Delete all files and folders associated with this release.
-        :return: None.
-        """
-        pass
-
 class OapenWorkflow(Workflow):
     """
     Workflow for processing the OAPEN metadata and IRUS-UK metrics data
     """
 
     DAG_ID_PREFIX = "oapen_workflow"
-    ORG_NAME = "OAPEN"
+    ORG_NAME = "OAPEN Press"
 
     def __init__(
         self,
@@ -209,7 +148,11 @@ class OapenWorkflow(Workflow):
 
         # Initialise Telesecope base class
         super().__init__(
-            dag_id=self.dag_id, start_date=start_date, schedule_interval=schedule_interval, catchup=catchup, airflow_vars=airflow_vars
+            dag_id=self.dag_id,
+            start_date=start_date,
+            schedule_interval=schedule_interval,
+            catchup=catchup,
+            airflow_vars=airflow_vars,
         )
 
         # Wait for irus_uk workflow to finish
@@ -222,28 +165,20 @@ class OapenWorkflow(Workflow):
 
         # Format OAPEN Metadata like ONIX to enable the next steps
         self.add_task(
-            self.create_onix_formatted_metadata_output_tasks,
-            task_id="create_onix_formatted_metadata_output_tasks"
+            self.create_onix_formatted_metadata_output_tasks, task_id="create_onix_formatted_metadata_output_tasks"
         )
 
         # Copy IRUS-UK data and add release date
-        self.add_task(
-            self.copy_irus_uk_release,
-            task_id="copy_irus_uk_release"
-        )
+        self.add_task(self.copy_irus_uk_release, task_id="copy_irus_uk_release")
 
         # Create OAEBU book product table
-        self.add_task(
-            self.create_oaebu_book_product_table,
-            task_id="create_oaebu_book_product_table"
-        )
+        self.add_task(self.create_oaebu_book_product_table, task_id="create_oaebu_book_product_table")
 
         # Create OAEBU Elastic Export tables
         self.create_oaebu_export_tasks()
 
         # Cleanup tasks
         self.add_task(self.cleanup)
-
 
     def make_release(self, **kwargs) -> OapenWorkflowRelease:
         """Creates a release object.
@@ -260,7 +195,6 @@ class OapenWorkflow(Workflow):
             gcp_project_id=project_id,
         )
 
-
     def cleanup(self, release: OapenWorkflowRelease, **kwargs):
         """Cleanup temporary files.
 
@@ -270,11 +204,10 @@ class OapenWorkflow(Workflow):
 
         release.cleanup()
 
-
     def copy_irus_uk_release(
-            self,
-            release: OapenWorkflowRelease,
-            **kwargs,
+        self,
+        release: OapenWorkflowRelease,
+        **kwargs,
     ):
         """Copy state of the oapen-irus-uk dataset and create a labled release
         :param release: Oapen workflow release information.
@@ -283,19 +216,21 @@ class OapenWorkflow(Workflow):
         source_table_id = f"{release.gcp_project_id}.{self.irus_uk_dataset_id}.{self.irus_uk_table_id}"
         destination_table_id = f"{release.gcp_project_id}.{self.oaebu_intermediate_dataset}.{self.irus_uk_dataset_id}_{bigquery_sharded_table_id('oapen_irus_uk_matched', release.release_date)}"
 
-        create_bigquery_dataset(project_id=release.gcp_project_id, dataset_id=self.oaebu_intermediate_dataset, location=self.dataset_location)
+        create_bigquery_dataset(
+            project_id=release.gcp_project_id,
+            dataset_id=self.oaebu_intermediate_dataset,
+            location=self.dataset_location,
+        )
 
         status = copy_bigquery_table(source_table_id, destination_table_id, self.dataset_location)
 
         if not status:
-            raise AirflowException(
-                f"Issue copying table: {source_table_id} to {destination_table_id}"
-            )
+            raise AirflowException(f"Issue copying table: {source_table_id} to {destination_table_id}")
 
     def create_onix_formatted_metadata_output_tasks(
-            self,
-            release: OapenWorkflowRelease,
-            **kwargs,
+        self,
+        release: OapenWorkflowRelease,
+        **kwargs,
     ):
         """Create the Book Product Table
         :param release: Oapen workflow release information.
@@ -334,7 +269,6 @@ class OapenWorkflow(Workflow):
             raise AirflowException(
                 f"create_bigquery_table_from_query failed on {project_id}.{output_dataset}.{table_id}"
             )
-
 
     def create_oaebu_book_product_table(
         self,
@@ -379,12 +313,12 @@ class OapenWorkflow(Workflow):
             oapen=True,
             ucl=False,
             onix_workflow=False,
-            onix_workflow_dataset='',
-            google_analytics_dataset='',
-            google_books_dataset='',
-            jstor_dataset='',
+            onix_workflow_dataset="",
+            google_analytics_dataset="",
+            google_books_dataset="",
+            jstor_dataset="",
             oapen_dataset=self.irus_uk_dataset_id,
-            ucl_dataset='',
+            ucl_dataset="",
             public_book_release_date=public_book_release_date,
         )
 
@@ -402,7 +336,6 @@ class OapenWorkflow(Workflow):
             raise AirflowException(
                 f"create_bigquery_table_from_query failed on {project_id}.{output_dataset}.{table_id}"
             )
-
 
     def export_oaebu_table(
         self,
@@ -446,10 +379,8 @@ class OapenWorkflow(Workflow):
                 f"create_bigquery_table_from_query failed on {project_id}.{output_dataset}.{table_id}"
             )
 
-
     def create_oaebu_export_tasks(self):
-        """Create tasks for exporting final metrics from our OAEBU data.  It will create output tables in the oaebu_elastic dataset.
-        """
+        """Create tasks for exporting final metrics from our OAEBU data.  It will create output tables in the oaebu_elastic dataset."""
 
         export_tables = [
             {"output_table": "book_product_list", "query_template": "export_book_list.sql.jinja2", "file_type": "json"},

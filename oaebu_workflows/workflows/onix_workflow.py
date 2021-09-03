@@ -207,7 +207,10 @@ def make_table_id(*, project_id: str, dataset_id: str, table_id: str, end_date: 
     new_table_id = table_id
     if sharded:
         table_date = select_table_shard_dates(
-            project_id=project_id, dataset_id=dataset_id, table_id=table_id, end_date=end_date,
+            project_id=project_id,
+            dataset_id=dataset_id,
+            table_id=table_id,
+            end_date=end_date,
         )[0]
         new_table_id = f"{table_id}{table_date.strftime('%Y%m%d')}"
 
@@ -619,9 +622,9 @@ class OnixWorkflow(Workflow):
 
         # Identify latest Book release from the Academic Observatory
         public_book_release_date = select_table_shard_dates(
-            project_id='academic-observatory',
-            dataset_id='observatory',
-            table_id='book',
+            project_id="academic-observatory",
+            dataset_id="observatory",
+            table_id="book",
             end_date=release.release_date,
         )[0]
 
@@ -691,7 +694,12 @@ class OnixWorkflow(Workflow):
         self.add_task(fn)
 
     def export_oaebu_table(
-        self, release: OnixWorkflowRelease, *, output_table: str, query_template: str, **kwargs,
+        self,
+        release: OnixWorkflowRelease,
+        *,
+        output_table: str,
+        query_template: str,
+        **kwargs,
     ):
         """Create an intermediate oaebu table.  They are of the form datasource_matched<date>
         :param release: Onix workflow release information.
@@ -707,7 +715,10 @@ class OnixWorkflow(Workflow):
         template_path = os.path.join(sql_folder(), query_template)
 
         sql = render_template(
-            template_path, project_id=release.project_id, dataset_id=release.oaebu_dataset, release=release_date,
+            template_path,
+            project_id=release.project_id,
+            dataset_id=release.oaebu_dataset,
+            release=release_date,
         )
 
         status = create_bigquery_table_from_query(
@@ -976,7 +987,9 @@ class OnixWorkflow(Workflow):
         )
 
         create_bigquery_dataset(
-            project_id=release.project_id, dataset_id=release.oaebu_data_qa_dataset, location=release.dataset_location,
+            project_id=release.project_id,
+            dataset_id=release.oaebu_data_qa_dataset,
+            location=release.dataset_location,
         )
 
         # Fix
@@ -1048,13 +1061,19 @@ class OnixWorkflow(Workflow):
         template_path = os.path.join(sql_folder(), isbn_validate_template_file)
 
         sql = render_template(
-            template_path, project_id=project_id, dataset_id=orig_dataset_id, table_id=orig_table_id, isbn=isbn,
+            template_path,
+            project_id=project_id,
+            dataset_id=orig_dataset_id,
+            table_id=orig_table_id,
+            isbn=isbn,
         )
 
         sql = isbn_utils_sql + sql
 
         create_bigquery_dataset(
-            project_id=project_id, dataset_id=output_dataset_id, location=dataset_location,
+            project_id=project_id,
+            dataset_id=output_dataset_id,
+            location=dataset_location,
         )
 
         status = create_bigquery_table_from_query(
@@ -1464,7 +1483,9 @@ class OnixWorkflow(Workflow):
         )
 
         create_bigquery_dataset(
-            project_id=release.project_id, dataset_id=release.oaebu_data_qa_dataset, location=release.dataset_location,
+            project_id=release.project_id,
+            dataset_id=release.oaebu_data_qa_dataset,
+            location=release.dataset_location,
         )
 
         status = create_bigquery_table_from_query(
