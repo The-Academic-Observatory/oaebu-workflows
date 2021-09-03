@@ -58,6 +58,11 @@ class OapenWorkflowRelease:
         self.release_date = release_date
         self.gcp_project_id = gcp_project_id
 
+    def cleanup(self):
+        """Delete all files and folders associated with this release.
+        :return: None.
+        """
+        pass
 
 class OapenWorkflow(Workflow):
     """
@@ -157,6 +162,11 @@ class OapenWorkflow(Workflow):
 
         # Wait for irus_uk workflow to finish
         ext_dag_id = make_dag_id(irus_uk_dag_id_prefix, self.ORG_NAME)
+        sensor = ExternalTaskSensor(task_id=f"{ext_dag_id}_sensor", external_dag_id=ext_dag_id, mode="reschedule")
+        self.add_sensor(sensor)
+
+        # Wait for OAPEN Metadata workflow to finish
+        ext_dag_id = "oapen_metadata"
         sensor = ExternalTaskSensor(task_id=f"{ext_dag_id}_sensor", external_dag_id=ext_dag_id, mode="reschedule")
         self.add_sensor(sensor)
 

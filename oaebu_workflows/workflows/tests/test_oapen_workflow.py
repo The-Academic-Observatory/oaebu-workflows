@@ -72,6 +72,7 @@ class TestOapenWorkflow(ObservatoryTestCase):
             self.assert_dag_structure(
                 {
                     "oapen_irus_uk_oapen_sensor": ["check_dependencies"],
+                    "oapen_metadata_sensor": ["check_dependencies"],
                     "check_dependencies": ["create_onix_formatted_metadata_output_tasks"],
                     "create_onix_formatted_metadata_output_tasks": ["copy_irus_uk_release"],
                     "copy_irus_uk_release": ["create_oaebu_book_product_table"],
@@ -177,6 +178,13 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
                 )
                 self.assertEqual(expected_state, ti.state)
 
+                ti = env.run_task(
+                    f"oapen_metadata_sensor",
+                    workflow_dag,
+                    execution_date=start_date,
+                )
+                self.assertEqual(expected_state, ti.state)
+
             # Run Dummy Dags
             expected_state = "success"
             execution_date = pendulum.datetime(year=2021, month=5, day=16)
@@ -188,11 +196,25 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
                 ti = env.run_task("dummy_task", dag, execution_date=execution_date)
                 self.assertEqual(expected_state, ti.state)
 
+            dag = make_dummy_dag("oapen_metadata", execution_date)
+            with env.create_dag_run(dag, execution_date):
+                # Running all of a DAGs tasks sets the DAG to finished
+                ti = env.run_task("dummy_task", dag, execution_date=execution_date)
+                self.assertEqual(expected_state, ti.state)
+
+
             # Run end to end tests for the DAG
             with env.create_dag_run(workflow_dag, execution_date):
                 # Test that sensors go into 'success' state as the DAGs that they are waiting for have finished
                 ti = env.run_task(
                     f"{make_dag_id(self.irus_uk_dag_id_prefix, org_name)}_sensor",
+                    workflow_dag,
+                    execution_date=execution_date,
+                )
+                self.assertEqual(expected_state, ti.state)
+
+                ti = env.run_task(
+                    f"oapen_metadata_sensor",
                     workflow_dag,
                     execution_date=execution_date,
                 )
