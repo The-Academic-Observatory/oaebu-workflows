@@ -48,8 +48,7 @@ class TestOapenWorkflow(ObservatoryTestCase):
 
         # Release Object Defaults for reference
         self.ao_gcp_project_id = "academic-observatory"
-        self.oapen_metadata_dataset_id = "oapen"
-        self.oapen_metadata_table_id = "metadata"
+
 
 
     @patch("oaebu_workflows.workflows.oapen_workflow.OapenWorkflow.make_release")
@@ -60,11 +59,8 @@ class TestOapenWorkflow(ObservatoryTestCase):
             wf = OapenWorkflow()
 
             mock_mr.return_value = OapenWorkflowRelease(
-                dag_id="oapen_workflow_test",
                 release_date=pendulum.datetime(2021, 1, 1),
                 gcp_project_id=self.gcp_project_id,
-                oapen_metadata_dataset_id=self.oapen_metadata_dataset_id,
-                oapen_metadata_table_id=self.oapen_metadata_table_id,
             )
 
             release = wf.make_release(execution_date=pendulum.datetime(2021, 1, 1))
@@ -151,7 +147,6 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
         org_name = self.org_name
 
         # Create datasets
-        partner_release_date = pendulum.datetime(2021, 1, 1)
         oaebu_intermediate_dataset_id = env.add_dataset(prefix="oaebu_intermediate")
         oaebu_output_dataset_id = env.add_dataset(prefix="oaebu")
         oaebu_onix_dataset_id = env.add_dataset(prefix="oaebu_onix_dataset")
@@ -162,12 +157,14 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
         with env.create(task_logging=True):
             self.gcp_bucket_name = env.transform_bucket
 
-            # Pull info from Observatory API
-            gcp_project_id = (self.gcp_project_id,)
-
             # Setup workflow
             start_date = pendulum.datetime(year=2021, month=5, day=9)
-            workflow = OapenWorkflow(start_date=start_date)
+            workflow = OapenWorkflow(
+                        oaebu_onix_dataset=oaebu_onix_dataset_id,
+                        oaebu_dataset=oaebu_output_dataset_id,
+                        oaebu_intermediate_dataset=oaebu_intermediate_dataset_id,
+                        oaebu_elastic_dataset=oaebu_elastic_dataset_id,
+                        start_date=start_date)
 
             # Make DAG
             workflow_dag = workflow.make_dag()
@@ -206,14 +203,8 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
                 # Mock make_release
                 workflow.make_release = MagicMock(
                     return_value=OapenWorkflowRelease(
-                        dag_id=make_dag_id(self.irus_uk_dag_id_prefix, org_name),
                         release_date=release_date,
                         gcp_project_id=self.gcp_project_id,
-                        oaebu_onix_dataset=oaebu_onix_dataset_id,
-                        oaebu_dataset=oaebu_output_dataset_id,
-                        oaebu_intermediate_dataset=oaebu_intermediate_dataset_id,
-                        oaebu_elastic_dataset=oaebu_elastic_dataset_id,
-                        irus_uk_dataset_id=self.irus_uk_dataset_id,
                     )
                 )
 

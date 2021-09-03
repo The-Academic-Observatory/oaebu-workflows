@@ -45,70 +45,17 @@ class OapenWorkflowRelease(AbstractRelease):
     def __init__(
         self,
         *,
-        dag_id: str,
         release_date: pendulum.DateTime,
         gcp_project_id: str,
-        ao_gcp_project_id: str = "academic-observatory",
-        oapen_metadata_dataset_id: str = "oapen",
-        oapen_metadata_table_id: str = "metadata",
-        public_book_metadata_dataset_id: str = "observatory",
-        public_book_metadata_table_id: str = "book",
-        irus_uk_dag_id_prefix: str = "oapen_irus_uk",
-        irus_uk_dataset_id: str = "oapen",
-        irus_uk_table_id: str = "oapen_irus_uk",
-        oaebu_dataset: str = "oaebu",
-        oaebu_onix_dataset: str = "oapen_onix",
-        oaebu_intermediate_dataset: str = "oaebu_intermediate",
-        oaebu_elastic_dataset: str = "data_export",
-        dataset_location: str = "us",
-        dataset_description: str = "Oapen workflow tables",
     ):
         """
-        :param dag_id: DAG ID.
         :param release_date: The release date. It's the current execution date.
         :param oapen_release_date: the OAPEN release date.
         :param gcp_project_id: GCP Project ID.
-        :param ao_gcp_project_id: GCP project ID for the Academic Observatory.
-        :param oapen_metadata_dataset_id: GCP dataset ID for the oapen data.
-        :param oapen_metadata_table_id: GCP table ID for the oapen data.
-        :param public_book_dataset_id: GCP dataset ID for the public book data.
-        :param public_book_table_id: GCP table ID for the public book data.
-        :param irus_uk_dag_id_prefix: OAEBU IRUS_UK dag id prefix.
-        :param irus_uk_dataset_id: OAEBU IRUS_UK dataset id.
-        :param irus_uk_table_id: OAEBU IRUS_UK table id.
-        :param oaebu_dataset: OAEBU dataset.
-        :param oaebu_intermediate_dataset: OAEBU intermediate dataset.
-        :param oaebu_elastic_dataset: OAEBU elastic dataset.
         """
 
-        self.dag_id = dag_id
         self.release_date = release_date
-
-        # GCP parameters for oaebu_oapen project
         self.gcp_project_id = gcp_project_id
-        self.dataset_location = dataset_location
-        self.dataset_description = dataset_description
-
-        self.oaebu_dataset = oaebu_dataset
-        self.oaebu_onix_dataset = oaebu_onix_dataset
-        self.oaebu_intermediate_dataset = oaebu_intermediate_dataset
-        self.oaebu_elastic_dataset = oaebu_elastic_dataset
-
-        # Academic Observatory Reference
-        self.ao_gcp_project_id = ao_gcp_project_id
-
-        # OAPEN Metadata
-        self.oapen_metadata_dataset_id = oapen_metadata_dataset_id
-        self.oapen_metadata_table_id = oapen_metadata_table_id
-
-        # Public Book Data
-        self.public_book_metadata_dataset_id = public_book_metadata_dataset_id
-        self.public_book_metadata_table_id = public_book_metadata_table_id
-
-        # IRUS-UK
-        self.irus_uk_dag_id_prefix = irus_uk_dag_id_prefix
-        self.irus_uk_dataset_id = irus_uk_dataset_id
-        self.irus_uk_table_id = irus_uk_table_id
 
 
     @property
@@ -184,7 +131,20 @@ class OapenWorkflow(Workflow):
     def __init__(
         self,
         *,
+        ao_gcp_project_id: str = "academic-observatory",
+        oapen_metadata_dataset_id: str = "oapen",
+        oapen_metadata_table_id: str = "metadata",
+        public_book_metadata_dataset_id: str = "observatory",
+        public_book_metadata_table_id: str = "book",
         irus_uk_dag_id_prefix: str = "oapen_irus_uk",
+        irus_uk_dataset_id: str = "oapen",
+        irus_uk_table_id: str = "oapen_irus_uk",
+        oaebu_dataset: str = "oaebu",
+        oaebu_onix_dataset: str = "oapen_onix",
+        oaebu_intermediate_dataset: str = "oaebu_intermediate",
+        oaebu_elastic_dataset: str = "data_export",
+        dataset_location: str = "us",
+        dataset_description: str = "Oapen workflow tables",
         dag_id: Optional[str] = None,
         start_date: Optional[pendulum.datetime] = pendulum.datetime(2021, 3, 28),
         schedule_interval: Optional[str] = "@weekly",
@@ -192,9 +152,17 @@ class OapenWorkflow(Workflow):
         airflow_vars: List = None,
     ):
         """Initialises the workflow object.
-        :param gcp_project_id: Project ID in GCP.
-        :param gcp_dataset_id: Dataset ID in GCP.
+        :param ao_gcp_project_id: GCP project ID for the Academic Observatory.
+        :param oapen_metadata_dataset_id: GCP dataset ID for the oapen data.
+        :param oapen_metadata_table_id: GCP table ID for the oapen data.
+        :param public_book_dataset_id: GCP dataset ID for the public book data.
+        :param public_book_table_id: GCP table ID for the public book data.
         :param irus_uk_dag_id_prefix: OAEBU IRUS_UK dag id prefix.
+        :param irus_uk_dataset_id: OAEBU IRUS_UK dataset id.
+        :param irus_uk_table_id: OAEBU IRUS_UK table id.
+        :param oaebu_dataset: OAEBU dataset.
+        :param oaebu_intermediate_dataset: OAEBU intermediate dataset.
+        :param oaebu_elastic_dataset: OAEBU elastic dataset.
         :param dag_id: DAG ID.
         :param start_date: Start date of the DAG.
         :param schedule_interval: Scheduled interval for running the DAG.
@@ -213,7 +181,31 @@ class OapenWorkflow(Workflow):
             ]
 
         self.org_name = self.ORG_NAME
+
+        # GCP parameters for oaebu_oapen project
+        self.dataset_location = dataset_location
+        self.dataset_description = dataset_description
+
+        self.oaebu_dataset = oaebu_dataset
+        self.oaebu_onix_dataset = oaebu_onix_dataset
+        self.oaebu_intermediate_dataset = oaebu_intermediate_dataset
+        self.oaebu_elastic_dataset = oaebu_elastic_dataset
+
+        # Academic Observatory Reference
+        self.ao_gcp_project_id = ao_gcp_project_id
+
+        # OAPEN Metadata
+        self.oapen_metadata_dataset_id = oapen_metadata_dataset_id
+        self.oapen_metadata_table_id = oapen_metadata_table_id
+
+        # Public Book Data
+        self.public_book_metadata_dataset_id = public_book_metadata_dataset_id
+        self.public_book_metadata_table_id = public_book_metadata_table_id
+
+        # IRUS-UK
         self.irus_uk_dag_id_prefix = irus_uk_dag_id_prefix
+        self.irus_uk_dataset_id = irus_uk_dataset_id
+        self.irus_uk_table_id = irus_uk_table_id
 
         # Initialise Telesecope base class
         super().__init__(
@@ -264,7 +256,6 @@ class OapenWorkflow(Workflow):
         project_id = Variable.get(AirflowVars.PROJECT_ID)
 
         return OapenWorkflowRelease(
-            dag_id=self.dag_id,
             release_date=release_date,
             gcp_project_id=project_id,
         )
@@ -289,12 +280,12 @@ class OapenWorkflow(Workflow):
         :param release: Oapen workflow release information.
         """
 
-        source_table_id = f"{release.gcp_project_id}.{release.irus_uk_dataset_id}.{release.irus_uk_table_id}"
-        destination_table_id = f"{release.gcp_project_id}.{release.oaebu_intermediate_dataset}.{release.irus_uk_dataset_id}_{bigquery_sharded_table_id('oapen_irus_uk_matched', release.release_date)}"
+        source_table_id = f"{release.gcp_project_id}.{self.irus_uk_dataset_id}.{self.irus_uk_table_id}"
+        destination_table_id = f"{release.gcp_project_id}.{self.oaebu_intermediate_dataset}.{self.irus_uk_dataset_id}_{bigquery_sharded_table_id('oapen_irus_uk_matched', release.release_date)}"
 
-        create_bigquery_dataset(project_id=release.gcp_project_id, dataset_id=release.oaebu_intermediate_dataset, location=release.dataset_location)
+        create_bigquery_dataset(project_id=release.gcp_project_id, dataset_id=self.oaebu_intermediate_dataset, location=self.dataset_location)
 
-        status = copy_bigquery_table(source_table_id, destination_table_id, release.dataset_location)
+        status = copy_bigquery_table(source_table_id, destination_table_id, self.dataset_location)
 
         if not status:
             raise AirflowException(
@@ -310,8 +301,8 @@ class OapenWorkflow(Workflow):
         :param release: Oapen workflow release information.
         """
 
-        output_dataset = release.oaebu_onix_dataset
-        data_location = release.dataset_location
+        output_dataset = self.oaebu_onix_dataset
+        data_location = self.dataset_location
         project_id = release.gcp_project_id
 
         output_table = "onix"
@@ -324,9 +315,9 @@ class OapenWorkflow(Workflow):
 
         sql = render_template(
             template_path,
-            project_id=release.ao_gcp_project_id,
-            dataset_id=release.oapen_metadata_dataset_id,
-            table_id=release.oapen_metadata_table_id,
+            project_id=self.ao_gcp_project_id,
+            dataset_id=self.oapen_metadata_dataset_id,
+            table_id=self.oapen_metadata_table_id,
         )
 
         create_bigquery_dataset(project_id=project_id, dataset_id=output_dataset, location=data_location)
@@ -356,10 +347,10 @@ class OapenWorkflow(Workflow):
         """
 
         output_table = "book_product"
-        output_dataset = release.oaebu_dataset
+        output_dataset = self.oaebu_dataset
         project_id = release.gcp_project_id
 
-        data_location = release.dataset_location
+        data_location = self.dataset_location
         release_date = release.release_date
 
         table_joining_template_file = "create_book_products.sql.jinja2"
@@ -369,17 +360,17 @@ class OapenWorkflow(Workflow):
 
         # Identify latest Book release from the Academic Observatory
         public_book_release_date = select_table_shard_dates(
-            project_id=release.ao_gcp_project_id,
-            dataset_id=release.public_book_metadata_dataset_id,
-            table_id=release.public_book_metadata_table_id,
+            project_id=self.ao_gcp_project_id,
+            dataset_id=self.public_book_metadata_dataset_id,
+            table_id=self.public_book_metadata_table_id,
             end_date=release.release_date,
         )[0]
 
         sql = render_template(
             template_path,
             project_id=project_id,
-            onix_dataset_id=release.oaebu_onix_dataset,
-            dataset_id=release.oaebu_intermediate_dataset,
+            onix_dataset_id=self.oaebu_onix_dataset,
+            dataset_id=self.oaebu_intermediate_dataset,
             release_date=release_date,
             onix_release_date=release_date,
             google_analytics=False,
@@ -392,7 +383,7 @@ class OapenWorkflow(Workflow):
             google_analytics_dataset='',
             google_books_dataset='',
             jstor_dataset='',
-            oapen_dataset=release.irus_uk_dataset_id,
+            oapen_dataset=self.irus_uk_dataset_id,
             ucl_dataset='',
             public_book_release_date=public_book_release_date,
         )
@@ -426,8 +417,8 @@ class OapenWorkflow(Workflow):
         """
 
         project_id = release.gcp_project_id
-        output_dataset = release.oaebu_elastic_dataset
-        data_location = release.dataset_location
+        output_dataset = self.oaebu_elastic_dataset
+        data_location = self.dataset_location
         release_date = release.release_date
 
         create_bigquery_dataset(project_id=project_id, dataset_id=output_dataset, location=data_location)
@@ -438,7 +429,7 @@ class OapenWorkflow(Workflow):
         sql = render_template(
             template_path,
             project_id=project_id,
-            dataset_id=release.oaebu_dataset,
+            dataset_id=self.oaebu_dataset,
             release=release_date,
         )
 
