@@ -71,7 +71,7 @@ class TestOapenWorkflow(ObservatoryTestCase):
             dag = wf.make_dag()
             self.assert_dag_structure(
                 {
-                    "oapen_irus_uk_oapen_sensor": ["check_dependencies"],
+                    "oapen_irus_uk_oapen_press_sensor": ["check_dependencies"],
                     "oapen_metadata_sensor": ["check_dependencies"],
                     "check_dependencies": ["create_onix_formatted_metadata_output_tasks"],
                     "create_onix_formatted_metadata_output_tasks": ["copy_irus_uk_release"],
