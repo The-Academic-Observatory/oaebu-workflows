@@ -668,6 +668,12 @@
             "mode": "NULLABLE",
             "name": "original",
             "type": "STRING"
+          },
+          {
+            "description": "",
+            "mode": "NULLABLE",
+            "name": "comments",
+            "type": "STRING"
           }
         ]
       },
@@ -703,6 +709,12 @@
         "description": "",
         "mode": "NULLABLE",
         "name": "volume",
+        "type": "STRING"
+      },
+      {
+        "description": "",
+        "mode": "NULLABLE",
+        "name": "peerreview",
         "type": "STRING"
       }
     ]
