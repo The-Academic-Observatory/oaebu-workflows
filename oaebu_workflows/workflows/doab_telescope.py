@@ -19,6 +19,7 @@ import os
 from typing import Tuple
 
 import pendulum
+from pendulum.parsing.exceptions import ParserError
 from airflow.exceptions import AirflowException
 from airflow.models.taskinstance import TaskInstance
 
@@ -264,7 +265,13 @@ def transform_value_to_list(k: str, v: str) -> Tuple[list, list]:
         v = v.replace("-", "")
     v = list(dict.fromkeys([x.strip() for x in v.split("||")]))
     if k == "dc.date.issued":
-        v = [pendulum.parse(date).to_date_string() for date in v]
+        v_reformat = []
+        for date in v:
+            try:
+                v_reformat.append(pendulum.parse(date).to_date_string())
+            except ParserError:
+                pass
+        v = v_reformat
     if k == "dc.subject.classification":
         for c in v:
             if c.startswith("bic Book Industry Communication::"):
