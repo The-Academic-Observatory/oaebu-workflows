@@ -632,31 +632,31 @@ class OnixWorkflow(Workflow):
         )[0]
 
         if include_google_analytics:
-            google_analytics_table_id = f"{project_id}.{oaebu_intermediate_dataset}.{google_analytics_dataset}_google_analytics_matched{release_date}"
+            google_analytics_table_id = f"{project_id}.{oaebu_intermediate_dataset}.{google_analytics_dataset}_google_analytics_matched{release_date.strftime('%Y%m%d')}"
         else:
             google_analytics_table_id = "empty_google_analytics"
 
         if include_google_books:
-            google_books_sales_table_id = f"{project_id}.{oaebu_intermediate_dataset}.{google_books_dataset}_google_books_sales_matched{release_date}"
-            google_books_traffic_table_id = f"{project_id}.{oaebu_intermediate_dataset}.{google_books_dataset}_google_books_traffic_matched{release_date}"
+            google_books_sales_table_id = f"{project_id}.{oaebu_intermediate_dataset}.{google_books_dataset}_google_books_sales_matched{release_date.strftime('%Y%m%d')}"
+            google_books_traffic_table_id = f"{project_id}.{oaebu_intermediate_dataset}.{google_books_dataset}_google_books_traffic_matched{release_date.strftime('%Y%m%d')}"
         else:
             google_books_sales_table_id = "empty_google_books_sales"
             google_books_traffic_table_id = "empty_google_books_traffic"
 
         if include_jstor:
-            jstor_country_table_id = f"{project_id}.{oaebu_intermediate_dataset}.{jstor_dataset}_jstor_country_matched{release_date}"
-            jstor_institution_table_id = f"{project_id}.{oaebu_intermediate_dataset}.{jstor_dataset}_jstor_institution_matched{release_date}"
+            jstor_country_table_id = f"{project_id}.{oaebu_intermediate_dataset}.{jstor_dataset}_jstor_country_matched{release_date.strftime('%Y%m%d')}"
+            jstor_institution_table_id = f"{project_id}.{oaebu_intermediate_dataset}.{jstor_dataset}_jstor_institution_matched{release_date.strftime('%Y%m%d')}"
         else:
             jstor_country_table_id = "empty_jstor_country"
             jstor_institution_table_id = "empty_jstor_institution"
 
         if include_oapen:
-            oapen_table_id = f"{project_id}.{oaebu_intermediate_dataset}.{oapen_dataset}_oapen_irus_uk_matched{release_date}"
+            oapen_table_id = f"{project_id}.{oaebu_intermediate_dataset}.{oapen_dataset}_oapen_irus_uk_matched{release_date.strftime('%Y%m%d')}"
         else:
             oapen_table_id = "empty_oapen"
 
         if include_ucl:
-            ucl_table_id = f"{project_id}.{oaebu_intermediate_dataset}.{ucl_dataset}_ucl_discovery_matched{release_date}"
+            ucl_table_id = f"{project_id}.{oaebu_intermediate_dataset}.{ucl_dataset}_ucl_discovery_matched{release_date.strftime('%Y%m%d')}"
         else:
             ucl_table_id = "empty_ucl_discovery"
 
