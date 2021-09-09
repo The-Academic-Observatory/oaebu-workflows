@@ -431,3 +431,4 @@ LEFT JOIN google_books_traffic_metadata on google_books_traffic_metadata.ISBN13 
 LEFT JOIN jstor_country_metadata on jstor_country_metadata.ISBN13 = onix_ebook_titles.ISBN13
 LEFT JOIN jstor_institution_metadata on jstor_institution_metadata.ISBN13 = onix_ebook_titles.ISBN13
 LEFT JOIN oapen_irus_uk_metadata on oapen_irus_uk_metadata.ISBN13 = onix_ebook_titles.ISBN13
+LEFT JOIN `academic-observatory.observatory.book{{ public_book_release_date.strftime('%Y%m%d') }}` as public_data on public_data.isbn = onix_ebook_titles.ISBN13
