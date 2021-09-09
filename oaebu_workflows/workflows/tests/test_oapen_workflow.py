@@ -74,8 +74,7 @@ class TestOapenWorkflow(ObservatoryTestCase):
                     "oapen_irus_uk_oapen_press_sensor": ["check_dependencies"],
                     "oapen_metadata_sensor": ["check_dependencies"],
                     "check_dependencies": ["create_onix_formatted_metadata_output_tasks"],
-                    "create_onix_formatted_metadata_output_tasks": ["copy_irus_uk_release"],
-                    "copy_irus_uk_release": ["create_oaebu_book_product_table"],
+                    "create_onix_formatted_metadata_output_tasks": ["create_oaebu_book_product_table"],
                     "create_oaebu_book_product_table": ["export_oaebu_table.book_product_list"],
                     "export_oaebu_table.book_product_list": ["export_oaebu_table.book_product_metrics"],
                     "export_oaebu_table.book_product_metrics": ["export_oaebu_table.book_product_metrics_country"],
@@ -235,14 +234,6 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
                 # Format OAPEN Metadata like ONIX to enable the next steps
                 ti = env.run_task(
                     workflow.create_onix_formatted_metadata_output_tasks.__name__,
-                    workflow_dag,
-                    execution_date,
-                )
-                self.assertEqual(expected_state, ti.state)
-
-                # Copy IRUS-UK data and add release date
-                ti = env.run_task(
-                    workflow.copy_irus_uk_release.__name__,
                     workflow_dag,
                     execution_date,
                 )

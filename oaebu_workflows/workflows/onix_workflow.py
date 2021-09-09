@@ -609,6 +609,9 @@ class OnixWorkflow(Workflow):
         :param ucl_dataset: dataset_id if it is  a relevant data source for this publisher
         """
 
+        project_id = release.project_id
+        oaebu_intermediate_dataset = release.oaebu_intermediate_dataset
+
         output_table = "book_product"
         output_dataset = release.oaebu_dataset
 
@@ -628,6 +631,35 @@ class OnixWorkflow(Workflow):
             end_date=release.release_date,
         )[0]
 
+        if include_google_analytics:
+            google_analytics_table_id = f"{project_id}.{oaebu_intermediate_dataset}.{google_analytics_dataset}_google_analytics_matched{release_date}"
+        else:
+            google_analytics_table_id = "empty_google_analytics"
+
+        if include_google_books:
+            google_books_sales_table_id = f"{project_id}.{oaebu_intermediate_dataset}.{google_books_dataset}_google_books_sales_matched{release_date}"
+            google_books_traffic_table_id = f"{project_id}.{oaebu_intermediate_dataset}.{google_books_dataset}_google_books_traffic_matched{release_date}"
+        else:
+            google_books_sales_table_id = "empty_google_books_sales"
+            google_books_traffic_table_id = "empty_google_books_traffic"
+
+        if include_jstor:
+            jstor_country_table_id = f"{project_id}.{oaebu_intermediate_dataset}.{jstor_dataset}_jstor_country_matched{release_date}"
+            jstor_institution_table_id = f"{project_id}.{oaebu_intermediate_dataset}.{jstor_dataset}_jstor_institution_matched{release_date}"
+        else:
+            jstor_country_table_id = "empty_jstor_country"
+            jstor_institution_table_id = "empty_jstor_institution"
+
+        if include_oapen:
+            oapen_table_id = f"{project_id}.{oaebu_intermediate_dataset}.{oapen_dataset}_oapen_irus_uk_matched{release_date}"
+        else:
+            oapen_table_id = "empty_oapen"
+
+        if include_ucl:
+            ucl_table_id = f"{project_id}.{oaebu_intermediate_dataset}.{ucl_dataset}_ucl_discovery_matched{release_date}"
+        else:
+            ucl_table_id = "empty_ucl_discovery"
+
         sql = render_template(
             template_path,
             project_id=release.project_id,
@@ -635,18 +667,15 @@ class OnixWorkflow(Workflow):
             dataset_id=release.oaebu_intermediate_dataset,
             onix_release_date=release.onix_release_date,
             release_date=release_date,
-            google_analytics=include_google_analytics,
-            google_books=include_google_books,
-            jstor=include_jstor,
-            oapen=include_oapen,
-            ucl=include_ucl,
             onix_workflow=True,
             onix_workflow_dataset=release.workflow_dataset,
-            google_analytics_dataset=google_analytics_dataset,
-            google_books_dataset=google_books_dataset,
-            jstor_dataset=jstor_dataset,
-            oapen_dataset=oapen_dataset,
-            ucl_dataset=ucl_dataset,
+            google_analytics_table_id=google_analytics_table_id,
+            google_books_sales_table_id=google_books_sales_table_id,
+            google_books_traffic_table_id=google_books_traffic_table_id,
+            jstor_country_table_id=jstor_country_table_id,
+            jstor_institution_table_id=jstor_institution_table_id,
+            oapen_table_id=oapen_table_id,
+            ucl_table_id=ucl_table_id,
             public_book_release_date=public_book_release_date,
         )
 

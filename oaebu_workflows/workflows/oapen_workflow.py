@@ -176,9 +176,6 @@ class OapenWorkflow(Workflow):
         # Format OAPEN Metadata like ONIX to enable the next steps
         self.add_task(self.create_onix_formatted_metadata_output_tasks)
 
-        # Copy IRUS-UK data and add release date
-        self.add_task(self.copy_irus_uk_release)
-
         # Create OAEBU book product table
         self.add_task(self.create_oaebu_book_product_table)
 
@@ -212,28 +209,6 @@ class OapenWorkflow(Workflow):
 
         release.cleanup()
 
-    def copy_irus_uk_release(
-        self,
-        release: OapenWorkflowRelease,
-        **kwargs,
-    ):
-        """Copy state of the oapen-irus-uk dataset and create a labled release
-        :param release: Oapen workflow release information.
-        """
-
-        source_table_id = f"{release.gcp_project_id}.{self.irus_uk_dataset_id}.{self.irus_uk_table_id}"
-        destination_table_id = f"{release.gcp_project_id}.{self.oaebu_intermediate_dataset}.{self.irus_uk_dataset_id}_{bigquery_sharded_table_id('oapen_irus_uk_matched', release.release_date)}"
-
-        create_bigquery_dataset(
-            project_id=release.gcp_project_id,
-            dataset_id=self.oaebu_intermediate_dataset,
-            location=self.dataset_location,
-        )
-
-        status = copy_bigquery_table(source_table_id, destination_table_id, self.dataset_location)
-
-        if not status:
-            raise AirflowException(f"Issue copying table: {source_table_id} to {destination_table_id}")
 
     def create_onix_formatted_metadata_output_tasks(
         self,
@@ -308,6 +283,14 @@ class OapenWorkflow(Workflow):
             end_date=release.release_date,
         )[0]
 
+        google_analytics_table_id = "empty_google_analytics"
+        google_books_sales_table_id = "empty_google_books_sales"
+        google_books_traffic_table_id = "empty_google_books_traffic"
+        jstor_country_table_id = "empty_jstor_country"
+        jstor_institution_table_id = "empty_jstor_institution"
+        oapen_table_id = f"{project_id}.{self.irus_uk_dataset_id}.{self.irus_uk_table_id}"
+        ucl_table_id = "empty_ucl_discovery"
+
         sql = render_template(
             template_path,
             project_id=project_id,
@@ -315,18 +298,15 @@ class OapenWorkflow(Workflow):
             dataset_id=self.oaebu_intermediate_dataset,
             release_date=release_date,
             onix_release_date=release_date,
-            google_analytics=False,
-            google_books=False,
-            jstor=False,
-            oapen=True,
-            ucl=False,
             onix_workflow=False,
             onix_workflow_dataset="",
-            google_analytics_dataset="",
-            google_books_dataset="",
-            jstor_dataset="",
-            oapen_dataset=self.irus_uk_dataset_id,
-            ucl_dataset="",
+            google_analytics_table_id=google_analytics_table_id,
+            google_books_sales_table_id=google_books_sales_table_id,
+            google_books_traffic_table_id=google_books_traffic_table_id,
+            jstor_country_table_id=jstor_country_table_id,
+            jstor_institution_table_id=jstor_institution_table_id,
+            oapen_table_id=oapen_table_id,
+            ucl_table_id=ucl_table_id,
             public_book_release_date=public_book_release_date,
         )
 
