@@ -174,15 +174,13 @@ class OapenWorkflow(Workflow):
         self.add_setup_task(self.check_dependencies)
 
         # Format OAPEN Metadata like ONIX to enable the next steps
-        self.add_task(
-            self.create_onix_formatted_metadata_output_tasks, task_id="create_onix_formatted_metadata_output_tasks"
-        )
+        self.add_task(self.create_onix_formatted_metadata_output_tasks)
 
         # Copy IRUS-UK data and add release date
-        self.add_task(self.copy_irus_uk_release, task_id="copy_irus_uk_release")
+        self.add_task(self.copy_irus_uk_release)
 
         # Create OAEBU book product table
-        self.add_task(self.create_oaebu_book_product_table, task_id="create_oaebu_book_product_table")
+        self.add_task(self.create_oaebu_book_product_table)
 
         # Create OAEBU Elastic Export tables
         self.create_oaebu_export_tasks()
