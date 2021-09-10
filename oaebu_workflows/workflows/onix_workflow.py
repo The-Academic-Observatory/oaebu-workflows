@@ -207,7 +207,10 @@ def make_table_id(*, project_id: str, dataset_id: str, table_id: str, end_date: 
     new_table_id = table_id
     if sharded:
         table_date = select_table_shard_dates(
-            project_id=project_id, dataset_id=dataset_id, table_id=table_id, end_date=end_date,
+            project_id=project_id,
+            dataset_id=dataset_id,
+            table_id=table_id,
+            end_date=end_date,
         )[0]
         new_table_id = f"{table_id}{table_date.strftime('%Y%m%d')}"
 
@@ -238,6 +241,9 @@ class OnixWorkflow(Workflow):
         org_name: str,
         gcp_project_id: str,
         gcp_bucket_name: str,
+        ao_gcp_project_id: str = "academic-observatory",
+        public_book_metadata_dataset_id: str = "observatory",
+        public_book_metadata_table_id: str = "book",
         onix_dataset_id: str = "onix",
         onix_table_id: str = "onix",
         schema_folder: str = default_schema_folder(),
@@ -274,6 +280,11 @@ class OnixWorkflow(Workflow):
         self.onix_dataset_id = onix_dataset_id
         self.onix_table_id = onix_table_id
         self.schema_folder = schema_folder
+
+        # Public Book Data
+        self.ao_gcp_project_id = ao_gcp_project_id
+        self.public_book_metadata_dataset_id = public_book_metadata_dataset_id
+        self.public_book_metadata_table_id = public_book_metadata_table_id
 
         # Initialise Telesecope base class
         super().__init__(
@@ -606,6 +617,9 @@ class OnixWorkflow(Workflow):
         :param ucl_dataset: dataset_id if it is  a relevant data source for this publisher
         """
 
+        project_id = release.project_id
+        oaebu_intermediate_dataset = release.oaebu_intermediate_dataset
+
         output_table = "book_product"
         output_dataset = release.oaebu_dataset
 
@@ -617,6 +631,44 @@ class OnixWorkflow(Workflow):
 
         table_id = bigquery_sharded_table_id(output_table, release_date)
 
+        # Identify latest Book release from the Academic Observatory
+        public_book_table_id = make_table_id(
+            project_id=self.ao_gcp_project_id,
+            dataset_id=self.public_book_metadata_dataset_id,
+            table_id=self.public_book_metadata_table_id,
+            end_date=release.release_date,
+            sharded=True,
+        )
+
+        if include_google_analytics:
+            google_analytics_table_id = f"{project_id}.{oaebu_intermediate_dataset}.{google_analytics_dataset}_google_analytics_matched{release_date.strftime('%Y%m%d')}"
+        else:
+            google_analytics_table_id = "empty_google_analytics"
+
+        if include_google_books:
+            google_books_sales_table_id = f"{project_id}.{oaebu_intermediate_dataset}.{google_books_dataset}_google_books_sales_matched{release_date.strftime('%Y%m%d')}"
+            google_books_traffic_table_id = f"{project_id}.{oaebu_intermediate_dataset}.{google_books_dataset}_google_books_traffic_matched{release_date.strftime('%Y%m%d')}"
+        else:
+            google_books_sales_table_id = "empty_google_books_sales"
+            google_books_traffic_table_id = "empty_google_books_traffic"
+
+        if include_jstor:
+            jstor_country_table_id = f"{project_id}.{oaebu_intermediate_dataset}.{jstor_dataset}_jstor_country_matched{release_date.strftime('%Y%m%d')}"
+            jstor_institution_table_id = f"{project_id}.{oaebu_intermediate_dataset}.{jstor_dataset}_jstor_institution_matched{release_date.strftime('%Y%m%d')}"
+        else:
+            jstor_country_table_id = "empty_jstor_country"
+            jstor_institution_table_id = "empty_jstor_institution"
+
+        if include_oapen:
+            oapen_table_id = f"{project_id}.{oaebu_intermediate_dataset}.{oapen_dataset}_oapen_irus_uk_matched{release_date.strftime('%Y%m%d')}"
+        else:
+            oapen_table_id = "empty_oapen"
+
+        if include_ucl:
+            ucl_table_id = f"{project_id}.{oaebu_intermediate_dataset}.{ucl_dataset}_ucl_discovery_matched{release_date.strftime('%Y%m%d')}"
+        else:
+            ucl_table_id = "empty_ucl_discovery"
+
         sql = render_template(
             template_path,
             project_id=release.project_id,
@@ -624,16 +676,16 @@ class OnixWorkflow(Workflow):
             dataset_id=release.oaebu_intermediate_dataset,
             onix_release_date=release.onix_release_date,
             release_date=release_date,
-            google_analytics=include_google_analytics,
-            google_books=include_google_books,
-            jstor=include_jstor,
-            oapen=include_oapen,
-            ucl=include_ucl,
-            google_analytics_dataset=google_analytics_dataset,
-            google_books_dataset=google_books_dataset,
-            jstor_dataset=jstor_dataset,
-            oapen_dataset=oapen_dataset,
-            ucl_dataset=ucl_dataset,
+            onix_workflow=True,
+            onix_workflow_dataset=release.workflow_dataset,
+            google_analytics_table_id=google_analytics_table_id,
+            google_books_sales_table_id=google_books_sales_table_id,
+            google_books_traffic_table_id=google_books_traffic_table_id,
+            jstor_country_table_id=jstor_country_table_id,
+            jstor_institution_table_id=jstor_institution_table_id,
+            oapen_table_id=oapen_table_id,
+            ucl_table_id=ucl_table_id,
+            public_book_tabel_id=f"{self.ao_gcp_project_id}.{self.public_book_metadata_dataset_id}.{public_book_table_id}",
         )
 
         create_bigquery_dataset(project_id=release.project_id, dataset_id=output_dataset, location=data_location)
@@ -680,7 +732,12 @@ class OnixWorkflow(Workflow):
         self.add_task(fn)
 
     def export_oaebu_table(
-        self, release: OnixWorkflowRelease, *, output_table: str, query_template: str, **kwargs,
+        self,
+        release: OnixWorkflowRelease,
+        *,
+        output_table: str,
+        query_template: str,
+        **kwargs,
     ):
         """Create an intermediate oaebu table.  They are of the form datasource_matched<date>
         :param release: Onix workflow release information.
@@ -696,7 +753,10 @@ class OnixWorkflow(Workflow):
         template_path = os.path.join(sql_folder(), query_template)
 
         sql = render_template(
-            template_path, project_id=release.project_id, dataset_id=release.oaebu_dataset, release=release_date,
+            template_path,
+            project_id=release.project_id,
+            dataset_id=release.oaebu_dataset,
+            release=release_date,
         )
 
         status = create_bigquery_table_from_query(
@@ -965,7 +1025,9 @@ class OnixWorkflow(Workflow):
         )
 
         create_bigquery_dataset(
-            project_id=release.project_id, dataset_id=release.oaebu_data_qa_dataset, location=release.dataset_location,
+            project_id=release.project_id,
+            dataset_id=release.oaebu_data_qa_dataset,
+            location=release.dataset_location,
         )
 
         # Fix
@@ -1037,13 +1099,19 @@ class OnixWorkflow(Workflow):
         template_path = os.path.join(sql_folder(), isbn_validate_template_file)
 
         sql = render_template(
-            template_path, project_id=project_id, dataset_id=orig_dataset_id, table_id=orig_table_id, isbn=isbn,
+            template_path,
+            project_id=project_id,
+            dataset_id=orig_dataset_id,
+            table_id=orig_table_id,
+            isbn=isbn,
         )
 
         sql = isbn_utils_sql + sql
 
         create_bigquery_dataset(
-            project_id=project_id, dataset_id=output_dataset_id, location=dataset_location,
+            project_id=project_id,
+            dataset_id=output_dataset_id,
+            location=dataset_location,
         )
 
         status = create_bigquery_table_from_query(
@@ -1400,6 +1468,7 @@ class OnixWorkflow(Workflow):
             orig_dataset_id=data_partner.gcp_dataset_id,
             orig_table=data_partner.gcp_table_id,
             orig_isbn=data_partner.isbn_field_name,
+            orig_title=data_partner.title_field_name,
         )
 
         # Populate the __name__ attribute of the partial object (it lacks one by default).
@@ -1418,6 +1487,7 @@ class OnixWorkflow(Workflow):
         orig_dataset_id: str,
         orig_table: str,
         orig_isbn: str,
+        orig_title: str,
         *args,
         **kwargs,
     ):
@@ -1427,6 +1497,7 @@ class OnixWorkflow(Workflow):
         :param orig_dataset_id: Dataset ID of the original partner data.
         :param orig_table: Original table name for the partner data.
         :param orig_isbn: Name of the ISBN field we're checking.
+        :param orig_title: Name of the title field we're including.
         """
 
         template_file = "oaebu_intermediate_metrics.sql.jinja2"
@@ -1446,10 +1517,13 @@ class OnixWorkflow(Workflow):
             dataset_id=release.oaebu_intermediate_dataset,
             table_id=intermediate_table_id,
             isbn=orig_isbn,
+            title=orig_title,
         )
 
         create_bigquery_dataset(
-            project_id=release.project_id, dataset_id=release.oaebu_data_qa_dataset, location=release.dataset_location,
+            project_id=release.project_id,
+            dataset_id=release.oaebu_data_qa_dataset,
+            location=release.dataset_location,
         )
 
         status = create_bigquery_table_from_query(

@@ -16,14 +16,18 @@
 
 WITH months as (SELECT
     ISBN13,
+    work_id,
+    work_family_id,
     onix.title as title,
     CAST(onix.published_year as INT64) as published_year,
     month.month,
     month.jstor_country as jstor,
-    month.oapen_irus_uk.locations as oapen_irus_uk,
-    month.google_analytics.unique_views.country as google_analytics
+    month.oapen_irus_uk.country as oapen_irus_uk,
+    month.google_analytics.unique_views.country as google_analytics,
+    month.google_books_sales.countries as google_books_sales,
+    month.ucl_discovery.downloads_per_country as ucl_discovery
 FROM `{{ project_id }}.{{ dataset_id }}.book_product{{ release.strftime('%Y%m%d') }}`, UNNEST(months) as month
-WHERE ISBN13 is not null AND month.month is not null AND (month.jstor_country IS NOT NULL OR month.oapen_irus_uk.locations IS NOT NULL)),
+WHERE ISBN13 is not null AND month.month is not null AND (month.jstor_country IS NOT NULL OR month.oapen_irus_uk.locations IS NOT NULL OR month.ucl_discovery.downloads_per_country IS NOT NULL)),
 
 countries as (
     SELECT
@@ -35,6 +39,8 @@ countries as (
 month_country as (
     SELECT
         ISBN13,
+        work_id,
+        work_family_id,
         title,
         published_year,
         month,
@@ -42,6 +48,15 @@ month_country as (
         name as country_name
     FROM months
     CROSS JOIN countries
+),
+
+google_books_month_country as (
+    SELECT
+        ISBN13,
+        month,
+        Country_of_Sale as alpha2,
+        qty
+    FROM months, UNNEST(google_books_sales)
 ),
 
 jstor_month_country as (
@@ -57,7 +72,7 @@ oapen_month_country as (
     SELECT
         ISBN13,
         month,
-        country_code as alpha2,
+        code as alpha2,
         title_requests,
         total_item_investigations,
         total_item_requests,
@@ -70,13 +85,32 @@ google_analytics_month_country as (
     SELECT
         ISBN13,
         month,
+        google.country_name,
+        country_code.country_code,
+        value
+    FROM (SELECT
+        ISBN13,
+        month,
         name as country_name,
         value
-    FROM months, UNNEST(google_analytics)
+    FROM months, UNNEST(google_analytics)) as google
+    LEFT JOIN `academic-observatory.settings.country_to_alpha2` as country_code on country_code.country_name = google.country_name
+),
+
+ucl_discovery_month_country as (
+    SELECT
+        ISBN13,
+        month,
+        country_name,
+        country_code as alpha2,
+        download_count
+    FROM months, UNNEST(ucl_discovery)
 )
 
 SELECT
     month_country.ISBN13 as product_id,
+    month_country.work_id as work_id,
+    month_country.work_family_id as work_family_id,
     month_country.title,
     month_country.published_year,
     month_country.month,
@@ -84,9 +118,13 @@ SELECT
     month_country.country_name,
     STRUCT(jstor.Total_Item_Requests) as jstor,
     STRUCT(oapen.title_requests, oapen.total_item_investigations, oapen.total_item_requests, oapen.unique_item_investigations, oapen.unique_item_requests) as oapen_irus_uk,
-    STRUCT(google.value as value) as google_analytics
+    STRUCT(google.value as value) as google_analytics,
+    STRUCT(google_books.qty as qty) as google_books,
+    STRUCT(ucl_discovery.download_count as download_count) as ucl_discovery
 FROM month_country
 LEFT JOIN jstor_month_country as jstor ON month_country.ISBN13 = jstor.ISBN13 AND month_country.month = jstor.month AND month_country.alpha2 = jstor.alpha2
 LEFT JOIN oapen_month_country as oapen ON month_country.ISBN13 = oapen.ISBN13 AND month_country.month = oapen.month AND month_country.alpha2 = oapen.alpha2
-LEFT JOIN google_analytics_month_country as google ON month_country.ISBN13 = google.ISBN13 AND month_country.month = google.month AND UPPER(month_country.country_name) = UPPER(google.country_name)
+LEFT JOIN google_analytics_month_country as google ON month_country.ISBN13 = google.ISBN13 AND month_country.month = google.month AND month_country.alpha2 = google.country_code
+LEFT JOIN google_books_month_country as google_books ON month_country.ISBN13 = google_books.ISBN13 AND month_country.month = google_books.month AND month_country.alpha2 = google_books.alpha2
+LEFT JOIN ucl_discovery_month_country as ucl_discovery ON month_country.ISBN13 = ucl_discovery.ISBN13 AND month_country.month = ucl_discovery.month AND month_country.alpha2 = ucl_discovery.alpha2
 WHERE jstor.total_item_requests IS NOT NULL OR oapen.title_requests IS NOT NULL OR 	oapen.total_item_requests IS NOT NULL or google.value IS NOT NULL

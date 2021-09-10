@@ -110,21 +110,29 @@ class TestOnixWorkflow(ObservatoryTestCase):
             "RelatedWorks": [
                 {
                     "WorkRelationCode": "Manifestation of",
-                    "WorkIdentifiers": [{"WorkIDType": "ISBN-13", "IDValue": "112"},],
+                    "WorkIdentifiers": [
+                        {"WorkIDType": "ISBN-13", "IDValue": "112"},
+                    ],
                 },
                 {
                     "WorkRelationCode": "Manifestation of",
-                    "WorkIdentifiers": [{"WorkIDType": "ISBN-13", "IDValue": "113"},],
+                    "WorkIdentifiers": [
+                        {"WorkIDType": "ISBN-13", "IDValue": "113"},
+                    ],
                 },
             ],
-            "RelatedProducts": [{"ProductRelationCodes": ["Replaces", "something random"], "ISBN13": "211"},],
+            "RelatedProducts": [
+                {"ProductRelationCodes": ["Replaces", "something random"], "ISBN13": "211"},
+            ],
         },
         {
             "ISBN13": "112",
             "RelatedWorks": [
                 {
                     "WorkRelationCode": "Manifestation of",
-                    "WorkIdentifiers": [{"WorkIDType": "ISBN-13", "IDValue": "112"},],
+                    "WorkIdentifiers": [
+                        {"WorkIDType": "ISBN-13", "IDValue": "112"},
+                    ],
                 },
             ],
             "RelatedProducts": [],
@@ -134,7 +142,9 @@ class TestOnixWorkflow(ObservatoryTestCase):
             "RelatedWorks": [
                 {
                     "WorkRelationCode": "Manifestation of",
-                    "WorkIdentifiers": [{"WorkIDType": "ISBN-13", "IDValue": "211"},],
+                    "WorkIdentifiers": [
+                        {"WorkIDType": "ISBN-13", "IDValue": "211"},
+                    ],
                 },
             ],
             "RelatedProducts": [],
@@ -143,7 +153,10 @@ class TestOnixWorkflow(ObservatoryTestCase):
 
     class MockTelescopeResponse:
         def __init__(self):
-            self.organisation = Organisation(name="test", gcp_project_id="project_id",)
+            self.organisation = Organisation(
+                name="test",
+                gcp_project_id="project_id",
+            )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -394,6 +407,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 gcp_dataset_id="dataset",
                 gcp_table_id="jstor_country",
                 isbn_field_name="isbn",
+                title_field_name="Book_Title",
                 sharded=False,
             ),
             OaebuPartners(
@@ -403,6 +417,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 gcp_dataset_id="dataset",
                 gcp_table_id="oapen_irus_uk",
                 isbn_field_name="ISBN",
+                title_field_name="book_title",
                 sharded=False,
             ),
             OaebuPartners(
@@ -412,6 +427,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 gcp_dataset_id="dataset",
                 gcp_table_id="google_books_sales",
                 isbn_field_name="Primary_ISBN",
+                title_field_name="Title",
                 sharded=False,
             ),
             OaebuPartners(
@@ -421,6 +437,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 gcp_dataset_id="dataset",
                 gcp_table_id="google_books_traffic",
                 isbn_field_name="Primary_ISBN",
+                title_field_name="Title",
                 sharded=False,
             ),
         ]
@@ -524,6 +541,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 gcp_dataset_id="dataset",
                 gcp_table_id="jstor_country",
                 isbn_field_name="isbn",
+                title_field_name="Book_Title",
                 sharded=False,
             ),
             OaebuPartners(
@@ -533,6 +551,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 gcp_dataset_id="dataset",
                 gcp_table_id="oapen_irus_uk",
                 isbn_field_name="ISBN",
+                title_field_name="book_title",
                 sharded=False,
             ),
             OaebuPartners(
@@ -542,6 +561,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 gcp_dataset_id="dataset",
                 gcp_table_id="google_books_sales",
                 isbn_field_name="Primary_ISBN",
+                title_field_name="Title",
                 sharded=False,
             ),
             OaebuPartners(
@@ -551,6 +571,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 gcp_dataset_id="dataset",
                 gcp_table_id="google_books_traffic",
                 isbn_field_name="Primary_ISBN",
+                title_field_name="Title",
                 sharded=False,
             ),
             OaebuPartners(
@@ -560,6 +581,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 gcp_dataset_id="dataset",
                 gcp_table_id="google_analytics",
                 isbn_field_name="publication_id",
+                title_field_name="title",
                 sharded=False,
             ),
         ]
@@ -884,6 +906,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 gcp_dataset_id="test_dataset",
                 gcp_table_id="test_table",
                 isbn_field_name="isbn",
+                title_field_name="title",
                 sharded=True,
             ),
             OaebuPartners(
@@ -893,6 +916,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 gcp_dataset_id="test_dataset",
                 gcp_table_id="test_table2",
                 isbn_field_name="isbn",
+                title_field_name="title",
                 sharded=True,
             ),
         ]
@@ -1078,6 +1102,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 gcp_dataset_id="jstor",
                 gcp_table_id="country",
                 isbn_field_name="ISBN",
+                title_field_name="Book_Title",
                 sharded=False,
             )
         ]
@@ -1151,6 +1176,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 gcp_dataset_id="google_books",
                 gcp_table_id="sales",
                 isbn_field_name="Primary_ISBN",
+                title_field_name="Title",
                 sharded=False,
             )
         ]
@@ -1224,6 +1250,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 gcp_dataset_id="google_books",
                 gcp_table_id="traffic",
                 isbn_field_name="Primary_ISBN",
+                title_field_name="Title",
                 sharded=False,
             )
         ]
@@ -1295,6 +1322,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 gcp_dataset_id="irus_uk",
                 gcp_table_id="oapen_irus_uk",
                 isbn_field_name="ISBN",
+                title_field_name="book_title",
                 sharded=False,
             )
         ]
@@ -1366,6 +1394,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 gcp_dataset_id="google",
                 gcp_table_id="google_analytics",
                 isbn_field_name="publication_id",
+                title_field_name="book_title",
                 sharded=False,
             )
         ]
@@ -1439,6 +1468,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 gcp_dataset_id="jstor",
                 gcp_table_id="country",
                 isbn_field_name="ISBN",
+                title_field_name="Book_Title",
                 sharded=False,
             )
         ]
@@ -1464,6 +1494,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 orig_dataset_id="jstor",
                 orig_table="country",
                 orig_isbn="isbn",
+                orig_title="Book_Title",
             )
 
             _, call_args = mock_bq_ds.call_args
@@ -1476,7 +1507,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
 
             sql_hash = hashlib.md5(call_args["sql"].encode("utf-8"))
             sql_hash = sql_hash.hexdigest()
-            expected_hash = "bca797c0edc0fe8cc30e263a3fb37ee6"
+            expected_hash = "71bc329dd609017504e91bc8fd8931fe"
             self.assertEqual(sql_hash, expected_hash)
 
             mock_bq_table_query.return_value = False
@@ -1496,6 +1527,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 orig_dataset_id="jstor",
                 orig_table="country",
                 orig_isbn="isbn",
+                orig_title="Book_Title",
             )
 
 
@@ -1621,14 +1653,14 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
 
         # Make partners
         partners = []
-        for (name, isbn_field_name, dag_id_prefix), table_id in zip(
+        for (name, isbn_field_name, title_field_name, dag_id_prefix), table_id in zip(
             [
-                (OaebuPartnerName.jstor_country, "ISBN", "jstor"),
-                (OaebuPartnerName.jstor_institution, "ISBN", "jstor"),
-                (OaebuPartnerName.google_books_sales, "Primary_ISBN", "google_books"),
-                (OaebuPartnerName.google_books_traffic, "Primary_ISBN", "google_books"),
-                (OaebuPartnerName.oapen_irus_uk, "ISBN", "oapen_irus_uk"),
-                (OaebuPartnerName.google_analytics, "publication_id", "google_analytics"),
+                (OaebuPartnerName.jstor_country, "ISBN", "Book_Title", "jstor"),
+                (OaebuPartnerName.jstor_institution, "ISBN", "Book_Title", "jstor"),
+                (OaebuPartnerName.google_books_sales, "Primary_ISBN", "Title", "google_books"),
+                (OaebuPartnerName.google_books_traffic, "Primary_ISBN", "Title", "google_books"),
+                (OaebuPartnerName.oapen_irus_uk, "ISBN", "book_title", "oapen_irus_uk"),
+                (OaebuPartnerName.google_analytics, "publication_id", "title", "google_analytics"),
             ],
             table_ids,
         ):
@@ -1640,6 +1672,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                     gcp_dataset_id=self.fake_partner_dataset,
                     gcp_table_id=table_id,
                     isbn_field_name=isbn_field_name,
+                    title_field_name=title_field_name,
                     sharded=False,
                 )
             )
@@ -1776,15 +1809,27 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                     self.assertEqual(expected_state, ti.state)
 
                 # Create oaebu output tables
-                ti = env.run_task(telescope.create_oaebu_book_product_table.__name__, workflow_dag, execution_date,)
+                ti = env.run_task(
+                    telescope.create_oaebu_book_product_table.__name__,
+                    workflow_dag,
+                    execution_date,
+                )
                 self.assertEqual(expected_state, ti.state)
 
                 # ONIX isbn check
-                ti = env.run_task(telescope.create_oaebu_data_qa_onix_isbn.__name__, workflow_dag, execution_date,)
+                ti = env.run_task(
+                    telescope.create_oaebu_data_qa_onix_isbn.__name__,
+                    workflow_dag,
+                    execution_date,
+                )
                 self.assertEqual(expected_state, ti.state)
 
                 # ONIX aggregate metrics
-                ti = env.run_task(telescope.create_oaebu_data_qa_onix_aggregate.__name__, workflow_dag, execution_date,)
+                ti = env.run_task(
+                    telescope.create_oaebu_data_qa_onix_aggregate.__name__,
+                    workflow_dag,
+                    execution_date,
+                )
                 self.assertEqual(expected_state, ti.state)
 
                 # JSTOR country isbn check
@@ -1821,7 +1866,9 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
 
                 # Google Books Sales isbn check
                 ti = env.run_task(
-                    telescope.create_oaebu_data_qa_google_books_sales_isbn.__name__, workflow_dag, execution_date,
+                    telescope.create_oaebu_data_qa_google_books_sales_isbn.__name__,
+                    workflow_dag,
+                    execution_date,
                 )
                 self.assertEqual(expected_state, ti.state)
 
@@ -1835,7 +1882,9 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
 
                 # Google Books Traffic isbn check
                 ti = env.run_task(
-                    telescope.create_oaebu_data_qa_google_books_traffic_isbn.__name__, workflow_dag, execution_date,
+                    telescope.create_oaebu_data_qa_google_books_traffic_isbn.__name__,
+                    workflow_dag,
+                    execution_date,
                 )
                 self.assertEqual(expected_state, ti.state)
 
@@ -1849,7 +1898,9 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
 
                 # OAPEN IRUS UK isbn check
                 ti = env.run_task(
-                    telescope.create_oaebu_data_qa_oapen_irus_uk_isbn.__name__, workflow_dag, execution_date,
+                    telescope.create_oaebu_data_qa_oapen_irus_uk_isbn.__name__,
+                    workflow_dag,
+                    execution_date,
                 )
                 self.assertEqual(expected_state, ti.state)
 
@@ -1864,7 +1915,9 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 if include_google_analytics:
                     # Google Analytics isbn check
                     env.run_task(
-                        telescope.create_oaebu_data_qa_google_analytics_isbn.__name__, workflow_dag, execution_date,
+                        telescope.create_oaebu_data_qa_google_analytics_isbn.__name__,
+                        workflow_dag,
+                        execution_date,
                     )
 
                     # Google Books Analytics unmatched isbns
@@ -1894,11 +1947,19 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 ]
 
                 for table in export_tables:
-                    ti = env.run_task(f"{telescope.export_oaebu_table.__name__}.{table}", workflow_dag, execution_date,)
+                    ti = env.run_task(
+                        f"{telescope.export_oaebu_table.__name__}.{table}",
+                        workflow_dag,
+                        execution_date,
+                    )
                     self.assertEqual(expected_state, ti.state)
 
                 # Export oaebu elastic qa table
-                ti = env.run_task(telescope.export_oaebu_qa_metrics.__name__, workflow_dag, execution_date,)
+                ti = env.run_task(
+                    telescope.export_oaebu_qa_metrics.__name__,
+                    workflow_dag,
+                    execution_date,
+                )
                 self.assertEqual(expected_state, ti.state)
 
                 # Test conditions
