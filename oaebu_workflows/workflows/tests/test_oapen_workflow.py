@@ -16,22 +16,19 @@
 
 
 import os
+from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
 import pendulum
 from click.testing import CliRunner
-
 from oaebu_workflows.workflows.oapen_workflow import OapenWorkflow, OapenWorkflowRelease
-
-from observatory.platform.utils.gc_utils import (
-    run_bigquery_query,
-)
-from observatory.platform.utils.workflow_utils import make_dag_id
+from observatory.platform.utils.gc_utils import run_bigquery_query
 from observatory.platform.utils.test_utils import (
     ObservatoryEnvironment,
     ObservatoryTestCase,
     make_dummy_dag,
 )
+from observatory.platform.utils.workflow_utils import make_dag_id
 
 
 class TestOapenWorkflow(ObservatoryTestCase):
@@ -164,11 +161,16 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
                 start_date=start_date,
             )
 
+            # Override sensor grace period and dag check
+            for sensor in workflow.sensors:
+                sensor.grace_period = timedelta(seconds=1)
+                sensor.check_exists = False
+
             # Make DAG
             workflow_dag = workflow.make_dag()
 
-            # Test that sensors go into the 'up_for_reschedule' state as the DAGs that they wait for haven't run
-            expected_state = "up_for_reschedule"
+            # If the DAG you are monitoring doesn't exist in dagrun database, it will return success to skip waiting.
+            expected_state = "success"
             with env.create_dag_run(workflow_dag, start_date):
                 ti = env.run_task(
                     f"{make_dag_id(self.irus_uk_dag_id_prefix, org_name)}_sensor",

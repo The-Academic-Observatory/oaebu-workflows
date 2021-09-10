@@ -16,27 +16,27 @@
 # Author: Richard Hosking
 
 import os
+from datetime import timedelta
 from functools import partial, update_wrapper
 from typing import List, Optional
 
 import pendulum
 from airflow.exceptions import AirflowException
 from airflow.models import Variable
-from airflow.sensors.external_task import ExternalTaskSensor
 from oaebu_workflows.config import sql_folder
-
 from oaebu_workflows.workflows.onix_workflow import make_table_id
-from observatory.platform.workflows.workflow import Workflow
+from observatory.platform.utils.airflow_utils import AirflowVars
+from observatory.platform.utils.dag_run_sensor import DagRunSensor
 from observatory.platform.utils.gc_utils import (
     bigquery_sharded_table_id,
+    copy_bigquery_table,
     create_bigquery_dataset,
     create_bigquery_table_from_query,
     select_table_shard_dates,
-    copy_bigquery_table,
 )
 from observatory.platform.utils.jinja2_utils import render_template
-from observatory.platform.utils.airflow_utils import AirflowVars
 from observatory.platform.utils.workflow_utils import make_dag_id
+from observatory.platform.workflows.workflow import Workflow
 
 
 class OapenWorkflowRelease:
@@ -164,12 +164,26 @@ class OapenWorkflow(Workflow):
 
         # Wait for irus_uk workflow to finish
         ext_dag_id = make_dag_id(irus_uk_dag_id_prefix, self.ORG_NAME)
-        sensor = ExternalTaskSensor(task_id=f"{ext_dag_id}_sensor", external_dag_id=ext_dag_id, mode="reschedule")
+        sensor = DagRunSensor(
+            task_id=f"{ext_dag_id}_sensor",
+            external_dag_id=ext_dag_id,
+            mode="reschedule",
+            duration=timedelta(days=7),  # Look back up to 7 days from execution date
+            poke_interval=int(timedelta(hours=1).total_seconds()),  # Check at this interval if dag run is ready
+            timeout=int(timedelta(days=2).total_seconds()),  # Sensor will fail after 2 days of waiting
+        )
         self.add_sensor(sensor)
 
         # Wait for OAPEN Metadata workflow to finish
         ext_dag_id = "oapen_metadata"
-        sensor = ExternalTaskSensor(task_id=f"{ext_dag_id}_sensor", external_dag_id=ext_dag_id, mode="reschedule")
+        sensor = DagRunSensor(
+            task_id=f"{ext_dag_id}_sensor",
+            external_dag_id=ext_dag_id,
+            mode="reschedule",
+            duration=timedelta(days=7),  # Look back up to 7 days from execution date
+            poke_interval=int(timedelta(hours=1).total_seconds()),  # Check at this interval if dag run is ready
+            timeout=int(timedelta(days=2).total_seconds()),  # Sensor will fail after 2 days of waiting
+        )
         self.add_sensor(sensor)
 
         # Setup tasks
