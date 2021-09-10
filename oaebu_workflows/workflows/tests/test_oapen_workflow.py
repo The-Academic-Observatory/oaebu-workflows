@@ -201,7 +201,6 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
                 ti = env.run_task("dummy_task", dag, execution_date=execution_date)
                 self.assertEqual(expected_state, ti.state)
 
-
             # Run end to end tests for the DAG
             with env.create_dag_run(workflow_dag, execution_date):
                 # Test that sensors go into 'success' state as the DAGs that they are waiting for have finished

@@ -25,6 +25,7 @@ from airflow.models import Variable
 from airflow.sensors.external_task import ExternalTaskSensor
 from oaebu_workflows.config import sql_folder
 
+from oaebu_workflows.workflows.onix_workflow import make_table_id
 from observatory.platform.workflows.workflow import Workflow
 from observatory.platform.utils.gc_utils import (
     bigquery_sharded_table_id,
@@ -63,6 +64,7 @@ class OapenWorkflowRelease:
         :return: None.
         """
         pass
+
 
 class OapenWorkflow(Workflow):
     """
@@ -209,7 +211,6 @@ class OapenWorkflow(Workflow):
 
         release.cleanup()
 
-
     def create_onix_formatted_metadata_output_tasks(
         self,
         release: OapenWorkflowRelease,
@@ -276,12 +277,13 @@ class OapenWorkflow(Workflow):
         table_id = bigquery_sharded_table_id(output_table, release_date)
 
         # Identify latest Book release from the Academic Observatory
-        public_book_release_date = select_table_shard_dates(
+        public_book_table_id = make_table_id(
             project_id=self.ao_gcp_project_id,
             dataset_id=self.public_book_metadata_dataset_id,
             table_id=self.public_book_metadata_table_id,
             end_date=release.release_date,
-        )[0]
+            sharded=True,
+        )
 
         google_analytics_table_id = "empty_google_analytics"
         google_books_sales_table_id = "empty_google_books_sales"
@@ -307,7 +309,7 @@ class OapenWorkflow(Workflow):
             jstor_institution_table_id=jstor_institution_table_id,
             oapen_table_id=oapen_table_id,
             ucl_table_id=ucl_table_id,
-            public_book_release_date=public_book_release_date,
+            public_book_tabel_id=public_book_table_id,
         )
 
         create_bigquery_dataset(project_id=project_id, dataset_id=output_dataset, location=data_location)
