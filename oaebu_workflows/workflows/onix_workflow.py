@@ -241,6 +241,9 @@ class OnixWorkflow(Workflow):
         org_name: str,
         gcp_project_id: str,
         gcp_bucket_name: str,
+        ao_gcp_project_id: str = "academic-observatory",
+        public_book_metadata_dataset_id: str = "observatory",
+        public_book_metadata_table_id: str = "book",
         onix_dataset_id: str = "onix",
         onix_table_id: str = "onix",
         schema_folder: str = default_schema_folder(),
@@ -277,6 +280,11 @@ class OnixWorkflow(Workflow):
         self.onix_dataset_id = onix_dataset_id
         self.onix_table_id = onix_table_id
         self.schema_folder = schema_folder
+
+        # Public Book Data
+        self.ao_gcp_project_id = ao_gcp_project_id
+        self.public_book_metadata_dataset_id = public_book_metadata_dataset_id
+        self.public_book_metadata_table_id = public_book_metadata_table_id
 
         # Initialise Telesecope base class
         super().__init__(
