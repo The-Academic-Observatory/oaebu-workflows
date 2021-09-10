@@ -17,6 +17,7 @@
 import hashlib
 import os
 import unittest
+from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
 import observatory.api.server.orm as orm
@@ -1678,12 +1679,8 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
 
         return partners
 
-    @patch("academic_observatory_workflows.workflows.doi_workflow.DagRunSensor.check_dag_exists")
-    def run_telescope_tests(self, m_dr_exists, *, org_name: str, include_google_analytics: bool = False):
+    def run_telescope_tests(self, *, org_name: str, include_google_analytics: bool = False):
         """Functional test of the ONIX workflow"""
-
-        # Skip dag existence check in sensor.
-        m_dr_exists.return_value = True
 
         # Setup Observatory environment
         env = ObservatoryEnvironment(self.gcp_project_id, self.data_location, enable_api=False)
@@ -1728,6 +1725,11 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 data_partners=data_partners,
                 start_date=start_date,
             )
+
+            # Skip dag existence check in sensor.
+            for sensor in telescope.sensors:
+                sensor.check_exists = False
+                sensor.grace_period = timedelta(seconds=1)
 
             # Make DAG
             workflow_dag = telescope.make_dag()
