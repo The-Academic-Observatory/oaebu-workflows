@@ -685,7 +685,7 @@ class OnixWorkflow(Workflow):
             jstor_institution_table_id=jstor_institution_table_id,
             oapen_table_id=oapen_table_id,
             ucl_table_id=ucl_table_id,
-            public_book_tabel_id=public_book_table_id,
+            public_book_tabel_id=f"{self.ao_gcp_project_id}.{self.public_book_metadata_dataset_id}.{public_book_table_id}",
         )
 
         create_bigquery_dataset(project_id=release.project_id, dataset_id=output_dataset, location=data_location)
