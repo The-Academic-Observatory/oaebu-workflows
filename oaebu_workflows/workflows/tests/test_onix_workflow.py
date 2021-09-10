@@ -17,21 +17,21 @@
 import hashlib
 import os
 import unittest
+from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
+import observatory.api.server.orm as orm
 import pendulum
 from airflow.exceptions import AirflowException
 from airflow.models.connection import Connection
 from click.testing import CliRunner
 from google.cloud import bigquery
 from google.cloud.bigquery import SourceFormat
-
-import observatory.api.server.orm as orm
 from oaebu_workflows.config import schema_folder as default_schema_folder
 from oaebu_workflows.config import test_fixtures_folder
+from oaebu_workflows.identifiers import TelescopeTypes
 from oaebu_workflows.workflows.oaebu_partners import OaebuPartnerName, OaebuPartners
 from oaebu_workflows.workflows.onix_workflow import OnixWorkflow, OnixWorkflowRelease
-from oaebu_workflows.identifiers import TelescopeTypes
 from observatory.api.server.orm import Organisation
 from observatory.platform.utils.airflow_utils import AirflowConns
 from observatory.platform.utils.gc_utils import (
@@ -48,9 +48,9 @@ from observatory.platform.utils.test_utils import (
 from observatory.platform.utils.workflow_utils import (
     bq_load_partition,
     bq_load_shard_v2,
+    make_dag_id,
     table_ids_from_path,
 )
-from observatory.platform.utils.workflow_utils import make_dag_id
 
 
 class TestOnixWorkflowRelease(unittest.TestCase):
@@ -1679,7 +1679,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
 
         return partners
 
-    def run_telescope_tests(self, org_name: str, include_google_analytics: bool = False):
+    def run_telescope_tests(self, *, org_name: str, include_google_analytics: bool = False):
         """Functional test of the ONIX workflow"""
 
         # Setup Observatory environment
@@ -1726,11 +1726,16 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 start_date=start_date,
             )
 
+            # Skip dag existence check in sensor.
+            for sensor in telescope.sensors:
+                sensor.check_exists = False
+                sensor.grace_period = timedelta(seconds=1)
+
             # Make DAG
             workflow_dag = telescope.make_dag()
 
-            # Test that sensors go into the 'up_for_reschedule' state as the DAGs that they wait for haven't run
-            expected_state = "up_for_reschedule"
+            # If there is no dag run in the search interval, sensor will return success.
+            expected_state = "success"
             with env.create_dag_run(workflow_dag, start_date):
                 for task_id in sensor_dag_ids:
                     ti = env.run_task(

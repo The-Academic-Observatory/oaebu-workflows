@@ -17,15 +17,14 @@
 
 import os
 import shutil
+from datetime import timedelta
 from functools import partial, update_wrapper
 from pathlib import Path
 from typing import List, Optional
 
 import pendulum
 from airflow.exceptions import AirflowException
-from airflow.sensors.external_task import ExternalTaskSensor
 from google.cloud.bigquery import SourceFormat
-
 from oaebu_workflows.config import schema_folder as default_schema_folder
 from oaebu_workflows.config import sql_folder
 from oaebu_workflows.workflows.oaebu_partners import OaebuPartnerName, OaebuPartners
@@ -34,6 +33,7 @@ from oaebu_workflows.workflows.onix_work_aggregation import (
     BookWorkAggregator,
     BookWorkFamilyAggregator,
 )
+from observatory.platform.utils.dag_run_sensor import DagRunSensor
 from observatory.platform.utils.file_utils import list_to_jsonl_gz
 from observatory.platform.utils.gc_utils import (
     bigquery_sharded_table_id,
@@ -46,9 +46,9 @@ from observatory.platform.utils.gc_utils import (
 from observatory.platform.utils.jinja2_utils import render_template
 from observatory.platform.utils.workflow_utils import (
     bq_load_shard_v2,
+    make_dag_id,
     table_ids_from_path,
 )
-from observatory.platform.utils.workflow_utils import make_dag_id
 from observatory.platform.workflows.workflow import AbstractRelease, Workflow
 
 
@@ -297,7 +297,14 @@ class OnixWorkflow(Workflow):
         partner_data_dag_prefix_ids.sort()  # Sort so that order is deterministic
         for dag_prefix in partner_data_dag_prefix_ids:
             ext_dag_id = make_dag_id(dag_prefix, org_name)
-            sensor = ExternalTaskSensor(task_id=f"{ext_dag_id}_sensor", external_dag_id=ext_dag_id, mode="reschedule")
+            sensor = DagRunSensor(
+                task_id=f"{ext_dag_id}_sensor",
+                external_dag_id=ext_dag_id,
+                mode="reschedule",
+                duration=timedelta(days=7),  # Look back up to 7 days from execution date
+                poke_interval=int(timedelta(hours=1).total_seconds()),  # Check at this interval if dag run is ready
+                timeout=int(timedelta(days=2).total_seconds()),  # Sensor will fail after 2 days of waiting
+            )
             self.add_sensor(sensor)
 
         # Aggregate Works
