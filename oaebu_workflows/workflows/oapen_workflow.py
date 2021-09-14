@@ -22,20 +22,18 @@ from typing import List, Optional
 
 import pendulum
 from airflow.exceptions import AirflowException
-from airflow.models import Variable
+
 from oaebu_workflows.config import sql_folder
-from oaebu_workflows.workflows.onix_workflow import make_table_id
+from oaebu_workflows.workflows.onix_workflow import make_table_name
 from observatory.platform.utils.airflow_utils import AirflowVars
 from observatory.platform.utils.dag_run_sensor import DagRunSensor
 from observatory.platform.utils.gc_utils import (
     bigquery_sharded_table_id,
-    copy_bigquery_table,
     create_bigquery_dataset,
     create_bigquery_table_from_query,
-    select_table_shard_dates,
 )
 from observatory.platform.utils.jinja2_utils import render_template
-from observatory.platform.utils.workflow_utils import make_dag_id
+from observatory.platform.utils.workflow_utils import make_dag_id, make_release_date
 from observatory.platform.workflows.workflow import Workflow
 
 
@@ -78,6 +76,7 @@ class OapenWorkflow(Workflow):
         self,
         *,
         ao_gcp_project_id: str = "academic-observatory",
+        oapen_gcp_project_id: str = "oaebu-oapen",
         oapen_metadata_dataset_id: str = "oapen",
         oapen_metadata_table_id: str = "metadata",
         public_book_metadata_dataset_id: str = "observatory",
@@ -92,7 +91,7 @@ class OapenWorkflow(Workflow):
         dataset_location: str = "us",
         dataset_description: str = "Oapen workflow tables",
         dag_id: Optional[str] = None,
-        start_date: Optional[pendulum.datetime] = pendulum.datetime(2021, 3, 28),
+        start_date: Optional[pendulum.DateTime] = pendulum.datetime(2021, 3, 28),
         schedule_interval: Optional[str] = "@weekly",
         catchup: Optional[bool] = False,
         airflow_vars: List = None,
@@ -139,6 +138,7 @@ class OapenWorkflow(Workflow):
 
         # Academic Observatory Reference
         self.ao_gcp_project_id = ao_gcp_project_id
+        self.oapen_gcp_project_id = oapen_gcp_project_id
 
         # OAPEN Metadata
         self.oapen_metadata_dataset_id = oapen_metadata_dataset_id
@@ -208,8 +208,8 @@ class OapenWorkflow(Workflow):
         """
 
         # Make release date
-        release_date = kwargs["next_execution_date"].subtract(microseconds=1).date()
-        project_id = Variable.get(AirflowVars.PROJECT_ID)
+        release_date = make_release_date(**kwargs)
+        project_id = self.oapen_gcp_project_id
 
         return OapenWorkflowRelease(
             release_date=release_date,
@@ -291,7 +291,7 @@ class OapenWorkflow(Workflow):
         table_id = bigquery_sharded_table_id(output_table, release_date)
 
         # Identify latest Book release from the Academic Observatory
-        public_book_table_id = make_table_id(
+        public_book_table_id = make_table_name(
             project_id=self.ao_gcp_project_id,
             dataset_id=self.public_book_metadata_dataset_id,
             table_id=self.public_book_metadata_table_id,

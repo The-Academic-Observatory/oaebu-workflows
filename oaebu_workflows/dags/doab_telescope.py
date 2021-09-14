@@ -19,5 +19,5 @@
 
 from oaebu_workflows.workflows.doab_telescope import DoabTelescope
 
-telescope = DoabTelescope()
-globals()[telescope.dag_id] = telescope.make_dag()
+workflow = DoabTelescope()
+globals()[workflow.dag_id] = workflow.make_dag()

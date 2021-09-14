@@ -28,5 +28,5 @@ telescopes = api.get_telescopes(telescope_type_id=telescope_type.id, limit=1000)
 
 # Make all telescopes
 for telescope in telescopes:
-    ucl_discovery_telescope = UclDiscoveryTelescope(telescope.organisation)
-    globals()[ucl_discovery_telescope.dag_id] = ucl_discovery_telescope.make_dag()
+    workflow = UclDiscoveryTelescope(telescope.organisation)
+    globals()[workflow.dag_id] = workflow.make_dag()

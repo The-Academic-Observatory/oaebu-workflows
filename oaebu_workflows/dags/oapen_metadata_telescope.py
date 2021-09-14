@@ -19,5 +19,5 @@
 
 from oaebu_workflows.workflows.oapen_metadata_telescope import OapenMetadataTelescope
 
-telescope = OapenMetadataTelescope()
-globals()[telescope.dag_id] = telescope.make_dag()
+workflow = OapenMetadataTelescope()
+globals()[workflow.dag_id] = workflow.make_dag()

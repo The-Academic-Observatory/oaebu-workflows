@@ -201,7 +201,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
             self.assertEqual(release.release_date, pendulum.datetime(2021, 1, 1, 0, 0, 0, 0))
             self.assertEqual(release.project_id, "project_id")
             self.assertEqual(release.transform_bucket, "bucket_name")
-            self.assertTrue(wf.sensors[0] != None)
+            self.assertTrue(wf.sensors[0] is not None)
 
     @patch("oaebu_workflows.workflows.onix_workflow.OnixWorkflow.make_release")
     @patch("oaebu_workflows.workflows.onix_workflow.select_table_shard_dates")
@@ -236,7 +236,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
             self.assertEqual(release.release_date, pendulum.datetime(2021, 1, 1, 0, 0, 0, 0))
             self.assertEqual(release.project_id, "project_id")
             self.assertEqual(release.transform_bucket, "bucket_name")
-            self.assertTrue(wf.sensors[0] != None)
+            self.assertTrue(wf.sensors[0] is not None)
 
     @patch("oaebu_workflows.workflows.onix_workflow.OnixWorkflow.make_release")
     @patch("oaebu_workflows.workflows.onix_workflow.select_table_shard_dates")

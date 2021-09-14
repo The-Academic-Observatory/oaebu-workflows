@@ -19,5 +19,5 @@
 
 from oaebu_workflows.workflows.oapen_workflow import OapenWorkflow
 
-oapen_workflow = OapenWorkflow()
-globals()[oapen_workflow.dag_id] = oapen_workflow.make_dag()
+workflow = OapenWorkflow()
+globals()[workflow.dag_id] = workflow.make_dag()

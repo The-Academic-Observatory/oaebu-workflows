@@ -23,6 +23,7 @@ import pendulum
 import vcr
 from airflow.exceptions import AirflowException
 from click.testing import CliRunner
+
 from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.workflows.oapen_metadata_telescope import (
     OapenMetadataRelease,
@@ -35,7 +36,7 @@ from observatory.platform.utils.test_utils import (
     ObservatoryTestCase,
     module_file_path,
 )
-from observatory.platform.utils.workflow_utils import blob_name, table_ids_from_path
+from observatory.platform.utils.workflow_utils import blob_name
 
 
 class MockResponse:

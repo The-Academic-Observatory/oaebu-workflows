@@ -37,7 +37,7 @@ for telescope in telescopes:
     date_regex = telescope.extra.get("date_regex")
     date_format = telescope.extra.get("date_format")
 
-    onix_telescope = OnixTelescope(
+    workflow = OnixTelescope(
         organisation_name=organisation_name,
         project_id=project_id,
         download_bucket=download_bucket,
@@ -46,4 +46,4 @@ for telescope in telescopes:
         date_regex=date_regex,
         date_format=date_format,
     )
-    globals()[onix_telescope.dag_id] = onix_telescope.make_dag()
+    globals()[workflow.dag_id] = workflow.make_dag()

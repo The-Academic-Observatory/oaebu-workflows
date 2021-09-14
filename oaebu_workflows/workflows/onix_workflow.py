@@ -25,8 +25,8 @@ from typing import List, Optional
 import pendulum
 from airflow.exceptions import AirflowException
 from google.cloud.bigquery import SourceFormat
-from oaebu_workflows.config import schema_folder as default_schema_folder
-from oaebu_workflows.config import sql_folder
+
+from oaebu_workflows.config import schema_folder as default_schema_folder, sql_folder
 from oaebu_workflows.workflows.oaebu_partners import OaebuPartnerName, OaebuPartners
 from oaebu_workflows.workflows.onix_telescope import OnixTelescope
 from oaebu_workflows.workflows.onix_work_aggregation import (
@@ -48,6 +48,8 @@ from observatory.platform.utils.workflow_utils import (
     bq_load_shard_v2,
     make_dag_id,
     table_ids_from_path,
+    make_release_date,
+    make_table_name
 )
 from observatory.platform.workflows.workflow import AbstractRelease, Workflow
 
@@ -194,29 +196,6 @@ class OnixWorkflowRelease(AbstractRelease):
         shutil.rmtree(self.transform_folder)
 
 
-def make_table_id(*, project_id: str, dataset_id: str, table_id: str, end_date: pendulum.datetime, sharded: bool):
-    """
-    Make a BQ table ID.
-    :param project_id: GCP Project ID.
-    :param dataset_id: GCP Dataset ID.
-    :param table_id: Table name to convert to the suitable BQ table ID.
-    :param end_date: Latest date considered.
-    :param sharded: whether the table is sharded or not.
-    """
-
-    new_table_id = table_id
-    if sharded:
-        table_date = select_table_shard_dates(
-            project_id=project_id,
-            dataset_id=dataset_id,
-            table_id=table_id,
-            end_date=end_date,
-        )[0]
-        new_table_id = f"{table_id}{table_date.strftime('%Y%m%d')}"
-
-    return new_table_id
-
-
 class OnixWorkflow(Workflow):
     """This workflow telescope:
     1. [Not implemented] Creates an ISBN13-> internal identifier lookup table.
@@ -248,7 +227,7 @@ class OnixWorkflow(Workflow):
         onix_table_id: str = "onix",
         schema_folder: str = default_schema_folder(),
         dag_id: Optional[str] = None,
-        start_date: Optional[pendulum.datetime] = pendulum.datetime(2021, 3, 28),
+        start_date: Optional[pendulum.DateTime] = pendulum.datetime(2021, 3, 28),
         schedule_interval: Optional[str] = "@weekly",
         catchup: Optional[bool] = False,
         data_partners: List[OaebuPartners] = None,
@@ -348,7 +327,7 @@ class OnixWorkflow(Workflow):
         """
 
         # Make release date
-        release_date = kwargs["next_execution_date"].subtract(microseconds=1).date()
+        release_date = make_release_date(**kwargs)
 
         # Get ONIX release date
         onix_release_dates = select_table_shard_dates(
@@ -361,7 +340,8 @@ class OnixWorkflow(Workflow):
         if not len(onix_release_dates):
             raise AirflowException("OnixWorkflow.make_release: no ONIX releases found")
 
-        onix_release_date = onix_release_dates[0].date()
+        onix_release_date = onix_release_dates[0]
+        onix_release_date = pendulum.datetime(onix_release_date.year, onix_release_date.month, onix_release_date.day)
         return OnixWorkflowRelease(
             dag_id=self.dag_id,
             release_date=release_date,
@@ -527,7 +507,7 @@ class OnixWorkflow(Workflow):
         :param sharded: whether the table is sharded or not.
         """
 
-        orig_table_id = make_table_id(
+        orig_table_id = make_table_name(
             project_id=orig_project_id,
             dataset_id=orig_dataset,
             table_id=orig_table,
@@ -639,7 +619,7 @@ class OnixWorkflow(Workflow):
         table_id = bigquery_sharded_table_id(output_table, release_date)
 
         # Identify latest Book release from the Academic Observatory
-        public_book_table_id = make_table_id(
+        public_book_table_id = make_table_name(
             project_id=self.ao_gcp_project_id,
             dataset_id=self.public_book_metadata_dataset_id,
             table_id=self.public_book_metadata_table_id,
@@ -1173,7 +1153,7 @@ class OnixWorkflow(Workflow):
         """
 
         release_date = release.release_date
-        orig_table_id = make_table_id(
+        orig_table_id = make_table_name(
             project_id=project_id,
             dataset_id=orig_dataset_id,
             table_id=orig_table,
@@ -1248,7 +1228,7 @@ class OnixWorkflow(Workflow):
         """
 
         release_date = release.release_date
-        orig_table_id = make_table_id(
+        orig_table_id = make_table_name(
             project_id=project_id,
             dataset_id=orig_dataset_id,
             table_id=orig_table,
@@ -1311,7 +1291,7 @@ class OnixWorkflow(Workflow):
         """
 
         release_date = release.release_date
-        orig_table_id = make_table_id(
+        orig_table_id = make_table_name(
             project_id=project_id,
             dataset_id=orig_dataset_id,
             table_id=orig_table,
@@ -1374,7 +1354,7 @@ class OnixWorkflow(Workflow):
         """
 
         release_date = release.release_date
-        orig_table_id = make_table_id(
+        orig_table_id = make_table_name(
             project_id=project_id,
             dataset_id=orig_dataset_id,
             table_id=orig_table,
@@ -1437,7 +1417,7 @@ class OnixWorkflow(Workflow):
         """
 
         release_date = release.release_date
-        orig_table_id = make_table_id(
+        orig_table_id = make_table_name(
             project_id=project_id,
             dataset_id=orig_dataset_id,
             table_id=orig_table,

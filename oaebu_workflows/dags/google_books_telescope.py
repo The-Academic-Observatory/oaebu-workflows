@@ -28,5 +28,5 @@ telescopes = api.get_telescopes(telescope_type_id=telescope_type.id, limit=1000)
 
 # Make all telescopes
 for telescope in telescopes:
-    telescope_instance = GoogleBooksTelescope(telescope.organisation)
-    globals()[telescope_instance.dag_id] = telescope_instance.make_dag()
+    workflow = GoogleBooksTelescope(telescope.organisation)
+    globals()[workflow.dag_id] = workflow.make_dag()
