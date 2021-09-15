@@ -301,7 +301,10 @@ def list_all_books(
                 "viewId": view_id,
                 "pageSize": 10000,
                 "dateRanges": [
-                    {"startDate": start_date.strftime("%Y-%m-%d"), "endDate": end_date.strftime("%Y-%m-%d"),}
+                    {
+                        "startDate": start_date.strftime("%Y-%m-%d"),
+                        "endDate": end_date.strftime("%Y-%m-%d"),
+                    }
                 ],
                 "metrics": [{"expression": "ga:avgTimeOnPage"}],
                 "dimensions": [{"name": "ga:pagepath"}, {"name": "ga:pageTitle"}],
@@ -412,7 +415,10 @@ def get_dimension_data(
                 "viewId": view_id,
                 "pageSize": 10000,
                 "dateRanges": [
-                    {"startDate": start_date.strftime("%Y-%m-%d"), "endDate": end_date.strftime("%Y-%m-%d"),}
+                    {
+                        "startDate": start_date.strftime("%Y-%m-%d"),
+                        "endDate": end_date.strftime("%Y-%m-%d"),
+                    }
                 ],
                 "metrics": metrics,
                 "dimensions": [{"name": "ga:pagePath"}, dimension],

@@ -14,8 +14,9 @@
 
 # Author: James Diprose
 
+
 class TelescopeTypes:
-    """ The type_id's for known TelescopeTypes """
+    """The type_id's for known TelescopeTypes"""
 
     fulcrum = "fulcrum"
     google_analytics = "google_analytics"

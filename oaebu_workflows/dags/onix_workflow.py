@@ -125,7 +125,9 @@ def get_oaebu_partner_data(project_id, org_name):
             OaebuPartnerName.jstor_institution,
             OaebuPartnerName.oapen_irus_uk,
         ],
-        "Wits University Press": [OaebuPartnerName.oapen_irus_uk,],
+        "Wits University Press": [
+            OaebuPartnerName.oapen_irus_uk,
+        ],
     }
 
     publisher_data_partners = list()
@@ -150,8 +152,11 @@ for telescope in telescopes:
 
     data_partners = get_oaebu_partner_data(gcp_project_id, org_name)
 
-    workflow = OnixWorkflow(
-        org_name=org_name, gcp_project_id=gcp_project_id, gcp_bucket_name=gcp_bucket_name, data_partners=data_partners,
+    onix_workflow = OnixWorkflow(
+        org_name=org_name,
+        gcp_project_id=gcp_project_id,
+        gcp_bucket_name=gcp_bucket_name,
+        data_partners=data_partners,
     )
 
     globals()[workflow.dag_id] = workflow.make_dag()
