@@ -57,7 +57,7 @@ class TestOnixWorkflowRelease(unittest.TestCase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        with patch("oaebu_workflows.workflows.onix_workflow.select_table_shard_dates") as mock_sel_table_suffixes:
+        with patch("observatory.platform.utils.gc_utils.select_table_shard_dates") as mock_sel_table_suffixes:
             mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
             self.release = OnixWorkflowRelease(
                 dag_id="did",
@@ -168,7 +168,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         self.bucket_name = "bucket_name"
 
     @patch("oaebu_workflows.workflows.onix_workflow.OnixWorkflow.make_release")
-    @patch("oaebu_workflows.workflows.onix_workflow.select_table_shard_dates")
+    @patch("observatory.platform.utils.gc_utils.select_table_shard_dates")
     def test_ctor_gen_dag_id(self, mock_sel_table_suffixes, mock_mr):
         mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
         with CliRunner().isolated_filesystem():
@@ -204,7 +204,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
             self.assertTrue(wf.sensors[0] is not None)
 
     @patch("oaebu_workflows.workflows.onix_workflow.OnixWorkflow.make_release")
-    @patch("oaebu_workflows.workflows.onix_workflow.select_table_shard_dates")
+    @patch("observatory.platform.utils.gc_utils.select_table_shard_dates")
     def test_ctor_gen_assign_dag_id(self, mock_sel_table_suffixes, mock_mr):
         mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
         with CliRunner().isolated_filesystem():
@@ -239,7 +239,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
             self.assertTrue(wf.sensors[0] is not None)
 
     @patch("oaebu_workflows.workflows.onix_workflow.OnixWorkflow.make_release")
-    @patch("oaebu_workflows.workflows.onix_workflow.select_table_shard_dates")
+    @patch("observatory.platform.utils.gc_utils.select_table_shard_dates")
     def test_ctor(self, mock_sel_table_suffixes, mock_mr):
         mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
         with CliRunner().isolated_filesystem():
@@ -289,7 +289,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
             self.assertEqual(release.onix_table_id, "onix")
 
     @patch("oaebu_workflows.workflows.onix_workflow.OnixWorkflow.make_release")
-    @patch("oaebu_workflows.workflows.onix_workflow.select_table_shard_dates")
+    @patch("observatory.platform.utils.gc_utils.select_table_shard_dates")
     def test_ctor_dataset_overrides(self, mock_sel_table_suffixes, mock_mr):
         mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
         with CliRunner().isolated_filesystem():
@@ -321,7 +321,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
             self.assertEqual(release.oaebu_data_qa_dataset, "override")
 
     @patch("oaebu_workflows.workflows.onix_workflow.run_bigquery_query")
-    @patch("oaebu_workflows.workflows.onix_workflow.select_table_shard_dates")
+    @patch("observatory.platform.utils.gc_utils.select_table_shard_dates")
     def test_get_onix_records(self, mock_sel_table_suffixes, mock_bq_query):
         mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
         mock_bq_query.return_value = TestOnixWorkflow.onix_data
@@ -350,8 +350,8 @@ class TestOnixWorkflow(ObservatoryTestCase):
             release = wf.make_release(**kwargs)
             self.assertIsInstance(release, OnixWorkflowRelease)
             self.assertEqual(release.dag_id, "onix_workflow_test")
-            self.assertEqual(release.release_date, pendulum.date(2021, 1, 31))
-            self.assertEqual(release.onix_release_date, pendulum.date(2021, 1, 1))
+            self.assertEqual(release.release_date, pendulum.datetime(2021, 1, 31))
+            self.assertEqual(release.onix_release_date, pendulum.datetime(2021, 1, 1))
             self.assertEqual(release.project_id, "project_id")
             self.assertEqual(release.onix_dataset_id, "onix")
             self.assertEqual(release.onix_table_id, "onix")
@@ -373,7 +373,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 wf.make_release(**kwargs)
 
     @patch("oaebu_workflows.workflows.onix_workflow.OnixWorkflow.make_release")
-    @patch("oaebu_workflows.workflows.onix_workflow.select_table_shard_dates")
+    @patch("observatory.platform.utils.gc_utils.select_table_shard_dates")
     def test_cleanup(self, mock_sel_table_suffixes, mock_mr):
         mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
         with CliRunner().isolated_filesystem():
@@ -692,7 +692,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
     @patch("oaebu_workflows.workflows.onix_workflow.bq_load_shard_v2")
     @patch("oaebu_workflows.workflows.onix_workflow.upload_files_to_cloud_storage")
     @patch("oaebu_workflows.workflows.onix_workflow.list_to_jsonl_gz")
-    @patch("oaebu_workflows.workflows.onix_workflow.select_table_shard_dates")
+    @patch("observatory.platform.utils.gc_utils.select_table_shard_dates")
     def test_create_and_upload_bq_isbn13_workid_lookup_table(
         self,
         mock_sel_table_suffixes,
@@ -806,7 +806,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
     @patch("oaebu_workflows.workflows.onix_workflow.bq_load_shard_v2")
     @patch("oaebu_workflows.workflows.onix_workflow.upload_files_to_cloud_storage")
     @patch("oaebu_workflows.workflows.onix_workflow.list_to_jsonl_gz")
-    @patch("oaebu_workflows.workflows.onix_workflow.select_table_shard_dates")
+    @patch("observatory.platform.utils.gc_utils.select_table_shard_dates")
     def test_create_and_upload_bq_isbn13_workfamilyid_lookup_table(
         self,
         mock_sel_table_suffixes,
@@ -895,8 +895,9 @@ class TestOnixWorkflow(ObservatoryTestCase):
     @patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_table_from_query")
     @patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_dataset")
     @patch("oaebu_workflows.workflows.onix_workflow.select_table_shard_dates")
+    @patch("observatory.platform.utils.workflow_utils.select_table_shard_dates")
     def test_create_oaebu_intermediate_table_tasks(
-        self, mock_sel_table_suffixes, mock_create_bq_ds, mock_create_bq_table, mock_mr
+        self, mock_select_table_shard_dates, mock_sel_table_suffixes, mock_create_bq_ds, mock_create_bq_table, mock_mr
     ):
         data_partners = [
             OaebuPartners(
@@ -921,6 +922,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
             ),
         ]
 
+        mock_select_table_shard_dates.return_value = [pendulum.datetime(2021, 1, 1)]
         mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
         mock_create_bq_table.return_value = True
 
@@ -1088,7 +1090,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 ),
             )
 
-    @patch("oaebu_workflows.workflows.onix_workflow.select_table_shard_dates")
+    @patch("observatory.platform.utils.workflow_utils.select_table_shard_dates")
     @patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_table_from_query")
     @patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_dataset")
     def test_create_oaebu_data_qa_jstor_isbn(self, mock_bq_ds, mock_bq_table_query, mock_sel_table_suffixes):
@@ -1160,7 +1162,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
             expected_hash = "7a9a66b5a0295ecdd53d245e659f3e85"
             self.assertEqual(sql_hash, expected_hash)
 
-    @patch("oaebu_workflows.workflows.onix_workflow.select_table_shard_dates")
+    @patch("observatory.platform.utils.workflow_utils.select_table_shard_dates")
     @patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_table_from_query")
     @patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_dataset")
     def test_create_oaebu_data_qa_google_books_sales_isbn(
@@ -1234,7 +1236,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
             expected_hash = "90bbe5c7fb00173d1a85f6ab13ab99b2"
             self.assertEqual(sql_hash, expected_hash)
 
-    @patch("oaebu_workflows.workflows.onix_workflow.select_table_shard_dates")
+    @patch("observatory.platform.utils.workflow_utils.select_table_shard_dates")
     @patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_table_from_query")
     @patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_dataset")
     def test_create_oaebu_data_qa_google_books_traffic_isbn(
@@ -1308,7 +1310,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
             expected_hash = "90bbe5c7fb00173d1a85f6ab13ab99b2"
             self.assertEqual(sql_hash, expected_hash)
 
-    @patch("oaebu_workflows.workflows.onix_workflow.select_table_shard_dates")
+    @patch("observatory.platform.utils.workflow_utils.select_table_shard_dates")
     @patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_table_from_query")
     @patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_dataset")
     def test_create_oaebu_data_qa_oapen_irus_uk_isbn(self, mock_bq_ds, mock_bq_table_query, mock_sel_table_suffixes):
@@ -1380,7 +1382,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
             expected_hash = "ae842fbf661d3a0c50b748dec8e1cd24"
             self.assertEqual(sql_hash, expected_hash)
 
-    @patch("oaebu_workflows.workflows.onix_workflow.select_table_shard_dates")
+    @patch("observatory.platform.utils.workflow_utils.select_table_shard_dates")
     @patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_table_from_query")
     @patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_dataset")
     def test_create_oaebu_data_qa_google_analytics_isbn(self, mock_bq_ds, mock_bq_table_query, mock_sel_table_suffixes):
@@ -1452,7 +1454,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
             expected_hash = "4302ca70501b435561f0c81d04e314cd"
             self.assertEqual(sql_hash, expected_hash)
 
-    @patch("oaebu_workflows.workflows.onix_workflow.select_table_shard_dates")
+    @patch("observatory.platform.utils.gc_utils.select_table_shard_dates")
     @patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_table_from_query")
     @patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_dataset")
     def test_create_oaebu_data_qa_intermediate_unmatched_workid(
