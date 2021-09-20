@@ -173,7 +173,12 @@ class OnixRelease(SnapshotRelease):
         self.sftp_folders.move_files_to_finished(self.file_name)
 
 
-def list_release_info(*, sftp_upload_folder: str, date_regex: str, date_format: str,) -> List[Dict]:
+def list_release_info(
+    *,
+    sftp_upload_folder: str,
+    date_regex: str,
+    date_format: str,
+) -> List[Dict]:
     """List the ONIX release info, a release date and a file name for each release.
 
     :param sftp_upload_folder: the SFTP upload folder.

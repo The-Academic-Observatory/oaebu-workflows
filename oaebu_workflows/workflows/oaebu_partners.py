@@ -20,7 +20,7 @@ from dataclasses import dataclass
 
 
 class OaebuPartnerName:
-    """ OAEBU partner name constants. """
+    """OAEBU partner name constants."""
 
     google_analytics = "Google Analytics"
     google_books_sales = "Google Books Sales"
