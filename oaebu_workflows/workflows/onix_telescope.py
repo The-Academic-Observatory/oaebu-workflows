@@ -220,7 +220,7 @@ class OnixTelescope(SnapshotTelescope):
         schedule_interval: str = "@weekly",
         dataset_id: str = "onix",
         schema_folder: str = default_schema_folder(),
-        source_format: SourceFormat = SourceFormat.NEWLINE_DELIMITED_JSON,
+        source_format: str = SourceFormat.NEWLINE_DELIMITED_JSON,
         catchup: bool = False,
         airflow_vars: List = None,
         airflow_conns: List = None,
