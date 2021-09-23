@@ -18,7 +18,6 @@
 class TelescopeTypes:
     """The type_id's for known TelescopeTypes"""
 
-    fulcrum = "fulcrum"
     google_analytics = "google_analytics"
     google_books = "google_books"
     jstor = "jstor"
@@ -26,4 +25,3 @@ class TelescopeTypes:
     onix = "onix"
     onix_workflow = "onix_workflow"
     ucl_discovery = "ucl_discovery"
-    wos = "wos"

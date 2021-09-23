@@ -41,7 +41,6 @@ from observatory.platform.utils.workflow_utils import (
     blob_name,
     bq_load_shard_v2,
     table_ids_from_path,
-    upload_files_from_list,
 )
 from observatory.platform.workflows.snapshot_telescope import (
     SnapshotRelease,
@@ -370,17 +369,6 @@ class OnixTelescope(SnapshotTelescope):
 
         for release in releases:
             release.download()
-
-    def upload_downloaded(self, releases: List[OnixRelease], **kwargs):
-        """Task to upload the downloaded ONIX releases.
-
-        :param releases: a list of ONIX releases.
-        :return: None.
-        """
-
-        for release in releases:
-            print(f"release download files: {release.download_files}, download bucket: {release.download_bucket}")
-            upload_files_from_list(release.download_files, release.download_bucket)
 
     def transform(self, releases: List[OnixRelease], **kwargs):
         """Task to transform the ONIX releases.
