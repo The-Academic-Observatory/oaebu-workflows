@@ -17,16 +17,15 @@
 import os
 import shutil
 
+import observatory.api.server.orm as orm
 import pendulum
 from airflow.models.connection import Connection
 from airflow.utils.state import State
-
-import observatory.api.server.orm as orm
 from oaebu_workflows.config import test_fixtures_folder
-from oaebu_workflows.workflows.onix_telescope import OnixTelescope
 from oaebu_workflows.identifiers import TelescopeTypes
+from oaebu_workflows.workflows.onix_telescope import OnixTelescope
 from observatory.platform.utils.airflow_utils import AirflowConns
-from observatory.platform.utils.file_utils import _hash_file
+from observatory.platform.utils.file_utils import get_file_hash
 from observatory.platform.utils.gc_utils import bigquery_sharded_table_id
 from observatory.platform.utils.test_utils import (
     ObservatoryEnvironment,
@@ -34,8 +33,8 @@ from observatory.platform.utils.test_utils import (
     SftpServer,
     module_file_path,
 )
-from observatory.platform.utils.workflow_utils import SftpFolders
 from observatory.platform.utils.workflow_utils import (
+    SftpFolders,
     SubFolder,
     blob_name,
     workflow_path,
@@ -213,7 +212,7 @@ class TestOnixTelescope(ObservatoryTestCase):
                     self.assertEqual(ti.state, State.SUCCESS)
 
                     download_file_path = os.path.join(download_folder, onix_file_name)
-                    expected_file_hash = _hash_file(onix_test_file, algorithm="md5")
+                    expected_file_hash = get_file_hash(file_path=onix_test_file, algorithm="md5")
                     self.assert_file_integrity(download_file_path, expected_file_hash, "md5")
 
                     # Test upload downloaded
