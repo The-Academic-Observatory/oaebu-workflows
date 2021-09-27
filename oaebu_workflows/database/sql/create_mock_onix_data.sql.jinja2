@@ -15,7 +15,7 @@
 # Author: Richard Hosking #}
 
 SELECT
-    oapen.identifier.isbn as ISBN13,
+    BITSTREAM_ISBN[SAFE_OFFSET(0)] as ISBN13,
     oapen.identifier.doi as Doi,
     "Digital download and online" as ProductForm,
     CAST(NULL as STRING) as EditionNumber,
