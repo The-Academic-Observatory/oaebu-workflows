@@ -165,7 +165,6 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
                 file_path = self.release.download_files[0]
                 self.assertTrue(os.path.exists(file_path))
                 self.assert_file_integrity(file_path, self.download_hash, "md5")
-                # self.assertEqual(self.download_hash, _hash_file(file_path, algorithm="md5"))
 
     def test_download_bad_response(self, mock_variable_get):
         """Validate handling when status code is not 200."""
