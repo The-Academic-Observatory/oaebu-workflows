@@ -23,14 +23,13 @@ import pendulum
 import vcr
 from airflow.exceptions import AirflowException
 from click.testing import CliRunner
-
 from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.workflows.oapen_metadata_telescope import (
     OapenMetadataRelease,
     OapenMetadataTelescope,
     transform_dict,
 )
-from observatory.platform.utils.file_utils import _hash_file, gzip_file_crc
+from observatory.platform.utils.file_utils import gzip_file_crc
 from observatory.platform.utils.test_utils import (
     ObservatoryEnvironment,
     ObservatoryTestCase,
@@ -83,7 +82,7 @@ def side_effect(arg):
 
 
 @patch("observatory.platform.utils.workflow_utils.Variable.get")
-class TestOapenMetadataTelescope(unittest.TestCase):
+class TestOapenMetadataTelescope(ObservatoryTestCase):
     """Tests for the functions used by the OapenMetadata telescope"""
 
     def __init__(
@@ -165,7 +164,8 @@ class TestOapenMetadataTelescope(unittest.TestCase):
                 self.assertEqual(1, len(self.release.download_files))
                 file_path = self.release.download_files[0]
                 self.assertTrue(os.path.exists(file_path))
-                self.assertEqual(self.download_hash, _hash_file(file_path, algorithm="md5"))
+                self.assert_file_integrity(file_path, self.download_hash, "md5")
+                # self.assertEqual(self.download_hash, _hash_file(file_path, algorithm="md5"))
 
     def test_download_bad_response(self, mock_variable_get):
         """Validate handling when status code is not 200."""
