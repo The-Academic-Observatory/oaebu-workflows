@@ -190,7 +190,7 @@ class DoabTelescope(StreamTelescope):
             airflow_vars=airflow_vars,
         )
 
-        self.add_setup_task_chain([self.check_dependencies, self.get_release_info])
+        self.add_setup_task(self.check_dependencies)
         self.add_task_chain(
             [self.download, self.upload_downloaded, self.transform, self.upload_transformed, self.bq_load_partition]
         )
@@ -198,10 +198,9 @@ class DoabTelescope(StreamTelescope):
 
     def make_release(self, **kwargs) -> "DoabRelease":
         # Make Release instance
-        ti: TaskInstance = kwargs["ti"]
-        start_date, end_date, first_release = ti.xcom_pull(key=DoabTelescope.RELEASE_INFO, include_prior_dates=True)
 
-        release = DoabRelease(self.dag_id, pendulum.parse(start_date), pendulum.parse(end_date), first_release)
+        start_date, end_date, first_release = self.get_release_info(**kwargs)
+        release = DoabRelease(self.dag_id, start_date, end_date, first_release)
         return release
 
     def download(self, release: DoabRelease, **kwargs):
