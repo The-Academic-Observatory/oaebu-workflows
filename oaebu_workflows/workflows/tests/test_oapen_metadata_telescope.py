@@ -138,8 +138,14 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
         """
         mock_variable_get.side_effect = side_effect
 
-        first_release = self.oapen_metadata.make_release(ti=MockTaskInstance(self.start_date, self.end_date, True))
-        later_release = self.oapen_metadata.make_release(ti=MockTaskInstance(self.start_date, self.end_date, False))
+        with patch(
+            "oaebu_workflows.workflows.oapen_metadata_telescope.OapenMetadataTelescope.get_release_info"
+        ) as m_get_release:
+            m_get_release.return_value = (pendulum.datetime(2021, 2, 12), pendulum.datetime(2021, 2, 19), True)
+            first_release = self.oapen_metadata.make_release(ti=MockTaskInstance(self.start_date, self.end_date, True))
+            m_get_release.return_value = (pendulum.datetime(2021, 2, 12), pendulum.datetime(2021, 2, 19), False)
+            later_release = self.oapen_metadata.make_release(ti=MockTaskInstance(self.start_date, self.end_date, False))
+
         for release in [first_release, later_release]:
             self.assertIsInstance(release, OapenMetadataRelease)
         self.assertTrue(first_release.first_release)
@@ -239,8 +245,7 @@ class TestOapenMetadataTelescopeDag(ObservatoryTestCase):
         dag = OapenMetadataTelescope().make_dag()
         self.assert_dag_structure(
             {
-                "check_dependencies": ["get_release_info"],
-                "get_release_info": ["download"],
+                "check_dependencies": ["download"],
                 "download": ["upload_downloaded"],
                 "upload_downloaded": ["transform"],
                 "transform": ["upload_transformed"],
@@ -282,8 +287,6 @@ class TestOapenMetadataTelescopeDag(ObservatoryTestCase):
                 with CliRunner().isolated_filesystem():
                     # Test that all dependencies are specified: no error should be thrown
                     env.run_task(telescope.check_dependencies.__name__, dag, execution_date)
-
-                    env.run_task(telescope.get_release_info.__name__, dag, execution_date)
 
                     # Test download
                     with vcr.use_cassette(self.download_path):
