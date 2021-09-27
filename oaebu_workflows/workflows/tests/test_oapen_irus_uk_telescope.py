@@ -26,9 +26,8 @@ from airflow.models.connection import Connection
 from click.testing import CliRunner
 from googleapiclient.discovery import build
 from googleapiclient.http import HttpMockSequence
-from requests import Response
-
 from oaebu_workflows.config import test_fixtures_folder
+from oaebu_workflows.identifiers import TelescopeTypes
 from oaebu_workflows.workflows.oapen_irus_uk_telescope import (
     OapenIrusUkRelease,
     OapenIrusUkTelescope,
@@ -37,7 +36,6 @@ from oaebu_workflows.workflows.oapen_irus_uk_telescope import (
     create_cloud_function,
     upload_source_code_to_bucket,
 )
-from oaebu_workflows.identifiers import TelescopeTypes
 from observatory.api.client.model.organisation import Organisation
 from observatory.api.server import orm
 from observatory.platform.utils.airflow_utils import AirflowConns
@@ -49,6 +47,7 @@ from observatory.platform.utils.test_utils import (
     random_id,
 )
 from observatory.platform.utils.workflow_utils import blob_name, table_ids_from_path
+from requests import Response
 
 
 class TestOapenIrusUkTelescope(ObservatoryTestCase):

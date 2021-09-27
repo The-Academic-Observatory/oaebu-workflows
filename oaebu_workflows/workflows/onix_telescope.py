@@ -25,21 +25,18 @@ import pendulum
 from airflow.exceptions import AirflowException
 from airflow.models.taskinstance import TaskInstance
 from google.cloud.bigquery import SourceFormat
-
 from oaebu_workflows.config import schema_folder as default_schema_folder
 from observatory.platform.utils.airflow_utils import AirflowConns, AirflowVars
 from observatory.platform.utils.config_utils import observatory_home
-from observatory.platform.utils.data_utils import get_file
+from observatory.platform.utils.http_download import download_file
 from observatory.platform.utils.proc_utils import wait_for_process
 from observatory.platform.utils.workflow_utils import (
     SftpFolders,
+    blob_name,
+    bq_load_shard_v2,
     make_dag_id,
     make_org_id,
     make_sftp_connection,
-)
-from observatory.platform.utils.workflow_utils import (
-    blob_name,
-    bq_load_shard_v2,
     table_ids_from_path,
 )
 from observatory.platform.workflows.snapshot_telescope import (
@@ -134,12 +131,11 @@ class OnixRelease(SnapshotRelease):
 
         # Download ONIX Parser
         bin_path = observatory_home("bin")
-        get_file(
-            self.ONIX_PARSER_NAME,
-            self.ONIX_PARSER_URL,
-            cache_subdir="",
-            cache_dir=bin_path,
-            md5_hash=self.ONIX_PARSER_MD5,
+        filename = os.path.join(bin_path, self.ONIX_PARSER_NAME)
+        download_file(
+            url=self.ONIX_PARSER_URL,
+            filename=filename,
+            hash=self.ONIX_PARSER_MD5,
         )
 
         # Transform release

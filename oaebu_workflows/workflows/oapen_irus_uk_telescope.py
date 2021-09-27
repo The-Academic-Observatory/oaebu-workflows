@@ -31,28 +31,30 @@ from google.auth.transport.requests import AuthorizedSession
 from google.cloud import bigquery
 from google.oauth2.service_account import IDTokenCredentials
 from googleapiclient.discovery import Resource, build
-from oauth2client.service_account import ServiceAccountCredentials
-
-from observatory.api.client.model.organisation import Organisation
 from oaebu_workflows.config import schema_folder as default_schema_folder
+from oauth2client.service_account import ServiceAccountCredentials
+from observatory.api.client.model.organisation import Organisation
 from observatory.platform.utils.airflow_utils import AirflowConns, AirflowVars
-from observatory.platform.utils.data_utils import get_file
-from observatory.platform.utils.file_utils import _hash_file, list_to_jsonl_gz
+from observatory.platform.utils.file_utils import get_file_hash, list_to_jsonl_gz
 from observatory.platform.utils.gc_utils import (
     copy_blob_from_cloud_storage,
     create_cloud_storage_bucket,
     download_blob_from_cloud_storage,
     upload_file_to_cloud_storage,
 )
+from observatory.platform.utils.http_download import download_file
 from observatory.platform.utils.workflow_utils import (
+    SubFolder,
     add_partition_date,
+    blob_name,
     make_dag_id,
     make_org_id,
-    SubFolder,
-    blob_name,
     workflow_path,
 )
-from observatory.platform.workflows.organisation_telescope import OrganisationRelease, OrganisationTelescope
+from observatory.platform.workflows.organisation_telescope import (
+    OrganisationRelease,
+    OrganisationTelescope,
+)
 
 
 class OapenIrusUkRelease(OrganisationRelease):
@@ -369,6 +371,7 @@ class OapenIrusUkTelescope(OrganisationTelescope):
         for release in releases:
             release.download_transform()
 
+
 def get_publisher_uuid(publisher_name: str) -> str:
     """Get the publisher UUID from the OAPEN API using the publisher name.
 
@@ -404,13 +407,15 @@ def upload_source_code_to_bucket(
     # get zip file with source code from github release
     telescope_folder = workflow_path(SubFolder.downloaded.value, OapenIrusUkTelescope.DAG_ID_PREFIX)
     filepath = os.path.join(telescope_folder, "oapen_cloud_function.zip")
-    expected_md5_hash = OapenIrusUkTelescope.FUNCTION_MD5_HASH
-    filepath, download = get_file(filepath, source_url, md5_hash=expected_md5_hash)
+    download_succeeded = download_file(
+        url=source_url,
+        filename=filepath,
+        hash=OapenIrusUkTelescope.FUNCTION_MD5_HASH,
+        hash_algorithm="md5",
+    )
 
-    # check if current md5 hash matches expected md5 hash
-    actual_md5_hash = _hash_file(filepath, algorithm="md5")
-    if expected_md5_hash != actual_md5_hash:
-        raise AirflowException(f"md5 hashes do not match, expected: {expected_md5_hash}, actual: {actual_md5_hash}")
+    if not download_succeeded:
+        raise AirflowException("File download failed. See logs for details.")
 
     # create storage bucket
     create_cloud_storage_bucket(bucket_name, location="EU", project_id=project_id, lifecycle_delete_age=1)

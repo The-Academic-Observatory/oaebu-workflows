@@ -16,13 +16,14 @@
 
 import os
 from datetime import timedelta
+from unittest.mock import MagicMock
 
 import httpretty
 import pendulum
-
+from croniter import croniter
 from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.workflows.doab_telescope import DoabRelease, DoabTelescope
-from observatory.platform.utils.file_utils import _hash_file
+from observatory.platform.utils.file_utils import get_file_hash
 from observatory.platform.utils.test_utils import (
     ObservatoryEnvironment,
     ObservatoryTestCase,
@@ -57,8 +58,7 @@ class TestDoabTelescope(ObservatoryTestCase):
         dag = DoabTelescope().make_dag()
         self.assert_dag_structure(
             {
-                "check_dependencies": ["get_release_info"],
-                "get_release_info": ["download"],
+                "check_dependencies": ["download"],
                 "download": ["upload_downloaded"],
                 "upload_downloaded": ["transform"],
                 "transform": ["upload_transformed"],
@@ -95,25 +95,19 @@ class TestDoabTelescope(ObservatoryTestCase):
         # Create the Observatory environment and run tests
         with env.create():
             # first run
-            with env.create_dag_run(dag, self.first_execution_date):
+            with env.create_dag_run(dag, self.first_execution_date) as m_dagrun:
                 # Test that all dependencies are specified: no error should be thrown
                 env.run_task(telescope.check_dependencies.__name__)
 
-                # Test list releases task with files available
-                ti = env.run_task(telescope.get_release_info.__name__)
-                start_date, end_date, first_release = ti.xcom_pull(
-                    key=DoabTelescope.RELEASE_INFO,
-                    task_ids=telescope.get_release_info.__name__,
-                    include_prior_dates=False,
+                start_date, end_date, first_release = telescope.get_release_info(
+                    execution_date=self.first_execution_date,
+                    dag_run=m_dagrun,
+                    dag=dag,
+                    next_execution_date=pendulum.datetime(2021, 3, 1),
                 )
-                self.assertEqual(pendulum.parse(start_date), dag.default_args["start_date"])
-                self.assertEqual(pendulum.parse(end_date), pendulum.today("UTC") - timedelta(days=1))
-                self.assertTrue(first_release)
 
                 # use release info for other tasks
-                release = DoabRelease(
-                    telescope.dag_id, pendulum.parse(start_date), pendulum.parse(end_date), first_release
-                )
+                release = DoabRelease(telescope.dag_id, start_date, end_date, first_release)
 
                 # Test download task
                 with httpretty.enabled():
@@ -122,7 +116,7 @@ class TestDoabTelescope(ObservatoryTestCase):
 
                 self.assertEqual(1, len(release.download_files))
                 download_path = release.download_files[0]
-                expected_file_hash = _hash_file(self.first_download_path, algorithm="md5")
+                expected_file_hash = get_file_hash(file_path=self.first_download_path, algorithm="md5")
                 self.assert_file_integrity(download_path, expected_file_hash, "md5")
 
                 # Test that file uploaded
@@ -166,25 +160,23 @@ class TestDoabTelescope(ObservatoryTestCase):
                 self.assert_cleanup(download_folder, extract_folder, transform_folder)
 
             # second run
-            with env.create_dag_run(dag, self.second_execution_date):
+            with env.create_dag_run(dag, self.second_execution_date) as m_dag_run:
                 # Test that all dependencies are specified: no error should be thrown
                 env.run_task(telescope.check_dependencies.__name__)
 
-                # Test list releases task with files available
-                ti = env.run_task(telescope.get_release_info.__name__)
-                start_date, end_date, first_release = ti.xcom_pull(
-                    key=DoabTelescope.RELEASE_INFO,
-                    task_ids=telescope.get_release_info.__name__,
-                    include_prior_dates=False,
+                start_date, end_date, first_release = telescope.get_release_info(
+                    execution_date=self.second_execution_date,
+                    dag_run=m_dag_run,
+                    dag=dag,
+                    next_execution_date=pendulum.datetime(2021, 4, 1),
                 )
-                self.assertEqual(release.end_date + timedelta(days=1), pendulum.parse(start_date))
-                self.assertEqual(pendulum.today("UTC") - timedelta(days=1), pendulum.parse(end_date))
+
+                self.assertEqual(release.end_date + timedelta(days=1), start_date)
+                self.assertEqual(pendulum.today("UTC") - timedelta(days=1), end_date)
                 self.assertFalse(first_release)
 
                 # use release info for other tasks
-                release = DoabRelease(
-                    telescope.dag_id, pendulum.parse(start_date), pendulum.parse(end_date), first_release
-                )
+                release = DoabRelease(telescope.dag_id, start_date, end_date, first_release)
 
                 # Test download task
                 with httpretty.enabled():
@@ -193,7 +185,7 @@ class TestDoabTelescope(ObservatoryTestCase):
 
                 self.assertEqual(1, len(release.download_files))
                 download_path = release.download_files[0]
-                expected_file_hash = _hash_file(self.second_download_path, algorithm="md5")
+                expected_file_hash = get_file_hash(file_path=self.second_download_path, algorithm="md5")
                 self.assert_file_integrity(download_path, expected_file_hash, "md5")
 
                 # Test that file uploaded
