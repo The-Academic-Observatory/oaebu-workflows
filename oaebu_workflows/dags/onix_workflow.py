@@ -139,6 +139,20 @@ def get_oaebu_partner_data(project_id, org_name):
     return publisher_data_partners
 
 
+def are_products_filtered(partner):
+    filtered_partners = {
+        "ANU Press": False,
+        "UCL Press": False,
+        "University of Michigan Press": True,
+        "Wits University Press": False
+    }
+
+    if partner in filtered_partners & filtered_partners[partner] is True:
+        return True
+    else:
+        # Default to not filtering
+        return False
+
 # Fetch all ONIX telescopes
 api = make_observatory_api()
 telescope_type = api.get_telescope_type(type_id=TelescopeTypes.onix)
@@ -157,6 +171,7 @@ for telescope in telescopes:
         gcp_project_id=gcp_project_id,
         gcp_bucket_name=gcp_bucket_name,
         data_partners=data_partners,
+        filtered=are_products_filtered(org_name),
     )
 
     globals()[workflow.dag_id] = workflow.make_dag()

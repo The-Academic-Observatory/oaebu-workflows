@@ -209,7 +209,7 @@ empty_work_family_ids as (
 
 onix_ebook_titles_raw as (
     SELECT
-        ISBN13,
+        onix.ISBN13,
         STRUCT(
             Doi,
             ProductForm,
@@ -252,7 +252,8 @@ onix_ebook_titles_raw as (
             ) as authors
         ) as onix
     FROM `{{ project_id }}.{{ onix_dataset_id }}.onix{{ onix_release_date.strftime('%Y%m%d') }}` as onix
-    WHERE ProductForm = "Digital download and online" OR ProductForm = "Digital (delivered electronically)" OR ProductForm = "Digital download"
+    {% if filter_books %}LEFT JOIN `{{ project_id }}.filter.filter` as filtered on filtered.ISBN13 = onix.ISBN13 {% endif %}
+    WHERE ProductForm = "Digital download and online" OR ProductForm = "Digital (delivered electronically)" OR ProductForm = "Digital download"{% if filter_books %} AND filtered.ISBN13 IS NOT NULL{% endif %}
 ),
 
 onix_ebook_titles as (

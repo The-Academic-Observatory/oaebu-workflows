@@ -231,6 +231,7 @@ class OnixWorkflow(Workflow):
         schedule_interval: Optional[str] = "@weekly",
         catchup: Optional[bool] = False,
         data_partners: List[OaebuPartners] = None,
+        filtered: bool = False,
     ):
         """Initialises the workflow object.
         :param org_name: Organisation name.
@@ -244,6 +245,7 @@ class OnixWorkflow(Workflow):
         :param schedule_interval: Scheduled interval for running the DAG.
         :param catchup: Whether to catch up missed DAG runs.
         :param data_partners: OAEBU data sources.
+        :param filtered: Should the book products in the ONIX feed be filtered
         """
 
         self.dag_id = dag_id
@@ -259,6 +261,8 @@ class OnixWorkflow(Workflow):
         self.onix_dataset_id = onix_dataset_id
         self.onix_table_id = onix_table_id
         self.schema_folder = schema_folder
+
+        self.filtered = filtered
 
         # Public Book Data
         self.ao_gcp_project_id = ao_gcp_project_id
@@ -673,6 +677,7 @@ class OnixWorkflow(Workflow):
             oapen_table_id=oapen_table_id,
             ucl_table_id=ucl_table_id,
             public_book_tabel_id=f"{self.ao_gcp_project_id}.{self.public_book_metadata_dataset_id}.{public_book_table_id}",
+            filter_books=self.filtered,
         )
 
         create_bigquery_dataset(project_id=release.project_id, dataset_id=output_dataset, location=data_location)
