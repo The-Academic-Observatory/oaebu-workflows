@@ -151,6 +151,21 @@ configs = [
         kibana_spaces=["oaebu-oapen", "dev-oaebu-oapen"],
         kibana_time_fields=OAEBU_KIBANA_TIME_FIELDS,
     ),
+    ElasticImportConfig(
+        dag_id=make_dag_id(DAG_PREFIX, "university_of_michigan_press_public_data"),
+        project_id="oaebu-public-data",
+        dataset_id="oaebu-umich",
+        bucket_name="oaebu-umich-press-transform",
+        data_location=DATA_LOCATION,
+        file_type=FILE_TYPE_JSONL,
+        sensor_dag_ids=[make_dag_id(DAG_ONIX_WORKFLOW_PREFIX, "university_of_michigan_press")],
+        elastic_mappings_path=ELASTIC_MAPPINGS_PATH,
+        elastic_mappings_func=load_elastic_mappings_oaebu,
+        elastic_cluster_id="oaebu-public-data",
+        kibana_spaces=["oaebu-umich-press", "dev-oaebu-umich-press"],
+        kibana_time_fields=OAEBU_KIBANA_TIME_FIELDS,
+        index_keep_info=index_keep_info,
+    ),
 ]
 
 for config in configs:
@@ -164,6 +179,7 @@ for config in configs:
         sensor_dag_ids=config.sensor_dag_ids,
         elastic_mappings_folder=ELASTIC_MAPPINGS_PATH,
         elastic_mappings_func=config.elastic_mappings_func,
+        elastic_cluster_id=config.elastic_cluster_id,
         kibana_spaces=config.kibana_spaces,
         kibana_time_fields=config.kibana_time_fields,
         index_keep_info=config.index_keep_info,
