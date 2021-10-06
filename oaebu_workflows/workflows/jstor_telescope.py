@@ -154,7 +154,7 @@ class JstorTelescope(OrganisationTelescope):
         schedule_interval: str = "@monthly",
         dataset_id: str = "jstor",
         schema_folder: str = default_schema_folder(),
-        source_format: SourceFormat = SourceFormat.NEWLINE_DELIMITED_JSON,
+        source_format: str = SourceFormat.NEWLINE_DELIMITED_JSON,
         dataset_description: str = "",
         catchup: bool = False,
         airflow_vars: List = None,
@@ -313,6 +313,7 @@ class JstorTelescope(OrganisationTelescope):
         """
         for release in releases:
             release.transform()
+
 
 def create_headers() -> dict:
     """Create a headers dict that can be used to make a request
