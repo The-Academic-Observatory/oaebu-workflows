@@ -104,8 +104,12 @@ class GoogleBooksRelease(OrganisationRelease):
 
         :return: None
         """
+        # Sort files to get same hash for unit tests
+        download_files = self.download_files
+        download_files.sort()
+
         results = defaultdict(list)
-        for file in self.download_files:
+        for file in download_files:
             report_type = "sales" if "Sales" in file else "traffic"
             with open(file, encoding="utf-16") as csv_file:
                 csv_reader = csv.DictReader(csv_file, delimiter="\t")

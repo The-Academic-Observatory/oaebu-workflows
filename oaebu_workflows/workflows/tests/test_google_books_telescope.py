@@ -151,7 +151,7 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
                 "no_download_files": 4,
                 "bq_rows": 8,
                 "traffic_download_hash": ["bea9ad67b4b5c20dac38421090941482", "db4dca44d5231e0c4e2ad95db41b79b6"],
-                "traffic_transform_hash": "2efc38f3",
+                "traffic_transform_hash": "cca664c2",
                 "sales_download_hash": ["d7f61bf2dc44a6c0104f15b0ef588815", "6496518be1ea73694d0a8f89c0b42f20"],
                 "sales_transform_hash": "cbeae337",
                 "test_files": {
