@@ -312,14 +312,12 @@ class TestOapenMetadataTelescopeDag(ObservatoryTestCase):
                     ti = env.run_task(telescope.bq_load_partition.__name__, dag, execution_date)
                     self.assertEqual(ti.state, "skipped")
 
-                    # Test bq_delete_old
-                    ti = env.run_task(telescope.bq_delete_old.__name__, dag, execution_date)
-                    self.assertEqual(ti.state, "success")
+                    # Test delete old task is skipped for the first release
+                    ti = env.run_task(telescope.bq_delete_old.__name__)
+                    self.assertEqual(ti.state, "skipped")
 
                     # Test bq_append_new
                     env.run_task(telescope.bq_append_new.__name__, dag, execution_date)
-
-                    partition_table_id = f"{release.dag_id}"
                     table_id = f"{self.project_id}.{telescope.dataset_id}.metadata"
                     expected_rows = 15310
                     self.assert_table_integrity(table_id, expected_rows)
@@ -332,5 +330,4 @@ class TestOapenMetadataTelescopeDag(ObservatoryTestCase):
                     )
 
                     env.run_task(telescope.cleanup.__name__, dag, execution_date)
-
                     self.assert_cleanup(download_folder, extract_folder, transform_folder)
