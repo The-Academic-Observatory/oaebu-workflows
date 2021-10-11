@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Author: Aniek Roelofs
 
 import csv
 import logging
@@ -19,21 +20,17 @@ import os
 from typing import Tuple
 
 import pendulum
-from pendulum.parsing.exceptions import ParserError
 from airflow.exceptions import AirflowException
-from airflow.models.taskinstance import TaskInstance
-
-# Author: Aniek Roelofs
-from oaebu_workflows.config import schema_folder as default_schema_folder
+from pendulum.parsing.exceptions import ParserError
 from observatory.platform.utils.airflow_utils import AirflowVars
 from observatory.platform.utils.file_utils import list_to_jsonl_gz
 from observatory.platform.utils.url_utils import get_user_agent, retry_session
-from observatory.platform.utils.workflow_utils import convert
-from observatory.platform.utils.workflow_utils import upload_files_from_list
+from observatory.platform.utils.workflow_utils import convert, upload_files_from_list
 from observatory.platform.workflows.stream_telescope import (
     StreamRelease,
     StreamTelescope,
 )
+from oaebu_workflows.config import schema_folder as default_schema_folder
 
 
 class DoabRelease(StreamRelease):
@@ -167,7 +164,6 @@ class DoabTelescope(StreamTelescope):
         schedule_interval: str = "@monthly",
         dataset_id: str = "doab",
         merge_partition_field: str = "id",
-        bq_merge_days: int = 7,
         schema_folder: str = default_schema_folder(),
         airflow_vars: list = None,
     ):
@@ -185,7 +181,6 @@ class DoabTelescope(StreamTelescope):
             schedule_interval,
             dataset_id,
             merge_partition_field,
-            bq_merge_days,
             schema_folder,
             airflow_vars=airflow_vars,
         )

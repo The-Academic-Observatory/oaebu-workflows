@@ -141,7 +141,6 @@ class OapenMetadataTelescope(StreamTelescope):
         schedule_interval: str = "@weekly",
         dataset_id: str = "oapen",
         merge_partition_field: str = "id",
-        bq_merge_days: int = 7,
         schema_folder: str = default_schema_folder(),
         schema_prefix: str = "oapen_",
         airflow_vars: List = None,
@@ -153,7 +152,6 @@ class OapenMetadataTelescope(StreamTelescope):
         :param schedule_interval: the schedule interval of the DAG.
         :param dataset_id: the dataset id.
         :param merge_partition_field: the BigQuery field used to match partitions for a merge
-        :param bq_merge_days: how often partitions should be merged (every x days)
         :param schema_folder: the SQL schema path.
         :param schema_prefix: the prefix used to find the schema path
         :param airflow_vars: list of airflow variable keys, for each variable it is checked if it exists in airflow
@@ -173,7 +171,6 @@ class OapenMetadataTelescope(StreamTelescope):
             schedule_interval,
             dataset_id,
             merge_partition_field,
-            bq_merge_days,
             schema_folder,
             schema_prefix=schema_prefix,
             airflow_vars=airflow_vars,

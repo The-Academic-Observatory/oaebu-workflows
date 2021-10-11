@@ -16,20 +16,20 @@
 
 import os
 from datetime import timedelta
-from unittest.mock import MagicMock
 
 import httpretty
 import pendulum
-from croniter import croniter
-from oaebu_workflows.config import test_fixtures_folder
-from oaebu_workflows.workflows.doab_telescope import DoabRelease, DoabTelescope
+from google.cloud import bigquery
 from observatory.platform.utils.file_utils import get_file_hash
 from observatory.platform.utils.test_utils import (
     ObservatoryEnvironment,
     ObservatoryTestCase,
     module_file_path,
 )
-from observatory.platform.utils.workflow_utils import blob_name, table_ids_from_path
+from observatory.platform.utils.workflow_utils import blob_name, create_date_table_id, table_ids_from_path
+
+from oaebu_workflows.config import test_fixtures_folder
+from oaebu_workflows.workflows.doab_telescope import DoabRelease, DoabTelescope
 
 
 class TestDoabTelescope(ObservatoryTestCase):
@@ -139,9 +139,9 @@ class TestDoabTelescope(ObservatoryTestCase):
                 ti = env.run_task(telescope.bq_load_partition.__name__)
                 self.assertEqual(ti.state, "skipped")
 
-                # Test delete old task is in success state, without doing anything
+                # Test delete old task is skipped for the first release
                 ti = env.run_task(telescope.bq_delete_old.__name__)
-                self.assertEqual(ti.state, "success")
+                self.assertEqual(ti.state, "skipped")
 
                 # Test append new creates table
                 env.run_task(telescope.bq_append_new.__name__)
@@ -207,7 +207,8 @@ class TestDoabTelescope(ObservatoryTestCase):
                 # Test that load partition task creates partition
                 env.run_task(telescope.bq_load_partition.__name__)
                 main_table_id, partition_table_id = table_ids_from_path(transform_path)
-                table_id = f"{self.project_id}.{telescope.dataset_id}.{partition_table_id}"
+                table_id = create_date_table_id(partition_table_id, release.end_date, bigquery.TimePartitioningType.DAY)
+                table_id = f"{self.project_id}.{telescope.dataset_id}.{table_id}"
                 expected_rows = 4
                 self.assert_table_integrity(table_id, expected_rows)
 
