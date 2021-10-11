@@ -67,7 +67,7 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
         """
 
         organisation = Organisation(name=self.organisation_name)
-        dag = GoogleBooksTelescope(organisation, file_suffixes=None).make_dag()
+        dag = GoogleBooksTelescope(organisation, accounts=None).make_dag()
         self.assert_dag_structure(
             {
                 "check_dependencies": ["list_release_info"],
@@ -89,8 +89,8 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
         :return: None
         """
         # Run tests both for telescope with file suffixes and without
-        for file_suffixes in [None, {"file_suffixes": ["foo", "bar"]}]:
-            with self.subTest(file_suffixes=file_suffixes):
+        for accounts in [None, {"accounts": ["foo", "bar"]}]:
+            with self.subTest(accounts=accounts):
                 env = ObservatoryEnvironment(
                     self.project_id, self.data_location, api_host=self.host, api_port=self.api_port
                 )
@@ -115,7 +115,7 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
                         organisation=organisation,
                         modified=dt,
                         created=dt,
-                        extra=file_suffixes,
+                        extra=accounts,
                     )
                     env.api_session.add(telescope)
                     env.api_session.commit()
@@ -130,7 +130,7 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
         """
         params = [
             {
-                "file_suffixes": None,
+                "accounts": None,
                 "no_download_files": 2,
                 "bq_rows": 4,
                 "traffic_download_hash": ["db4dca44d5231e0c4e2ad95db41b79b6"],
@@ -147,7 +147,7 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
                 },
             },
             {
-                "file_suffixes": ["foo", "bar"],
+                "accounts": ["foo", "bar"],
                 "no_download_files": 4,
                 "bq_rows": 8,
                 "traffic_download_hash": ["bea9ad67b4b5c20dac38421090941482", "db4dca44d5231e0c4e2ad95db41b79b6"],
@@ -192,9 +192,7 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
                             gcp_download_bucket=env.download_bucket,
                             gcp_transform_bucket=env.transform_bucket,
                         )
-                        telescope = GoogleBooksTelescope(
-                            org, file_suffixes=setup["file_suffixes"], dataset_id=dataset_id
-                        )
+                        telescope = GoogleBooksTelescope(org, accounts=setup["accounts"], dataset_id=dataset_id)
                         dag = telescope.make_dag()
 
                         # Add SFTP connection
@@ -344,7 +342,7 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
                 gcp_download_bucket="download_bucket",
                 gcp_transform_bucket="transform_bucket",
             )
-            telescope = GoogleBooksTelescope(org, file_suffixes=None, dataset_id="dataset_id")
+            telescope = GoogleBooksTelescope(org, accounts=None, dataset_id="dataset_id")
             file_path = test_fixtures_folder("google_books", "GoogleSalesTransactionReport_2020_02.csv")
             file_name = os.path.basename(file_path)
             release_files = [os.path.join(telescope.sftp_folders.in_progress, file_name)]

@@ -43,9 +43,9 @@ The corresponding tables created in BigQuery are `google.google_books_salesYYYYM
 
 ## Telescope object 'extra'
 This telescope is created using the Observatory API. There is one 'extra' field that is optional for the
- corresponding Telescope object, namely the 'file_suffixes' field.   
+ corresponding Telescope object, namely the 'accounts' field.   
 
-### file_suffixes
+### accounts
 This field is only required if a publisher uses more than 1 Google Books account. 
 If there are multiple accounts for 1 publisher, the reports of these accounts (for the same report type and month
 ) are combined in the 'transform' step of the telescope.  

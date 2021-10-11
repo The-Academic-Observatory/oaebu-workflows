@@ -161,7 +161,7 @@ class GoogleBooksTelescope(OrganisationTelescope):
     def __init__(
         self,
         organisation: Organisation,
-        file_suffixes: Optional[List[str]],
+        accounts: Optional[List[str]],
         dag_id: Optional[str] = None,
         start_date: pendulum.DateTime = pendulum.datetime(2018, 1, 1),
         schedule_interval: str = "@monthly",
@@ -174,6 +174,7 @@ class GoogleBooksTelescope(OrganisationTelescope):
         """Construct a GoogleBooksTelescope instance.
 
         :param organisation: the Organisation the DAG will process.
+        :param accounts: the file suffixes of the Google Books accounts that are linked to the Organisation.
         :param dag_id: the id of the DAG.
         :param start_date: the start date of the DAG.
         :param schedule_interval: the schedule interval of the DAG.
@@ -212,11 +213,11 @@ class GoogleBooksTelescope(OrganisationTelescope):
         self.no_accounts = 1
         # Change sftp regex and file count if file suffixes are given. This can happen when there are multiple Google
         # Books accounts for 1 organisation. Each account has it's own file suffix
-        if file_suffixes:
+        if accounts:
             self.sftp_regex = (
-                r"^Google(SalesTransaction|BooksTraffic)Report_(" + r"|".join(file_suffixes) + r")\d{4}_\d{2}.csv$"
+                r"^Google(SalesTransaction|BooksTraffic)Report_(" + r"|".join(accounts) + r")\d{4}_\d{2}.csv$"
             )
-            self.no_accounts = len(file_suffixes)
+            self.no_accounts = len(accounts)
 
         self.add_setup_task_chain([self.check_dependencies, self.list_release_info])
         self.add_task_chain(

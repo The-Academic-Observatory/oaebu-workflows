@@ -28,6 +28,6 @@ telescopes = api.get_telescopes(telescope_type_id=telescope_type.id, limit=1000)
 
 # Make all telescopes
 for telescope in telescopes:
-    file_suffixes = telescope.extra.get("file_suffixes") if telescope.extra else None
-    workflow = GoogleBooksTelescope(telescope.organisation, file_suffixes)
+    accounts = telescope.extra.get("accounts") if telescope.extra else None
+    workflow = GoogleBooksTelescope(telescope.organisation, accounts)
     globals()[workflow.dag_id] = workflow.make_dag()
