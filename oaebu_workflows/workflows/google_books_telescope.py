@@ -15,6 +15,7 @@
 # Author: Aniek Roelofs
 
 import csv
+import logging
 import os
 import re
 from collections import OrderedDict, defaultdict
@@ -40,7 +41,14 @@ from observatory.platform.workflows.organisation_telescope import OrganisationRe
 
 
 class GoogleBooksRelease(OrganisationRelease):
-    def __init__(self, dag_id: str, release_date: pendulum.DateTime, sftp_files: List[str], organisation: Organisation):
+    def __init__(
+        self,
+        dag_id: str,
+        release_date: pendulum.DateTime,
+        sftp_files: List[str],
+        sftp_regex: str,
+        organisation: Organisation,
+    ):
         """Construct a GoogleBooksRelease.
 
         :param dag_id: the DAG id.
@@ -51,8 +59,8 @@ class GoogleBooksRelease(OrganisationRelease):
         self.dag_id = dag_id
         self.release_date = release_date
 
-        download_files_regex = f"^{GoogleBooksTelescope.DAG_ID_PREFIX}_(sales|traffic)\.csv$"
-        transform_files_regex = f"^{GoogleBooksTelescope.DAG_ID_PREFIX}_(sales|traffic)\.jsonl\.gz$"
+        download_files_regex = sftp_regex
+        transform_files_regex = r"^google_books_(sales|traffic).jsonl.gz$"
         super().__init__(
             self.dag_id,
             release_date,
@@ -62,23 +70,22 @@ class GoogleBooksRelease(OrganisationRelease):
         )
         self.sftp_files = sftp_files
 
-    def download_path(self, remote_path: str) -> str:
+    def download_path(self, path: str) -> str:
         """Creates full download path
 
-        :param remote_path: filepath of remote sftp tile
+        :param path: filepath of remote sftp file
         :return: Download path
         """
-        report_type = "sales" if "Sales" in remote_path else "traffic"
-        return os.path.join(self.download_folder, f"{GoogleBooksTelescope.DAG_ID_PREFIX}_{report_type}.csv")
+        file_name = os.path.basename(path)
+        return os.path.join(self.download_folder, file_name)
 
-    def transform_path(self, path: str) -> str:
+    def transform_path(self, report_type: str) -> str:
         """Creates full transform path
 
-        :param path: filepath of download file
+        :param report_type: Type of report, either 'sales' or 'traffic'
         :return: Transform path
         """
-        report_type = "sales" if "sales" in path else "traffic"
-        return os.path.join(self.transform_folder, f"{GoogleBooksTelescope.DAG_ID_PREFIX}_{report_type}.jsonl.gz")
+        return os.path.join(self.transform_folder, f"google_books_{report_type}.jsonl.gz")
 
     def download(self):
         """Downloads Google Books reports.
@@ -90,21 +97,29 @@ class GoogleBooksRelease(OrganisationRelease):
                 sftp.get(file, localpath=self.download_path(file))
 
     def transform(self):
-        """Transforms sales and traffic report. For both reports it transforms the csv into a jsonl file and
+        """Transforms sales and traffic reports. For both reports it transforms the csv into a jsonl file and
         replaces spaces in the keys with underscores.
+        If there are multiple reports of the same type (in case there are multiple accounts used), the results are
+        combined in one list.
 
         :return: None
         """
-        for file in self.download_files:
-            results = []
+        # Sort files to get same hash for unit tests
+        download_files = self.download_files
+        download_files.sort()
+
+        results = defaultdict(list)
+        for file in download_files:
+            report_type = "sales" if "Sales" in file else "traffic"
             with open(file, encoding="utf-16") as csv_file:
                 csv_reader = csv.DictReader(csv_file, delimiter="\t")
                 for row in csv_reader:
                     transformed_row = OrderedDict((convert(k.replace("%", "Perc")), v) for k, v in row.items())
-                    if "sales" in file:
+                    # Sales transaction report
+                    if report_type == "sales":
                         transaction_date = pendulum.from_format(transformed_row["Transaction_Date"], "MM/DD/YY")
 
-                        # sanity check that transaction date is in month of release date
+                        # Sanity check that transaction date is in month of release date
                         if self.release_date.start_of("month") <= transaction_date <= self.release_date.end_of("month"):
                             pass
                         else:
@@ -114,24 +129,28 @@ class GoogleBooksRelease(OrganisationRelease):
                                 f"release month: {self.release_date.strftime('%Y-%m')}"
                             )
 
-                        # transform to valid date format
+                        # Transform to valid date format
                         transformed_row["Transaction_Date"] = transaction_date.strftime("%Y-%m-%d")
 
-                        # remove percentage sign
+                        # Remove percentage sign
                         transformed_row["Publisher_Revenue_Perc"] = transformed_row["Publisher_Revenue_Perc"].strip("%")
-                        # this field is not present for some publishers (UCL Press), for ANU Press the field value is
+                        # This field is not present for some publishers (UCL Press), for ANU Press the field value is
                         # “E-Book”
                         try:
                             transformed_row["Line_of_Business"]
                         except KeyError:
                             transformed_row["Line_of_Business"] = None
+                    # Traffic report
                     else:
-                        # remove percentage sign
+                        # Remove percentage sign
                         transformed_row["Buy_Link_CTR"] = transformed_row["Buy_Link_CTR"].strip("%")
 
-                    results.append(transformed_row)
-            results = add_partition_date(results, self.release_date, bigquery.TimePartitioningType.MONTH)
-            list_to_jsonl_gz(self.transform_path(file), results)
+                    # Append results
+                    results[report_type].append(transformed_row)
+
+        for report_type, report_results in results.items():
+            report_results = add_partition_date(report_results, self.release_date, bigquery.TimePartitioningType.MONTH)
+            list_to_jsonl_gz(self.transform_path(report_type), report_results)
 
 
 class GoogleBooksTelescope(OrganisationTelescope):
@@ -142,6 +161,7 @@ class GoogleBooksTelescope(OrganisationTelescope):
     def __init__(
         self,
         organisation: Organisation,
+        accounts: Optional[List[str]],
         dag_id: Optional[str] = None,
         start_date: pendulum.DateTime = pendulum.datetime(2018, 1, 1),
         schedule_interval: str = "@monthly",
@@ -154,6 +174,7 @@ class GoogleBooksTelescope(OrganisationTelescope):
         """Construct a GoogleBooksTelescope instance.
 
         :param organisation: the Organisation the DAG will process.
+        :param accounts: the file suffixes of the Google Books accounts that are linked to the Organisation.
         :param dag_id: the id of the DAG.
         :param start_date: the start date of the DAG.
         :param schedule_interval: the schedule interval of the DAG.
@@ -189,6 +210,14 @@ class GoogleBooksTelescope(OrganisationTelescope):
         )
         self.sftp_folders = SftpFolders(dag_id, organisation.name)
         self.sftp_regex = r"^Google(SalesTransaction|BooksTraffic)Report_\d{4}_\d{2}.csv$"
+        self.no_accounts = 1
+        # Change sftp regex and file count if file suffixes are given. This can happen when there are multiple Google
+        # Books accounts for 1 organisation. Each account has it's own file suffix
+        if accounts:
+            self.sftp_regex = (
+                r"^Google(SalesTransaction|BooksTraffic)Report_(" + r"|".join(accounts) + r")\d{4}_\d{2}.csv$"
+            )
+            self.no_accounts = len(accounts)
 
         self.add_setup_task_chain([self.check_dependencies, self.list_release_info])
         self.add_task_chain(
@@ -220,13 +249,18 @@ class GoogleBooksTelescope(OrganisationTelescope):
         releases = []
         for release_date, sftp_files in reports_info.items():
             releases.append(
-                GoogleBooksRelease(self.dag_id, pendulum.parse(release_date), sftp_files, self.organisation)
+                GoogleBooksRelease(
+                    self.dag_id, pendulum.parse(release_date), sftp_files, self.sftp_regex, self.organisation
+                )
             )
         return releases
 
     def list_release_info(self, **kwargs):
         """Lists all Google Books releases available on the SFTP server and publishes sftp file paths and
         release_date's as an XCom.
+        When an organisation has multiple Google Books accounts, it will check if reports are available for all
+        accounts for the specific report type and month. Only if this is the case all reports are processed in this
+        release.
 
         :param kwargs: the context passed from the BranchPythonOperator. See
         https://airflow.apache.org/docs/stable/macros-ref.html
@@ -234,17 +268,39 @@ class GoogleBooksTelescope(OrganisationTelescope):
         :return: the identifier of the task to execute next.
         """
 
-        release_info = defaultdict(list)
-
+        reports = defaultdict(list)
+        # List all reports in the 'upload' folder of the organisation
         with make_sftp_connection() as sftp:
             files = sftp.listdir(self.sftp_folders.upload)
             for file_name in files:
-                if re.match(self.sftp_regex, file_name):
+                match = re.match(self.sftp_regex, file_name)
+                if match:
+                    # Get the release date from file name
                     date_str = file_name[-11:].strip(".csv")
                     release_date = pendulum.from_format(date_str, "YYYY_MM").end_of("month")
                     release_date = release_date.format("YYYYMMDD")
+
+                    # Get the report type from file name
+                    report_type = match.group(1)
+
+                    # Create the full path of the file for the 'in progress' folder
                     sftp_file = os.path.join(self.sftp_folders.in_progress, file_name)
-                    release_info[release_date].append(sftp_file)
+
+                    # Append report
+                    reports[report_type + release_date].append(sftp_file)
+
+        # Check that for each report type + date combination there is a report available for each Google Books account
+        release_info = defaultdict(list)
+        for report, sftp_files in reports.items():
+            release_date = report[-8:]
+            if len(sftp_files) == self.no_accounts:
+                release_info[release_date] += sftp_files
+            else:
+                logging.warning(
+                    f"Reports are missing for some Google Books accounts for the month of: {release_date}. "
+                    f"There are {len(sftp_files)} {report} reports available, but {self.no_accounts} "
+                    f"accounts. Reports that are available: {sftp_files}"
+                )
 
         continue_dag = len(release_info)
         if continue_dag:
