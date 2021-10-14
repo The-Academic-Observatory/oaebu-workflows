@@ -46,7 +46,7 @@ from observatory.platform.workflows.snapshot_telescope import (
 
 
 class OnixRelease(SnapshotRelease):
-    DOWNLOAD_FILES_REGEX = r".*\.xml"
+    DOWNLOAD_FILES_REGEX = r"^.*\.(onx|xml)$"
     TRANSFORM_FILES_REGEX = "onix.jsonl"
     ONIX_PARSER_NAME = "coki-onix-parser.jar"
     ONIX_PARSER_URL = "https://github.com/The-Academic-Observatory/onix-parser/releases/download/v1.1/coki-onix-parser-1.1-SNAPSHOT-shaded.jar"
