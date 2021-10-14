@@ -660,6 +660,11 @@
         "mode": "NULLABLE",
         "name": "ExtentUnit",
         "type": "STRING"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "ExtentValueRoman",
+        "type": "STRING"
       }
     ],
     "mode": "REPEATED",
