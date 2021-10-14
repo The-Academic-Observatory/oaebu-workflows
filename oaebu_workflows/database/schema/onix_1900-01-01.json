@@ -80,9 +80,26 @@
         "type": "RECORD"
       },
       {
+        "fields": [
+          {
+            "mode": "NULLABLE",
+            "name": "CollectionIdType",
+            "type": "STRING"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "IDValue",
+            "type": "STRING"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "IDTypeName",
+            "type": "STRING"
+          }
+        ],
         "mode": "REPEATED",
         "name": "CollectionIdentifers",
-        "type": "STRING"
+        "type": "RECORD"
       },
       {
         "mode": "NULLABLE",
@@ -268,6 +285,11 @@
       {
         "mode": "REPEATED",
         "name": "ProductRelationCodes",
+        "type": "STRING"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "PID_Proprietary",
         "type": "STRING"
       }
     ],
@@ -601,6 +623,11 @@
         "mode": "NULLABLE",
         "name": "ISNI",
         "type": "STRING"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "CorprorateName",
+        "type": "STRING"
       }
     ],
     "mode": "REPEATED",
@@ -628,6 +655,11 @@
         "mode": "NULLABLE",
         "name": "SubjectSchemeVersion",
         "type": "FLOAT"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "SubjectSchemeName",
+        "type": "STRING"
       },
       {
         "mode": "NULLABLE",
