@@ -49,8 +49,8 @@ class OnixRelease(SnapshotRelease):
     DOWNLOAD_FILES_REGEX = r"^.*\.(onx|xml)$"
     TRANSFORM_FILES_REGEX = "onix.jsonl"
     ONIX_PARSER_NAME = "coki-onix-parser.jar"
-    ONIX_PARSER_URL = "https://github.com/The-Academic-Observatory/onix-parser/releases/download/v1.1/coki-onix-parser-1.1-SNAPSHOT-shaded.jar"
-    ONIX_PARSER_MD5 = "e752ffdeb015e7a269cad6a6f9abdfed"
+    ONIX_PARSER_URL = "https://github.com/The-Academic-Observatory/onix-parser/releases/download/v1.1/coki-onix-parser-1.2-SNAPSHOT-shaded.jar"
+    ONIX_PARSER_MD5 = "bf223124df9e93cdb1cbb5d7dc71080c"
 
     def __init__(
         self,
