@@ -222,7 +222,7 @@ class OapenIrusUkTelescope(OrganisationTelescope):
     # cloud function
     FUNCTION_MD5_HASH = "46b07fbc9e70756b3cc80cb9ab38934c"  # MD5 hash of the zipped source code
     FUNCTION_BLOB_NAME = "cloud_function_source_code.zip"  # blob name of zipped source code
-    OAPEN_API_URL = "https://library.oapen.org/rest/search?query=publisher.name:{publisher_name}&expand=metadata"
+    OAPEN_API_URL = "https://library.oapen.org/rest/search?query=publisher.name:{publisher_name}"
 
     def __init__(
         self,
@@ -379,8 +379,8 @@ def get_publisher_uuid(publisher_name: str) -> str:
     :return: The publisher UUID
     """
     url = OapenIrusUkTelescope.OAPEN_API_URL.format(publisher_name=publisher_name)
-    response = requests.get(url)
     logging.info(f"Getting publisher UUID for publisher: {publisher_name}, from: {url}")
+    response = requests.get(url)
     if response.status_code != 200:
         raise RuntimeError(
             f"Request to get publisher UUID unsuccessful, url: {url}, status code: {response.status_code}, "
