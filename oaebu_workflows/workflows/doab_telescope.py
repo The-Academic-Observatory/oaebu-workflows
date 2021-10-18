@@ -96,6 +96,7 @@ class DoabRelease(StreamRelease):
             "dc.contributor.author",
             "dc.contributor.editor",
             "dc.date.available",
+            "dc.date.accessioned",
             "dc.date.issued",
             "dc.date.submitted",
             "dc.dateSubmitted",
