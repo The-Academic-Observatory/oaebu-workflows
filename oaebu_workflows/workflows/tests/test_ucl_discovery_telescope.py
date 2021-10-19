@@ -155,7 +155,7 @@ class TestUclDiscoveryTelescope(ObservatoryTestCase):
                 env.add_connection(conn)
 
                 # Test that all dependencies are specified: no error should be thrown
-                env.run_task(telescope.check_dependencies.__name__, dag, execution_date)
+                env.run_task(telescope.check_dependencies.__name__)
 
                 # Use release to check tasks
                 cron_schedule = dag.normalized_schedule_interval
@@ -165,29 +165,29 @@ class TestUclDiscoveryTelescope(ObservatoryTestCase):
 
                 # Test download
                 with vcr.use_cassette(self.metadata_cassette):
-                    env.run_task(telescope.download.__name__, dag, execution_date)
+                    env.run_task(telescope.download.__name__)
                 self.assertEqual(1, len(release.download_files))
                 for file in release.download_files:
                     self.assert_file_integrity(file, self.download_hash, "md5")
 
                 # Test upload downloaded
-                env.run_task(telescope.upload_downloaded.__name__, dag, execution_date)
+                env.run_task(telescope.upload_downloaded.__name__)
                 for file in release.download_files:
                     self.assert_blob_integrity(env.download_bucket, blob_name(file), file)
 
                 # Test that file transformed
-                env.run_task(telescope.transform.__name__, dag, execution_date)
+                env.run_task(telescope.transform.__name__)
                 self.assertEqual(1, len(release.transform_files))
                 for file in release.transform_files:
                     self.assert_file_integrity(file, self.transform_hash, "gzip_crc")
 
                 # Test that transformed file uploaded
-                env.run_task(telescope.upload_transformed.__name__, dag, execution_date)
+                env.run_task(telescope.upload_transformed.__name__)
                 for file in release.transform_files:
                     self.assert_blob_integrity(env.transform_bucket, blob_name(file), file)
 
                 # Test that data loaded into BigQuery
-                env.run_task(telescope.bq_load_partition.__name__, dag, execution_date)
+                env.run_task(telescope.bq_load_partition.__name__)
                 for file in release.transform_files:
                     table_id, _ = table_ids_from_path(file)
                     table_id = f'{self.project_id}.{dataset_id}.{table_id}${release.release_date.strftime("%Y%m")}'
@@ -200,7 +200,7 @@ class TestUclDiscoveryTelescope(ObservatoryTestCase):
                     release.extract_folder,
                     release.transform_folder,
                 )
-                env.run_task(telescope.cleanup.__name__, dag, execution_date)
+                env.run_task(telescope.cleanup.__name__)
                 self.assert_cleanup(download_folder, extract_folder, transform_folder)
 
     @patch("oaebu_workflows.workflows.ucl_discovery_telescope.retry_session")

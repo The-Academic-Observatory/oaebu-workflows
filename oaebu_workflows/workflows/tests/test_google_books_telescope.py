@@ -202,7 +202,7 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
                         env.add_connection(conn)
                         with env.create_dag_run(dag, execution_date):
                             # Test that all dependencies are specified: no error should be thrown
-                            env.run_task(telescope.check_dependencies.__name__, dag, execution_date)
+                            env.run_task(telescope.check_dependencies.__name__)
 
                             # Add file to SFTP server
                             local_sftp_folders = SftpFolders(telescope.dag_id, self.organisation_name, sftp_root)
@@ -212,7 +212,7 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
                                 shutil.copy(file_path, upload_file)
 
                             # Check that the correct release info is returned via Xcom
-                            ti = env.run_task(telescope.list_release_info.__name__, dag, execution_date)
+                            ti = env.run_task(telescope.list_release_info.__name__)
                             release_info = ti.xcom_pull(
                                 key=GoogleBooksTelescope.RELEASE_INFO,
                                 task_ids=telescope.list_release_info.__name__,
@@ -246,7 +246,7 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
                                 )
 
                             # Test move file to in progress
-                            env.run_task(telescope.move_files_to_in_progress.__name__, dag, execution_date)
+                            env.run_task(telescope.move_files_to_in_progress.__name__)
                             for release in releases:
                                 for file in release.sftp_files:
                                     file_name = os.path.basename(file)
@@ -257,7 +257,7 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
                                     self.assertTrue(os.path.isfile(in_progress_file))
 
                             # Test download
-                            env.run_task(telescope.download.__name__, dag, execution_date)
+                            env.run_task(telescope.download.__name__)
                             for release in releases:
                                 self.assertEqual(setup["no_download_files"], len(release.download_files))
                                 files = release.download_files
@@ -274,13 +274,13 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
                                     self.assert_file_integrity(file, expected_file_hash, "md5")
 
                             # Test upload downloaded
-                            env.run_task(telescope.upload_downloaded.__name__, dag, execution_date)
+                            env.run_task(telescope.upload_downloaded.__name__)
                             for release in releases:
                                 for file in release.download_files:
                                     self.assert_blob_integrity(env.download_bucket, blob_name(file), file)
 
                             # Test that file transformed
-                            env.run_task(telescope.transform.__name__, dag, execution_date)
+                            env.run_task(telescope.transform.__name__)
                             for release in releases:
                                 self.assertEqual(2, len(release.transform_files))
                                 for file in release.transform_files:
@@ -291,13 +291,13 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
                                     self.assert_file_integrity(file, expected_file_hash, "gzip_crc")
 
                             # Test that transformed file uploaded
-                            env.run_task(telescope.upload_transformed.__name__, dag, execution_date)
+                            env.run_task(telescope.upload_transformed.__name__)
                             for release in releases:
                                 for file in release.transform_files:
                                     self.assert_blob_integrity(env.transform_bucket, blob_name(file), file)
 
                             # Test that data loaded into BigQuery
-                            env.run_task(telescope.bq_load_partition.__name__, dag, execution_date)
+                            env.run_task(telescope.bq_load_partition.__name__)
                             for release in releases:
                                 for file in release.transform_files:
                                     table_id, _ = table_ids_from_path(file)
@@ -306,7 +306,7 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
                                     self.assert_table_integrity(table_id, expected_rows)
 
                             # Test move files to finished
-                            env.run_task(telescope.move_files_to_finished.__name__, dag, execution_date)
+                            env.run_task(telescope.move_files_to_finished.__name__)
                             for release in releases:
                                 for file in release.sftp_files:
                                     file_name = os.path.basename(file)
@@ -322,7 +322,7 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
                                 release.extract_folder,
                                 release.transform_folder,
                             )
-                            env.run_task(telescope.cleanup.__name__, dag, execution_date)
+                            env.run_task(telescope.cleanup.__name__)
                             self.assert_cleanup(download_folder, extract_folder, transform_folder)
 
     @patch("observatory.platform.utils.workflow_utils.Variable.get")

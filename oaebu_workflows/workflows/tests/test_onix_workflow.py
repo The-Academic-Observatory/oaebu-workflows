@@ -1741,7 +1741,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
             with env.create_dag_run(workflow_dag, start_date):
                 for task_id in sensor_dag_ids:
                     ti = env.run_task(
-                        f"{make_dag_id(task_id, org_name)}_sensor", workflow_dag, execution_date=start_date
+                        f"{make_dag_id(task_id, org_name)}_sensor"
                     )
                     self.assertEqual(expected_state, ti.state)
 
@@ -1753,7 +1753,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 dag = make_dummy_dag(make_dag_id(dag_id, org_name), execution_date)
                 with env.create_dag_run(dag, execution_date):
                     # Running all of a DAGs tasks sets the DAG to finished
-                    ti = env.run_task("dummy_task", dag, execution_date=execution_date)
+                    ti = env.run_task("dummy_task")
                     self.assertEqual(expected_state, ti.state)
 
             # Run end to end tests for DOI DAG
@@ -1761,7 +1761,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 # Test that sensors go into 'success' state as the DAGs that they are waiting for have finished
                 for task_id in sensor_dag_ids:
                     ti = env.run_task(
-                        f"{make_dag_id(task_id, org_name)}_sensor", workflow_dag, execution_date=execution_date
+                        f"{make_dag_id(task_id, org_name)}_sensor"
                     )
                     self.assertEqual(expected_state, ti.state)
 
@@ -1784,23 +1784,23 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 )
 
                 # Aggregate works
-                ti = env.run_task(telescope.aggregate_works.__name__, workflow_dag, execution_date)
+                ti = env.run_task(telescope.aggregate_works.__name__)
                 self.assertEqual(expected_state, ti.state)
 
                 # Upload aggregation tables
-                ti = env.run_task(telescope.upload_aggregation_tables.__name__, workflow_dag, execution_date)
+                ti = env.run_task(telescope.upload_aggregation_tables.__name__)
                 self.assertEqual(expected_state, ti.state)
 
                 # Load work id table into bigquery
-                ti = env.run_task(telescope.bq_load_workid_lookup.__name__, workflow_dag, execution_date)
+                ti = env.run_task(telescope.bq_load_workid_lookup.__name__)
                 self.assertEqual(expected_state, ti.state)
 
                 # Load work id errors table into bigquery
-                ti = env.run_task(telescope.bq_load_workid_lookup_errors.__name__, workflow_dag, execution_date)
+                ti = env.run_task(telescope.bq_load_workid_lookup_errors.__name__)
                 self.assertEqual(expected_state, ti.state)
 
                 # Load work family id table into bigquery
-                ti = env.run_task(telescope.bq_load_workfamilyid_lookup.__name__, workflow_dag, execution_date)
+                ti = env.run_task(telescope.bq_load_workfamilyid_lookup.__name__)
                 self.assertEqual(expected_state, ti.state)
 
                 # Create oaebu intermediate tables
@@ -1809,122 +1809,92 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                     oaebu_table = data_partner.gcp_table_id
 
                     ti = env.run_task(
-                        f"{telescope.create_oaebu_intermediate_table.__name__}.{oaebu_dataset}.{oaebu_table}",
-                        workflow_dag,
-                        execution_date,
+                        f"{telescope.create_oaebu_intermediate_table.__name__}.{oaebu_dataset}.{oaebu_table}"
                     )
                     self.assertEqual(expected_state, ti.state)
 
                 # Create oaebu output tables
                 ti = env.run_task(
-                    telescope.create_oaebu_book_product_table.__name__,
-                    workflow_dag,
-                    execution_date,
+                    telescope.create_oaebu_book_product_table.__name__
                 )
                 self.assertEqual(expected_state, ti.state)
 
                 # ONIX isbn check
                 ti = env.run_task(
-                    telescope.create_oaebu_data_qa_onix_isbn.__name__,
-                    workflow_dag,
-                    execution_date,
+                    telescope.create_oaebu_data_qa_onix_isbn.__name__
                 )
                 self.assertEqual(expected_state, ti.state)
 
                 # ONIX aggregate metrics
                 ti = env.run_task(
-                    telescope.create_oaebu_data_qa_onix_aggregate.__name__,
-                    workflow_dag,
-                    execution_date,
+                    telescope.create_oaebu_data_qa_onix_aggregate.__name__
                 )
                 self.assertEqual(expected_state, ti.state)
 
                 # JSTOR country isbn check
                 ti = env.run_task(
-                    f"{telescope.create_oaebu_data_qa_jstor_isbn.__name__}.{data_partners[0].gcp_dataset_id}.{data_partners[0].gcp_table_id}",
-                    workflow_dag,
-                    execution_date,
+                    f"{telescope.create_oaebu_data_qa_jstor_isbn.__name__}.{data_partners[0].gcp_dataset_id}.{data_partners[0].gcp_table_id}"
                 )
                 self.assertEqual(expected_state, ti.state)
 
                 # JSTOR country intermediate unmatched isbns
                 ti = env.run_task(
-                    f"{telescope.create_oaebu_data_qa_intermediate_unmatched_workid.__name__}.{data_partners[0].gcp_dataset_id}.{data_partners[0].gcp_table_id}",
-                    workflow_dag,
-                    execution_date,
+                    f"{telescope.create_oaebu_data_qa_intermediate_unmatched_workid.__name__}.{data_partners[0].gcp_dataset_id}.{data_partners[0].gcp_table_id}"
                 )
                 self.assertEqual(expected_state, ti.state)
 
                 # JSTOR institution isbn check
                 ti = env.run_task(
-                    f"{telescope.create_oaebu_data_qa_jstor_isbn.__name__}.{data_partners[1].gcp_dataset_id}.{data_partners[1].gcp_table_id}",
-                    workflow_dag,
-                    execution_date,
+                    f"{telescope.create_oaebu_data_qa_jstor_isbn.__name__}.{data_partners[1].gcp_dataset_id}.{data_partners[1].gcp_table_id}"
                 )
                 self.assertEqual(expected_state, ti.state)
 
                 # JSTOR institution intermediate unmatched isbns
                 ti = env.run_task(
-                    f"{telescope.create_oaebu_data_qa_intermediate_unmatched_workid.__name__}.{data_partners[1].gcp_dataset_id}.{data_partners[1].gcp_table_id}",
-                    workflow_dag,
-                    execution_date,
+                    f"{telescope.create_oaebu_data_qa_intermediate_unmatched_workid.__name__}.{data_partners[1].gcp_dataset_id}.{data_partners[1].gcp_table_id}"
                 )
                 self.assertEqual(expected_state, ti.state)
 
                 # Google Books Sales isbn check
                 ti = env.run_task(
-                    telescope.create_oaebu_data_qa_google_books_sales_isbn.__name__,
-                    workflow_dag,
-                    execution_date,
+                    telescope.create_oaebu_data_qa_google_books_sales_isbn.__name__
                 )
                 self.assertEqual(expected_state, ti.state)
 
                 # Google Books Sales intermediate unmatched isbns
                 ti = env.run_task(
-                    f"{telescope.create_oaebu_data_qa_intermediate_unmatched_workid.__name__}.{data_partners[2].gcp_dataset_id}.{data_partners[2].gcp_table_id}",
-                    workflow_dag,
-                    execution_date,
+                    f"{telescope.create_oaebu_data_qa_intermediate_unmatched_workid.__name__}.{data_partners[2].gcp_dataset_id}.{data_partners[2].gcp_table_id}"
                 )
                 self.assertEqual(expected_state, ti.state)
 
                 # Google Books Traffic isbn check
                 ti = env.run_task(
-                    telescope.create_oaebu_data_qa_google_books_traffic_isbn.__name__,
-                    workflow_dag,
-                    execution_date,
+                    telescope.create_oaebu_data_qa_google_books_traffic_isbn.__name__
                 )
                 self.assertEqual(expected_state, ti.state)
 
                 # Google Books Traffic intermediate unmatched isbns
                 ti = env.run_task(
-                    f"{telescope.create_oaebu_data_qa_intermediate_unmatched_workid.__name__}.{data_partners[3].gcp_dataset_id}.{data_partners[3].gcp_table_id}",
-                    workflow_dag,
-                    execution_date,
+                    f"{telescope.create_oaebu_data_qa_intermediate_unmatched_workid.__name__}.{data_partners[3].gcp_dataset_id}.{data_partners[3].gcp_table_id}"
                 )
                 self.assertEqual(expected_state, ti.state)
 
                 # OAPEN IRUS UK isbn check
                 ti = env.run_task(
-                    telescope.create_oaebu_data_qa_oapen_irus_uk_isbn.__name__,
-                    workflow_dag,
-                    execution_date,
+                    telescope.create_oaebu_data_qa_oapen_irus_uk_isbn.__name__
                 )
                 self.assertEqual(expected_state, ti.state)
 
                 # OAPEN IRUS UK intermediate unmatched isbns
                 ti = env.run_task(
-                    f"{telescope.create_oaebu_data_qa_intermediate_unmatched_workid.__name__}.{data_partners[4].gcp_dataset_id}.{data_partners[4].gcp_table_id}",
-                    workflow_dag,
-                    execution_date,
+                    f"{telescope.create_oaebu_data_qa_intermediate_unmatched_workid.__name__}.{data_partners[4].gcp_dataset_id}.{data_partners[4].gcp_table_id}"
                 )
                 self.assertEqual(expected_state, ti.state)
 
                 if include_google_analytics:
                     # Google Analytics isbn check
                     env.run_task(
-                        telescope.create_oaebu_data_qa_google_analytics_isbn.__name__,
-                        workflow_dag,
-                        execution_date,
+                        telescope.create_oaebu_data_qa_google_analytics_isbn.__name__
                     )
 
                     # Google Books Analytics unmatched isbns
@@ -1932,9 +1902,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                     print(f"{data_partners[5].gcp_dataset_id}.{data_partners[5].gcp_table_id}")
                     print("---------------------------------------")
                     env.run_task(
-                        f"{telescope.create_oaebu_data_qa_intermediate_unmatched_workid.__name__}.{data_partners[5].gcp_dataset_id}.{data_partners[5].gcp_table_id}",
-                        workflow_dag,
-                        execution_date,
+                        f"{telescope.create_oaebu_data_qa_intermediate_unmatched_workid.__name__}.{data_partners[5].gcp_dataset_id}.{data_partners[5].gcp_table_id}"
                     )
 
                 # Export oaebu elastic tables
@@ -1955,17 +1923,13 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
 
                 for table in export_tables:
                     ti = env.run_task(
-                        f"{telescope.export_oaebu_table.__name__}.{table}",
-                        workflow_dag,
-                        execution_date,
+                        f"{telescope.export_oaebu_table.__name__}.{table}"
                     )
                     self.assertEqual(expected_state, ti.state)
 
                 # Export oaebu elastic qa table
                 ti = env.run_task(
-                    telescope.export_oaebu_qa_metrics.__name__,
-                    workflow_dag,
-                    execution_date,
+                    telescope.export_oaebu_qa_metrics.__name__
                 )
                 self.assertEqual(expected_state, ti.state)
 
@@ -2176,7 +2140,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 self.assertTrue("112" in isbns)
 
                 # Cleanup
-                env.run_task(telescope.cleanup.__name__, workflow_dag, execution_date)
+                env.run_task(telescope.cleanup.__name__)
 
     def test_telescope(self):
         """Test that ONIX Workflow runs when Google Analytics is not included"""

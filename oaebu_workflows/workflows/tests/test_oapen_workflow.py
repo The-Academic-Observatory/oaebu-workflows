@@ -173,16 +173,12 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
             expected_state = "success"
             with env.create_dag_run(workflow_dag, start_date):
                 ti = env.run_task(
-                    f"{make_dag_id(self.irus_uk_dag_id_prefix, org_name)}_sensor",
-                    workflow_dag,
-                    execution_date=start_date,
+                    f"{make_dag_id(self.irus_uk_dag_id_prefix, org_name)}_sensor"
                 )
                 self.assertEqual(expected_state, ti.state)
 
                 ti = env.run_task(
-                    f"oapen_metadata_sensor",
-                    workflow_dag,
-                    execution_date=start_date,
+                    f"oapen_metadata_sensor"
                 )
                 self.assertEqual(expected_state, ti.state)
 
@@ -194,34 +190,30 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
             dag = make_dummy_dag(make_dag_id(self.irus_uk_dag_id_prefix, org_name), execution_date)
             with env.create_dag_run(dag, execution_date):
                 # Running all of a DAGs tasks sets the DAG to finished
-                ti = env.run_task("dummy_task", dag, execution_date=execution_date)
+                ti = env.run_task("dummy_task")
                 self.assertEqual(expected_state, ti.state)
 
             dag = make_dummy_dag("oapen_metadata", execution_date)
             with env.create_dag_run(dag, execution_date):
                 # Running all of a DAGs tasks sets the DAG to finished
-                ti = env.run_task("dummy_task", dag, execution_date=execution_date)
+                ti = env.run_task("dummy_task")
                 self.assertEqual(expected_state, ti.state)
 
             # Run end to end tests for the DAG
             with env.create_dag_run(workflow_dag, execution_date):
                 # Test that sensors go into 'success' state as the DAGs that they are waiting for have finished
                 ti = env.run_task(
-                    f"{make_dag_id(self.irus_uk_dag_id_prefix, org_name)}_sensor",
-                    workflow_dag,
-                    execution_date=execution_date,
+                    f"{make_dag_id(self.irus_uk_dag_id_prefix, org_name)}_sensor"
                 )
                 self.assertEqual(expected_state, ti.state)
 
                 ti = env.run_task(
-                    f"oapen_metadata_sensor",
-                    workflow_dag,
-                    execution_date=execution_date,
+                    f"oapen_metadata_sensor"
                 )
                 self.assertEqual(expected_state, ti.state)
 
                 # Check dependencies
-                ti = env.run_task("check_dependencies", workflow_dag, execution_date=execution_date)
+                ti = env.run_task("check_dependencies")
                 self.assertEqual(expected_state, ti.state)
 
                 # Mock make_release
@@ -234,17 +226,13 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
 
                 # Format OAPEN Metadata like ONIX to enable the next steps
                 ti = env.run_task(
-                    workflow.create_onix_formatted_metadata_output_tasks.__name__,
-                    workflow_dag,
-                    execution_date,
+                    workflow.create_onix_formatted_metadata_output_tasks.__name__
                 )
                 self.assertEqual(expected_state, ti.state)
 
                 # Create oaebu output tables
                 ti = env.run_task(
-                    workflow.create_oaebu_book_product_table.__name__,
-                    workflow_dag,
-                    execution_date,
+                    workflow.create_oaebu_book_product_table.__name__
                 )
                 self.assertEqual(expected_state, ti.state)
 
@@ -266,9 +254,7 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
 
                 for table in export_tables:
                     ti = env.run_task(
-                        f"{workflow.export_oaebu_table.__name__}.{table}",
-                        workflow_dag,
-                        execution_date,
+                        f"{workflow.export_oaebu_table.__name__}.{table}"
                     )
                     self.assertEqual(expected_state, ti.state)
 
@@ -300,4 +286,4 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
                 self.assertEqual(len(records), 0)
 
                 # Cleanup
-                env.run_task(workflow.cleanup.__name__, workflow_dag, execution_date)
+                env.run_task(workflow.cleanup.__name__)

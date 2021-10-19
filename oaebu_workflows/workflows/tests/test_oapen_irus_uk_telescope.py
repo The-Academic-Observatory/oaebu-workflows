@@ -196,10 +196,10 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
                 env.add_connection(conn)
 
                 # Test that all dependencies are specified: no error should be thrown
-                env.run_task(telescope.check_dependencies.__name__, dag, execution_date)
+                env.run_task(telescope.check_dependencies.__name__)
 
                 # Test create cloud function task: no error should be thrown
-                env.run_task(telescope.create_cloud_function.__name__, dag, execution_date)
+                env.run_task(telescope.create_cloud_function.__name__)
 
                 # Test call cloud function task: no error should be thrown
                 with httpretty.enabled():
@@ -221,26 +221,26 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
                         f"cloudfunctions.net/{OapenIrusUkTelescope.FUNCTION_NAME}"
                     )
                     httpretty.register_uri(httpretty.POST, url, body="")
-                    env.run_task(telescope.call_cloud_function.__name__, dag, execution_date)
+                    env.run_task(telescope.call_cloud_function.__name__)
 
                 # Test transfer task
                 upload_file_to_cloud_storage(OapenIrusUkTelescope.OAPEN_BUCKET, release.blob_name, self.download_path)
-                env.run_task(telescope.transfer.__name__, dag, execution_date)
+                env.run_task(telescope.transfer.__name__)
                 self.assert_blob_integrity(env.download_bucket, release.blob_name, self.download_path)
 
                 # Test download_transform task
-                env.run_task(telescope.download_transform.__name__, dag, execution_date)
+                env.run_task(telescope.download_transform.__name__)
                 self.assertEqual(1, len(release.transform_files))
                 for file in release.transform_files:
                     self.assert_file_integrity(file, self.transform_hash, "gzip_crc")
 
                 # Test that transformed file uploaded
-                env.run_task(telescope.upload_transformed.__name__, dag, execution_date)
+                env.run_task(telescope.upload_transformed.__name__)
                 for file in release.transform_files:
                     self.assert_blob_integrity(env.transform_bucket, blob_name(file), file)
 
                 # Test that data loaded into BigQuery
-                env.run_task(telescope.bq_load_partition.__name__, dag, execution_date)
+                env.run_task(telescope.bq_load_partition.__name__)
                 for file in release.transform_files:
                     table_id, _ = table_ids_from_path(file)
                     table_id = f'{self.project_id}.{dataset_id}.{table_id}${release.release_date.strftime("%Y%m")}'
@@ -253,7 +253,7 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
                     release.extract_folder,
                     release.transform_folder,
                 )
-                env.run_task(telescope.cleanup.__name__, dag, execution_date)
+                env.run_task(telescope.cleanup.__name__)
                 self.assert_cleanup(download_folder, extract_folder, transform_folder)
 
                 # Delete oapen bucket
