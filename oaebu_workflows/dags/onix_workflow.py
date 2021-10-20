@@ -128,6 +128,11 @@ def get_oaebu_partner_data(project_id, org_name):
         "Wits University Press": [
             OaebuPartnerName.oapen_irus_uk,
         ],
+        "Springer Nature": [
+            OaebuPartnerName.oapen_irus_uk,
+            OaebuPartnerName.google_books_sales,
+            OaebuPartnerName.google_books_traffic,
+        ],
     }
 
     publisher_data_partners = list()

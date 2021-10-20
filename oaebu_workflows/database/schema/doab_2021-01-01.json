@@ -54,6 +54,12 @@
         "type": "INTEGER"
       },
       {
+        "description": "",
+        "mode": "NULLABLE",
+        "name": "acronym",
+        "type": "STRING"
+      },
+      {
         "description": "contributor",
         "mode": "NULLABLE",
         "name": "contributor",
@@ -99,7 +105,7 @@
         "fields": [
           {
             "description": "Date made available in OAPEN. Starts from June 2010",
-            "mode": "NULLABLE",
+            "mode": "REPEATED",
             "name": "accessioned",
             "type": "TIMESTAMP"
           },

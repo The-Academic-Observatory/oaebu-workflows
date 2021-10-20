@@ -128,7 +128,7 @@ class TestDoabTelescope(ObservatoryTestCase):
 
                 self.assertEqual(1, len(release.transform_files))
                 transform_path = release.transform_files[0]
-                expected_file_hash = "ed36b4ac"
+                expected_file_hash = "97a86394"
                 self.assert_file_integrity(transform_path, expected_file_hash, "gzip_crc")
 
                 # Test that transformed file uploaded
@@ -197,7 +197,7 @@ class TestDoabTelescope(ObservatoryTestCase):
 
                 self.assertEqual(1, len(release.transform_files))
                 transform_path = release.transform_files[0]
-                expected_file_hash = "b3e604ba"
+                expected_file_hash = "19f6ba1e"
                 self.assert_file_integrity(transform_path, expected_file_hash, "gzip_crc")
 
                 # Test that transformed file uploaded
