@@ -171,7 +171,7 @@ class TestOnixTelescope(ObservatoryTestCase):
                 env.add_connection(conn)
                 with env.create_dag_run(dag, execution_date):
                     # Test that all dependencies are specified: no error should be thrown
-                    ti = env.run_task(telescope.check_dependencies.__name__, dag, execution_date)
+                    ti = env.run_task(telescope.check_dependencies.__name__)
                     self.assertEqual(ti.state, State.SUCCESS)
 
                     # Add ONIX file to SFTP server
@@ -184,7 +184,7 @@ class TestOnixTelescope(ObservatoryTestCase):
                     shutil.copy(onix_test_file, onix_file_dst)
 
                     # Get release info from SFTP server and check that the correct release info is returned via Xcom
-                    ti = env.run_task(telescope.list_release_info.__name__, dag, execution_date)
+                    ti = env.run_task(telescope.list_release_info.__name__)
                     self.assertEqual(ti.state, State.SUCCESS)
                     expected_release_info = [{"release_date": release_date, "file_name": onix_file_name}]
                     release_info = ti.xcom_pull(
@@ -200,7 +200,7 @@ class TestOnixTelescope(ObservatoryTestCase):
                     self.assertEqual(expected_release_info, release_info)
 
                     # Test move file to in progress
-                    ti = env.run_task(telescope.move_files_to_in_progress.__name__, dag, execution_date)
+                    ti = env.run_task(telescope.move_files_to_in_progress.__name__)
                     self.assertEqual(ti.state, State.SUCCESS)
 
                     in_progress_path = os.path.join(local_sftp_folders.in_progress, onix_file_name)
@@ -208,7 +208,7 @@ class TestOnixTelescope(ObservatoryTestCase):
                     self.assertTrue(os.path.isfile(in_progress_path))
 
                     # Test download
-                    ti = env.run_task(telescope.download.__name__, dag, execution_date)
+                    ti = env.run_task(telescope.download.__name__)
                     self.assertEqual(ti.state, State.SUCCESS)
 
                     download_file_path = os.path.join(download_folder, onix_file_name)
@@ -216,13 +216,13 @@ class TestOnixTelescope(ObservatoryTestCase):
                     self.assert_file_integrity(download_file_path, expected_file_hash, "md5")
 
                     # Test upload downloaded
-                    ti = env.run_task(telescope.upload_downloaded.__name__, dag, execution_date)
+                    ti = env.run_task(telescope.upload_downloaded.__name__)
                     self.assertEqual(ti.state, State.SUCCESS)
 
                     self.assert_blob_integrity(env.download_bucket, blob_name(download_file_path), download_file_path)
 
                     # Test transform
-                    ti = env.run_task(telescope.transform.__name__, dag, execution_date)
+                    ti = env.run_task(telescope.transform.__name__)
                     self.assertEqual(ti.state, State.SUCCESS)
 
                     transform_file_path = os.path.join(transform_folder, "onix.jsonl")
@@ -230,7 +230,7 @@ class TestOnixTelescope(ObservatoryTestCase):
                     self.assert_file_integrity(transform_file_path, expected_file_hash, "md5")
 
                     # Test upload to cloud storage
-                    ti = env.run_task(telescope.upload_transformed.__name__, dag, execution_date)
+                    ti = env.run_task(telescope.upload_transformed.__name__)
                     self.assertEqual(ti.state, State.SUCCESS)
 
                     self.assert_blob_integrity(
@@ -238,7 +238,7 @@ class TestOnixTelescope(ObservatoryTestCase):
                     )
 
                     # Test load into BigQuery
-                    ti = env.run_task(telescope.bq_load.__name__, dag, execution_date)
+                    ti = env.run_task(telescope.bq_load.__name__)
                     self.assertEqual(ti.state, State.SUCCESS)
 
                     table_id = f"{self.project_id}.{dataset_id}.{bigquery_sharded_table_id(telescope.DAG_ID_PREFIX, release_date)}"
@@ -246,14 +246,14 @@ class TestOnixTelescope(ObservatoryTestCase):
                     self.assert_table_integrity(table_id, expected_rows)
 
                     # Test move files to finished
-                    ti = env.run_task(telescope.move_files_to_finished.__name__, dag, execution_date)
+                    ti = env.run_task(telescope.move_files_to_finished.__name__)
                     self.assertEqual(ti.state, State.SUCCESS)
                     finished_path = os.path.join(local_sftp_folders.finished, onix_file_name)
                     self.assertFalse(os.path.isfile(local_sftp_folders.in_progress))
                     self.assertTrue(os.path.isfile(finished_path))
 
                     # Test cleanup
-                    ti = env.run_task(telescope.cleanup.__name__, dag, execution_date)
+                    ti = env.run_task(telescope.cleanup.__name__)
                     self.assertEqual(ti.state, State.SUCCESS)
 
                     self.assert_cleanup(download_folder, extract_folder, transform_folder)

@@ -174,7 +174,7 @@ class TestJstorTelescope(ObservatoryTestCase):
                 env.add_connection(conn)
 
                 # Test that all dependencies are specified: no error should be thrown
-                env.run_task(telescope.check_dependencies.__name__, dag, execution_date)
+                env.run_task(telescope.check_dependencies.__name__)
 
                 # Test list releases task with files available
                 with httpretty.enabled():
@@ -182,7 +182,7 @@ class TestJstorTelescope(ObservatoryTestCase):
                         self.setup_mock_file_download(
                             report["url"], report["path"], headers=report["headers"], method=httpretty.HEAD
                         )
-                    ti = env.run_task(telescope.list_reports.__name__, dag, execution_date)
+                    ti = env.run_task(telescope.list_reports.__name__)
                 available_reports = ti.xcom_pull(
                     key=JstorTelescope.REPORTS_INFO, task_ids=telescope.list_reports.__name__, include_prior_dates=False
                 )
@@ -197,7 +197,7 @@ class TestJstorTelescope(ObservatoryTestCase):
                 with httpretty.enabled():
                     for report in [self.country_report, self.institution_report]:
                         self.setup_mock_file_download(report["url"], report["path"], headers=report["headers"])
-                    ti = env.run_task(telescope.download_reports.__name__, dag, execution_date)
+                    ti = env.run_task(telescope.download_reports.__name__)
 
                 # use release info for other tasks
                 available_releases = ti.xcom_pull(
@@ -222,12 +222,12 @@ class TestJstorTelescope(ObservatoryTestCase):
                     self.assert_file_integrity(file, expected_file_hash, "md5")
 
                 # Test that file uploaded
-                env.run_task(telescope.upload_downloaded.__name__, dag, execution_date)
+                env.run_task(telescope.upload_downloaded.__name__)
                 for file in release.download_files:
                     self.assert_blob_integrity(env.download_bucket, blob_name(file), file)
 
                 # Test that file transformed
-                env.run_task(telescope.transform.__name__, dag, execution_date)
+                env.run_task(telescope.transform.__name__)
                 self.assertEqual(2, len(release.transform_files))
                 for file in release.transform_files:
                     if "country" in file:
@@ -237,12 +237,12 @@ class TestJstorTelescope(ObservatoryTestCase):
                     self.assert_file_integrity(file, expected_file_hash, "gzip_crc")
 
                 # Test that transformed file uploaded
-                env.run_task(telescope.upload_transformed.__name__, dag, execution_date)
+                env.run_task(telescope.upload_transformed.__name__)
                 for file in release.transform_files:
                     self.assert_blob_integrity(env.transform_bucket, blob_name(file), file)
 
                 # Test that data loaded into BigQuery
-                env.run_task(telescope.bq_load_partition.__name__, dag, execution_date)
+                env.run_task(telescope.bq_load_partition.__name__)
                 for file in release.transform_files:
                     table_id, _ = table_ids_from_path(file)
                     table_id = f'{self.project_id}.{dataset_id}.{table_id}${release.release_date.strftime("%Y%m")}'
@@ -258,7 +258,7 @@ class TestJstorTelescope(ObservatoryTestCase):
                     release.extract_folder,
                     release.transform_folder,
                 )
-                env.run_task(telescope.cleanup.__name__, dag, execution_date)
+                env.run_task(telescope.cleanup.__name__)
                 self.assert_cleanup(download_folder, extract_folder, transform_folder)
 
     def test_get_label_id(self):

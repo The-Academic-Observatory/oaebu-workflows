@@ -286,30 +286,30 @@ class TestOapenMetadataTelescopeDag(ObservatoryTestCase):
             with env.create_dag_run(dag, execution_date):
                 with CliRunner().isolated_filesystem():
                     # Test that all dependencies are specified: no error should be thrown
-                    env.run_task(telescope.check_dependencies.__name__, dag, execution_date)
+                    env.run_task(telescope.check_dependencies.__name__)
 
                     # Test download
                     with vcr.use_cassette(self.download_path):
-                        env.run_task(telescope.download.__name__, dag, execution_date)
+                        env.run_task(telescope.download.__name__)
                     self.assertEqual(len(release.download_files), 1)
 
                     # Test upload_downloaded
-                    env.run_task(telescope.upload_downloaded.__name__, dag, execution_date)
+                    env.run_task(telescope.upload_downloaded.__name__)
                     for file in release.download_files:
                         self.assert_blob_integrity(env.download_bucket, blob_name(file), file)
 
                     # Test download
-                    env.run_task(telescope.transform.__name__, dag, execution_date)
+                    env.run_task(telescope.transform.__name__)
                     self.assertEqual(len(release.transform_files), 1)
 
                     # Test upload_transformed
-                    env.run_task(telescope.upload_transformed.__name__, dag, execution_date)
+                    env.run_task(telescope.upload_transformed.__name__)
 
                     for file in release.transform_files:
                         self.assert_blob_integrity(env.transform_bucket, blob_name(file), file)
 
                     # Test bq_load partition
-                    ti = env.run_task(telescope.bq_load_partition.__name__, dag, execution_date)
+                    ti = env.run_task(telescope.bq_load_partition.__name__)
                     self.assertEqual(ti.state, "skipped")
 
                     # Test delete old task is skipped for the first release
@@ -317,7 +317,7 @@ class TestOapenMetadataTelescopeDag(ObservatoryTestCase):
                     self.assertEqual(ti.state, "skipped")
 
                     # Test bq_append_new
-                    env.run_task(telescope.bq_append_new.__name__, dag, execution_date)
+                    env.run_task(telescope.bq_append_new.__name__)
                     table_id = f"{self.project_id}.{telescope.dataset_id}.metadata"
                     expected_rows = 15310
                     self.assert_table_integrity(table_id, expected_rows)
@@ -329,5 +329,5 @@ class TestOapenMetadataTelescopeDag(ObservatoryTestCase):
                         release.transform_folder,
                     )
 
-                    env.run_task(telescope.cleanup.__name__, dag, execution_date)
+                    env.run_task(telescope.cleanup.__name__)
                     self.assert_cleanup(download_folder, extract_folder, transform_folder)
