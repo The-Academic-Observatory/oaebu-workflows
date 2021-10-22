@@ -345,12 +345,18 @@ def create_http_mock_sequence(country_report_url: str, institution_report_url: s
             },
         ]
     }
-    list_messages = {
+    list_messages1 = {
         "messages": [
             {"id": "1788ec9e91f3de62", "threadId": "1788e9b0a848236a"},
+        ],
+        "resultSizeEstimate": 2,
+        "nextPageToken": 1234,
+    }
+    list_messages2 = {
+        "messages": [
             {"id": "1788ebe4ecbab055", "threadId": "1788e9b0a848236a"},
         ],
-        "resultSizeEstimate": 4,
+        "resultSizeEstimate": 2,
     }
     get_message1 = {
         "id": "1788ec9e91f3de62",
@@ -409,8 +415,8 @@ def create_http_mock_sequence(country_report_url: str, institution_report_url: s
         "labelIds": ["Label_1", "CATEGORY_PERSONAL", "INBOX"],
     }
     http_mock_sequence = [
-        ({"status": "200"}, json.dumps(list_labels)),
-        ({"status": "200"}, json.dumps(list_messages)),
+        ({"status": "200"}, json.dumps(list_messages1)),
+        ({"status": "200"}, json.dumps(list_messages2)),
         ({"status": "200"}, json.dumps(get_message1)),
         ({"status": "200"}, json.dumps(get_message2)),
         ({"status": "200"}, json.dumps(list_labels)),

@@ -253,8 +253,7 @@ class JstorTelescope(OrganisationTelescope):
         """
 
         service = create_gmail_service()
-        label_id = get_label_id(service, self.PROCESSED_LABEL_NAME)
-        available_reports = list_reports(service, self.publisher_id, label_id)
+        available_reports = list_reports(service, self.publisher_id)
 
         continue_dag = len(available_reports) > 0
         if continue_dag:
@@ -453,20 +452,7 @@ def get_label_id(service: Resource, label_name: str) -> str:
     return label_id
 
 
-def message_has_label(message: dict, label_id: str) -> bool:
-    """Checks if a message has the given label
-
-    :param message: A Gmail message
-    :param label_id: The label id
-    :return: True if the message has the label
-    """
-    label_ids = message["labelIds"]
-    for label in label_ids:
-        if label == label_id:
-            return True
-
-
-def list_reports(service: Resource, publisher_id: str, processed_label_id: str) -> List[dict]:
+def list_reports(service: Resource, publisher_id: str) -> List[dict]:
     """List the available releases by going through the messages of a gmail account and looking for a specific pattern.
 
     If a message has been processed previously it has a specific label, messages with this label will be skipped.
@@ -475,26 +461,34 @@ def list_reports(service: Resource, publisher_id: str, processed_label_id: str) 
 
     :param service: Gmail service
     :param publisher_id: Id of the publisher
-    :param processed_label_id: Id of the 'processed_reports' label
     :return: Dictionary with release dates as key and reports info as value, where reports info is a list of country
     and/or institution reports.
     """
+    # List messages with specific query
+    list_params = {
+        "userId": "me",
+        "q": f"-label: {JstorTelescope.PROCESSED_LABEL_NAME} subject:'JSTOR Publisher Report Available'",
+        "labelIds": ["INBOX"],
+        "maxResults": 500,
+    }
+    first_query = True
+    next_page_token = None
+    messages = []
+    while next_page_token or first_query:
+        # Set the next page token if it isn't the first query
+        if not first_query:
+            list_params["pageToken"] = next_page_token
+        first_query = False
+
+        # Get the results
+        results = service.users().messages().list(**list_params).execute()
+        next_page_token = results.get("nextPageToken")
+        messages += results["messages"]
 
     available_reports = []
-    # list messages with specific query
-    results = (
-        service.users()
-        .messages()
-        .list(userId="me", q='subject:"JSTOR Publisher Report Available"', labelIds=["INBOX"])
-        .execute()
-    )
-    for message_info in results["messages"]:
+    for message_info in messages:
         message_id = message_info["id"]
         message = service.users().messages().get(userId="me", id=message_id).execute()
-
-        # check if message has processed label id
-        if message_has_label(message, processed_label_id):
-            continue
 
         # get download url
         download_url = None
@@ -512,6 +506,10 @@ def list_reports(service: Resource, publisher_id: str, processed_label_id: str) 
         # get publisher
         report_publisher = filename.split("_")[1]
         if report_publisher != publisher_id:
+            logging.info(
+                f"Skipping report, because the publisher id in the report's file name '{report_publisher}' "
+                f"does not match the current publisher id: {publisher_id}"
+            )
             continue
 
         # get report_type
