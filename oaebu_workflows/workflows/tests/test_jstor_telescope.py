@@ -76,6 +76,14 @@ class TestJstorTelescope(ObservatoryTestCase):
             "transform_hash": "4a664f4d",
             "table_rows": 3,
         }
+        self.wrong_publisher_report = {
+            "path": test_fixtures_folder("jstor", "institution_20210401.tsv"),  # has to be valid path, but is not used
+            "url": "https://www.jstor.org/admin/reports/download/12345",
+            "headers": {
+                "Content-Disposition": f"attachment; filename=PUB_publisher_PUBBIU_"
+                f'{self.release_date.strftime("%Y%m%d")}.tsv'
+            },
+        }
 
     def test_dag_structure(self):
         """Test that the Jstor DAG has the correct structure.
@@ -142,7 +150,11 @@ class TestJstorTelescope(ObservatoryTestCase):
 
         mock_account_credentials.from_json_keyfile_dict.return_value = ""
 
-        http = HttpMockSequence(create_http_mock_sequence(self.country_report["url"], self.institution_report["url"]))
+        http = HttpMockSequence(
+            create_http_mock_sequence(
+                self.country_report["url"], self.institution_report["url"], self.wrong_publisher_report["url"]
+            )
+        )
         mock_build.return_value = build("gmail", "v1", http=http)
 
         # Setup Observatory environment
@@ -163,7 +175,7 @@ class TestJstorTelescope(ObservatoryTestCase):
         dag = telescope.make_dag()
 
         # Create the Observatory environment and run tests
-        with env.create():
+        with env.create(task_logging=True):
             with env.create_dag_run(dag, execution_date):
                 # add gmail connection
                 conn = Connection(
@@ -178,7 +190,7 @@ class TestJstorTelescope(ObservatoryTestCase):
 
                 # Test list releases task with files available
                 with httpretty.enabled():
-                    for report in [self.country_report, self.institution_report]:
+                    for report in [self.country_report, self.institution_report, self.wrong_publisher_report]:
                         self.setup_mock_file_download(
                             report["url"], report["path"], headers=report["headers"], method=httpretty.HEAD
                         )
@@ -320,11 +332,14 @@ class TestJstorTelescope(ObservatoryTestCase):
         self.assertEqual("existing_label", label_id)
 
 
-def create_http_mock_sequence(country_report_url: str, institution_report_url: str) -> list:
+def create_http_mock_sequence(
+    country_report_url: str, institution_report_url: str, wrong_publisher_report_url: str
+) -> list:
     """Create a list with mocked http responses
 
     :param country_report_url: URL to country report
     :param institution_report_url: URL to institution report
+    :param wrong_publisher_report_url: URL to report with a non-matching publisher id
     :return: List with http responses
     """
     list_labels = {
@@ -345,12 +360,19 @@ def create_http_mock_sequence(country_report_url: str, institution_report_url: s
             },
         ]
     }
-    list_messages = {
+    list_messages1 = {
         "messages": [
             {"id": "1788ec9e91f3de62", "threadId": "1788e9b0a848236a"},
-            {"id": "1788ebe4ecbab055", "threadId": "1788e9b0a848236a"},
         ],
-        "resultSizeEstimate": 4,
+        "resultSizeEstimate": 2,
+        "nextPageToken": 1234,
+    }
+    list_messages2 = {
+        "messages": [
+            {"id": "1788ebe4ecbab055", "threadId": "1788e9b0a848236a"},
+            {"id": "5621ayw3vjtag411", "threadId": "1788e9b0a848236a"},
+        ],
+        "resultSizeEstimate": 2,
     }
     get_message1 = {
         "id": "1788ec9e91f3de62",
@@ -398,6 +420,29 @@ def create_http_mock_sequence(country_report_url: str, institution_report_url: s
         "historyId": "2302",
         "internalDate": "1617303299000",
     }
+    get_message3 = {
+        "id": "5621ayw3vjtag411",
+        "threadId": "1788e9b0a848236a",
+        "labelIds": ["CATEGORY_PERSONAL", "INBOX"],
+        "snippet": "JSTOR JSTOR Usage Reports Report Complete Twitter Facebook Tumblr Dear OAEBU Service "
+        "Account, Your usage report &quot;Book Usage by Country&quot; is now available to "
+        "download. Download Completed Report",
+        "payload": {
+            "partId": "",
+            "mimeType": "text/html",
+            "filename": "",
+            "headers": [{"name": "Delivered-To", "value": "accountname@gmail.com"}],
+            "body": {
+                "size": 12313,
+                "data": base64.urlsafe_b64encode(
+                    f'<a href="{wrong_publisher_report_url}">Download Completed Report</a>'.encode()
+                ).decode(),
+            },
+        },
+        "sizeEstimate": 17939,
+        "historyId": "2302",
+        "internalDate": "1617303299000",
+    }
     modify_message1 = {
         "id": "1788ec9e91f3de62",
         "threadId": "1788e9b0a848236a",
@@ -409,10 +454,11 @@ def create_http_mock_sequence(country_report_url: str, institution_report_url: s
         "labelIds": ["Label_1", "CATEGORY_PERSONAL", "INBOX"],
     }
     http_mock_sequence = [
-        ({"status": "200"}, json.dumps(list_labels)),
-        ({"status": "200"}, json.dumps(list_messages)),
+        ({"status": "200"}, json.dumps(list_messages1)),
+        ({"status": "200"}, json.dumps(list_messages2)),
         ({"status": "200"}, json.dumps(get_message1)),
         ({"status": "200"}, json.dumps(get_message2)),
+        ({"status": "200"}, json.dumps(get_message3)),
         ({"status": "200"}, json.dumps(list_labels)),
         ({"status": "200"}, json.dumps(modify_message1)),
         ({"status": "200"}, json.dumps(modify_message2)),
