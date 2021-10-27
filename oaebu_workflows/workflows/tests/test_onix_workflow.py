@@ -19,7 +19,7 @@ import os
 import unittest
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
-
+from airflow.sensors.base import BaseSensorOperator
 import observatory.api.server.orm as orm
 import pendulum
 from airflow.exceptions import AirflowException
@@ -201,7 +201,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
             self.assertEqual(release.release_date, pendulum.datetime(2021, 1, 1, 0, 0, 0, 0))
             self.assertEqual(release.project_id, "project_id")
             self.assertEqual(release.transform_bucket, "bucket_name")
-            self.assertTrue(wf.sensors[0] is not None)
+            self.assertIsInstance(wf.operators[0][0], BaseSensorOperator)
 
     @patch("oaebu_workflows.workflows.onix_workflow.OnixWorkflow.make_release")
     @patch("observatory.platform.utils.gc_utils.select_table_shard_dates")
@@ -236,7 +236,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
             self.assertEqual(release.release_date, pendulum.datetime(2021, 1, 1, 0, 0, 0, 0))
             self.assertEqual(release.project_id, "project_id")
             self.assertEqual(release.transform_bucket, "bucket_name")
-            self.assertTrue(wf.sensors[0] is not None)
+            self.assertIsInstance(wf.operators[0][0], BaseSensorOperator)
 
     @patch("oaebu_workflows.workflows.onix_workflow.OnixWorkflow.make_release")
     @patch("observatory.platform.utils.gc_utils.select_table_shard_dates")
@@ -945,17 +945,15 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 onix_table_id="onix",
             )
 
-            release = wf.make_release()
-
             # Spin up tasks
-            oaebu_task1_op = wf.task_funcs[5]
-            self.assertEqual(oaebu_task1_op.func.__name__, "create_oaebu_intermediate_table.test_dataset.test_table")
+            oaebu_task1_op = wf.operators[6]
+            self.assertEqual(oaebu_task1_op.task_id, "create_oaebu_intermediate_table.test_dataset.test_table")
 
-            oaebu_task2_op = wf.task_funcs[6]
-            self.assertEqual(oaebu_task2_op.func.__name__, "create_oaebu_intermediate_table.test_dataset.test_table2")
+            oaebu_task2_op = wf.operators[7]
+            self.assertEqual(oaebu_task2_op.task_id, "create_oaebu_intermediate_table.test_dataset.test_table2")
 
             # Run tasks
-            oaebu_task1_op.func(release)
+            oaebu_task1_op.execute_callable()
             _, call_args = mock_create_bq_ds.call_args
             self.assertEqual(call_args["project_id"], "project_id")
             self.assertEqual(call_args["dataset_id"], "oaebu_intermediate")
@@ -971,7 +969,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
             expected_hash = "1dabe0b435be583fdbae6ad4421f579b"
             self.assertEqual(sql_hash, expected_hash)
 
-            oaebu_task2_op.func(release)
+            oaebu_task2_op.execute_callable()
             _, call_args = mock_create_bq_ds.call_args
             self.assertEqual(call_args["project_id"], "project_id")
             self.assertEqual(call_args["dataset_id"], "oaebu_intermediate")
@@ -1729,7 +1727,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
             )
 
             # Skip dag existence check in sensor.
-            for sensor in telescope.sensors:
+            for sensor in telescope.operators[0]:
                 sensor.check_exists = False
                 sensor.grace_period = timedelta(seconds=1)
 
