@@ -162,7 +162,7 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
             )
 
             # Override sensor grace period and dag check
-            for sensor in workflow.sensors:
+            for sensor in workflow.operators[0]:
                 sensor.grace_period = timedelta(seconds=1)
                 sensor.check_exists = False
 
