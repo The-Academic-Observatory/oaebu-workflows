@@ -61,7 +61,7 @@ class TestJstorTelescope(ObservatoryTestCase):
                 "Content-Disposition": f"attachment; filename=PUB_{publisher_id}_PUBBCU_"
                 f'{self.release_date.strftime("%Y%m%d")}.tsv'
             },
-            "download_hash": "9c5eff69085457758e3743d229ec46a1",
+            "download_hash": "1bad528f89b2d8df0846c47a58d7fb2e",
             "transform_hash": "9b197a54",
             "table_rows": 10,
         }
@@ -242,6 +242,7 @@ class TestJstorTelescope(ObservatoryTestCase):
                 env.run_task(telescope.transform.__name__)
                 self.assertEqual(2, len(release.transform_files))
                 for file in release.transform_files:
+                    print(file)
                     if "country" in file:
                         expected_file_hash = self.country_report["transform_hash"]
                     else:
