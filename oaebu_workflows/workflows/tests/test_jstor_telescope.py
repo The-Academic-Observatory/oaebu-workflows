@@ -21,12 +21,14 @@ from unittest.mock import patch
 
 import httpretty
 import pendulum
+from airflow.exceptions import AirflowException
 from airflow.models.connection import Connection
+from click.testing import CliRunner
 from googleapiclient.discovery import build
 from googleapiclient.http import HttpMockSequence
 
 from oaebu_workflows.config import test_fixtures_folder
-from oaebu_workflows.workflows.jstor_telescope import JstorRelease, JstorTelescope, get_label_id
+from oaebu_workflows.workflows.jstor_telescope import JstorRelease, JstorTelescope, get_label_id, get_release_date
 from oaebu_workflows.identifiers import TelescopeTypes
 from observatory.api.client.model.organisation import Organisation
 from observatory.api.server import orm
@@ -331,6 +333,49 @@ class TestJstorTelescope(ObservatoryTestCase):
         # call function with match for label
         label_id = get_label_id(service, JstorTelescope.PROCESSED_LABEL_NAME)
         self.assertEqual("existing_label", label_id)
+
+    def test_get_release_date(self):
+        """Test that the get_release_date returns the correct release date and raises an exception when dates are
+        incorrect
+
+        :return: None.
+        """
+        with CliRunner().isolated_filesystem():
+            # Test reports in new format with header
+            new_report_content = (
+                "Report_Name\tBook Usage by Country\nReport_ID\tPUB_BCU\nReport_Description\t"
+                "Usage of your books on JSTOR by country.\nPublisher_Name\tPublisher 1\nReporting_Period\t"
+                "{start_date} to {end_date}\nCreated\t2021-10-01\nCreated_By\tJSTOR"
+            )
+            old_report_content = (
+                "Book Title\tUsage Month\nAddress source war after\t{start_date}\nNote spend " "government\t{end_date}"
+            )
+            reports = [
+                {"file": "new_success.tsv", "start": "2020-01-01", "end": "2020-01-31"},
+                {"file": "new_fail.tsv", "start": "2020-01-01", "end": "2020-02-01"},
+                {"file": "old_success.tsv", "start": "2020-01", "end": "2020-01"},
+                {"file": "old_fail.tsv", "start": "2020-01", "end": "2020-02"},
+            ]
+
+            for report in reports:
+                with open(report["file"], "w") as f:
+                    if report == reports[0] or report == reports[1]:
+                        f.write(new_report_content.format(start_date=report["start"], end_date=report["end"]))
+                    else:
+                        f.write(old_report_content.format(start_date=report["start"], end_date=report["end"]))
+
+            # Test new report is successful
+            release_date = get_release_date(reports[0]["file"])
+            self.assertEqual(pendulum.parse(reports[0]["end"]), release_date)
+            # Test new report fails
+            with self.assertRaises(AirflowException):
+                get_release_date(reports[1]["file"])
+            # Test old report is successful
+            release_date = get_release_date(reports[2]["file"])
+            self.assertEqual(pendulum.parse(reports[2]["end"]).end_of("month"), release_date)
+            # Test old report fails
+            with self.assertRaises(AirflowException):
+                get_release_date(reports[3]["file"])
 
 
 def create_http_mock_sequence(
