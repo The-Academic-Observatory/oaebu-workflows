@@ -92,7 +92,15 @@ class JstorRelease(OrganisationRelease):
         """
         for file in self.download_files:
             results = []
-            with open(file) as tsv_file:
+            # Check if report has header in old or new format based on the first line
+            with open(file, "r") as tsv_file:
+                first_line = tsv_file.readline()
+            with open(file, "r") as tsv_file:
+                # Skip the header section of the file for the new format
+                if first_line.startswith("Report_Name"):
+                    line = None
+                    while line != "\n":
+                        line = next(tsv_file)
                 csv_reader = csv.DictReader(tsv_file, delimiter="\t")
                 for row in csv_reader:
                     transformed_row = OrderedDict((convert(k), v) for k, v in row.items())
@@ -387,7 +395,45 @@ def download_report(url: str, download_path: str):
 
 
 def get_release_date(report_path: str) -> pendulum.DateTime:
-    """Get the release date from the "Usage Month" column in the first row of the report.
+    """Get the release date from the "Reporting_Period" part of the header.
+    Also checks if the reports contains data from exactly one month.
+
+    :param report_path: The path to the JSTOR report
+    :return: The release date, defaults to end of the month
+    """
+
+    # Check if report has header in old or new format based on the first line
+    with open(report_path, "r") as tsv_file:
+        first_line = tsv_file.readline()
+
+    # Process report with the old header
+    if not first_line.startswith("Report_Name"):
+        return get_release_date_deprecated(report_path)
+
+    # Process report with new header
+    with open(report_path, "r") as tsv_file:
+        for line in tsv_file:
+            line = line.strip("\n").split("\t")
+            if line[0] == "Reporting_Period":
+                start_date = pendulum.parse(line[1].split(" ")[0])
+                end_date = pendulum.parse(line[1].split(" ")[-1])
+                break
+
+    # Check that month of start and end date are the same
+    if start_date.end_of("month").start_of("day") != end_date:
+        raise AirflowException(
+            f"Report contains data that is not from exactly 1 month, start date: {start_date}, end date: {end_date}"
+        )
+
+    # Get the release date based on last day of the month
+    release_date = end_date
+    return release_date
+
+
+def get_release_date_deprecated(report_path: str) -> pendulum.DateTime:
+    """This function is deprecated, because the headers for the reports have changed since 2021-10-01.
+    It might still be used for reports that were created before this date and have not been processed yet.
+    Get the release date from the "Usage Month" column in the first row of the report.
     Also checks if the reports contains data from the same month only.
 
     :param report_path: The path to the JSTOR report
@@ -403,7 +449,7 @@ def get_release_date(report_path: str) -> pendulum.DateTime:
 
     # check that month in first and last row are the same
     if first_usage_month != last_usage_month:
-        logging.info(
+        raise AirflowException(
             f"Report contains data from more than 1 month, start month: {first_usage_month}, "
             f"end month: {last_usage_month}"
         )
