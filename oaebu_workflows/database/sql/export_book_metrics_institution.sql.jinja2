@@ -24,4 +24,4 @@ SELECT
         institution.Total_Item_Requests
     ) as jstor,
 FROM `{{ project_id }}.{{ dataset_id }}.book_product{{ release.strftime('%Y%m%d') }}`, UNNEST(months) as month, UNNEST(month.jstor_institution) as institution
-WHERE month.oapen_irus_uk IS NOT NULL OR month.google_books_traffic IS NOT NULL OR month.google_books_sales IS NOT NULL
+WHERE ARRAY_LENGTH(month.jstor_institution) > 0
