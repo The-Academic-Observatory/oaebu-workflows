@@ -82,6 +82,23 @@ oapen as (
     {% endif %}
 ),
 
+ucl_discovery as (
+    {% if ucl_discovery %}
+    SELECT
+        {{ ucl_isbn }} as ISBN,
+        title,
+        release_date,
+        "ucl_discovery" as source
+    FROM `{{ project_id }}.{{ dataset_id }}.{{ ucl_table }}_unmatched_{{ ucl_isbn }}{{ release.strftime('%Y%m%d') }}`
+    {% else %}
+    SELECT
+        CAST(NULL as STRING) as ISBN,
+        CAST(NULL as STRING) as title,
+        CAST(NULL as DATE) as release_date,
+        "ucl_discovery" as source
+    {% endif %}
+),
+
 all_un_matched as (
 SELECT * FROM google_analytics
     UNION ALL
@@ -90,6 +107,8 @@ SELECT * FROM google_books
 SELECT * FROM jstor
     UNION ALL
 SELECT * FROM oapen
+    UNION ALL
+SELECT * FROM ucl_discovery
 )
 
 SELECT
@@ -99,10 +118,12 @@ SELECT
     ARRAY_AGG(DISTINCT IF(source = "google_books", title, NULL) IGNORE NULLS LIMIT 1)[SAFE_OFFSET(0)] as google_books_title,
     ARRAY_AGG(DISTINCT IF(source = "jstor", title, NULL) IGNORE NULLS LIMIT 1)[SAFE_OFFSET(0)] as jstor_title,
     ARRAY_AGG(DISTINCT IF(source = "oapen", title, NULL) IGNORE NULLS LIMIT 1)[SAFE_OFFSET(0)] as oapen_title,
+    ARRAY_AGG(DISTINCT IF(source = "ucl_discovery", title, NULL) IGNORE NULLS LIMIT 1)[SAFE_OFFSET(0)] as ucl_discovery_title,
     "google_analytics" in UNNEST(ARRAY_AGG(source)) as in_google_analytics,
     "google_books" in UNNEST(ARRAY_AGG(source)) as in_google_books,
     "jstor" in UNNEST(ARRAY_AGG(source)) as in_jstor,
     "oapen" in UNNEST(ARRAY_AGG(source)) as in_oapen,
+    "ucl_discovery" in UNNEST(ARRAY_AGG(source)) as in_ucl_discovery,
 FROM all_un_matched
 WHERE ISBN IS NOT NULL
 GROUP BY ISBN, release_date
