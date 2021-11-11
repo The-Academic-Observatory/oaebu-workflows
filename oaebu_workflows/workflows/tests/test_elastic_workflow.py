@@ -113,7 +113,7 @@ class TestElasticImportWorkflow(ObservatoryTestCase):
             (
                 "oaebu_anu_press_book_product_subject_thema_metrics",
                 render_template(
-                    os.path.join(path, "oaebu-subject-metrics-bthema-mappings.json.jinja2"), aggregation_level=aggregate_level
+                    os.path.join(path, "oaebu-subject-metrics-thema-mappings.json.jinja2"), aggregation_level=aggregate_level
                 ),
             ),
             (
