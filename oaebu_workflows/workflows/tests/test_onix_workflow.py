@@ -679,9 +679,17 @@ class TestOnixWorkflow(ObservatoryTestCase):
                         "export_oaebu_table.book_product_publisher_metrics"
                     ],
                     "export_oaebu_table.book_product_publisher_metrics": [
-                        "export_oaebu_table.book_product_subject_metrics"
+                        "export_oaebu_table.book_product_subject_bic_metrics"
                     ],
-                    "export_oaebu_table.book_product_subject_metrics": ["export_oaebu_table.book_product_year_metrics"],
+                    "export_oaebu_table.book_product_subject_bic_metrics": [
+                        "export_oaebu_table.book_product_subject_bisac_metrics"
+                    ],
+                    "export_oaebu_table.book_product_subject_bisac_metrics": [
+                        "export_oaebu_table.book_product_subject_thema_metrics"
+                    ],
+                    "export_oaebu_table.book_product_subject_thema_metrics": [
+                        "export_oaebu_table.book_product_year_metrics"
+                    ],
                     "export_oaebu_table.book_product_year_metrics": [
                         "export_oaebu_table.book_product_subject_year_metrics"
                     ],
@@ -1903,7 +1911,9 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                     "book_product_metrics_referrer",
                     "book_product_metrics_events",
                     "book_product_publisher_metrics",
-                    "book_product_subject_metrics",
+                    "book_product_subject_bic_metrics",
+                    "book_product_subject_bisac_metrics",
+                    "book_product_subject_thema_metrics",
                     "book_product_year_metrics",
                     "book_product_subject_year_metrics",
                     "book_product_author_metrics",
