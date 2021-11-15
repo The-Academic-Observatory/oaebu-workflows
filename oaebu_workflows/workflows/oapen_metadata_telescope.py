@@ -56,6 +56,7 @@ class OapenMetadataRelease(StreamRelease):
 
     def download(self) -> bool:
         """Download Oapen metadata CSV.
+
         :return: True if download is successful
         """
         logging.info(f"Downloading csv from url: {OapenMetadataTelescope.CSV_URL}")
@@ -65,9 +66,15 @@ class OapenMetadataRelease(StreamRelease):
             with open(self.csv_path, "w") as f:
                 f.write(response.content.decode("utf-8"))
             logging.info(f"Downloaded csv successful to {self.csv_path}")
-            return True
         else:
             raise AirflowException(f"Download csv unsuccessful, {response.text}")
+
+        with open(self.csv_path, "r") as f:
+            csv_dict = [row for row in csv.DictReader(f)]
+            if len(csv_dict) == 0:
+                raise AirflowException(f"CSV file is empty")
+
+        return True
 
     def transform(self):
         """Transform the oapen metadata csv file by storing in a jsonl format and restructuring lists/dicts.
