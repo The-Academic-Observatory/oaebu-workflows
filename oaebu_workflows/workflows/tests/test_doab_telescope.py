@@ -16,9 +16,12 @@
 
 import os
 from datetime import timedelta
+from unittest.mock import patch
 
 import httpretty
 import pendulum
+from airflow.exceptions import AirflowException
+from click.testing import CliRunner
 from google.cloud import bigquery
 from observatory.platform.utils.file_utils import get_file_hash
 from observatory.platform.utils.test_utils import (
@@ -232,3 +235,32 @@ class TestDoabTelescope(ObservatoryTestCase):
                 )
                 env.run_task(telescope.cleanup.__name__)
                 self.assert_cleanup(download_folder, extract_folder, transform_folder)
+
+    @patch("observatory.platform.utils.workflow_utils.Variable.get")
+    def test_download(self, mock_variable_get):
+        """Download release and check exception is raised when response is not 200 or csv is empty.
+
+        :param mock_variable_get: Mock result of airflow's Variable.get() function
+        :return:
+        """
+        start_date = pendulum.datetime(2020, 1, 1)
+        end_date = pendulum.datetime(2020, 1, 31)
+        release = DoabRelease("doab", start_date, end_date, False)
+
+        with CliRunner().isolated_filesystem():
+            mock_variable_get.return_value = "data"
+
+            # Test exception is raised for invalid status code
+            with httpretty.enabled():
+                httpretty.register_uri(httpretty.GET, DoabTelescope.CSV_URL, status=400)
+
+                with self.assertRaises(AirflowException):
+                    release.download()
+
+            # Test exception is raised for empty csv file
+            with httpretty.enabled():
+                empty_csv = "Column1,Column2"
+                httpretty.register_uri(httpretty.GET, DoabTelescope.CSV_URL, body=empty_csv)
+
+                with self.assertRaises(AirflowException):
+                    release.download()
