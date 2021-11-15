@@ -19,20 +19,26 @@ import os
 import unittest
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
-from airflow.sensors.base import BaseSensorOperator
+
 import observatory.api.server.orm as orm
 import pendulum
 from airflow.exceptions import AirflowException
 from airflow.models.connection import Connection
+from airflow.sensors.base import BaseSensorOperator
 from click.testing import CliRunner
 from google.cloud import bigquery
 from google.cloud.bigquery import SourceFormat
 from oaebu_workflows.config import schema_folder as default_schema_folder
 from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.identifiers import TelescopeTypes
-from oaebu_workflows.workflows.oaebu_partners import OaebuPartnerName, OaebuPartners
+from oaebu_workflows.workflows.oaebu_partners import OaebuPartner, OaebuPartnerName
 from oaebu_workflows.workflows.onix_workflow import OnixWorkflow, OnixWorkflowRelease
-from observatory.api.server.orm import Organisation
+from observatory.api.server.orm import (
+    Dataset,
+    DatasetRelease,
+    DatasetStorage,
+    Organisation,
+)
 from observatory.platform.utils.airflow_utils import AirflowConns
 from observatory.platform.utils.gc_utils import (
     run_bigquery_query,
@@ -400,7 +406,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
 
     def test_dag_structure_ignore_google_analytics(self):
         data_partners = [
-            OaebuPartners(
+            OaebuPartner(
                 name=OaebuPartnerName.jstor_country,
                 dag_id_prefix="jstor",
                 gcp_project_id="project",
@@ -410,7 +416,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 title_field_name="Book_Title",
                 sharded=False,
             ),
-            OaebuPartners(
+            OaebuPartner(
                 name=OaebuPartnerName.oapen_irus_uk,
                 dag_id_prefix="oapen_irus_uk",
                 gcp_project_id="project",
@@ -420,7 +426,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 title_field_name="book_title",
                 sharded=False,
             ),
-            OaebuPartners(
+            OaebuPartner(
                 name=OaebuPartnerName.google_books_sales,
                 dag_id_prefix="google_books",
                 gcp_project_id="project",
@@ -430,7 +436,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 title_field_name="Title",
                 sharded=False,
             ),
-            OaebuPartners(
+            OaebuPartner(
                 name=OaebuPartnerName.google_books_traffic,
                 dag_id_prefix="google_books",
                 gcp_project_id="project",
@@ -545,7 +551,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
 
     def test_dag_structure_with_google_analytics(self):
         data_partners = [
-            OaebuPartners(
+            OaebuPartner(
                 name=OaebuPartnerName.jstor_country,
                 dag_id_prefix="jstor",
                 gcp_project_id="project",
@@ -555,7 +561,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 title_field_name="Book_Title",
                 sharded=False,
             ),
-            OaebuPartners(
+            OaebuPartner(
                 name=OaebuPartnerName.oapen_irus_uk,
                 dag_id_prefix="oapen_irus_uk",
                 gcp_project_id="project",
@@ -565,7 +571,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 title_field_name="book_title",
                 sharded=False,
             ),
-            OaebuPartners(
+            OaebuPartner(
                 name=OaebuPartnerName.google_books_sales,
                 dag_id_prefix="google_books",
                 gcp_project_id="project",
@@ -575,7 +581,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 title_field_name="Title",
                 sharded=False,
             ),
-            OaebuPartners(
+            OaebuPartner(
                 name=OaebuPartnerName.google_books_traffic,
                 dag_id_prefix="google_books",
                 gcp_project_id="project",
@@ -585,7 +591,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 title_field_name="Title",
                 sharded=False,
             ),
-            OaebuPartners(
+            OaebuPartner(
                 name=OaebuPartnerName.google_analytics,
                 dag_id_prefix="google_analytics",
                 gcp_project_id="project",
@@ -922,7 +928,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         self, mock_select_table_shard_dates, mock_sel_table_suffixes, mock_create_bq_ds, mock_create_bq_table, mock_mr
     ):
         data_partners = [
-            OaebuPartners(
+            OaebuPartner(
                 name="Test Partner",
                 dag_id_prefix="test_dag",
                 gcp_project_id="test_project",
@@ -932,7 +938,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 title_field_name="title",
                 sharded=True,
             ),
-            OaebuPartners(
+            OaebuPartner(
                 name="Test Partner",
                 dag_id_prefix="test_dag",
                 gcp_project_id="test_project",
@@ -1117,7 +1123,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
 
         data_partners = [
-            OaebuPartners(
+            OaebuPartner(
                 name=OaebuPartnerName.jstor_country,
                 dag_id_prefix="jstor",
                 gcp_project_id="project",
@@ -1191,7 +1197,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
 
         data_partners = [
-            OaebuPartners(
+            OaebuPartner(
                 name=OaebuPartnerName.google_books_sales,
                 dag_id_prefix="google_books",
                 gcp_project_id="project",
@@ -1265,7 +1271,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
 
         data_partners = [
-            OaebuPartners(
+            OaebuPartner(
                 name=OaebuPartnerName.google_books_traffic,
                 dag_id_prefix="google_books",
                 gcp_project_id="project",
@@ -1337,7 +1343,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
 
         data_partners = [
-            OaebuPartners(
+            OaebuPartner(
                 name=OaebuPartnerName.oapen_irus_uk,
                 dag_id_prefix="oapen_irus_uk",
                 gcp_project_id="project",
@@ -1409,7 +1415,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
 
         data_partners = [
-            OaebuPartners(
+            OaebuPartner(
                 name=OaebuPartnerName.oapen_irus_uk,
                 dag_id_prefix="google_analytics",
                 gcp_project_id="project",
@@ -1483,7 +1489,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
 
         data_partners = [
-            OaebuPartners(
+            OaebuPartner(
                 name=OaebuPartnerName.jstor_country,
                 dag_id_prefix="jstor",
                 gcp_project_id="project",
@@ -1602,6 +1608,47 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 env.api_session.add(telescope)
             env.api_session.commit()
 
+            # Load oaebu partners
+            telescope_type = orm.TelescopeType(name="Dummy Telescope", type_id="dummy", created=dt, modified=dt)
+            env.api_session.add(telescope_type)
+            org_name = org_names[0]
+            organisation = orm.Organisation(name=org_name, created=dt, modified=dt)
+            env.api_session.add(organisation)
+            telescope = orm.Telescope(
+                name=f"{org_name} Dummy Telescope",
+                telescope_type=telescope_type,
+                organisation=organisation,
+                extra={"groups": ["oaebu"]},
+                modified=dt,
+                created=dt,
+            )
+            env.api_session.add(telescope)
+            env.api_session.commit()
+
+            dataset = Dataset(
+                name="dataset",
+                extra={"isbn_field_name": "isbn", "title_field_name": "title"},
+                connection=telescope,
+                created=dt,
+                modified=dt,
+            )
+
+            env.api_session.add(dataset)
+            env.api_session.commit()
+
+            # Create
+            dict_ = {
+                "dataset": {"id": 1},
+                "service": "google",
+                "address": "project.dataset.table",
+                "extra": {"table_type": "sharded"},
+                "created": dt,
+                "modified": dt,
+            }
+            obj = DatasetStorage(**dict_)
+            env.api_session.add(obj)
+            env.api_session.commit()
+
             # Check that all DAGs load
             for org_name in org_names:
                 dag_id = make_dag_id("onix_workflow", org_name)
@@ -1687,7 +1734,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
             table_ids,
         ):
             partners.append(
-                OaebuPartners(
+                OaebuPartner(
                     name=name,
                     dag_id_prefix=dag_id_prefix,
                     gcp_project_id=self.gcp_project_id,

@@ -32,7 +32,7 @@ class OaebuPartnerName:
 
 
 @dataclass
-class OaebuPartners:
+class OaebuPartner:
     """Temporary class for storing information about data sources we are using to produce oaebu intermediate tables for.  Change or remove this later when Observatory API is more mature.
 
     :param name: Name of the data partner.

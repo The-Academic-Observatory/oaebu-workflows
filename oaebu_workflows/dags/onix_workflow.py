@@ -17,131 +17,129 @@
 # The keywords airflow and DAG are required to load the DAGs from this file, see bullet 2 in the Apache Airflow FAQ:
 # https://airflow.apache.org/docs/stable/faq.html
 
-from oaebu_workflows.identifiers import TelescopeTypes
-from oaebu_workflows.workflows.oaebu_partners import OaebuPartnerName, OaebuPartners
-from oaebu_workflows.workflows.onix_workflow import OnixWorkflow
+from typing import List, Tuple
 
+from airflow.exceptions import AirflowException
+from oaebu_workflows.identifiers import TelescopeTypes
+from oaebu_workflows.workflows.oaebu_partners import OaebuPartner
+from oaebu_workflows.workflows.onix_workflow import OnixWorkflow
 from observatory.platform.utils.workflow_utils import make_observatory_api
 
 
-# Temporary function. Create oaebu partner metadata.
-# Get rid of this when we change the Observatory API.
-def get_oaebu_partner_data(project_id, org_name):
+def is_oaebu_telescope(telescope: "Telescope") -> bool:
+    """Determine whether a telescope is an OAEBU telescope.
 
-    oaebu_data = [
-        OaebuPartners(
-            name=OaebuPartnerName.google_analytics,
-            dag_id_prefix="google_analytics",
-            gcp_project_id=project_id,
-            gcp_dataset_id="google",
-            gcp_table_id="google_analytics",
-            isbn_field_name="publication_id",
-            title_field_name="title",
-            sharded=False,
-        ),
-        OaebuPartners(
-            name=OaebuPartnerName.google_books_sales,
-            dag_id_prefix="google_books",
-            gcp_project_id=project_id,
-            gcp_dataset_id="google",
-            gcp_table_id="google_books_sales",
-            isbn_field_name="Primary_ISBN",
-            title_field_name="Title",
-            sharded=False,
-        ),
-        OaebuPartners(
-            name=OaebuPartnerName.google_books_traffic,
-            dag_id_prefix="google_books",
-            gcp_project_id=project_id,
-            gcp_dataset_id="google",
-            gcp_table_id="google_books_traffic",
-            isbn_field_name="Primary_ISBN",
-            title_field_name="Title",
-            sharded=False,
-        ),
-        OaebuPartners(
-            name=OaebuPartnerName.jstor_country,
-            dag_id_prefix="jstor",
-            gcp_project_id=project_id,
-            gcp_dataset_id="jstor",
-            gcp_table_id="jstor_country",
-            isbn_field_name="eISBN",
-            title_field_name="Book_Title",
-            sharded=False,
-        ),
-        OaebuPartners(
-            name=OaebuPartnerName.jstor_institution,
-            dag_id_prefix="jstor",
-            gcp_project_id=project_id,
-            gcp_dataset_id="jstor",
-            gcp_table_id="jstor_institution",
-            isbn_field_name="eISBN",
-            title_field_name="Book_Title",
-            sharded=False,
-        ),
-        OaebuPartners(
-            name=OaebuPartnerName.oapen_irus_uk,
-            dag_id_prefix="oapen_irus_uk",
-            gcp_project_id=project_id,
-            gcp_dataset_id="oapen",
-            gcp_table_id="oapen_irus_uk",
-            isbn_field_name="ISBN",
-            title_field_name="book_title",
-            sharded=False,
-        ),
-        OaebuPartners(
-            name=OaebuPartnerName.ucl_discovery,
-            dag_id_prefix="ucl_discovery",
-            gcp_project_id=project_id,
-            gcp_dataset_id="ucl",
-            gcp_table_id="ucl_discovery",
-            isbn_field_name="ISBN",
-            title_field_name="book_title",
-            sharded=False,
-        ),
-    ]
+    :param telescope: Telescope to check.
+    :return: Whether the telescope is used for OAEBU.
+    """
 
-    publisher_to_provider_mapping = {
-        "ANU Press": [
-            OaebuPartnerName.google_analytics,
-            OaebuPartnerName.google_books_sales,
-            OaebuPartnerName.google_books_traffic,
-            OaebuPartnerName.jstor_country,
-            OaebuPartnerName.jstor_institution,
-            OaebuPartnerName.oapen_irus_uk,
-        ],
-        "UCL Press": [
-            OaebuPartnerName.google_books_sales,
-            OaebuPartnerName.google_books_traffic,
-            OaebuPartnerName.jstor_country,
-            OaebuPartnerName.jstor_institution,
-            OaebuPartnerName.oapen_irus_uk,
-            OaebuPartnerName.ucl_discovery,
-        ],
-        "University of Michigan Press": [
-            OaebuPartnerName.google_books_sales,
-            OaebuPartnerName.google_books_traffic,
-            OaebuPartnerName.jstor_country,
-            OaebuPartnerName.jstor_institution,
-            OaebuPartnerName.oapen_irus_uk,
-        ],
-        "Wits University Press": [
-            OaebuPartnerName.oapen_irus_uk,
-        ],
-        "Springer Nature": [
-            OaebuPartnerName.oapen_irus_uk,
-            OaebuPartnerName.google_books_sales,
-            OaebuPartnerName.google_books_traffic,
-        ],
-    }
+    if telescope.extra is None:
+        return False
 
-    publisher_data_partners = list()
+    groups = telescope.extra.get("groups", None)
+    if groups is None or "oaebu" not in groups:
+        return False
+    return True
 
-    for data in oaebu_data:
-        if data.name in publisher_to_provider_mapping[org_name]:
-            publisher_data_partners.append(data)
 
-    return publisher_data_partners
+def get_gcp_address(storage: "DatasetStorage") -> Tuple[str, str, str]:
+    """Get the project id, dataset id, and table id from a GCP storage location.
+
+    :param storage: Dataset storage info.
+    :return: project id, dataset id, table id.
+    """
+
+    if storage.service != "google":
+        raise AirflowException("Unsupported DatasetStorage type")
+
+    return storage.address.split(".")
+
+
+def get_isbn_field_name(dataset: "Dataset") -> str:
+    """Get the ISBN field name in a dataset.
+
+    :param dataset: Dataset info.
+    :return: ISBN field name.
+    """
+
+    if dataset.extra is None:
+        return False
+
+    isbn_field_name = dataset.extra.get("isbn_field_name", None)
+    if isbn_field_name is None:
+        raise AirflowException("isbn_field_name missing from Dataset extra")
+
+    return isbn_field_name
+
+
+def get_title_field_name(dataset: "Dataset") -> str:
+    """Get the title field name in a dataset.
+
+    :param dataset: Dataset info.
+    :return: Title field name.
+    """
+
+    if dataset.extra is None:
+        return False
+
+    title_field_name = dataset.extra.get("title_field_name", None)
+    if title_field_name is None:
+        raise AirflowException("title_field_name missing from Dataset extra")
+
+    return title_field_name
+
+
+def is_sharded(storage: "DatasetStorage") -> bool:
+    """Determine if a dataset storage table is sharded.
+
+    :param storage: Dataset storage info.
+    :return: Whether the table is sharded.
+    """
+
+    if storage.extra is None:
+        return False
+
+    table_type = storage.extra.get("table_type", None)
+    if table_type is None:
+        raise AirflowException("DatasetStorage table_type not found")
+
+    return table_type == "sharded"
+
+
+def get_oaebu_partner_data(organisation_id: int) -> List[OaebuPartner]:
+    """Get the OAEBU datasets for a given organisation.
+
+    :param organisation_id: Organisation id.
+    :return: List of OAEBU partner dataset information.
+    """
+
+    telescopes = api.get_telescopes(organisation_id=organisation_id, limit=1000)
+    partners = list()
+
+    for telescope in telescopes:
+        if not is_oaebu_telescope(telescope):
+            continue
+
+        datasets = api.get_datasets(telescope_id=telescope.id, limit=1000)
+        for dataset in datasets:
+            storages = api.get_dataset_storages(dataset_id=dataset.id, limit=1000)
+            for storage in storages:
+                gcp_project_id, gcp_dataset_id, gcp_table_id = get_gcp_address(storage)
+
+                partners.append(
+                    OaebuPartner(
+                        name=telescope.organisation.name,
+                        dag_id_prefix=telescope.telescope_type.type_id,
+                        gcp_project_id=gcp_project_id,
+                        gcp_dataset_id=gcp_dataset_id,
+                        gcp_table_id=gcp_table_id,
+                        isbn_field_name=get_isbn_field_name(dataset),
+                        title_field_name=get_title_field_name(dataset),
+                        sharded=is_sharded(storage),
+                    )
+                )
+
+    return partners
 
 
 # Fetch all ONIX telescopes
@@ -154,8 +152,7 @@ for telescope in telescopes:
     org_name = telescope.organisation.name
     gcp_project_id = telescope.organisation.gcp_project_id
     gcp_bucket_name = telescope.organisation.gcp_transform_bucket
-
-    data_partners = get_oaebu_partner_data(gcp_project_id, org_name)
+    data_partners = get_oaebu_partner_data(telescope.organisation.id)
 
     workflow = OnixWorkflow(
         org_name=org_name,
