@@ -975,7 +975,61 @@ class TestBookWorkAggregator(unittest.TestCase):
 
         agg.aggregate()
         table = agg.get_works_lookup_table()
+        self.assertEqual(len(agg.errors), 1)
         self.assertEqual(agg.errors[0][0:54], "Warning: product 123 has multiple work ID assignments:")
+        self.assertEqual(len(table), 3)
+
+    def test_filtering_duplicate_isbns(self):
+        agg = BookWorkAggregator(
+            [
+                {
+                    "ISBN13": "123",
+                    "GTIN_13": "123",
+                    "RelatedWorks": [
+                        {
+                            "WorkRelationCode": "Manifestation of",
+                            "WorkIdentifiers": [{"WorkIDType": "ISBN-13", "IDValue": "246"}],
+                        },
+                    ],
+                },
+                {
+                    "ISBN13": "123",
+                    "GTIN_13": "999",
+                    "RelatedWorks": [
+                        {
+                            "WorkRelationCode": "Manifestation of",
+                            "WorkIdentifiers": [{"WorkIDType": "ISBN-13", "IDValue": "999"}],
+                        },
+                    ],
+                },
+                {
+                    "ISBN13": "246",
+                    "GTIN_13": "123",
+                    "RelatedWorks": [
+                        {
+                            "WorkRelationCode": "Manifestation of",
+                            "WorkIdentifiers": [{"WorkIDType": "ISBN-13", "IDValue": "246"}],
+                        },
+                    ],
+                },
+                {
+                    "ISBN13": "789",
+                    "GTIN_13": "123",
+                    "RelatedWorks": [
+                        {
+                            "WorkRelationCode": "Manifestation of",
+                            "WorkIdentifiers": [{"WorkIDType": "ISBN-13", "IDValue": "789"}],
+                        },
+                    ],
+                },
+            ]
+        )
+
+        agg.aggregate()
+        table = agg.get_works_lookup_table()
+        self.assertEqual(len(agg.errors), 1)
+        self.assertEqual(agg.errors[0], "ISBN 123 has duplicate product records in the ONIX data source.")
+        self.assertEqual(len(table), 3)
 
 
 class TestBookWorkFamilyAggregator(unittest.TestCase):
