@@ -14,14 +14,14 @@
 
 # Author: Aniek Roelofs, Tuan Chien
 
-import logging
 import os
 from unittest.mock import patch
 
 import pendulum
-import vcr
 import httpretty
+from datetime import timedelta
 from airflow.exceptions import AirflowException
+from google.cloud import bigquery
 from click.testing import CliRunner
 from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.workflows.oapen_metadata_telescope import (
@@ -33,7 +33,7 @@ from observatory.platform.utils.test_utils import (
     ObservatoryTestCase,
     module_file_path,
 )
-from observatory.platform.utils.workflow_utils import blob_name
+from observatory.platform.utils.workflow_utils import blob_name, table_ids_from_path, create_date_table_id
 
 
 class TestOapenMetadataTelescope(ObservatoryTestCase):
@@ -49,8 +49,11 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
         self.project_id = os.getenv("TEST_GCP_PROJECT_ID")
         self.data_location = os.getenv("TEST_GCP_DATA_LOCATION")
 
-        # Paths
-        self.download_path = os.path.join(test_fixtures_folder(), "oapen_metadata", "oapen_metadata_2021-02-19.yaml")
+        self.first_download_path = test_fixtures_folder("oapen_metadata", "oapen_metadata1.csv")
+        self.first_execution_date = pendulum.datetime(year=2021, month=2, day=1)
+
+        self.second_download_path = test_fixtures_folder("oapen_metadata", "oapen_metadata2.csv")
+        self.second_execution_date = pendulum.datetime(year=2021, month=2, day=7)
 
     def setup_environment(self) -> ObservatoryEnvironment:
         """Setup observatory environment"""
@@ -96,62 +99,146 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
         env = self.setup_environment()
         telescope = OapenMetadataTelescope(dataset_id=self.dataset_id)
         dag = telescope.make_dag()
-        execution_date = pendulum.parse("2021-02-12")
-        start_date = pendulum.datetime(2018, 5, 14)
-        end_date = pendulum.datetime(2021, 2, 13)
-        release = OapenMetadataRelease(
-            dag_id="oapen_metadata", start_date=start_date, end_date=end_date, first_release=True
-        )
 
-        with env.create():
-            with env.create_dag_run(dag, execution_date):
-                with CliRunner().isolated_filesystem():
-                    # Test that all dependencies are specified: no error should be thrown
-                    env.run_task(telescope.check_dependencies.__name__)
+        with env.create(task_logging=True):
+            # first run
+            with env.create_dag_run(dag, self.first_execution_date) as first_dagrun:
+                # Test that all dependencies are specified: no error should be thrown
+                env.run_task(telescope.check_dependencies.__name__)
 
-                    # Test download
-                    with vcr.use_cassette(self.download_path):
-                        env.run_task(telescope.download.__name__)
-                    self.assertEqual(len(release.download_files), 1)
+                start_date, end_date, first_release = telescope.get_release_info(
+                    execution_date=self.first_execution_date,
+                    dag_run=first_dagrun,
+                    dag=dag,
+                    next_execution_date=self.second_execution_date,
+                )
 
-                    # Test upload_downloaded
-                    env.run_task(telescope.upload_downloaded.__name__)
-                    for file in release.download_files:
-                        self.assert_blob_integrity(env.download_bucket, blob_name(file), file)
+                # Use release info for other tasks
+                release = OapenMetadataRelease(telescope.dag_id, start_date, end_date, first_release)
 
-                    # Test download
-                    env.run_task(telescope.transform.__name__)
-                    self.assertEqual(len(release.transform_files), 1)
+                # Test download task
+                with httpretty.enabled():
+                    self.setup_mock_file_download(OapenMetadataTelescope.CSV_URL, self.first_download_path)
+                    env.run_task(telescope.download.__name__)
 
-                    # Test upload_transformed
-                    env.run_task(telescope.upload_transformed.__name__)
+                self.assertEqual(1, len(release.download_files))
+                download_path = release.download_files[0]
+                expected_file_hash = "735584bffe046b9e073b6a63518a4044"
+                self.assert_file_integrity(download_path, expected_file_hash, "md5")
 
-                    for file in release.transform_files:
-                        self.assert_blob_integrity(env.transform_bucket, blob_name(file), file)
+                # Test that file uploaded
+                env.run_task(telescope.upload_downloaded.__name__)
+                self.assert_blob_integrity(env.download_bucket, blob_name(download_path), download_path)
 
-                    # Test bq_load partition
-                    ti = env.run_task(telescope.bq_load_partition.__name__)
-                    self.assertEqual(ti.state, "skipped")
+                # Test that file transformed
+                env.run_task(telescope.transform.__name__)
 
-                    # Test delete old task is skipped for the first release
-                    ti = env.run_task(telescope.bq_delete_old.__name__)
-                    self.assertEqual(ti.state, "skipped")
+                self.assertEqual(1, len(release.transform_files))
+                transform_path = release.transform_files[0]
+                expected_file_hash = "fbf31c05"
+                self.assert_file_integrity(transform_path, expected_file_hash, "gzip_crc")
 
-                    # Test bq_append_new
-                    env.run_task(telescope.bq_append_new.__name__)
-                    table_id = f"{self.project_id}.{telescope.dataset_id}.metadata"
-                    expected_rows = 15310
-                    self.assert_table_integrity(table_id, expected_rows)
+                # Test that transformed file uploaded
+                env.run_task(telescope.upload_transformed.__name__)
+                self.assert_blob_integrity(env.transform_bucket, blob_name(transform_path), transform_path)
 
-                    # Test cleanup
-                    download_folder, extract_folder, transform_folder = (
-                        release.download_folder,
-                        release.extract_folder,
-                        release.transform_folder,
-                    )
+                # Test that load partition task is skipped for the first release
+                ti = env.run_task(telescope.bq_load_partition.__name__)
+                self.assertEqual(ti.state, "skipped")
 
-                    env.run_task(telescope.cleanup.__name__)
-                    self.assert_cleanup(download_folder, extract_folder, transform_folder)
+                # Test delete old task is skipped for the first release
+                ti = env.run_task(telescope.bq_delete_old.__name__)
+                self.assertEqual(ti.state, "skipped")
+
+                # Test append new creates table
+                env.run_task(telescope.bq_append_new.__name__)
+                main_table_id, partition_table_id = table_ids_from_path(transform_path)
+                table_id = f"{self.project_id}.{telescope.dataset_id}.{main_table_id}"
+                expected_rows = 4
+                self.assert_table_integrity(table_id, expected_rows)
+
+                # Test that all telescope data deleted
+                download_folder, extract_folder, transform_folder = (
+                    release.download_folder,
+                    release.extract_folder,
+                    release.transform_folder,
+                )
+                env.run_task(telescope.cleanup.__name__)
+                self.assert_cleanup(download_folder, extract_folder, transform_folder)
+
+                # second run
+            with env.create_dag_run(dag, self.second_execution_date) as second_dagrun:
+                # Test that all dependencies are specified: no error should be thrown
+                env.run_task(telescope.check_dependencies.__name__)
+
+                start_date, end_date, first_release = telescope.get_release_info(
+                    execution_date=self.second_execution_date,
+                    dag_run=second_dagrun,
+                    dag=dag,
+                    next_execution_date=pendulum.datetime(2021, 2, 14),
+                )
+
+                self.assertEqual(release.end_date + timedelta(days=1), start_date)
+                self.assertEqual(pendulum.today("UTC") - timedelta(days=1), end_date)
+                self.assertFalse(first_release)
+
+                # use release info for other tasks
+                release = OapenMetadataRelease(telescope.dag_id, start_date, end_date, first_release)
+
+                # Test download task
+                with httpretty.enabled():
+                    self.setup_mock_file_download(OapenMetadataTelescope.CSV_URL, self.second_download_path)
+                    env.run_task(telescope.download.__name__)
+
+                self.assertEqual(1, len(release.download_files))
+                download_path = release.download_files[0]
+                expected_file_hash = "331b0dbe0b0e8c0e166015d15a2954d0"
+                self.assert_file_integrity(download_path, expected_file_hash, "md5")
+
+                # Test that file uploaded
+                env.run_task(telescope.upload_downloaded.__name__)
+                self.assert_blob_integrity(env.download_bucket, blob_name(download_path), download_path)
+
+                # Test that file transformed
+                env.run_task(telescope.transform.__name__)
+
+                self.assertEqual(1, len(release.transform_files))
+                transform_path = release.transform_files[0]
+                expected_file_hash = "ab5c3e9d"
+                self.assert_file_integrity(transform_path, expected_file_hash, "gzip_crc")
+
+                # Test that transformed file uploaded
+                env.run_task(telescope.upload_transformed.__name__)
+                self.assert_blob_integrity(env.transform_bucket, blob_name(transform_path), transform_path)
+
+                # Test that load partition task creates partition
+                env.run_task(telescope.bq_load_partition.__name__)
+                main_table_id, partition_table_id = table_ids_from_path(transform_path)
+                table_id = create_date_table_id(partition_table_id, release.end_date, bigquery.TimePartitioningType.DAY)
+                table_id = f"{self.project_id}.{telescope.dataset_id}.{table_id}"
+                expected_rows = 4
+                self.assert_table_integrity(table_id, expected_rows)
+
+                # Test task deleted rows from main table
+                env.run_task(telescope.bq_delete_old.__name__)
+                table_id = f"{self.project_id}.{telescope.dataset_id}.{main_table_id}"
+                expected_rows = 3
+                self.assert_table_integrity(table_id, expected_rows)
+
+                # Test append new adds rows to table
+                env.run_task(telescope.bq_append_new.__name__)
+                table_id = f"{self.project_id}.{telescope.dataset_id}.{main_table_id}"
+                expected_rows = 7
+                self.assert_table_integrity(table_id, expected_rows)
+
+                # Test that all telescope data deleted
+                download_folder, extract_folder, transform_folder = (
+                    release.download_folder,
+                    release.extract_folder,
+                    release.transform_folder,
+                )
+                env.run_task(telescope.cleanup.__name__)
+                self.assert_cleanup(download_folder, extract_folder, transform_folder)
 
     @patch("observatory.platform.utils.workflow_utils.Variable.get")
     def test_download(self, mock_variable_get):
