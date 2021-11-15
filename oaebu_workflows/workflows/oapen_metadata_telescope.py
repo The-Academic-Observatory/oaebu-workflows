@@ -23,7 +23,6 @@ from typing import List, Tuple
 
 import pendulum
 from airflow.exceptions import AirflowException
-from airflow.models.taskinstance import TaskInstance
 from oaebu_workflows.config import schema_folder as default_schema_folder
 from observatory.platform.utils.airflow_utils import AirflowVars
 from observatory.platform.utils.file_utils import list_to_jsonl_gz
@@ -114,6 +113,7 @@ class OapenMetadataRelease(StreamRelease):
             "oapen.grant.project",
             "oapen.relation.isbn",
             "dc.identifier",
+            "oapen.identifier.ocn",
             "dc.date.accessioned",
             "BITSTREAM License",
             "oapen.relation.isFundedBy_grantor.name",
@@ -213,7 +213,7 @@ class OapenMetadataTelescope(StreamTelescope):
         release.transform()
 
 
-def get_nested_fieldnames(csv_entries: dict) -> set:
+def get_nested_fieldnames(csv_entries: List[dict]) -> set:
     """Fieldnames with '.' should be converted to nested dictionaries. This function will return a set of
     fieldnames for nested dictionaries from the highest to second lowest levels.
     E.g these fieldnames: dc.date.available, dc.date.issued, dc.description

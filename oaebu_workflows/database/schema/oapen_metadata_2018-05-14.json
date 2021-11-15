@@ -472,7 +472,13 @@
             "mode": "NULLABLE",
             "name": "isbn",
             "type": "STRING"
-          }
+          },
+          {
+            "description": "",
+            "mode": "REPEATED",
+            "name": "ocn",
+            "type": "STRING"
+        }
         ]
       },
       {
