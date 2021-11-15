@@ -241,6 +241,7 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
                     "book_product_metrics",
                     "book_product_metrics_country",
                     "book_product_metrics_institution",
+                    "institution_list",
                     "book_product_metrics_city",
                     "book_product_metrics_referrer",
                     "book_product_metrics_events",
