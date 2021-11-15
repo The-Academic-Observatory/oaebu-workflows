@@ -667,6 +667,9 @@ class TestOnixWorkflow(ObservatoryTestCase):
                         "export_oaebu_table.book_product_metrics_institution"
                     ],
                     "export_oaebu_table.book_product_metrics_institution": [
+                        "export_oaebu_table.institution_list"
+                    ],
+                    "export_oaebu_table.institution_list": [
                         "export_oaebu_table.book_product_metrics_city"
                     ],
                     "export_oaebu_table.book_product_metrics_city": [
