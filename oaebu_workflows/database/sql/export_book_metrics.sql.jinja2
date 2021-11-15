@@ -19,6 +19,7 @@ SELECT
     work_id,
     work_family_id,
     onix.title as title,
+    onix.authors,
     CAST(onix.published_year as INT64) as published_year,
     month.month,
     STRUCT((SELECT SUM(value) FROM UNNEST(month.google_analytics.unique_views.country)) as unique_views) as google_analytics,
