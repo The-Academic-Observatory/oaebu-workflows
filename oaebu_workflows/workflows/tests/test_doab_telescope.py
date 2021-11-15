@@ -23,6 +23,7 @@ import pendulum
 from airflow.exceptions import AirflowException
 from click.testing import CliRunner
 from google.cloud import bigquery
+from observatory.platform.utils.airflow_utils import AirflowVars
 from observatory.platform.utils.file_utils import get_file_hash
 from observatory.platform.utils.test_utils import (
     ObservatoryEnvironment,
@@ -32,7 +33,7 @@ from observatory.platform.utils.test_utils import (
 from observatory.platform.utils.workflow_utils import blob_name, create_date_table_id, table_ids_from_path
 
 from oaebu_workflows.config import test_fixtures_folder
-from oaebu_workflows.workflows.doab_telescope import DoabRelease, DoabTelescope
+from oaebu_workflows.workflows.doab_telescope import DoabRelease, DoabTelescope, convert, transform_dict
 
 
 class TestDoabTelescope(ObservatoryTestCase):
@@ -236,6 +237,12 @@ class TestDoabTelescope(ObservatoryTestCase):
                 env.run_task(telescope.cleanup.__name__)
                 self.assert_cleanup(download_folder, extract_folder, transform_folder)
 
+    def test_airflow_vars(self):
+        """Cover case when airflow_vars is given."""
+
+        telescope = DoabTelescope(airflow_vars=[AirflowVars.DOWNLOAD_BUCKET])
+        self.assertEqual(telescope.airflow_vars, [AirflowVars.DOWNLOAD_BUCKET, AirflowVars.TRANSFORM_BUCKET])
+
     @patch("observatory.platform.utils.workflow_utils.Variable.get")
     def test_download(self, mock_variable_get):
         """Download release and check exception is raised when response is not 200 or csv is empty.
@@ -264,3 +271,24 @@ class TestDoabTelescope(ObservatoryTestCase):
 
                 with self.assertRaises(AirflowException):
                     release.download()
+
+    def test_transform_dict(self):
+        """Check transform_dict handling of invalid case."""
+        nested_fields = ["dc.subject.classification"]
+        list_fields = ["dc.subject.classification", "dc.date.issued", "BITSTREAM ISBN"]
+        test_dict = {
+            "field1": [{"1": "value1"}, "2"],
+            "field2": None,
+            "dc.subject.classification": "value1||value2",
+            "dc.date.issued": "0000-01-01",
+            "BITSTREAM ISBN": "123-5521-4521",
+        }
+        transformed_dict = {
+            "field1": [{"1": "value1"}, "2"],
+            "dc": {"subject": {"classification": {"value": ["value1", "value2"]}}},
+            "dc_date_issued": [],
+            "BITSTREAM_ISBN": ["12355214521"],
+        }
+
+        result = transform_dict(test_dict, convert, nested_fields, list_fields)
+        self.assertDictEqual(result, transformed_dict)
