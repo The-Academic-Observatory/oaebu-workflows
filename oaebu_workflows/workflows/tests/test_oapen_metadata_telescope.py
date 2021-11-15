@@ -27,12 +27,15 @@ from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.workflows.oapen_metadata_telescope import (
     OapenMetadataRelease,
     OapenMetadataTelescope,
+    convert,
+    transform_dict,
 )
 from observatory.platform.utils.test_utils import (
     ObservatoryEnvironment,
     ObservatoryTestCase,
     module_file_path,
 )
+from observatory.platform.utils.airflow_utils import AirflowVars
 from observatory.platform.utils.workflow_utils import blob_name, table_ids_from_path, create_date_table_id
 
 
@@ -240,6 +243,12 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
                 env.run_task(telescope.cleanup.__name__)
                 self.assert_cleanup(download_folder, extract_folder, transform_folder)
 
+    def test_airflow_vars(self):
+        """Cover case when airflow_vars is given."""
+
+        telescope = OapenMetadataTelescope(airflow_vars=[AirflowVars.DOWNLOAD_BUCKET])
+        self.assertEqual(telescope.airflow_vars, [AirflowVars.DOWNLOAD_BUCKET, AirflowVars.TRANSFORM_BUCKET])
+
     @patch("observatory.platform.utils.workflow_utils.Variable.get")
     def test_download(self, mock_variable_get):
         """Download release and check exception is raised when response is not 200 or csv is empty.
@@ -268,3 +277,17 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
 
                 with self.assertRaises(AirflowException):
                     release.download()
+
+    def test_transform_dict(self):
+        """Check transform_dict handling of invalid case."""
+        nested_fields = ["dc.subject.classification"]
+        list_fields = ["dc.subject.classification"]
+        test_dict = {"field1": [{"1": "value1"}, "2"], "dc.subject.classification": "value1||value2", "field2": None}
+        transformed_dict = {
+            "field1": [{"1": "value1"}, "2"],
+            "dc": {"subject": {"classification": {"value": ["value1", "value2"]}}},
+            "field2": None,
+        }
+
+        result = transform_dict(test_dict, convert, nested_fields, list_fields)
+        self.assertDictEqual(result, transformed_dict)
