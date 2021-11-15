@@ -187,10 +187,11 @@ class BookWorkAggregator:
         :param records: List of ONIX Product records.
         """
 
-        self.records = records
         self.relevant_product_codes = self.set_relevant_product_relation_codes()
         self.errors = list()
         self.works = list()
+
+        self.records = self.filter_out_duplicate_records(records)
 
         self.n = len(self.records)
         self.isbn13_to_index = {self.records[i]["ISBN13"]: i for i in range(self.n)}
@@ -208,6 +209,39 @@ class BookWorkAggregator:
                 self.proprietary_to_product[pid_proprietary] = record
 
         self.uf = UnionFind(self.n)
+
+    def filter_out_duplicate_records(self, records: dict) -> List[dict]:
+        """Filter out records with duplicate ISBNs.  Logs the duplicates, and returns the filtered records.
+
+        :param records: Product records.
+        :return: Tuple of a list of filtered records, and a list of ISBNs which appear more than once in a record.
+        """
+
+        isbns = set()
+        filtered_records = list()
+        duplicates = list()
+
+        for record in records:
+            isbn = record["ISBN13"]
+            if isbn not in isbns:
+                isbns.add(isbn)
+                filtered_records.append(record)
+            else:
+                duplicates.append(isbn)
+
+        self.log_duplicate_isbns(duplicates)
+
+        return filtered_records
+
+    def log_duplicate_isbns(self, duplicates: List[str]):
+        """Log the list of duplicate ISBNs encountered.
+
+        :param duplicates: List of duplicate ISBNs.
+        """
+
+        for isbn in duplicates:
+            error_msg = f"ISBN {isbn} has duplicate product records in the ONIX data source."
+            self.errors.append(error_msg)
 
     def get_pref_work_id(self, identifiers: List[Dict]) -> Tuple[Union[None, str], Union[None, str]]:
         """
@@ -450,7 +484,7 @@ class BookWorkAggregator:
     def log_get_works_lookup_table_errors(self, manifestations: Set[str], isbn: str):
         """Log an error when an ISBN is assigned to multiple WorkIDs.
 
-        :param manifestations: List of work IDs manifesting this product manifests.
+        :param manifestations: List of work IDs manifested by an ISBN.
         :param isbn: ISBN that has multiple WorkID assignments.
         """
 
