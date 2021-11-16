@@ -119,7 +119,7 @@ SELECT
     STRUCT(jstor.Total_Item_Requests) as jstor,
     STRUCT(oapen.title_requests, oapen.total_item_investigations, oapen.total_item_requests, oapen.unique_item_investigations, oapen.unique_item_requests) as oapen_irus_uk,
     STRUCT(google.value as value) as google_analytics,
-    STRUCT(google_books.qty as qty) as google_books,
+    STRUCT(google_books.qty as qty) as google_books_sales,
     STRUCT(ucl_discovery.download_count as download_count) as ucl_discovery
 FROM month_country
 LEFT JOIN jstor_month_country as jstor ON month_country.ISBN13 = jstor.ISBN13 AND month_country.month = jstor.month AND month_country.alpha2 = jstor.alpha2
