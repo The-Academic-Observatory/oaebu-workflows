@@ -65,6 +65,9 @@ def load_elastic_mappings_oaebu(path: str, table_prefix: str) -> Dict:
     elif "unmatched" in table_prefix:
         mappings_path = os.path.join(path, "oaebu-unmatched-metrics-mappings.json.jinja2")
         return json.loads(render_template(mappings_path))
+    elif "institution_list" in table_prefix:
+        mappings_path = os.path.join(path, "oaebu-institution-list-mappings.json.jinja2")
+        return json.loads(render_template(mappings_path))
     else:
         # Aggregation level
         aggregation_level_search = re.search(r"(?<=book_)(.*?)(?=_)", table_prefix)

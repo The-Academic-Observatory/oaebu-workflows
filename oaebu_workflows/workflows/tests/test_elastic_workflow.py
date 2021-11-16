@@ -19,13 +19,12 @@ from __future__ import annotations
 import json
 import os
 
+from oaebu_workflows.config import elastic_mappings_folder
+from oaebu_workflows.dags.elastic_import_workflow import load_elastic_mappings_oaebu
 from observatory.platform.utils.config_utils import module_file_path
 from observatory.platform.utils.jinja2_utils import render_template
 from observatory.platform.utils.test_utils import ObservatoryEnvironment, ObservatoryTestCase
 from observatory.platform.utils.workflow_utils import make_dag_id
-
-from oaebu_workflows.config import elastic_mappings_folder
-from oaebu_workflows.dags.elastic_import_workflow import load_elastic_mappings_oaebu
 
 
 class TestElasticImportWorkflow(ObservatoryTestCase):
@@ -101,19 +100,22 @@ class TestElasticImportWorkflow(ObservatoryTestCase):
             (
                 "oaebu_anu_press_book_product_subject_bic_metrics",
                 render_template(
-                    os.path.join(path, "oaebu-subject-bic-metrics-mappings.json.jinja2"), aggregation_level=aggregate_level
+                    os.path.join(path, "oaebu-subject-bic-metrics-mappings.json.jinja2"),
+                    aggregation_level=aggregate_level,
                 ),
             ),
             (
                 "oaebu_anu_press_book_product_subject_bisac_metrics",
                 render_template(
-                    os.path.join(path, "oaebu-subject-bisac-metrics-mappings.json.jinja2"), aggregation_level=aggregate_level
+                    os.path.join(path, "oaebu-subject-bisac-metrics-mappings.json.jinja2"),
+                    aggregation_level=aggregate_level,
                 ),
             ),
             (
                 "oaebu_anu_press_book_product_subject_thema_metrics",
                 render_template(
-                    os.path.join(path, "oaebu-subject-thema-metrics-mappings.json.jinja2"), aggregation_level=aggregate_level
+                    os.path.join(path, "oaebu-subject-thema-metrics-mappings.json.jinja2"),
+                    aggregation_level=aggregate_level,
                 ),
             ),
             (
@@ -135,6 +137,17 @@ class TestElasticImportWorkflow(ObservatoryTestCase):
                     os.path.join(path, "oaebu-unmatched-metrics-mappings.json.jinja2"),
                     aggregation_level=aggregate_level,
                 ),
+            ),
+            (
+                "oaebu_anu_press_unmatched_book_metrics",
+                render_template(
+                    os.path.join(path, "oaebu-unmatched-metrics-mappings.json.jinja2"),
+                    aggregation_level=aggregate_level,
+                ),
+            ),
+            (
+                "oaebu_anu_press_institution_list",
+                render_template(os.path.join(path, "oaebu-institution-list-mappings.json.jinja2")),
             ),
         ]
 
