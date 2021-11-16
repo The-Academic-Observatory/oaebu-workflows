@@ -821,7 +821,7 @@ class OnixWorkflow(Workflow):
             google_books=include_google_books,
             jstor=include_jstor,
             oapen=include_oapen,
-            ucl=include_ucl,
+            ucl_discovery=include_ucl,
             google_analytics_table=google_analytics_table,
             google_books_table=google_books_table,
             jstor_table=jstor_table,
