@@ -99,9 +99,21 @@ class TestElasticImportWorkflow(ObservatoryTestCase):
                 ),
             ),
             (
-                "oaebu_anu_press_book_product_subject_metrics",
+                "oaebu_anu_press_book_product_subject_bic_metrics",
                 render_template(
-                    os.path.join(path, "oaebu-subject-metrics-mappings.json.jinja2"), aggregation_level=aggregate_level
+                    os.path.join(path, "oaebu-subject-bic-metrics-mappings.json.jinja2"), aggregation_level=aggregate_level
+                ),
+            ),
+            (
+                "oaebu_anu_press_book_product_subject_bisac_metrics",
+                render_template(
+                    os.path.join(path, "oaebu-subject-bisac-metrics-mappings.json.jinja2"), aggregation_level=aggregate_level
+                ),
+            ),
+            (
+                "oaebu_anu_press_book_product_subject_thema_metrics",
+                render_template(
+                    os.path.join(path, "oaebu-subject-thema-metrics-mappings.json.jinja2"), aggregation_level=aggregate_level
                 ),
             ),
             (

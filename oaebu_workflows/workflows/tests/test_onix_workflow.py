@@ -516,9 +516,17 @@ class TestOnixWorkflow(ObservatoryTestCase):
                         "export_oaebu_table.book_product_publisher_metrics"
                     ],
                     "export_oaebu_table.book_product_publisher_metrics": [
-                        "export_oaebu_table.book_product_subject_metrics"
+                        "export_oaebu_table.book_product_subject_bic_metrics"
                     ],
-                    "export_oaebu_table.book_product_subject_metrics": ["export_oaebu_table.book_product_year_metrics"],
+                    "export_oaebu_table.book_product_subject_bic_metrics": [
+                        "export_oaebu_table.book_product_subject_bisac_metrics"
+                    ],
+                    "export_oaebu_table.book_product_subject_bisac_metrics": [
+                        "export_oaebu_table.book_product_subject_thema_metrics"
+                    ],
+                    "export_oaebu_table.book_product_subject_thema_metrics": [
+                        "export_oaebu_table.book_product_year_metrics"
+                    ],
                     "export_oaebu_table.book_product_year_metrics": [
                         "export_oaebu_table.book_product_subject_year_metrics"
                     ],
@@ -671,9 +679,17 @@ class TestOnixWorkflow(ObservatoryTestCase):
                         "export_oaebu_table.book_product_publisher_metrics"
                     ],
                     "export_oaebu_table.book_product_publisher_metrics": [
-                        "export_oaebu_table.book_product_subject_metrics"
+                        "export_oaebu_table.book_product_subject_bic_metrics"
                     ],
-                    "export_oaebu_table.book_product_subject_metrics": ["export_oaebu_table.book_product_year_metrics"],
+                    "export_oaebu_table.book_product_subject_bic_metrics": [
+                        "export_oaebu_table.book_product_subject_bisac_metrics"
+                    ],
+                    "export_oaebu_table.book_product_subject_bisac_metrics": [
+                        "export_oaebu_table.book_product_subject_thema_metrics"
+                    ],
+                    "export_oaebu_table.book_product_subject_thema_metrics": [
+                        "export_oaebu_table.book_product_year_metrics"
+                    ],
                     "export_oaebu_table.book_product_year_metrics": [
                         "export_oaebu_table.book_product_subject_year_metrics"
                     ],
@@ -1738,9 +1754,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
             expected_state = "success"
             with env.create_dag_run(workflow_dag, start_date):
                 for task_id in sensor_dag_ids:
-                    ti = env.run_task(
-                        f"{make_dag_id(task_id, org_name)}_sensor"
-                    )
+                    ti = env.run_task(f"{make_dag_id(task_id, org_name)}_sensor")
                     self.assertEqual(expected_state, ti.state)
 
             # Run Dummy Dags
@@ -1758,9 +1772,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
             with env.create_dag_run(workflow_dag, execution_date):
                 # Test that sensors go into 'success' state as the DAGs that they are waiting for have finished
                 for task_id in sensor_dag_ids:
-                    ti = env.run_task(
-                        f"{make_dag_id(task_id, org_name)}_sensor"
-                    )
+                    ti = env.run_task(f"{make_dag_id(task_id, org_name)}_sensor")
                     self.assertEqual(expected_state, ti.state)
 
                 # Mock make_release
@@ -1812,21 +1824,15 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                     self.assertEqual(expected_state, ti.state)
 
                 # Create oaebu output tables
-                ti = env.run_task(
-                    telescope.create_oaebu_book_product_table.__name__
-                )
+                ti = env.run_task(telescope.create_oaebu_book_product_table.__name__)
                 self.assertEqual(expected_state, ti.state)
 
                 # ONIX isbn check
-                ti = env.run_task(
-                    telescope.create_oaebu_data_qa_onix_isbn.__name__
-                )
+                ti = env.run_task(telescope.create_oaebu_data_qa_onix_isbn.__name__)
                 self.assertEqual(expected_state, ti.state)
 
                 # ONIX aggregate metrics
-                ti = env.run_task(
-                    telescope.create_oaebu_data_qa_onix_aggregate.__name__
-                )
+                ti = env.run_task(telescope.create_oaebu_data_qa_onix_aggregate.__name__)
                 self.assertEqual(expected_state, ti.state)
 
                 # JSTOR country isbn check
@@ -1854,9 +1860,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 self.assertEqual(expected_state, ti.state)
 
                 # Google Books Sales isbn check
-                ti = env.run_task(
-                    telescope.create_oaebu_data_qa_google_books_sales_isbn.__name__
-                )
+                ti = env.run_task(telescope.create_oaebu_data_qa_google_books_sales_isbn.__name__)
                 self.assertEqual(expected_state, ti.state)
 
                 # Google Books Sales intermediate unmatched isbns
@@ -1866,9 +1870,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 self.assertEqual(expected_state, ti.state)
 
                 # Google Books Traffic isbn check
-                ti = env.run_task(
-                    telescope.create_oaebu_data_qa_google_books_traffic_isbn.__name__
-                )
+                ti = env.run_task(telescope.create_oaebu_data_qa_google_books_traffic_isbn.__name__)
                 self.assertEqual(expected_state, ti.state)
 
                 # Google Books Traffic intermediate unmatched isbns
@@ -1878,9 +1880,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 self.assertEqual(expected_state, ti.state)
 
                 # OAPEN IRUS UK isbn check
-                ti = env.run_task(
-                    telescope.create_oaebu_data_qa_oapen_irus_uk_isbn.__name__
-                )
+                ti = env.run_task(telescope.create_oaebu_data_qa_oapen_irus_uk_isbn.__name__)
                 self.assertEqual(expected_state, ti.state)
 
                 # OAPEN IRUS UK intermediate unmatched isbns
@@ -1891,9 +1891,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
 
                 if include_google_analytics:
                     # Google Analytics isbn check
-                    env.run_task(
-                        telescope.create_oaebu_data_qa_google_analytics_isbn.__name__
-                    )
+                    env.run_task(telescope.create_oaebu_data_qa_google_analytics_isbn.__name__)
 
                     # Google Books Analytics unmatched isbns
                     print("---------------------------------------")
@@ -1913,22 +1911,20 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                     "book_product_metrics_referrer",
                     "book_product_metrics_events",
                     "book_product_publisher_metrics",
-                    "book_product_subject_metrics",
+                    "book_product_subject_bic_metrics",
+                    "book_product_subject_bisac_metrics",
+                    "book_product_subject_thema_metrics",
                     "book_product_year_metrics",
                     "book_product_subject_year_metrics",
                     "book_product_author_metrics",
                 ]
 
                 for table in export_tables:
-                    ti = env.run_task(
-                        f"{telescope.export_oaebu_table.__name__}.{table}"
-                    )
+                    ti = env.run_task(f"{telescope.export_oaebu_table.__name__}.{table}")
                     self.assertEqual(expected_state, ti.state)
 
                 # Export oaebu elastic qa table
-                ti = env.run_task(
-                    telescope.export_oaebu_qa_metrics.__name__
-                )
+                ti = env.run_task(telescope.export_oaebu_qa_metrics.__name__)
                 self.assertEqual(expected_state, ti.state)
 
                 # Test conditions

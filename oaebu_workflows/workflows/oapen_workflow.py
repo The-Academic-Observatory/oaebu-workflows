@@ -425,8 +425,18 @@ class OapenWorkflow(Workflow):
                 "file_type": "json",
             },
             {
-                "output_table": "book_product_subject_metrics",
-                "query_template": "export_book_subject_metrics.sql.jinja2",
+                "output_table": "book_product_subject_bic_metrics",
+                "query_template": "export_book_subject_bic_metrics.sql.jinja2",
+                "file_type": "json",
+            },
+            {
+                "output_table": "book_product_subject_bisac_metrics",
+                "query_template": "export_book_subject_bisac_metrics.sql.jinja2",
+                "file_type": "json",
+            },
+            {
+                "output_table": "book_product_subject_thema_metrics",
+                "query_template": "export_book_subject_thema_metrics.sql.jinja2",
                 "file_type": "json",
             },
             {

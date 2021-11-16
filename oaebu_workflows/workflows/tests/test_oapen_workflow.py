@@ -91,9 +91,17 @@ class TestOapenWorkflow(ObservatoryTestCase):
                         "export_oaebu_table.book_product_publisher_metrics"
                     ],
                     "export_oaebu_table.book_product_publisher_metrics": [
-                        "export_oaebu_table.book_product_subject_metrics"
+                        "export_oaebu_table.book_product_subject_bic_metrics"
                     ],
-                    "export_oaebu_table.book_product_subject_metrics": ["export_oaebu_table.book_product_year_metrics"],
+                    "export_oaebu_table.book_product_subject_bic_metrics": [
+                        "export_oaebu_table.book_product_subject_bisac_metrics"
+                    ],
+                    "export_oaebu_table.book_product_subject_bisac_metrics": [
+                        "export_oaebu_table.book_product_subject_thema_metrics"
+                    ],
+                    "export_oaebu_table.book_product_subject_thema_metrics": [
+                        "export_oaebu_table.book_product_year_metrics"
+                    ],
                     "export_oaebu_table.book_product_year_metrics": [
                         "export_oaebu_table.book_product_subject_year_metrics"
                     ],
@@ -172,14 +180,10 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
             # If the DAG you are monitoring doesn't exist in dagrun database, it will return success to skip waiting.
             expected_state = "success"
             with env.create_dag_run(workflow_dag, start_date):
-                ti = env.run_task(
-                    f"{make_dag_id(self.irus_uk_dag_id_prefix, org_name)}_sensor"
-                )
+                ti = env.run_task(f"{make_dag_id(self.irus_uk_dag_id_prefix, org_name)}_sensor")
                 self.assertEqual(expected_state, ti.state)
 
-                ti = env.run_task(
-                    f"oapen_metadata_sensor"
-                )
+                ti = env.run_task(f"oapen_metadata_sensor")
                 self.assertEqual(expected_state, ti.state)
 
             # Run Dummy Dags
@@ -202,14 +206,10 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
             # Run end to end tests for the DAG
             with env.create_dag_run(workflow_dag, execution_date):
                 # Test that sensors go into 'success' state as the DAGs that they are waiting for have finished
-                ti = env.run_task(
-                    f"{make_dag_id(self.irus_uk_dag_id_prefix, org_name)}_sensor"
-                )
+                ti = env.run_task(f"{make_dag_id(self.irus_uk_dag_id_prefix, org_name)}_sensor")
                 self.assertEqual(expected_state, ti.state)
 
-                ti = env.run_task(
-                    f"oapen_metadata_sensor"
-                )
+                ti = env.run_task(f"oapen_metadata_sensor")
                 self.assertEqual(expected_state, ti.state)
 
                 # Check dependencies
@@ -225,15 +225,11 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
                 )
 
                 # Format OAPEN Metadata like ONIX to enable the next steps
-                ti = env.run_task(
-                    workflow.create_onix_formatted_metadata_output_tasks.__name__
-                )
+                ti = env.run_task(workflow.create_onix_formatted_metadata_output_tasks.__name__)
                 self.assertEqual(expected_state, ti.state)
 
                 # Create oaebu output tables
-                ti = env.run_task(
-                    workflow.create_oaebu_book_product_table.__name__
-                )
+                ti = env.run_task(workflow.create_oaebu_book_product_table.__name__)
                 self.assertEqual(expected_state, ti.state)
 
                 # Export oaebu elastic tables
@@ -246,16 +242,16 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
                     "book_product_metrics_referrer",
                     "book_product_metrics_events",
                     "book_product_publisher_metrics",
-                    "book_product_subject_metrics",
+                    "book_product_subject_bic_metrics",
+                    "book_product_subject_bisac_metrics",
+                    "book_product_subject_thema_metrics",
                     "book_product_year_metrics",
                     "book_product_subject_year_metrics",
                     "book_product_author_metrics",
                 ]
 
                 for table in export_tables:
-                    ti = env.run_task(
-                        f"{workflow.export_oaebu_table.__name__}.{table}"
-                    )
+                    ti = env.run_task(f"{workflow.export_oaebu_table.__name__}.{table}")
                     self.assertEqual(expected_state, ti.state)
 
                 # Test conditions
