@@ -241,7 +241,7 @@ class TestDoabTelescope(ObservatoryTestCase):
         """Cover case when airflow_vars is given."""
 
         telescope = DoabTelescope(airflow_vars=[AirflowVars.DOWNLOAD_BUCKET])
-        self.assertEqual(telescope.airflow_vars, [AirflowVars.DOWNLOAD_BUCKET, AirflowVars.TRANSFORM_BUCKET])
+        self.assertEqual(set(telescope.airflow_vars), {AirflowVars.DOWNLOAD_BUCKET, AirflowVars.TRANSFORM_BUCKET})
 
     @patch("observatory.platform.utils.workflow_utils.Variable.get")
     def test_download(self, mock_variable_get):
