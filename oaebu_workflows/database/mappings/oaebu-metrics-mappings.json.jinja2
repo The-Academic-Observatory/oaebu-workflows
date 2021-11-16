@@ -37,6 +37,28 @@
           }
         }
       },
+      "authors": {
+        "properties": {
+          "PersonName": {
+            "type": "text",
+            "fields": {
+              "keyword": {
+                "type": "keyword",
+                "ignore_above": 256
+              }
+            }
+          },
+          "ORCID": {
+            "type": "text",
+            "fields": {
+              "keyword": {
+                "type": "keyword",
+                "ignore_above": 256
+              }
+            }
+          }
+        }
+      },
       "published_year": {
         "type": "long",
         "fields": {
