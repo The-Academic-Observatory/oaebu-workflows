@@ -220,6 +220,18 @@
             "mode": "NULLABLE",
             "name": "urlwebshop",
             "type": "STRING"
+          },
+          {
+            "description": "",
+            "mode": "NULLABLE",
+            "name": "citation",
+            "type": "STRING"
+          },
+          {
+            "description": "",
+            "mode": "NULLABLE",
+            "name": "isbn",
+            "type": "STRING"
           }
         ]
       },
@@ -239,6 +251,12 @@
         "description": "",
         "mode": "REPEATED",
         "name": "number",
+        "type": "STRING"
+      },
+      {
+        "description": "",
+        "mode": "NULLABLE",
+        "name": "publisher",
         "type": "STRING"
       },
       {
