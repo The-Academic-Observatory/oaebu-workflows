@@ -79,6 +79,9 @@ class TestOapenWorkflow(ObservatoryTestCase):
                         "export_oaebu_table.book_product_metrics_institution"
                     ],
                     "export_oaebu_table.book_product_metrics_institution": [
+                        "export_oaebu_table.institution_list"
+                    ],
+                    "export_oaebu_table.institution_list": [
                         "export_oaebu_table.book_product_metrics_city"
                     ],
                     "export_oaebu_table.book_product_metrics_city": [
@@ -238,6 +241,7 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
                     "book_product_metrics",
                     "book_product_metrics_country",
                     "book_product_metrics_institution",
+                    "institution_list",
                     "book_product_metrics_city",
                     "book_product_metrics_referrer",
                     "book_product_metrics_events",

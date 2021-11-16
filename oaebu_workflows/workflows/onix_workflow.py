@@ -870,6 +870,11 @@ class OnixWorkflow(Workflow):
                 "file_type": "json",
             },
             {
+                "output_table": "institution_list",
+                "query_template": "export_institution_list.sql.jinja2",
+                "file_type": "json",
+            },
+            {
                 "output_table": "book_product_metrics_city",
                 "query_template": "export_book_metrics_city.sql.jinja2",
                 "file_type": "json",
