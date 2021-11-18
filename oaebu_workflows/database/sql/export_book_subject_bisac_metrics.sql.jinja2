@@ -28,6 +28,7 @@ CREATE TEMP FUNCTION top_level_subjects(subjects ARRAY<STRING>) AS (
 
 SELECT
   bisac.name as subject,
+  metrics.subject as subject_code,
   metrics.* EXCEPT (subject)
 FROM(
     SELECT
