@@ -42,7 +42,6 @@ from observatory.platform.utils.gc_utils import (
     download_blob_from_cloud_storage,
     upload_file_to_cloud_storage,
 )
-from observatory.platform.utils.http_download import download_file
 from observatory.platform.utils.workflow_utils import (
     SubFolder,
     add_partition_date,
@@ -138,10 +137,11 @@ class OapenIrusUkRelease(OrganisationRelease):
         else:
             logging.info(f"Using existing cloud function, source code has not changed.")
 
-    def call_cloud_function(self, publisher_id: str):
+    def call_cloud_function(self, publisher_name_v4: str, publisher_uuid_v5: str):
         """Call the google cloud function that is inside the oapen project id
 
-        :param publisher_id: The publisher ID used with the OAPEN API.
+        :param publisher_name_v4: the publisher name, used with OAPEN counter v4 data
+        :param publisher_uuid_v5: the publisher UUID, used with OAPEN counter v5 data
         :return: None.
         """
         # set up cloud function variables
@@ -154,16 +154,9 @@ class OapenIrusUkRelease(OrganisationRelease):
 
         # get the publisher_uuid or publisher_id, both are set to empty strings when publisher id is 'oapen'
         if self.release_date >= pendulum.datetime(2020, 4, 1):
-            if publisher_id == "oapen":
-                publisher_uuid = ""
-            else:
-                publisher_uuid = get_publisher_uuid(publisher_id)
             airflow_conn = AirflowConns.OAPEN_IRUS_UK_API
         else:
-            publisher_uuid = "NA"
             airflow_conn = AirflowConns.OAPEN_IRUS_UK_LOGIN
-            if publisher_id == "oapen":
-                publisher_id = ""
         username = BaseHook.get_connection(airflow_conn).login
         password = BaseHook.get_connection(airflow_conn).password
 
@@ -173,8 +166,8 @@ class OapenIrusUkRelease(OrganisationRelease):
             username,
             password,
             geoip_license_key,
-            publisher_id,
-            publisher_uuid,
+            publisher_name_v4,
+            publisher_uuid_v5,
             source_bucket,
             self.blob_name,
         )
@@ -217,17 +210,17 @@ class OapenIrusUkTelescope(OrganisationTelescope):
     FUNCTION_REGION = "europe-west1"  # Region of the google cloud function
     FUNCTION_SOURCE_URL = (
         "https://github.com/The-Academic-Observatory/oapen-irus-uk-cloud-function/releases/"
-        "download/v1.1.4/oapen-irus-uk-cloud-function.zip"
+        "download/v1.1.5/oapen-irus-uk-cloud-function.zip"
     )  # URL to the zipped source code of the
     # cloud function
-    FUNCTION_MD5_HASH = "46b07fbc9e70756b3cc80cb9ab38934c"  # MD5 hash of the zipped source code
+    FUNCTION_MD5_HASH = "11cdf9869e3aeebe33f9110400d780d4"  # MD5 hash of the zipped source code
     FUNCTION_BLOB_NAME = "cloud_function_source_code.zip"  # blob name of zipped source code
-    OAPEN_API_URL = "https://library.oapen.org/rest/search?query=publisher.name:{publisher_name}"
 
     def __init__(
         self,
         organisation: Organisation,
-        publisher_id: str,
+        publisher_name_v4: str,
+        publisher_uuid_v5: str,
         dag_id: Optional[str] = None,
         start_date: pendulum.DateTime = pendulum.datetime(2018, 1, 1),
         schedule_interval: str = "0 0 14 * *",
@@ -244,7 +237,8 @@ class OapenIrusUkTelescope(OrganisationTelescope):
 
         """The OAPEN irus uk telescope.
         :param organisation: the Organisation the DAG will process.
-        :param publisher_id: the publisher ID, obtained from the 'extra' info from the API regarding the telescope.
+        :param publisher_name_v4: the publisher name, used with OAPEN counter v4 data, obtained from the 'extra' info
+        :param publisher_uuid_v5: the publisher UUID, used with OAPEN counter v5 data, obtained from the 'extra' info
         :param dag_id: the id of the DAG.
         :param start_date: the start date of the DAG.
         :param schedule_interval: the schedule interval of the DAG.
@@ -300,7 +294,8 @@ class OapenIrusUkTelescope(OrganisationTelescope):
             table_descriptions=table_descriptions,
         )
         self.max_cloud_function_instances = max_cloud_function_instances
-        self.publisher_id = publisher_id
+        self.publisher_name_v4 = publisher_name_v4
+        self.publisher_uuid_v5 = publisher_uuid_v5
 
         self.add_setup_task(self.check_dependencies)
         # create PythonOperator with task concurrency of 1, so tasks to create cloud function never run in parallel
@@ -330,9 +325,14 @@ class OapenIrusUkTelescope(OrganisationTelescope):
         """
         super().check_dependencies()
 
-        if self.publisher_id is None:
-            expected_extra = {"publisher_id": quote("Publisher Name")}
-            raise AirflowException(f"Publisher ID is not set in 'extra' of telescope, extra example: {expected_extra}")
+        if self.publisher_name_v4 is None or self.publisher_uuid_v5 is None:
+            expected_extra = {
+                "publisher_name_v4": quote("Publisher Name"),
+                "publisher_uuid_v5": "df73bf94-b818-494c-a8dd-6775b0573bc2",
+            }
+            raise AirflowException(
+                f"Publisher name and/or uuid is not set in 'extra' of telescope, extra example:" f" {expected_extra}"
+            )
         return True
 
     def create_cloud_function(self, releases: List[OapenIrusUkRelease], **kwargs):
@@ -351,7 +351,7 @@ class OapenIrusUkTelescope(OrganisationTelescope):
         :return: None.
         """
         for release in releases:
-            release.call_cloud_function(self.publisher_id)
+            release.call_cloud_function(self.publisher_name_v4, self.publisher_uuid_v5)
 
     def transfer(self, releases: List[OapenIrusUkRelease], **kwargs):
         """Task to transfer the file for each release.
@@ -372,26 +372,6 @@ class OapenIrusUkTelescope(OrganisationTelescope):
             release.download_transform()
 
 
-def get_publisher_uuid(publisher_name: str) -> str:
-    """Get the publisher UUID from the OAPEN API using the publisher name.
-
-    :param publisher_name: The name of the publisher
-    :return: The publisher UUID
-    """
-    url = OapenIrusUkTelescope.OAPEN_API_URL.format(publisher_name=publisher_name)
-    logging.info(f"Getting publisher UUID for publisher: {publisher_name}, from: {url}")
-    response = requests.get(url)
-    if response.status_code != 200:
-        raise RuntimeError(
-            f"Request to get publisher UUID unsuccessful, url: {url}, status code: {response.status_code}, "
-            f"response: {response.text}, reason: {response.reason}"
-        )
-    response_json = response.json()
-    publisher_uuid = response_json[0]["uuid"]
-    logging.info(f"Found publisher UUID: {publisher_uuid}")
-    return publisher_uuid
-
-
 def upload_source_code_to_bucket(
     source_url: str, project_id: str, bucket_name: str, blob_name: str
 ) -> Tuple[bool, bool]:
@@ -404,20 +384,21 @@ def upload_source_code_to_bucket(
     :return: Whether task was successful and whether file was uploaded
     """
 
-    # get zip file with source code from github release
+    # Get zip file with source code from github release
     telescope_folder = workflow_path(SubFolder.downloaded.value, OapenIrusUkTelescope.DAG_ID_PREFIX)
     filepath = os.path.join(telescope_folder, "oapen_cloud_function.zip")
-    download_succeeded = download_file(
-        url=source_url,
-        filename=filepath,
-        hash=OapenIrusUkTelescope.FUNCTION_MD5_HASH,
-        hash_algorithm="md5",
-    )
 
-    if not download_succeeded:
-        raise AirflowException("File download failed. See logs for details.")
+    response = requests.get(source_url)
+    with open(filepath, "wb") as f:
+        f.write(response.content)
 
-    # create storage bucket
+    # Check if current md5 hash matches expected md5 hash
+    expected_md5_hash = OapenIrusUkTelescope.FUNCTION_MD5_HASH
+    actual_md5_hash = get_file_hash(file_path=filepath, algorithm="md5")
+    if expected_md5_hash != actual_md5_hash:
+        raise AirflowException(f"md5 hashes do not match, expected: {expected_md5_hash}, actual: {actual_md5_hash}")
+
+    # Create storage bucket
     create_cloud_storage_bucket(bucket_name, location="EU", project_id=project_id, lifecycle_delete_age=1)
 
     # upload zip to cloud storage
@@ -508,8 +489,8 @@ def call_cloud_function(
     username: str,
     password: str,
     geoip_license_key: str,
-    publisher_name: str,
-    publisher_uuid: str,
+    publisher_name_v4: str,
+    publisher_uuid_v5: str,
     bucket_name: str,
     blob_name: str,
 ):
@@ -524,8 +505,8 @@ def call_cloud_function(
     :param username: Oapen username (email or requestor_id)
     :param password: Oapen password (password or api_key)
     :param geoip_license_key: License key of geoip database
-    :param publisher_name: URL encoded name of the publisher (used for old version)
-    :param publisher_uuid: UUID of the publisher (used for new version, 'NA' for old version)
+    :param publisher_name_v4: URL encoded name of the publisher (used for counter version 4)
+    :param publisher_uuid_v5: UUID of the publisher (used for counter version 5)
     :param bucket_name: Name of the bucket to store oapen access stats data
     :param blob_name: Blob name to store oapen access stats data
     :return: None
@@ -539,8 +520,8 @@ def call_cloud_function(
         "username": username,
         "password": password,
         "geoip_license_key": geoip_license_key,
-        "publisher_name": publisher_name,
-        "publisher_uuid": publisher_uuid,
+        "publisher_name_v4": publisher_name_v4,
+        "publisher_uuid_v5": publisher_uuid_v5,
         "bucket_name": bucket_name,
         "blob_name": blob_name,
     }

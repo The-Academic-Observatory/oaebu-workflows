@@ -40,21 +40,57 @@ The corresponding table created in BigQuery is `oapen.oapen_irus_ukYYYYMMDD`.
 ```
 
 ## Telescope object 'extra'
-This telescope is created using the Observatory API. There is one 'extra' field that is required for the
- corresponding Telescope object, namely the 'publisher_id'.   
+This telescope is created using the Observatory API. There are two 'extra' fields that are required for the
+ corresponding Telescope object, namely the 'publisher_name_v4' and 'publisher_uuid_v4'.   
+A mapping is required between the OAPEN publisher name and the organisation name obtained from the observatory API.
+The OAPEN publisher name is used directly for the older counter 4 platform, for the newer counter 5 platform the
+ publisher UUID is used.
 
-### publisher_id
-A mapping is required between the OAPEN publisher ID and the organisation name obtained from the observatory API.
-The OAPEN publisher_id is used directly for the older platform and is used for the new platform to look up the
- publisher uuid, which is then used to collect the data. 
- 
-The publisher_id can be found by going to the OAPEN [page to manually create reports](https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/br1b/).
-On this page there is a drop down list with publisher names, to get the publisher_id simply url encode the publisher
+### publisher_name_v4
+The publisher_name_v4 can be found by going to the OAPEN [page to manually create reports](https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/br1b/).
+On this page there is a drop down list with publisher names, to get the publisher name simply url encode the publisher
  name from this list.
 
 Note that occasionally there are multiple publisher names for one publisher.  
-For example to get all data from Edinburgh University Press, you need data from both publisher_ids 
+For example to get all data from Edinburgh University Press, you need data from both publishers
 `Edinburgh University Press` and `Edinburgh University Press,`.
+Multiple publisher names can be passed on by delimiting them with a '|' character.
+
+### publisher_uuid_v5
+The publisher_uuid_v5 can be found by querying the OAPEN API and creating a list of unique Publisher names and UUIDs.
+
+This API request will return all items including their Publisher name and UUID:
+https://irus.jisc.ac.uk/api/oapen/reports/oapen_ir/?platform=215&requestor_id=<requestor_id>&api_key=<api_key>&granularity=totals&begin_date=2020-04&end_date=2021-11 
+
+To get a file with mappings between Publisher Name and UUID, use the following Python snippet:
+
+```python
+import requests
+import pandas as pd
+
+# Set up your credentials, the start & end date and path to output file
+requestor_id = "YOUR_REQUESTOR_ID"
+api_key = "YOUR_API_KEY"
+start_date = "2020-04"
+end_date = "2021-11"
+out_file = "/path/to/output_mapping.csv"
+
+# Query the OAPEN API
+url = f"https://irus.jisc.ac.uk/api/oapen/reports/oapen_ir/?platform=215&requestor_id={requestor_id}&api_key={api_key}&granularity=totals&begin_date={start_date}&end_date={end_date}"
+response = requests.get(url)
+response_json = response.json()
+
+# Store result in dataframe, get unique publisher values and sort
+df = pd.DataFrame(response_json['Report_Items'])
+result = df.drop_duplicates(["Publisher", "Publisher_ID"])[["Publisher", "Publisher_ID"]].sort_values(["Publisher", "Publisher_ID"])
+
+# Save result to csv file
+result.to_csv(out_file, index=False)
+```
+
+From this file look up the publisher UUIDs of interest.
+Similar to the publisher names described above, multiple publisher UUIDs can be passed on by delimiting them with a
+ '|' character.
 
 ## Cloud Function
 The OAPEN IRUS-UK telescope makes use of a Google Cloud Function that resides in the OAPEN Google project. 
