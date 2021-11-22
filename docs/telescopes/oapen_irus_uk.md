@@ -41,7 +41,7 @@ The corresponding table created in BigQuery is `oapen.oapen_irus_ukYYYYMMDD`.
 
 ## Telescope object 'extra'
 This telescope is created using the Observatory API. There are two 'extra' fields that are required for the
- corresponding Telescope object, namely the 'publisher_name_v4' and 'publisher_uuid_v4'.   
+ corresponding Telescope object, namely the 'publisher_name_v4' and 'publisher_uuid_v5'.   
 A mapping is required between the OAPEN publisher name and the organisation name obtained from the observatory API.
 The OAPEN publisher name is used directly for the older counter 4 platform, for the newer counter 5 platform the
  publisher UUID is used.

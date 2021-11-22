@@ -328,7 +328,7 @@ class OapenIrusUkTelescope(OrganisationTelescope):
         if self.publisher_name_v4 is None or self.publisher_uuid_v5 is None:
             expected_extra = {
                 "publisher_name_v4": quote("Publisher Name"),
-                "publisher_uuid_v5": "df73bf94-b818-494c-a8dd-6775b0573bc2",
+                "publisher_uuid_v5": "fa61gy52-m815-024x-o2af-9248j9353ks4",
             }
             raise AirflowException(
                 f"Publisher name and/or uuid is not set in 'extra' of telescope, extra example:" f" {expected_extra}"
