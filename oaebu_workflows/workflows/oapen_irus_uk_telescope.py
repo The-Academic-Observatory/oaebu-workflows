@@ -20,7 +20,6 @@ import logging
 import os
 import time
 from typing import Dict, List, Optional, Tuple
-from urllib.parse import quote
 
 import pendulum
 import requests
@@ -211,9 +210,8 @@ class OapenIrusUkTelescope(OrganisationTelescope):
     FUNCTION_SOURCE_URL = (
         "https://github.com/The-Academic-Observatory/oapen-irus-uk-cloud-function/releases/"
         "download/v1.1.5/oapen-irus-uk-cloud-function.zip"
-    )  # URL to the zipped source code of the
-    # cloud function
-    FUNCTION_MD5_HASH = "11cdf9869e3aeebe33f9110400d780d4"  # MD5 hash of the zipped source code
+    )  # URL to the zipped source code of the cloud function
+    FUNCTION_MD5_HASH = "ffed057f0443485d93c2d35553bbfdf1"  # MD5 hash of the zipped source code
     FUNCTION_BLOB_NAME = "cloud_function_source_code.zip"  # blob name of zipped source code
 
     def __init__(
@@ -318,22 +316,6 @@ class OapenIrusUkTelescope(OrganisationTelescope):
         logging.info(f"Release date: {release_date}")
         releases = [OapenIrusUkRelease(self.dag_id, release_date, self.organisation)]
         return releases
-
-    def check_dependencies(self, **kwargs) -> bool:
-        """Check dependencies of DAG. Add to parent method to additionally check for a view id
-        :return: True if dependencies are valid.
-        """
-        super().check_dependencies()
-
-        if self.publisher_name_v4 is None or self.publisher_uuid_v5 is None:
-            expected_extra = {
-                "publisher_name_v4": quote("Publisher Name"),
-                "publisher_uuid_v5": "fa61gy52-m815-024x-o2af-9248j9353ks4",
-            }
-            raise AirflowException(
-                f"Publisher name and/or uuid is not set in 'extra' of telescope, extra example:" f" {expected_extra}"
-            )
-        return True
 
     def create_cloud_function(self, releases: List[OapenIrusUkRelease], **kwargs):
         """Task to create the cloud function for each release.
