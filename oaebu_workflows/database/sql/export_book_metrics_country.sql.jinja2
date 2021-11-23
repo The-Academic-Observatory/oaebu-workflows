@@ -27,7 +27,7 @@ WITH months as (SELECT
     month.google_books_sales.countries as google_books_sales,
     month.ucl_discovery.downloads_per_country as ucl_discovery
 FROM `{{ project_id }}.{{ dataset_id }}.book_product{{ release.strftime('%Y%m%d') }}`, UNNEST(months) as month
-WHERE ISBN13 is not null AND month.month is not null AND (month.jstor_country IS NOT NULL OR month.oapen_irus_uk.locations IS NOT NULL OR month.ucl_discovery.downloads_per_country IS NOT NULL)),
+WHERE ISBN13 is not null AND month.month is not null AND (month.jstor_country IS NOT NULL OR month.oapen_irus_uk.locations IS NOT NULL OR month.google_analytics IS NOT NULL OR month.google_books_sales IS NOT NULL OR month.ucl_discovery.downloads_per_country IS NOT NULL)),
 
 countries as (
     SELECT
@@ -127,4 +127,4 @@ LEFT JOIN oapen_month_country as oapen ON month_country.ISBN13 = oapen.ISBN13 AN
 LEFT JOIN google_analytics_month_country as google ON month_country.ISBN13 = google.ISBN13 AND month_country.month = google.month AND month_country.alpha2 = google.country_code
 LEFT JOIN google_books_month_country as google_books ON month_country.ISBN13 = google_books.ISBN13 AND month_country.month = google_books.month AND month_country.alpha2 = google_books.alpha2
 LEFT JOIN ucl_discovery_month_country as ucl_discovery ON month_country.ISBN13 = ucl_discovery.ISBN13 AND month_country.month = ucl_discovery.month AND month_country.alpha2 = ucl_discovery.alpha2
-WHERE jstor.total_item_requests IS NOT NULL OR oapen.title_requests IS NOT NULL OR 	oapen.total_item_requests IS NOT NULL or google.value IS NOT NULL
+WHERE jstor.total_item_requests IS NOT NULL OR oapen.title_requests IS NOT NULL OR oapen.total_item_requests IS NOT NULL OR google.value IS NOT NULL OR google_books.qty IS NOT NULL OR ucl_discovery.download_count IS NOT NULL
