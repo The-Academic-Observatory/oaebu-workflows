@@ -62,7 +62,10 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
         self.project_id = os.getenv("TEST_GCP_PROJECT_ID")
         self.data_location = os.getenv("TEST_GCP_DATA_LOCATION")
         self.organisation_name = "ucl_press"
-        self.extra = {"publisher_id": quote("UCL Press")}
+        self.extra = {
+            "publisher_name_v4": quote("UCL Press"),
+            "publisher_uuid_v5": "df73bf94-b818-494c-a8dd-6775b0573bc2",
+        }
         self.host = "localhost"
         self.api_port = 5000
         self.download_path = test_fixtures_folder("oapen_irus_uk", "download.jsonl.gz")
@@ -73,7 +76,9 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
         :return: None
         """
         organisation = Organisation(name=self.organisation_name)
-        dag = OapenIrusUkTelescope(organisation, self.extra.get("publisher_id")).make_dag()
+        dag = OapenIrusUkTelescope(
+            organisation, self.extra["publisher_name_v4"], self.extra["publisher_uuid_v5"]
+        ).make_dag()
         self.assert_dag_structure(
             {
                 "check_dependencies": ["create_cloud_function"],
@@ -141,7 +146,10 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
             gcp_transform_bucket=env.transform_bucket,
         )
         telescope = OapenIrusUkTelescope(
-            organisation=organisation, publisher_id=self.extra.get("publisher_id"), dataset_id=dataset_id
+            organisation=organisation,
+            publisher_name_v4=self.extra.get("publisher_name_v4"),
+            publisher_uuid_v5=self.extra.get("publisher_uuid_v5"),
+            dataset_id=dataset_id,
         )
         # Fake oapen project and bucket
         OapenIrusUkTelescope.OAPEN_PROJECT_ID = env.project_id
@@ -307,7 +315,9 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
                 gcp_download_bucket="download_bucket",
                 gcp_transform_bucket="transform_bucket",
             )
-            telescope = OapenIrusUkTelescope(org, publisher_id="publisher", dataset_id="dataset_id")
+            telescope = OapenIrusUkTelescope(
+                org, publisher_name_v4="publisher", publisher_uuid_v5="publisherUUID", dataset_id="dataset_id"
+            )
             release = OapenIrusUkRelease(telescope.dag_id, pendulum.parse("2020-02-01"), org)
 
             location = f"projects/{telescope.OAPEN_PROJECT_ID}/locations/{telescope.FUNCTION_REGION}"
@@ -351,11 +361,8 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
 
     @patch("observatory.platform.utils.workflow_utils.Variable.get")
     @patch("oaebu_workflows.workflows.oapen_irus_uk_telescope.BaseHook.get_connection")
-    @patch("oaebu_workflows.workflows.oapen_irus_uk_telescope.get_publisher_uuid")
     @patch("oaebu_workflows.workflows.oapen_irus_uk_telescope.call_cloud_function")
-    def test_release_call_cloud_function(
-        self, mock_call_function, mock_get_publisher, mock_conn_get, mock_variable_get
-    ):
+    def test_release_call_cloud_function(self, mock_call_function, mock_conn_get, mock_variable_get):
         """Test the call_cloud_function method of the OapenIrusUkRelease
 
         :param mock_variable_get: Mock Airflow Variable 'data'
@@ -371,7 +378,6 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
             ),
         }
         mock_conn_get.side_effect = lambda x: connections[x]
-        mock_get_publisher.return_value = "publisher_uuid"
 
         with CliRunner().isolated_filesystem():
             mock_variable_get.return_value = os.path.join(os.getcwd(), "data")
@@ -385,40 +391,35 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
             # Test new platform and old platform
             for date in ["2020-03", "2020-04"]:
                 # Test for a given publisher name and the 'oapen' publisher
-                for publisher_id in ["publisher", "oapen"]:
+                for publisher in [("publisher", "uuid1"), ("oapen", "uuid2")]:
                     mock_call_function.reset_mock()
 
-                    telescope = OapenIrusUkTelescope(org, publisher_id=publisher_id, dataset_id="dataset_id")
+                    telescope = OapenIrusUkTelescope(
+                        org, publisher_name_v4=publisher[0], publisher_uuid_v5=publisher[1], dataset_id="dataset_id"
+                    )
                     release = OapenIrusUkRelease(telescope.dag_id, pendulum.parse(date + "-01"), org)
                     function_url = (
                         f"https://{telescope.FUNCTION_REGION}-{telescope.OAPEN_PROJECT_ID}"
                         f".cloudfunctions.net/{telescope.FUNCTION_NAME}"
                     )
 
-                    release.call_cloud_function(telescope.publisher_id)
+                    release.call_cloud_function(telescope.publisher_name_v4, telescope.publisher_uuid_v5)
 
                     # Test that the call function is called with the correct args
                     if date == "2020-04":
                         username = "requestor_id"
                         password = "api_key"
-                        if publisher_id == "oapen":
-                            publisher_uuid = ""
-                        else:
-                            publisher_uuid = "publisher_uuid"
                     else:
                         username = "email"
                         password = "password"
-                        publisher_uuid = "NA"
-                        if publisher_id == "oapen":
-                            publisher_id = ""
                     mock_call_function.assert_called_once_with(
                         function_url,
                         date,
                         username,
                         password,
                         "key",
-                        publisher_id,
-                        publisher_uuid,
+                        telescope.publisher_name_v4,
+                        telescope.publisher_uuid_v5,
                         telescope.OAPEN_BUCKET,
                         release.blob_name,
                     )

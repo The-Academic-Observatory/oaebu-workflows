@@ -28,5 +28,9 @@ telescopes = api.get_telescopes(telescope_type_id=telescope_type.id, limit=1000)
 
 # Make all telescopes
 for telescope in telescopes:
-    workflow = OapenIrusUkTelescope(telescope.organisation, telescope.extra.get("publisher_id"))
+    workflow = OapenIrusUkTelescope(
+        telescope.organisation,
+        telescope.extra.get("publisher_name_v4", ""),
+        telescope.extra.get("publisher_uuid_v5", ""),
+    )
     globals()[workflow.dag_id] = workflow.make_dag()
