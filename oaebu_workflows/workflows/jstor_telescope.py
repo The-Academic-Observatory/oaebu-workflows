@@ -513,7 +513,7 @@ def list_reports(service: Resource, publisher_id: str) -> List[dict]:
     # List messages with specific query
     list_params = {
         "userId": "me",
-        "q": f"-label: {JstorTelescope.PROCESSED_LABEL_NAME} subject:'JSTOR Publisher Report Available'",
+        "q": f'-label:{JstorTelescope.PROCESSED_LABEL_NAME} subject:"JSTOR Publisher Report Available" from:no-reply@ithaka.org',
         "labelIds": ["INBOX"],
         "maxResults": 500,
     }
