@@ -1,0 +1,39 @@
+[
+  {
+    "mode": "NULLABLE",
+    "name": "product_id",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "title",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "published_year",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "month",
+    "type": "DATE"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "institution",
+    "type": "STRING"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "Total_Item_Requests",
+        "type": "INTEGER"
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "jstor",
+    "type": "RECORD"
+  }
+]

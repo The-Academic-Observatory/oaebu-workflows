@@ -1,0 +1,67 @@
+[
+  {
+    "mode": "NULLABLE",
+    "name": "product_id",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "work_id",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "work_family_id",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "ProductForm",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "usage_flag",
+    "type": "BOOLEAN"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "EditionNumber",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "time_field",
+    "type": "DATE"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "published_year",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "title",
+    "type": "STRING"
+  },
+  {
+    "mode": "REPEATED",
+    "name": "bic_subjects",
+    "type": "STRING"
+  },
+  {
+    "mode": "REPEATED",
+    "name": "bisac_subjects",
+    "type": "STRING"
+  },
+  {
+    "mode": "REPEATED",
+    "name": "thema_subjects",
+    "type": "STRING"
+  },
+  {
+    "mode": "REPEATED",
+    "name": "keywords",
+    "type": "STRING"
+  }
+]

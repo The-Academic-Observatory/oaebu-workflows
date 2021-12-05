@@ -1,0 +1,200 @@
+[
+  {
+    "mode": "NULLABLE",
+    "name": "product_id",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "work_id",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "work_family_id",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "title",
+    "type": "STRING"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "PersonName",
+        "type": "STRING"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "ORCID",
+        "type": "STRING"
+      }
+    ],
+    "mode": "REPEATED",
+    "name": "authors",
+    "type": "RECORD"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "published_year",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "month",
+    "type": "DATE"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "unique_views",
+        "type": "INTEGER"
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "google_analytics",
+    "type": "RECORD"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "count",
+        "type": "INTEGER"
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "crossref_events",
+    "type": "RECORD"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "Book_Visits_BV_",
+        "type": "INTEGER"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "BV_with_Pages_Viewed",
+        "type": "INTEGER"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "Non_Unique_Buy_Clicks",
+        "type": "INTEGER"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "BV_with_Buy_Clicks",
+        "type": "INTEGER"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "Buy_Link_CTR",
+        "type": "FLOAT"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "Pages_Viewed",
+        "type": "INTEGER"
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "google_books_traffic",
+    "type": "RECORD"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "qty",
+        "type": "INTEGER"
+      },
+      {
+        "fields": [
+          {
+            "mode": "NULLABLE",
+            "name": "Country_of_Sale",
+            "type": "STRING"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "qty",
+            "type": "INTEGER"
+          }
+        ],
+        "mode": "REPEATED",
+        "name": "countries",
+        "type": "RECORD"
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "google_books_sales",
+    "type": "RECORD"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "Total_Item_Requests",
+        "type": "INTEGER"
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "jstor",
+    "type": "RECORD"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "version",
+        "type": "STRING"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "title_requests",
+        "type": "INTEGER"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "total_item_investigations",
+        "type": "INTEGER"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "total_item_requests",
+        "type": "INTEGER"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "unique_item_investigations",
+        "type": "INTEGER"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "unique_item_requests",
+        "type": "INTEGER"
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "oapen_irus_uk",
+    "type": "RECORD"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "total_downloads",
+        "type": "INTEGER"
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "ucl_discovery",
+    "type": "RECORD"
+  }
+]
