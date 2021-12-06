@@ -2,199 +2,235 @@
   {
     "mode": "NULLABLE",
     "name": "product_id",
-    "type": "STRING"
+    "type": "STRING",
+    "description": "Book Product ID"
   },
   {
     "mode": "NULLABLE",
     "name": "work_id",
-    "type": "STRING"
+    "type": "STRING",
+    "description": "Book Work ID"
   },
   {
     "mode": "NULLABLE",
     "name": "work_family_id",
-    "type": "STRING"
+    "type": "STRING",
+    "description": "Book Work Family ID"
   },
   {
     "mode": "NULLABLE",
     "name": "title",
-    "type": "STRING"
+    "type": "STRING",
+    "description": "The title of the book"
   },
   {
     "fields": [
       {
         "mode": "NULLABLE",
         "name": "PersonName",
-        "type": "STRING"
+        "type": "STRING",
+        "description": "The Author's Name"
       },
       {
         "mode": "NULLABLE",
         "name": "ORCID",
-        "type": "STRING"
+        "type": "STRING",
+        "description": "The Authors ORCID ID"
       }
     ],
     "mode": "REPEATED",
     "name": "authors",
-    "type": "RECORD"
+    "type": "RECORD",
+    "description": "A list of Book Authors"
   },
   {
     "mode": "NULLABLE",
     "name": "published_year",
-    "type": "INTEGER"
+    "type": "INTEGER",
+    "description": "The Books published year"
   },
   {
     "mode": "NULLABLE",
     "name": "month",
-    "type": "DATE"
+    "type": "DATE",
+    "description": "The month in which the metrics took place"
   },
   {
     "fields": [
       {
         "mode": "NULLABLE",
         "name": "unique_views",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": "The number of unique views"
       }
     ],
     "mode": "NULLABLE",
     "name": "google_analytics",
-    "type": "RECORD"
+    "type": "RECORD",
+    "description": "Metrics from Google Analytics"
   },
   {
     "fields": [
       {
         "mode": "NULLABLE",
         "name": "count",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": "Count of events"
       }
     ],
     "mode": "NULLABLE",
     "name": "crossref_events",
-    "type": "RECORD"
+    "type": "RECORD",
+    "description": "Metrics from Crossref Events"
   },
   {
     "fields": [
       {
         "mode": "NULLABLE",
         "name": "Book_Visits_BV_",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "BV_with_Pages_Viewed",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "Non_Unique_Buy_Clicks",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "BV_with_Buy_Clicks",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "Buy_Link_CTR",
-        "type": "FLOAT"
+        "type": "FLOAT",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "Pages_Viewed",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": ""
       }
     ],
     "mode": "NULLABLE",
     "name": "google_books_traffic",
-    "type": "RECORD"
+    "type": "RECORD",
+    "description": "Metrics from Google Books Traffic"
   },
   {
     "fields": [
       {
         "mode": "NULLABLE",
         "name": "qty",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": ""
       },
       {
         "fields": [
           {
             "mode": "NULLABLE",
             "name": "Country_of_Sale",
-            "type": "STRING"
+            "type": "STRING",
+            "description": "Country in which sale occured"
           },
           {
             "mode": "NULLABLE",
             "name": "qty",
-            "type": "INTEGER"
+            "type": "INTEGER",
+            "description": "quantity of sales"
           }
         ],
         "mode": "REPEATED",
         "name": "countries",
-        "type": "RECORD"
+        "type": "RECORD",
+        "description": "A list of Countries"
       }
     ],
     "mode": "NULLABLE",
     "name": "google_books_sales",
-    "type": "RECORD"
+    "type": "RECORD",
+    "description": "Metrics from Google Books Sales"
   },
   {
     "fields": [
       {
         "mode": "NULLABLE",
         "name": "Total_Item_Requests",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": "Total number of item requests"
       }
     ],
     "mode": "NULLABLE",
     "name": "jstor",
-    "type": "RECORD"
+    "type": "RECORD",
+    "description": "Metrics from JSTOR"
   },
   {
     "fields": [
       {
         "mode": "NULLABLE",
         "name": "version",
-        "type": "STRING"
+        "type": "STRING",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "title_requests",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "total_item_investigations",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "total_item_requests",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "unique_item_investigations",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "unique_item_requests",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": ""
       }
     ],
     "mode": "NULLABLE",
     "name": "oapen_irus_uk",
-    "type": "RECORD"
+    "type": "RECORD",
+    "description": "Metrics from IRUS-UK"
   },
   {
     "fields": [
       {
         "mode": "NULLABLE",
         "name": "total_downloads",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": ""
       }
     ],
     "mode": "NULLABLE",
     "name": "ucl_discovery",
-    "type": "RECORD"
+    "type": "RECORD",
+    "description": "Metrics from UCL Disovery"
   }
 ]
