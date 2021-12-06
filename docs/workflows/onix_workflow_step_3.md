@@ -3,7 +3,9 @@
 WIP - copy text and diagrams in
 
 
-## Book Product List Schema
+## Book Metric
+
+### Book Product List Schema
 
 ``` eval_rst
 .. csv-table::
@@ -12,7 +14,7 @@ WIP - copy text and diagrams in
    :header-rows: 1
 ```
 
-## Book Product Metrics Schema
+### Book Product Metrics Schema
 
 ``` eval_rst
 .. csv-table::
@@ -21,7 +23,7 @@ WIP - copy text and diagrams in
    :header-rows: 1
 ```
 
-## Book Product Year Metrics Schema
+### Book Product Year Metrics Schema
 
 ``` eval_rst
 .. csv-table::
@@ -30,7 +32,7 @@ WIP - copy text and diagrams in
    :header-rows: 1
 ```
 
-## Book Product Metrics City Schema
+### Book Product Metrics City Schema
 
 ``` eval_rst
 .. csv-table::
@@ -39,7 +41,7 @@ WIP - copy text and diagrams in
    :header-rows: 1
 ```
 
-## Book Product Metrics Country Schema
+### Book Product Metrics Country Schema
 
 ``` eval_rst
 .. csv-table::
@@ -48,7 +50,7 @@ WIP - copy text and diagrams in
    :header-rows: 1
 ```
 
-## Book Product Metrics Events Schema
+## #Book Product Metrics Events Schema
 
 ``` eval_rst
 .. csv-table::
@@ -57,7 +59,7 @@ WIP - copy text and diagrams in
    :header-rows: 1
 ```
 
-## Institution List Schema
+### Institution List Schema
 
 ``` eval_rst
 .. csv-table::
@@ -66,7 +68,7 @@ WIP - copy text and diagrams in
    :header-rows: 1
 ```
 
-## Book Product Metrics Institutions Schema
+### Book Product Metrics Institutions Schema
 
 ``` eval_rst
 .. csv-table::
@@ -75,7 +77,7 @@ WIP - copy text and diagrams in
    :header-rows: 1
 ```
 
-## Book Product Metrics Referrer Schema
+### Book Product Metrics Referrer Schema
 
 ``` eval_rst
 .. csv-table::
@@ -84,7 +86,9 @@ WIP - copy text and diagrams in
    :header-rows: 1
 ```
 
-## Book Product Subjects BIC Schema
+## Book Subject Metrics
+
+### Book Product Subjects BIC Schema
 
 ``` eval_rst
 .. csv-table::
@@ -93,7 +97,7 @@ WIP - copy text and diagrams in
    :header-rows: 1
 ```
 
-## Book Product Subjects BISAC Schema
+### Book Product Subjects BISAC Schema
 
 ``` eval_rst
 .. csv-table::
@@ -102,7 +106,7 @@ WIP - copy text and diagrams in
    :header-rows: 1
 ```
 
-## Book Product Subjects THEMA Schema
+### Book Product Subjects THEMA Schema
 
 ``` eval_rst
 .. csv-table::
@@ -111,7 +115,7 @@ WIP - copy text and diagrams in
    :header-rows: 1
 ```
 
-## Book Product Subject Year Schema
+### Book Product Subject Year Schema
 
 ``` eval_rst
 .. csv-table::
@@ -120,7 +124,9 @@ WIP - copy text and diagrams in
    :header-rows: 1
 ```
 
-## Unmatched Book Metrics Schema
+## QA Related Datasets
+
+### Unmatched Book Metrics Schema
 
 ``` eval_rst
 .. csv-table::
