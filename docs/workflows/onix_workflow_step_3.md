@@ -92,7 +92,7 @@ WIP - copy text and diagrams in
 
 ``` eval_rst
 .. csv-table::
-   :file: ../schemas/oaebu_publisher_book_product_subject_bic_latest.csv
+   :file: ../schemas/oaebu_publisher_book_product_subject_bic_metrics_latest.csv
    :width: 100%
    :header-rows: 1
 ```
@@ -101,7 +101,7 @@ WIP - copy text and diagrams in
 
 ``` eval_rst
 .. csv-table::
-   :file: ../schemas/oaebu_publisher_book_product_subject_bisac_latest.csv
+   :file: ../schemas/oaebu_publisher_book_product_subject_bisac_metrics_latest.csv
    :width: 100%
    :header-rows: 1
 ```
@@ -110,7 +110,7 @@ WIP - copy text and diagrams in
 
 ``` eval_rst
 .. csv-table::
-   :file: ../schemas/oaebu_publisher_book_product_subject_thema_latest.csv
+   :file: ../schemas/oaebu_publisher_book_product_subject_thema_metrics_latest.csv
    :width: 100%
    :header-rows: 1
 ```
@@ -119,7 +119,7 @@ WIP - copy text and diagrams in
 
 ``` eval_rst
 .. csv-table::
-   :file: ../schemas/oaebu_publisher_book_product_subject_year_latest.csv
+   :file: ../schemas/oaebu_publisher_book_product_subject_year_metrics_latest.csv
    :width: 100%
    :header-rows: 1
 ```
