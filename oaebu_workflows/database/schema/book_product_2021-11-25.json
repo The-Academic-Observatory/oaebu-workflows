@@ -2,86 +2,102 @@
   {
     "mode": "NULLABLE",
     "name": "ISBN13",
-    "type": "STRING"
+    "type": "STRING",
+    "description": "ISBN13"
   },
   {
     "fields": [
       {
         "mode": "NULLABLE",
         "name": "Doi",
-        "type": "STRING"
+        "type": "STRING",
+        "description": "DOI"
       },
       {
         "mode": "NULLABLE",
         "name": "ProductForm",
-        "type": "STRING"
+        "type": "STRING",
+        "description": "The product form, such as digital, print etc"
       },
       {
         "mode": "NULLABLE",
         "name": "EditionNumber",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": "The edition number of this book product"
       },
       {
         "mode": "NULLABLE",
         "name": "title",
-        "type": "STRING"
+        "type": "STRING",
+        "description": "The Book's Title"
       },
       {
         "mode": "NULLABLE",
         "name": "published_year",
-        "type": "STRING"
+        "type": "STRING",
+        "description": "The year the book was published"
       },
       {
         "mode": "REPEATED",
         "name": "bic_subjects",
-        "type": "STRING"
+        "type": "STRING",
+        "description": "A list of BIC subjects"
       },
       {
         "mode": "REPEATED",
         "name": "bisac_subjects",
-        "type": "STRING"
+        "type": "STRING",
+        "description": "A list of BISAC subjects"
       },
       {
         "mode": "REPEATED",
         "name": "thema_subjects",
-        "type": "STRING"
+        "type": "STRING",
+        "description": "A list of THEMA subjects"
       },
       {
         "mode": "REPEATED",
         "name": "keywords",
-        "type": "STRING"
+        "type": "STRING",
+        "description": "A list of Keywords"
       },
       {
         "fields": [
           {
             "mode": "NULLABLE",
             "name": "PersonName",
-            "type": "STRING"
+            "type": "STRING",
+            "description": "The Authors Full Name"
           },
           {
             "mode": "NULLABLE",
             "name": "ORCID",
-            "type": "STRING"
+            "type": "STRING",
+            "description": "Authors ORCID ID, if present"
           }
         ],
         "mode": "REPEATED",
         "name": "authors",
-        "type": "RECORD"
+        "type": "RECORD",
+        "description": "Book Authors"
       }
     ],
     "mode": "NULLABLE",
     "name": "onix",
-    "type": "RECORD"
+    "type": "RECORD",
+    "description": "Fields Pulled from the ONIX Record for this Book Product"
   },
   {
     "mode": "NULLABLE",
     "name": "work_id",
-    "type": "STRING"
+    "type": "STRING",
+    "description": "The dervied Work_ID that we calculate"
   },
   {
     "mode": "NULLABLE",
     "name": "work_family_id",
-    "type": "STRING"
+    "type": "STRING",
+    "description": "The Dervied Work_Family_ID that we calculate"
   },
   {
     "fields": [
@@ -90,280 +106,332 @@
           {
             "mode": "NULLABLE",
             "name": "doi",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "REPEATED",
             "name": "title",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "type",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "publisher",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "published_year",
-            "type": "INTEGER"
+            "type": "INTEGER",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "published_year_month",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "REPEATED",
             "name": "work_isbns",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           }
         ],
         "mode": "REPEATED",
         "name": "crossref_objects",
-        "type": "RECORD"
+        "type": "RECORD",
+        "description": "Linked Objects from Crossref and their values"
       },
       {
         "fields": [
           {
             "mode": "NULLABLE",
             "name": "doi",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "REPEATED",
             "name": "title",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "type",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           }
         ],
         "mode": "REPEATED",
         "name": "chapters",
-        "type": "RECORD"
+        "type": "RECORD",
+        "description": "Linked Objects from Crossref where they are of type book-chapter only"
       },
       {
         "fields": [
           {
             "mode": "NULLABLE",
             "name": "source",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "count",
-            "type": "INTEGER"
+            "type": "INTEGER",
+            "description": ""
           }
         ],
         "mode": "REPEATED",
         "name": "events",
-        "type": "RECORD"
+        "type": "RECORD",
+        "description": ""
       },
       {
         "fields": [
           {
             "mode": "NULLABLE",
             "name": "ISBN13",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "Imprint_Name",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "Title",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "Author",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           }
         ],
         "mode": "NULLABLE",
         "name": "google_books_sales",
-        "type": "RECORD"
+        "type": "RECORD",
+        "description": "Metadata derived from Google Books Sales"
       },
       {
         "fields": [
           {
             "mode": "NULLABLE",
             "name": "ISBN13",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "Title",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           }
         ],
         "mode": "NULLABLE",
         "name": "google_books_traffic",
-        "type": "RECORD"
+        "type": "RECORD",
+        "description": "Metadata derived from Google Books Sales"
       },
       {
         "fields": [
           {
             "mode": "NULLABLE",
             "name": "ISBN13",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "Book_Title",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "Book_ID",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "Authors",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "ISBN",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "eISBN",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "Copyright_Year",
-            "type": "INTEGER"
+            "type": "INTEGER",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "Disciplines",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "Usage_Type",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           }
         ],
         "mode": "NULLABLE",
         "name": "jstor_metadata",
-        "type": "RECORD"
+        "type": "RECORD",
+        "description": "Metadata derived from JSTOR"
       },
       {
         "fields": [
           {
             "mode": "NULLABLE",
             "name": "ISBN13",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "Book_Title",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "Book_ID",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "Authors",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "ISBN",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "eISBN",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "Copyright_Year",
-            "type": "INTEGER"
+            "type": "INTEGER",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "Disciplines",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "Usage_Type",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           }
         ],
         "mode": "NULLABLE",
         "name": "jstor_institution_metadata",
-        "type": "RECORD"
+        "type": "RECORD",
+        "description": "Metadata derived from JSTOR Institutions"
       },
       {
         "fields": [
           {
             "mode": "NULLABLE",
             "name": "ISBN13",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "book_title",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "publisher",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           }
         ],
         "mode": "NULLABLE",
         "name": "oapen_irus_uk_metadata",
-        "type": "RECORD"
+        "type": "RECORD",
+        "description": "Metadata derived from IRUS_UK"
       }
     ],
     "mode": "NULLABLE",
     "name": "metadata",
-    "type": "RECORD"
+    "type": "RECORD",
+    "description": "Metadata on this book, derived and organised by source"
   },
   {
     "fields": [
       {
         "mode": "NULLABLE",
         "name": "month",
-        "type": "DATE"
+        "type": "DATE",
+        "description": "Month of Recorded Metrics"
       },
       {
         "fields": [
           {
             "mode": "NULLABLE",
             "name": "source",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "count",
-            "type": "INTEGER"
+            "type": "INTEGER",
+            "description": ""
           }
         ],
         "mode": "REPEATED",
         "name": "crossref_events",
-        "type": "RECORD"
+        "type": "RECORD",
+        "description": "Metrics Dervied From Crossref Events"
       },
       {
         "fields": [
@@ -372,342 +440,405 @@
               {
                 "mode": "NULLABLE",
                 "name": "average_time",
-                "type": "FLOAT"
+                "type": "FLOAT",
+                "description": ""
               },
               {
                 "fields": [
                   {
                     "mode": "NULLABLE",
                     "name": "name",
-                    "type": "STRING"
+                    "type": "STRING",
+                    "description": ""
                   },
                   {
                     "mode": "NULLABLE",
                     "name": "value",
-                    "type": "INTEGER"
+                    "type": "INTEGER",
+                    "description": ""
                   }
                 ],
                 "mode": "REPEATED",
                 "name": "country",
-                "type": "RECORD"
+                "type": "RECORD",
+                "description": ""
               },
               {
                 "fields": [
                   {
                     "mode": "NULLABLE",
                     "name": "name",
-                    "type": "STRING"
+                    "type": "STRING",
+                    "description": ""
                   },
                   {
                     "mode": "NULLABLE",
                     "name": "value",
-                    "type": "INTEGER"
+                    "type": "INTEGER",
+                    "description": ""
                   }
                 ],
                 "mode": "REPEATED",
                 "name": "referrer",
-                "type": "RECORD"
+                "type": "RECORD",
+                "description": ""
               },
               {
                 "fields": [
                   {
                     "mode": "NULLABLE",
                     "name": "name",
-                    "type": "STRING"
+                    "type": "STRING",
+                    "description": ""
                   },
                   {
                     "mode": "NULLABLE",
                     "name": "value",
-                    "type": "INTEGER"
+                    "type": "INTEGER",
+                    "description": ""
                   }
                 ],
                 "mode": "REPEATED",
                 "name": "social_network",
-                "type": "RECORD"
+                "type": "RECORD",
+                "description": ""
               }
             ],
             "mode": "NULLABLE",
             "name": "unique_views",
-            "type": "RECORD"
+            "type": "RECORD",
+            "description": ""
           }
         ],
         "mode": "NULLABLE",
         "name": "google_analytics",
-        "type": "RECORD"
+        "type": "RECORD",
+        "description": "Metrics derived from Google Analytics"
       },
       {
         "fields": [
           {
             "mode": "NULLABLE",
             "name": "qty",
-            "type": "INTEGER"
+            "type": "INTEGER",
+            "description": ""
           },
           {
             "fields": [
               {
                 "mode": "NULLABLE",
                 "name": "Country_of_Sale",
-                "type": "STRING"
+                "type": "STRING",
+              "description": ""
               },
               {
                 "mode": "NULLABLE",
                 "name": "qty",
-                "type": "INTEGER"
+                "type": "INTEGER",
+                "description": ""
               }
             ],
             "mode": "REPEATED",
             "name": "countries",
-            "type": "RECORD"
+            "type": "RECORD",
+            "description": ""
           }
         ],
         "mode": "NULLABLE",
         "name": "google_books_sales",
-        "type": "RECORD"
+        "type": "RECORD",
+        "description": "Metrics derived from Google Books Sales"
       },
       {
         "fields": [
           {
             "mode": "NULLABLE",
             "name": "Book_Visits_BV_",
-            "type": "INTEGER"
+            "type": "INTEGER",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "BV_with_Pages_Viewed",
-            "type": "INTEGER"
+            "type": "INTEGER",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "Non_Unique_Buy_Clicks",
-            "type": "INTEGER"
+            "type": "INTEGER",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "BV_with_Buy_Clicks",
-            "type": "INTEGER"
+            "type": "INTEGER",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "Buy_Link_CTR",
-            "type": "FLOAT"
+            "type": "FLOAT",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "Pages_Viewed",
-            "type": "INTEGER"
+            "type": "INTEGER",
+            "description": ""
           }
         ],
         "mode": "NULLABLE",
         "name": "google_books_traffic",
-        "type": "RECORD"
+        "type": "RECORD",
+        "description": "Metrics derived from Google Books Traffic"
       },
       {
         "fields": [
           {
             "mode": "NULLABLE",
             "name": "Country_name",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "Total_Item_Requests",
-            "type": "INTEGER"
+            "type": "INTEGER",
+            "description": ""
           }
         ],
         "mode": "REPEATED",
         "name": "jstor_country",
-        "type": "RECORD"
+        "type": "RECORD",
+        "description": "Metrics derived from JSTOR Country"
       },
       {
         "fields": [
           {
             "mode": "NULLABLE",
             "name": "Institution",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "Total_Item_Requests",
-            "type": "INTEGER"
+            "type": "INTEGER",
+            "description": ""
           }
         ],
         "mode": "REPEATED",
         "name": "jstor_institution",
-        "type": "RECORD"
+        "type": "RECORD",
+        "description": "Metrics derived from JSTOR Institutions"
       },
       {
         "fields": [
           {
             "mode": "NULLABLE",
             "name": "version",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "title_requests",
-            "type": "INTEGER"
+            "type": "INTEGER",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "total_item_investigations",
-            "type": "INTEGER"
+            "type": "INTEGER",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "total_item_requests",
-            "type": "INTEGER"
+            "type": "INTEGER",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "unique_item_investigations",
-            "type": "INTEGER"
+            "type": "INTEGER",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "unique_item_requests",
-            "type": "INTEGER"
+            "type": "INTEGER",
+            "description": ""
           },
           {
             "fields": [
               {
                 "mode": "NULLABLE",
                 "name": "name",
-                "type": "STRING"
+                "type": "STRING",
+                "description": ""
               },
               {
                 "mode": "NULLABLE",
                 "name": "code",
-                "type": "STRING"
+                "type": "STRING",
+                "description": ""
               },
               {
                 "mode": "NULLABLE",
                 "name": "title_requests",
-                "type": "INTEGER"
+                "type": "INTEGER",
+                "description": ""
               },
               {
                 "mode": "NULLABLE",
                 "name": "total_item_investigations",
-                "type": "INTEGER"
+                "type": "INTEGER",
+                "description": ""
               },
               {
                 "mode": "NULLABLE",
                 "name": "total_item_requests",
-                "type": "INTEGER"
+                "type": "INTEGER",
+                "description": ""
               },
               {
                 "mode": "NULLABLE",
                 "name": "unique_item_investigations",
-                "type": "INTEGER"
+                "type": "INTEGER",
+                "description": ""
               },
               {
                 "mode": "NULLABLE",
                 "name": "unique_item_requests",
-                "type": "INTEGER"
+                "type": "INTEGER",
+                "description": ""
               }
             ],
             "mode": "REPEATED",
             "name": "country",
-            "type": "RECORD"
+            "type": "RECORD",
+            "description": ""
           },
           {
             "fields": [
               {
                 "mode": "NULLABLE",
                 "name": "latitude",
-                "type": "FLOAT"
+                "type": "FLOAT",
+                "description": ""
               },
               {
                 "mode": "NULLABLE",
                 "name": "longitude",
-                "type": "FLOAT"
+                "type": "FLOAT",
+                "description": ""
               },
               {
                 "mode": "NULLABLE",
                 "name": "city",
-                "type": "STRING"
+                "type": "STRING",
+                "description": ""
               },
               {
                 "mode": "NULLABLE",
                 "name": "country_name",
-                "type": "STRING"
+                "type": "STRING",
+                "description": ""
               },
               {
                 "mode": "NULLABLE",
                 "name": "country_code",
-                "type": "STRING"
+                "type": "STRING",
+                "description": ""
               },
               {
                 "mode": "NULLABLE",
                 "name": "title_requests",
-                "type": "INTEGER"
+                "type": "INTEGER",
+                "description": ""
               },
               {
                 "mode": "NULLABLE",
                 "name": "total_item_investigations",
-                "type": "INTEGER"
+                "type": "INTEGER",
+                "description": ""
               },
               {
                 "mode": "NULLABLE",
                 "name": "total_item_requests",
-                "type": "INTEGER"
+                "type": "INTEGER",
+                "description": ""
               },
               {
                 "mode": "NULLABLE",
                 "name": "unique_item_investigations",
-                "type": "INTEGER"
+                "type": "INTEGER",
+                "description": ""
               },
               {
                 "mode": "NULLABLE",
                 "name": "unique_item_requests",
-                "type": "INTEGER"
+                "type": "INTEGER",
+                "description": ""
               }
             ],
             "mode": "REPEATED",
             "name": "locations",
-            "type": "RECORD"
+            "type": "RECORD",
+            "description": ""
           }
         ],
         "mode": "NULLABLE",
         "name": "oapen_irus_uk",
-        "type": "RECORD"
+        "type": "RECORD",
+        "description": "Metrics derived from IRUS-UK"
       },
       {
         "fields": [
           {
             "mode": "NULLABLE",
             "name": "total_downloads",
-            "type": "INTEGER"
+            "type": "INTEGER",
+            "description": ""
           },
           {
             "fields": [
               {
                 "mode": "NULLABLE",
                 "name": "country_code",
-                "type": "STRING"
+                "type": "STRING",
+                "description": ""
               },
               {
                 "mode": "NULLABLE",
                 "name": "country_name",
-                "type": "STRING"
+                "type": "STRING",
+                "description": ""
               },
               {
                 "mode": "NULLABLE",
                 "name": "download_count",
-                "type": "INTEGER"
+                "type": "INTEGER",
+                "description": ""
               }
             ],
             "mode": "REPEATED",
             "name": "downloads_per_country",
-            "type": "RECORD"
+            "type": "RECORD",
+                "description": ""
           }
         ],
         "mode": "NULLABLE",
         "name": "ucl_discovery",
-        "type": "RECORD"
+        "type": "RECORD",
+        "description": "Metrics derived from UCL Discovery"
       }
     ],
     "mode": "REPEATED",
     "name": "months",
-    "type": "RECORD"
+    "type": "RECORD",
+    "description": "Linked Metrics from all sources, organised by month of occurance"
   }
 ]
