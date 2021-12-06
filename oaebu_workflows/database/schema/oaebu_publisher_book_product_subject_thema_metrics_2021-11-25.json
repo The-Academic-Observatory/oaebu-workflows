@@ -2,138 +2,163 @@
   {
     "mode": "NULLABLE",
     "name": "subject",
-    "type": "STRING"
+    "type": "STRING",
+    "description": "Thema Subject"
   },
   {
     "mode": "NULLABLE",
     "name": "subject_code",
-    "type": "STRING"
+    "type": "STRING",
+    "description": "Thema Subject Code"
   },
   {
     "mode": "NULLABLE",
     "name": "unique_books",
-    "type": "INTEGER"
+    "type": "INTEGER",
+    "description": "The number of unique books"
   },
   {
     "mode": "NULLABLE",
     "name": "month",
-    "type": "DATE"
+    "type": "DATE",
+    "description": "The month in which the metrics occurred"
   },
   {
     "fields": [
       {
         "mode": "NULLABLE",
         "name": "unique_views",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": "The number of unique views"
       }
     ],
     "mode": "NULLABLE",
     "name": "google_analytics",
-    "type": "RECORD"
+    "type": "RECORD",
+    "description": "Metrics from Google Analytics"
   },
   {
     "fields": [
       {
         "mode": "NULLABLE",
         "name": "count",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": ""
       }
     ],
     "mode": "NULLABLE",
     "name": "crossref_events",
-    "type": "RECORD"
+    "type": "RECORD",
+    "description": "Metrics from Crossref events"
   },
   {
     "fields": [
       {
         "mode": "NULLABLE",
         "name": "Book_Visits_BV_",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "BV_with_Pages_Viewed",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "Non_Unique_Buy_Clicks",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "BV_with_Buy_Clicks",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "Buy_Link_CTR",
-        "type": "FLOAT"
+        "type": "FLOAT",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "Pages_Viewed",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": ""
       }
     ],
     "mode": "NULLABLE",
     "name": "google_books_traffic",
-    "type": "RECORD"
+    "type": "RECORD",
+    "description": "Metrics from Google Books Traffic"
   },
   {
     "fields": [
       {
         "mode": "NULLABLE",
         "name": "qty",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": ""
       }
     ],
     "mode": "NULLABLE",
     "name": "google_books_sales",
-    "type": "RECORD"
+    "type": "RECORD",
+    "description": "Metrics from Google Books Sales"
   },
   {
     "fields": [
       {
         "mode": "NULLABLE",
         "name": "Total_Item_Requests",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": ""
       }
     ],
     "mode": "NULLABLE",
     "name": "jstor",
-    "type": "RECORD"
+    "type": "RECORD",
+    "description": "Metrics from JSTOR"
   },
   {
     "fields": [
       {
         "mode": "NULLABLE",
         "name": "title_requests",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "total_item_investigations",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "total_item_requests",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "unique_item_investigations",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "unique_item_requests",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": ""
       }
     ],
     "mode": "NULLABLE",
     "name": "oapen_irus_uk",
-    "type": "RECORD"
+    "type": "RECORD",
+    "description": "Metrics from IRUS-UK"
   }
 ]
