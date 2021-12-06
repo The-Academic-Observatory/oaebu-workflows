@@ -12,11 +12,27 @@ The ONIX workflow is dependent on the ONIX telescope.  It waits for the ONIX tel
 ## Work ID
 The Work ID will be an arbitrary ISBN representative from a product in the equivalence class.
 
+``` eval_rst
+.. csv-table::
+   :file: ../schemas/onix_workid_isbn_latest.csv
+   :width: 100%
+   :header-rows: 1
+```
+
 ## Work Family ID
 The Work Family ID will be an arbitrary Work ID (ISBN) representative from a work in the equivalence class.
 
+``` eval_rst
+.. csv-table::
+   :file: ../schemas/onix_workfamilyid_isbn_latest.csv
+   :width: 100%
+   :header-rows: 1
+```
+
 ## Create OAEBU intermediate tables
 For each data partner's tables containing ISBN, create new "matched" tables which extend the original data with new "work_id" and "work_family_id" columns.
+
+The schemas for these tables are identical to the raw Telescope's schemas, with the addition of work_ids and work_family_ids.
 
 ## Create QA tables
 For each data source, including the intermediate tables, we can produce some basic quality assurance checks on the data, and output these to tables for easy export. For example we can check to see if ISBNs provided are valid, or if there are unmatched ISBN indicating missing ONIX product records.
