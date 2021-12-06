@@ -1,0 +1,47 @@
+[
+  {
+    "mode": "NULLABLE",
+    "name": "table_size",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "no_isbns",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "no_relatedworks",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "no_relatedproducts",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "no_doi",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "no_productform",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "no_contributors",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "no_titledetails",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "no_publisher_urls",
+    "type": "INTEGER"
+  }
+]

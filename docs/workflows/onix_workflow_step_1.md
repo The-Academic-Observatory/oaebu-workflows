@@ -36,3 +36,22 @@ The schemas for these tables are identical to the raw Telescope's schemas, with 
 
 ## Create QA tables
 For each data source, including the intermediate tables, we can produce some basic quality assurance checks on the data, and output these to tables for easy export. For example we can check to see if ISBNs provided are valid, or if there are unmatched ISBN indicating missing ONIX product records.
+
+
+### ONIX Aggregate Metrics
+
+``` eval_rst
+.. csv-table::
+   :file: ../schemas/onix_aggregate_metrics_latest.csv
+   :width: 100%
+   :header-rows: 1
+```
+
+### ONIX Work ID ISBN Errors
+
+``` eval_rst
+.. csv-table::
+   :file: ../schemas/onix_workid_isbn_errors_latest.csv
+   :width: 100%
+   :header-rows: 1
+```
