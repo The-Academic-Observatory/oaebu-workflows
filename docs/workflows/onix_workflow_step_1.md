@@ -1,4 +1,4 @@
-# ONIX workflow
+# ONIX workflow Step 1 - Mapping Book Products
 
 The ONIX workflow uses the ONIX table created by the ONIX telescope to do the following:
   1. Aggregate book product records into works records. Works are equivalence classes of products, where each product in the class is a manifestation of each other. For example, a PDF and a paperback of the same work.
