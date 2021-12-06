@@ -2,6 +2,10 @@
 
 WIP - copy text and diagrams in
 
+``` eval_rst
+.. image:: ../static/onix_workflow_3.png
+   :width: 650
+```
 
 ## Book Metric
 

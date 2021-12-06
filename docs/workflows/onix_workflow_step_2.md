@@ -2,6 +2,10 @@
 
 WIP - copy text and diagrams in
 
+``` eval_rst
+.. image:: ../static/onix_workflow_2.png
+   :width: 650
+```
 
 ## Book Product Schema
 

@@ -34,6 +34,11 @@ For each data partner's tables containing ISBN, create new "matched" tables whic
 
 The schemas for these tables are identical to the raw Telescope's schemas, with the addition of work_ids and work_family_ids.
 
+``` eval_rst
+.. image:: ../static/onix_workflow_1.png
+   :width: 650
+```
+
 ## Create QA tables
 For each data source, including the intermediate tables, we can produce some basic quality assurance checks on the data, and output these to tables for easy export. For example we can check to see if ISBNs provided are valid, or if there are unmatched ISBN indicating missing ONIX product records.
 
