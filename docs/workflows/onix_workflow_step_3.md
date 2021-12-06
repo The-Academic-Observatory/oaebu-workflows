@@ -50,7 +50,7 @@ WIP - copy text and diagrams in
    :header-rows: 1
 ```
 
-## #Book Product Metrics Events Schema
+### Book Product Metrics Events Schema
 
 ``` eval_rst
 .. csv-table::
