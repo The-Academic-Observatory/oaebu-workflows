@@ -133,7 +133,7 @@
         "mode": "NULLABLE",
         "name": "qty",
         "type": "INTEGER",
-        "description": ""
+        "description": "Quantity of sales"
       },
       {
         "fields": [
@@ -147,7 +147,7 @@
             "mode": "NULLABLE",
             "name": "qty",
             "type": "INTEGER",
-            "description": "quantity of sales"
+            "description": "Quantity of sales"
           }
         ],
         "mode": "REPEATED",
@@ -181,7 +181,7 @@
         "mode": "NULLABLE",
         "name": "version",
         "type": "STRING",
-        "description": ""
+        "description": "Version of the OAPEN IRUS UK API, corresponds to the COUNTER report version"
       },
       {
         "mode": "NULLABLE",

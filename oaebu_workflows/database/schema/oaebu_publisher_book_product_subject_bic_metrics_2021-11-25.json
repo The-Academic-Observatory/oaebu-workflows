@@ -115,7 +115,7 @@
         "mode": "NULLABLE",
         "name": "Total_Item_Requests",
         "type": "INTEGER",
-        "description": ""
+        "description": "Total number of request made"
       }
     ],
     "mode": "NULLABLE",

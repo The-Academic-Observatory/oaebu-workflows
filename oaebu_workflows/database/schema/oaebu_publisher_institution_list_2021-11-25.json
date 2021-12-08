@@ -2,6 +2,7 @@
   {
     "mode": "NULLABLE",
     "name": "institution",
-    "type": "STRING"
+    "type": "STRING",
+    "description": "Institution Name"
   }
 ]

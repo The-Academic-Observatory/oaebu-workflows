@@ -47,7 +47,7 @@
         "mode": "NULLABLE",
         "name": "value",
         "type": "INTEGER",
-        "description": ""
+        "description": "Number of unique views"
       }
     ],
     "mode": "NULLABLE",

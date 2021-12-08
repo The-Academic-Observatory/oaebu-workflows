@@ -47,7 +47,7 @@
         "mode": "NULLABLE",
         "name": "count",
         "type": "INTEGER",
-        "description": ""
+        "description": "Count of Events"
       }
     ],
     "mode": "NULLABLE",

@@ -35,7 +35,7 @@
         "mode": "NULLABLE",
         "name": "Total_Item_Requests",
         "type": "INTEGER",
-       "description": ""
+       "description": "Total number of request made from that specific institution"
       }
     ],
     "mode": "NULLABLE",

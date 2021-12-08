@@ -39,7 +39,7 @@
     "mode": "NULLABLE",
     "name": "time_field",
     "type": "DATE",
-    "description": ""
+    "description": "Required for Elasticsearch, generally not used though"
   },
   {
     "mode": "NULLABLE",
