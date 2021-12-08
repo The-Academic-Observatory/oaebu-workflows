@@ -13,6 +13,8 @@ Step three of the ONIX workflow is to export the book_product table to a sequenc
 
 This table is a list of each Book Product. It is primarily used for drop-down fields, or where a list of all the books independent of metrics is desired.
 
+[Link to Query]()
+
 ``` eval_rst
 .. csv-table::
    :file: ../schemas/oaebu_publisher_book_product_list_latest.csv
@@ -23,6 +25,8 @@ This table is a list of each Book Product. It is primarily used for drop-down fi
 ### Book Product Metrics Schema
 
 This table contains metrics, organised by month, that are linked to each book. The country, city, institution, events and referrals expand on this to provided further useful breakdowns of metrics.
+
+[Link to Query]()
 
 ``` eval_rst
 .. csv-table::
@@ -35,6 +39,8 @@ This table contains metrics, organised by month, that are linked to each book. T
 
 This table contains metrics, organised by month, that are linked to each book.
 
+[Link to Query]()
+
 ``` eval_rst
 .. csv-table::
    :file: ../schemas/oaebu_publisher_book_product_year_metrics_latest.csv
@@ -45,6 +51,8 @@ This table contains metrics, organised by month, that are linked to each book.
 ### Book Product Metrics City Schema
 
 This table contains metrics, organised by month and city of measured usage, that are linked to each book.
+
+[Link to Query]()
 
 ``` eval_rst
 .. csv-table::
@@ -57,6 +65,8 @@ This table contains metrics, organised by month and city of measured usage, that
 
 This table contains metrics, organised by month and country of measured usage, that are linked to each book.
 
+[Link to Query]()
+
 ``` eval_rst
 .. csv-table::
    :file: ../schemas/oaebu_publisher_book_product_metrics_country_latest.csv
@@ -67,6 +77,8 @@ This table contains metrics, organised by month and country of measured usage, t
 ### Book Product Metrics Events Schema
 
 This table contains metrics, organised by month and crossref event type, that are linked to each book.
+
+[Link to Query]()
 
 ``` eval_rst
 .. csv-table::
@@ -79,6 +91,8 @@ This table contains metrics, organised by month and crossref event type, that ar
 
 This table is a list of each unique Institution where metrics are linked too. It is primarily used for drop-down fields, or where a list of all the books independent of metrics is desired.
 
+[Link to Query]()
+
 ``` eval_rst
 .. csv-table::
    :file: ../schemas/oaebu_publisher_institution_list_latest.csv
@@ -90,6 +104,8 @@ This table is a list of each unique Institution where metrics are linked too. It
 
 This table contains metrics, organised by month and institution for which there is measured activity linked to each book.
 
+[Link to Query]()
+
 ``` eval_rst
 .. csv-table::
    :file: ../schemas/oaebu_publisher_book_product_metrics_institution_latest.csv
@@ -100,6 +116,8 @@ This table contains metrics, organised by month and institution for which there 
 ### Book Product Metrics Referrer Schema
 
 This table contains metrics, organised by month and location of referrals, that are linked to each book. Referrals are gathered using a standard feature of the modern web, where new requests to a website often contain a referral field that specifies the website where a link was clicked that brought the end user to your website.
+
+[Link to Query]()
 
 ``` eval_rst
 .. csv-table::
@@ -114,6 +132,8 @@ This table contains metrics, organised by month and location of referrals, that 
 
 This table contains metrics, organised by month and BIC subject type, that are linked to each book.
 
+[Link to Query]()
+
 ``` eval_rst
 .. csv-table::
    :file: ../schemas/oaebu_publisher_book_product_subject_bic_metrics_latest.csv
@@ -124,6 +144,8 @@ This table contains metrics, organised by month and BIC subject type, that are l
 ### Book Product Subjects BISAC Schema
 
 This table contains metrics, organised by month and BISAC subject type, that are linked to each book.
+
+[Link to Query]()
 
 ``` eval_rst
 .. csv-table::
@@ -136,6 +158,8 @@ This table contains metrics, organised by month and BISAC subject type, that are
 
 This table contains metrics, organised by month and THEMA subject type, that are linked to each book.
 
+[Link to Query]()
+
 ``` eval_rst
 .. csv-table::
    :file: ../schemas/oaebu_publisher_book_product_subject_thema_metrics_latest.csv
@@ -146,6 +170,8 @@ This table contains metrics, organised by month and THEMA subject type, that are
 ### Book Product Subject Year Schema
 
 This table contains metrics, organised by year and currently just the BIC subject type, that are linked to each book.
+
+[Link to Query]()
 
 ``` eval_rst
 .. csv-table::
@@ -159,6 +185,8 @@ This table contains metrics, organised by year and currently just the BIC subjec
 ### Unmatched Book Metrics Schema
 
 This dataset is helpful for understanding where metrics and books defined in the onix feed are not matched. Helping target data quality tasks upstream of this workflow.
+
+[Link to Query]()
 
 ``` eval_rst
 .. csv-table::
