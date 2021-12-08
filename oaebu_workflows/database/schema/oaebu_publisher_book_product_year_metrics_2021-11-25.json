@@ -104,27 +104,32 @@
       {
         "mode": "NULLABLE",
         "name": "title_requests",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": "The total number of title requests. Only available for data before 2020-04-01"
       },
       {
         "mode": "NULLABLE",
         "name": "total_item_investigations",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": "The total number of item investigations. Only available for data since 2020-04-01"
       },
       {
         "mode": "NULLABLE",
         "name": "total_item_requests",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": "The total number of item requests. Only available for data since 2020-04-01"
       },
       {
         "mode": "NULLABLE",
         "name": "unique_item_investigations",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": "The number of unique item investigations. Only available for data since 2020-04-01"
       },
       {
         "mode": "NULLABLE",
         "name": "unique_item_requests",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": "The number of unique item requests. Only available for data since 2020-04-01"
       }
     ],
     "mode": "NULLABLE",
