@@ -801,7 +801,7 @@
             "mode": "NULLABLE",
             "name": "total_downloads",
             "type": "INTEGER",
-            "description": ""
+            "description": "Number of downloads"
           },
           {
             "fields": [
