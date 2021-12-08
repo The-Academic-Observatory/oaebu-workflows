@@ -43,32 +43,38 @@
       {
         "mode": "NULLABLE",
         "name": "Book_Visits_BV_",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": "A Book Visit is registered each time a unique user views one of your books on Google Books. This number includes informational page views (such as the “About this book” page) as well as preview content page views"
       },
       {
         "mode": "NULLABLE",
         "name": "BV_with_Pages_Viewed",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": "The number of Book Visits in which users accessed preview pages of your book. This doesn’t include visits where a user accessed only informational pages for your books"
       },
       {
         "mode": "NULLABLE",
         "name": "Non_Unique_Buy_Clicks",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": "The number of clicks on links for purchasing the book on retailer websites (including your website, if you provided a buy link)"
       },
       {
         "mode": "NULLABLE",
         "name": "BV_with_Buy_Clicks",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": "The number of visits which included a click on a purchase link"
       },
       {
         "mode": "NULLABLE",
         "name": "Buy_Link_CTR",
-        "type": "FLOAT"
+        "type": "FLOAT",
+        "description": "The clickthrough rate for purchase links. The values are percentages"
       },
       {
         "mode": "NULLABLE",
         "name": "Pages_Viewed",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": "The total number of unique preview content pages that a user viewed in a given session (counted as a 24-hour period)"
       }
     ],
     "mode": "NULLABLE",
