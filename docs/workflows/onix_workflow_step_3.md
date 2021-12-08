@@ -13,7 +13,7 @@ Step three of the ONIX workflow is to export the book_product table to a sequenc
 
 This table is a list of each Book Product. It is primarily used for drop-down fields, or where a list of all the books independent of metrics is desired.
 
-[Link to Query]()
+[Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_book_list.sql.jinja2)
 
 ``` eval_rst
 .. csv-table::
@@ -26,7 +26,7 @@ This table is a list of each Book Product. It is primarily used for drop-down fi
 
 This table contains metrics, organised by month, that are linked to each book. The country, city, institution, events and referrals expand on this to provided further useful breakdowns of metrics.
 
-[Link to Query]()
+[Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_book_metrics.sql.jinja2)
 
 ``` eval_rst
 .. csv-table::
@@ -39,7 +39,7 @@ This table contains metrics, organised by month, that are linked to each book. T
 
 This table contains metrics, organised by month, that are linked to each book.
 
-[Link to Query]()
+[Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_book_year_metrics.sql.jinja2)
 
 ``` eval_rst
 .. csv-table::
@@ -52,7 +52,7 @@ This table contains metrics, organised by month, that are linked to each book.
 
 This table contains metrics, organised by month and city of measured usage, that are linked to each book.
 
-[Link to Query]()
+[Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_book_metrics_city.sql.jinja2)
 
 ``` eval_rst
 .. csv-table::
@@ -65,7 +65,7 @@ This table contains metrics, organised by month and city of measured usage, that
 
 This table contains metrics, organised by month and country of measured usage, that are linked to each book.
 
-[Link to Query]()
+[Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_book_metrics_country.sql.jinja2)
 
 ``` eval_rst
 .. csv-table::
@@ -78,7 +78,7 @@ This table contains metrics, organised by month and country of measured usage, t
 
 This table contains metrics, organised by month and crossref event type, that are linked to each book.
 
-[Link to Query]()
+[Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_book_metrics_event.sql.jinja2)
 
 ``` eval_rst
 .. csv-table::
@@ -91,7 +91,7 @@ This table contains metrics, organised by month and crossref event type, that ar
 
 This table is a list of each unique Institution where metrics are linked too. It is primarily used for drop-down fields, or where a list of all the books independent of metrics is desired.
 
-[Link to Query]()
+[Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_book_metrics_institution.sql.jinja2)
 
 ``` eval_rst
 .. csv-table::
@@ -104,7 +104,7 @@ This table is a list of each unique Institution where metrics are linked too. It
 
 This table contains metrics, organised by month and institution for which there is measured activity linked to each book.
 
-[Link to Query]()
+[Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_institution_list.sql.jinja2)
 
 ``` eval_rst
 .. csv-table::
@@ -117,7 +117,7 @@ This table contains metrics, organised by month and institution for which there 
 
 This table contains metrics, organised by month and location of referrals, that are linked to each book. Referrals are gathered using a standard feature of the modern web, where new requests to a website often contain a referral field that specifies the website where a link was clicked that brought the end user to your website.
 
-[Link to Query]()
+[Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_book_metrics_referrer.sql.jinja2)
 
 ``` eval_rst
 .. csv-table::
@@ -132,7 +132,7 @@ This table contains metrics, organised by month and location of referrals, that 
 
 This table contains metrics, organised by month and BIC subject type, that are linked to each book.
 
-[Link to Query]()
+[Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_book_subject_bic_metrics.sql.jinja2)
 
 ``` eval_rst
 .. csv-table::
@@ -145,7 +145,7 @@ This table contains metrics, organised by month and BIC subject type, that are l
 
 This table contains metrics, organised by month and BISAC subject type, that are linked to each book.
 
-[Link to Query]()
+[Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_book_subject_bisac_metrics.sql.jinja2)
 
 ``` eval_rst
 .. csv-table::
@@ -158,7 +158,7 @@ This table contains metrics, organised by month and BISAC subject type, that are
 
 This table contains metrics, organised by month and THEMA subject type, that are linked to each book.
 
-[Link to Query]()
+[Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_book_subject_thema_metrics.sql.jinja2)
 
 ``` eval_rst
 .. csv-table::
@@ -171,7 +171,7 @@ This table contains metrics, organised by month and THEMA subject type, that are
 
 This table contains metrics, organised by year and currently just the BIC subject type, that are linked to each book.
 
-[Link to Query]()
+[Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_book_subject_year_metrics.sql.jinja2)
 
 ``` eval_rst
 .. csv-table::
@@ -186,7 +186,7 @@ This table contains metrics, organised by year and currently just the BIC subjec
 
 This dataset is helpful for understanding where metrics and books defined in the onix feed are not matched. Helping target data quality tasks upstream of this workflow.
 
-[Link to Query]()
+[Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_unmatched_metrics.sql.jinja2)
 
 ``` eval_rst
 .. csv-table::

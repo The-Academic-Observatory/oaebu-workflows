@@ -11,7 +11,6 @@ The ONIX workflow is dependent on the ONIX telescope.  It waits for the ONIX tel
 
 ## Work ID
 The Work ID will be an arbitrary ISBN representative from a product in the equivalence class.
-[Link to Query]()
 
 ``` eval_rst
 .. csv-table::
@@ -22,8 +21,6 @@ The Work ID will be an arbitrary ISBN representative from a product in the equiv
 
 ## Work Family ID
 The Work Family ID will be an arbitrary Work ID (ISBN) representative from a work in the equivalence class.
-
-[Link to Query]()
 
 ``` eval_rst
 .. csv-table::
@@ -37,7 +34,7 @@ For each data partner's tables containing ISBN, create new "matched" tables whic
 
 The schemas for these tables are identical to the raw Telescope's schemas, with the addition of work_ids and work_family_ids.
 
-[Link to Query]()
+[Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/assign_workid_workfamilyid.sql.jinja2)
 
 ``` eval_rst
 .. image:: ../static/onix_workflow_1.png
@@ -50,7 +47,7 @@ For each data source, including the intermediate tables, we can produce some bas
 
 ### ONIX Aggregate Metrics
 
-[Link to Query]()
+[Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/onix_aggregate_metrics.sql.jinja2)
 
 ``` eval_rst
 .. csv-table::
@@ -60,8 +57,6 @@ For each data source, including the intermediate tables, we can produce some bas
 ```
 
 ### ONIX Work ID ISBN Errors
-
-[Link to Query]()
 
 ``` eval_rst
 .. csv-table::
