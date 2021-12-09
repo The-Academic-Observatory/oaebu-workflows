@@ -23,10 +23,14 @@ from airflow.exceptions import AirflowException
 from oaebu_workflows.identifiers import TelescopeTypes
 from oaebu_workflows.workflows.oaebu_partners import OaebuPartner
 from oaebu_workflows.workflows.onix_workflow import OnixWorkflow
+from observatory.api.client.model.dataset import Dataset
+from observatory.api.client.model.dataset_release import DatasetRelease
+from observatory.api.client.model.dataset_storage import DatasetStorage
+from observatory.api.client.model.telescope import Telescope
 from observatory.platform.utils.workflow_utils import make_observatory_api
 
 
-def is_oaebu_telescope(telescope: "Telescope") -> bool:
+def is_oaebu_telescope(telescope: Telescope) -> bool:
     """Determine whether a telescope is an OAEBU telescope.
 
     :param telescope: Telescope to check.
@@ -42,7 +46,7 @@ def is_oaebu_telescope(telescope: "Telescope") -> bool:
     return True
 
 
-def get_gcp_address(storage: "DatasetStorage") -> Tuple[str, str, str]:
+def get_gcp_address(storage: DatasetStorage) -> Tuple[str, str, str]:
     """Get the project id, dataset id, and table id from a GCP storage location.
 
     :param storage: Dataset storage info.
@@ -55,7 +59,7 @@ def get_gcp_address(storage: "DatasetStorage") -> Tuple[str, str, str]:
     return storage.address.split(".")
 
 
-def get_isbn_field_name(dataset: "Dataset") -> str:
+def get_isbn_field_name(dataset: Dataset) -> str:
     """Get the ISBN field name in a dataset.
 
     :param dataset: Dataset info.
@@ -72,7 +76,7 @@ def get_isbn_field_name(dataset: "Dataset") -> str:
     return isbn_field_name
 
 
-def get_title_field_name(dataset: "Dataset") -> str:
+def get_title_field_name(dataset: Dataset) -> str:
     """Get the title field name in a dataset.
 
     :param dataset: Dataset info.
@@ -89,7 +93,7 @@ def get_title_field_name(dataset: "Dataset") -> str:
     return title_field_name
 
 
-def is_sharded(storage: "DatasetStorage") -> bool:
+def is_sharded(storage: DatasetStorage) -> bool:
     """Determine if a dataset storage table is sharded.
 
     :param storage: Dataset storage info.
