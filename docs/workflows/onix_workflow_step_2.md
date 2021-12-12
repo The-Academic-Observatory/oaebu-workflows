@@ -1,6 +1,6 @@
 # ONIX workflow Step 2 - Linking Metircs
 
-Step 2 of the ONIX workflow is all about linking and aggregrating the metrics, which have arrived through various telescopes, to the book records in the publishers ONIX feed.
+Step 2 of the ONIX workflow takes the metrics fetched through various telescopes, then aggregates and joins them to the book records in the publisher's ONIX feed.
 
 ``` eval_rst
 .. image:: ../static/onix_workflow_2.png
