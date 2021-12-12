@@ -42,7 +42,7 @@ The schemas for these tables are identical to the raw Telescope's schemas, with 
 ```
 
 ## Create QA tables
-For each data source, including the intermediate tables, we can produce some basic quality assurance checks on the data, and output these to tables for easy export. For example we can check to see if ISBNs provided are valid, or if there are unmatched ISBN indicating missing ONIX product records.
+For each data source, including the intermediate tables, we perform basic quality assurance checks on the data, and output the results to tables that are easy to export for analysis by the publisher (e.g. to CSV). For example we verify if the provided ISBNs are valid, or if there are unmatched ISBNs indicating that there are missing ONIX product records.
 
 
 ### ONIX Aggregate Metrics
