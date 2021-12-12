@@ -6,6 +6,16 @@ The ONIX workflow uses the ONIX table created by the ONIX telescope to do the fo
   3. Produce intermediate lookup tables mapping ISBN13 -> WorkID and ISBN13 -> WorkFamilyID.
   4. Produce oaebu_intermediate tables that append work_id and work_family_id columns to different data tables with ISBN keys.
 
+## Definitions - Product, Work and Work Families
+
+A **Product**: A product is a manifestation of a work, and will have its own ISBN. There may be several DOIs linked to a single product though (or sometimes none at all).
+
+A **Work**: Can be a collection of products, which are each different manifestation of the same work. Some datasets have unique IDs assigned to the concept of a work, but these are not as clear as the usage of ISBN for a product.
+
+An **Edition**: Is a new Work, but is derived as a revision from an existing work as opposed to being entirely new.
+
+A **Work Family** is a collection of works which are different editions of each other.
+
 ## Dependencies
 The ONIX workflow is dependent on the ONIX telescope.  It waits for the ONIX telescope to finish before it starts executing.  This requires an ONIX telescope to be present and scheduled.
 
