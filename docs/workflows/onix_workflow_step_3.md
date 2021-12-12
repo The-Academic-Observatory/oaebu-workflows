@@ -1,6 +1,6 @@
 # ONIX workflow Step 3 - Exporting to Elasticsearch
 
-Step three of the ONIX workflow is to export the book_product table to a sequence of flattened tables that can be exported to Elasticsearch. The data in these tables is not materially different to the book product table, just organised in a way better suited for dashboards in Kibana.
+Step three of the ONIX workflow is to export the book_product table to a sequence of flattened tables that can be exported to Elasticsearch. The data in these tables is not materially different to the book product table, just organised in a way, better suited for dashboards in Kibana.
 
 ``` eval_rst
 .. image:: ../static/onix_workflow_3.png
