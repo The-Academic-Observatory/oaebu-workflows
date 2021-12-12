@@ -25,9 +25,9 @@ from typing import List, Optional
 import pendulum
 from airflow.exceptions import AirflowException
 from google.cloud.bigquery import SourceFormat
-
-from oaebu_workflows.config import schema_folder as default_schema_folder, sql_folder
-from oaebu_workflows.workflows.oaebu_partners import OaebuPartnerName, OaebuPartners
+from oaebu_workflows.config import schema_folder as default_schema_folder
+from oaebu_workflows.config import sql_folder
+from oaebu_workflows.workflows.oaebu_partners import OaebuPartner, OaebuPartnerName
 from oaebu_workflows.workflows.onix_telescope import OnixTelescope
 from oaebu_workflows.workflows.onix_work_aggregation import (
     BookWorkAggregator,
@@ -47,9 +47,9 @@ from observatory.platform.utils.jinja2_utils import render_template
 from observatory.platform.utils.workflow_utils import (
     bq_load_shard_v2,
     make_dag_id,
-    table_ids_from_path,
     make_release_date,
-    make_table_name
+    make_table_name,
+    table_ids_from_path,
 )
 from observatory.platform.workflows.workflow import AbstractRelease, Workflow
 
@@ -230,7 +230,7 @@ class OnixWorkflow(Workflow):
         start_date: Optional[pendulum.DateTime] = pendulum.datetime(2021, 3, 28),
         schedule_interval: Optional[str] = "@weekly",
         catchup: Optional[bool] = False,
-        data_partners: List[OaebuPartners] = None,
+        data_partners: List[OaebuPartner] = None,
     ):
         """Initialises the workflow object.
         :param org_name: Organisation name.
@@ -552,7 +552,7 @@ class OnixWorkflow(Workflow):
                 f"create_bigquery_table_from_query failed on {release.project_id}.{output_dataset}.{table_id}"
             )
 
-    def create_oaebu_intermediate_table_tasks(self, data_partners: List[OaebuPartners]):
+    def create_oaebu_intermediate_table_tasks(self, data_partners: List[OaebuPartner]):
         """Create tasks for generating oaebu intermediate tables for each OAEBU data partner.
         :param data_partners: List of oaebu partner data.
         """
@@ -691,7 +691,7 @@ class OnixWorkflow(Workflow):
                 f"create_bigquery_table_from_query failed on {release.project_id}.{output_dataset}.{table_id}"
             )
 
-    def create_oaebu_output_tasks(self, data_partners: List[OaebuPartners]):
+    def create_oaebu_output_tasks(self, data_partners: List[OaebuPartner]):
         """Create tasks for outputing final metrics from our OAEBU data.  It will create output tables in the oaebu dataset.
         :param data_partners: List of oaebu partner data.
         """
@@ -847,7 +847,7 @@ class OnixWorkflow(Workflow):
                 f"create_bigquery_table_from_query failed on {release.project_id}.{output_dataset}.{table_id}"
             )
 
-    def create_oaebu_export_tasks(self, data_partners: List[OaebuPartners]):
+    def create_oaebu_export_tasks(self, data_partners: List[OaebuPartner]):
         """Create tasks for exporting final metrics from our OAEBU data.  It will create output tables in the oaebu_elastic dataset.
         :param data_partners: Onix workflow release information.
         """
@@ -969,7 +969,7 @@ class OnixWorkflow(Workflow):
         update_wrapper(fn, self.export_oaebu_qa_metrics)
         self.add_task(fn)
 
-    def create_oaebu_data_qa_tasks(self, data_partners: List[OaebuPartners]):
+    def create_oaebu_data_qa_tasks(self, data_partners: List[OaebuPartner]):
         """Create tasks for outputing QA metrics from our OAEBU data.  It will create output tables in the oaebu_data_qa dataset.
         :param data_partners: List of oaebu partner data.
         """
@@ -1130,7 +1130,7 @@ class OnixWorkflow(Workflow):
                 f"create_bigquery_table_from_query failed on {project_id}.{output_dataset_id}.{output_table_id}"
             )
 
-    def create_oaebu_data_qa_jstor_tasks(self, data_partner: OaebuPartners):
+    def create_oaebu_data_qa_jstor_tasks(self, data_partner: OaebuPartner):
         """Create JSTOR quality assurance metrics.
         :param data_partner: OaebuPartner metadata.
         """
@@ -1207,7 +1207,7 @@ class OnixWorkflow(Workflow):
             isbn="eISBN",
         )
 
-    def create_oaebu_data_qa_google_analytics_tasks(self, data_partner: OaebuPartners):
+    def create_oaebu_data_qa_google_analytics_tasks(self, data_partner: OaebuPartner):
         """Create Google Analytics quality assurance metrics.
         :param data_partner: OaebuPartner metadata.
         """
@@ -1269,7 +1269,7 @@ class OnixWorkflow(Workflow):
             isbn="publication_id",
         )
 
-    def create_oaebu_data_qa_oapen_irus_uk_tasks(self, data_partner: OaebuPartners):
+    def create_oaebu_data_qa_oapen_irus_uk_tasks(self, data_partner: OaebuPartner):
         """Create OAPEN IRUS UK quality assurance metrics.
         :param data_partner: OaebuPartner metadata.
         """
@@ -1332,7 +1332,7 @@ class OnixWorkflow(Workflow):
             isbn="ISBN",
         )
 
-    def create_oaebu_data_qa_google_books_sales_tasks(self, data_partner: OaebuPartners):
+    def create_oaebu_data_qa_google_books_sales_tasks(self, data_partner: OaebuPartner):
         """Create Google Books Sales quality assurance metrics.
         :param data_partner: OaebuPartner metadata.
         """
@@ -1395,7 +1395,7 @@ class OnixWorkflow(Workflow):
             isbn="Primary_ISBN",
         )
 
-    def create_oaebu_data_qa_google_books_traffic_tasks(self, data_partner: OaebuPartners):
+    def create_oaebu_data_qa_google_books_traffic_tasks(self, data_partner: OaebuPartner):
         """Create Google Books Traffic quality assurance metrics.
         :param data_partner: OaebuPartner metadata.
         """
@@ -1458,7 +1458,7 @@ class OnixWorkflow(Workflow):
             isbn="Primary_ISBN",
         )
 
-    def create_oaebu_data_qa_intermediate_tasks(self, data_partner: OaebuPartners):
+    def create_oaebu_data_qa_intermediate_tasks(self, data_partner: OaebuPartner):
         """Create tasks for generating oaebu intermediate metrics for each OAEBU data partner.
         :param data_partner: List of oaebu partner data.
         """
