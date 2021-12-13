@@ -343,6 +343,7 @@ onix_ebook_titles_raw as (
             Doi,
             ProductForm,
             EditionNumber,
+            # This IF statement is used to select between two fields to extract the title as different publishers place the title value in different locations
             IF(
                 onix.TitleDetails[SAFE_OFFSET(0)].TitleElements[SAFE_OFFSET(0)].TitleText is not null,
                 onix.TitleDetails[SAFE_OFFSET(0)].TitleElements[SAFE_OFFSET(0)].TitleText,
@@ -351,6 +352,7 @@ onix_ebook_titles_raw as (
                 SUBSTRING(CAST(dates.Date as STRING), 0, 4)
             FROM UNNEST(onix.PublishingDates) as dates
             WHERE dates.PublishingDateRole = "Publication date")[SAFE_OFFSET(0)] as published_year,
+            # The following four sub-queries all pull data from the onix.subjects array, but neatly organised the values into the 4 current classification systems
             ARRAY(
                 SELECT
                     subject.SubjectCode
