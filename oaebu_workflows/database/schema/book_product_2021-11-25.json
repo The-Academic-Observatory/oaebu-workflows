@@ -1,0 +1,844 @@
+[
+  {
+    "mode": "NULLABLE",
+    "name": "ISBN13",
+    "type": "STRING",
+    "description": "ISBN13"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "Doi",
+        "type": "STRING",
+        "description": "DOI"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "ProductForm",
+        "type": "STRING",
+        "description": "The product form, such as digital, print etc"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "EditionNumber",
+        "type": "INTEGER",
+        "description": "The edition number of this book product"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "title",
+        "type": "STRING",
+        "description": "The Book's Title"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "published_year",
+        "type": "STRING",
+        "description": "The year the book was published"
+      },
+      {
+        "mode": "REPEATED",
+        "name": "bic_subjects",
+        "type": "STRING",
+        "description": "A list of BIC subjects"
+      },
+      {
+        "mode": "REPEATED",
+        "name": "bisac_subjects",
+        "type": "STRING",
+        "description": "A list of BISAC subjects"
+      },
+      {
+        "mode": "REPEATED",
+        "name": "thema_subjects",
+        "type": "STRING",
+        "description": "A list of THEMA subjects"
+      },
+      {
+        "mode": "REPEATED",
+        "name": "keywords",
+        "type": "STRING",
+        "description": "A list of Keywords"
+      },
+      {
+        "fields": [
+          {
+            "mode": "NULLABLE",
+            "name": "PersonName",
+            "type": "STRING",
+            "description": "The Authors Full Name"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "ORCID",
+            "type": "STRING",
+            "description": "Authors ORCID ID, if present"
+          }
+        ],
+        "mode": "REPEATED",
+        "name": "authors",
+        "type": "RECORD",
+        "description": "Book Authors"
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "onix",
+    "type": "RECORD",
+    "description": "Fields Pulled from the ONIX Record for this Book Product"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "work_id",
+    "type": "STRING",
+    "description": "The dervied Work_ID that we calculate"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "work_family_id",
+    "type": "STRING",
+    "description": "The Dervied Work_Family_ID that we calculate"
+  },
+  {
+    "fields": [
+      {
+        "fields": [
+          {
+            "mode": "NULLABLE",
+            "name": "doi",
+            "type": "STRING",
+            "description": "The DOI from crossref"
+          },
+          {
+            "mode": "REPEATED",
+            "name": "title",
+            "type": "STRING",
+            "description": "The title from crossref"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "type",
+            "type": "STRING",
+            "description": "The type from crossref"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "publisher",
+            "type": "STRING",
+            "description": "The publisher from crossref"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "published_year",
+            "type": "INTEGER",
+            "description": "The published year from crossref"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "published_year_month",
+            "type": "STRING",
+            "description": "The published year-month from crossref"
+          },
+          {
+            "mode": "REPEATED",
+            "name": "work_isbns",
+            "type": "STRING",
+            "description": "ISBNs"
+          }
+        ],
+        "mode": "REPEATED",
+        "name": "crossref_objects",
+        "type": "RECORD",
+        "description": "Linked Objects from Crossref and their values"
+      },
+      {
+        "fields": [
+          {
+            "mode": "NULLABLE",
+            "name": "doi",
+            "type": "STRING",
+            "description": "The Book Chapter DOI"
+          },
+          {
+            "mode": "REPEATED",
+            "name": "title",
+            "type": "STRING",
+            "description": "The Book Chapter title"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "type",
+            "type": "STRING",
+            "description": "The Book Chapter type"
+          }
+        ],
+        "mode": "REPEATED",
+        "name": "chapters",
+        "type": "RECORD",
+        "description": "Linked Objects from Crossref where they are of type book-chapter only"
+      },
+      {
+        "fields": [
+          {
+            "mode": "NULLABLE",
+            "name": "source",
+            "type": "STRING",
+            "description": "Event Source Type"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "count",
+            "type": "INTEGER",
+            "description": "Count of events"
+          }
+        ],
+        "mode": "REPEATED",
+        "name": "events",
+        "type": "RECORD",
+        "description": "Count of events from Crossref Events"
+      },
+      {
+        "fields": [
+          {
+            "mode": "NULLABLE",
+            "name": "ISBN13",
+            "type": "STRING",
+            "description": "ISBN"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "Imprint_Name",
+            "type": "STRING",
+            "description": "The template used for the book."
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "Title",
+            "type": "STRING",
+            "description": "The title of the book."
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "Author",
+            "type": "STRING",
+            "description": "The author of the book."
+          }
+        ],
+        "mode": "NULLABLE",
+        "name": "google_books_sales",
+        "type": "RECORD",
+        "description": "Metadata derived from Google Books Sales"
+      },
+      {
+        "fields": [
+          {
+            "mode": "NULLABLE",
+            "name": "ISBN13",
+            "type": "STRING",
+            "description": "ISBN"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "Title",
+            "type": "STRING",
+            "description": "The title of the book"
+          }
+        ],
+        "mode": "NULLABLE",
+        "name": "google_books_traffic",
+        "type": "RECORD",
+        "description": "Metadata derived from Google Books Sales"
+      },
+      {
+        "fields": [
+          {
+            "mode": "NULLABLE",
+            "name": "ISBN13",
+            "type": "STRING",
+            "description": "ISBN of the book (13 digits)"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "Book_Title",
+            "type": "STRING",
+            "description": "Title of the book"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "Book_ID",
+            "type": "STRING",
+            "description": "DOI of the book on JSTOR"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "Authors",
+            "type": "STRING",
+            "description": "Author of the book"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "ISBN",
+            "type": "STRING",
+            "description": "ISBN of the book"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "eISBN",
+            "type": "STRING",
+            "description": "ISBN of the digital version of the book (13 digits)"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "Copyright_Year",
+            "type": "INTEGER",
+            "description": "Publication year"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "Disciplines",
+            "type": "STRING",
+            "description": "Subject category of the book"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "Usage_Type",
+            "type": "STRING",
+            "description": "For our case it is Open Access"
+          }
+        ],
+        "mode": "NULLABLE",
+        "name": "jstor_metadata",
+        "type": "RECORD",
+        "description": "Metadata derived from JSTOR"
+      },
+      {
+        "fields": [
+          {
+            "mode": "NULLABLE",
+            "name": "ISBN13",
+            "type": "STRING",
+            "description": "ISBN of the book (13 digits)"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "Book_Title",
+            "type": "STRING",
+            "description": "Title of the book"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "Book_ID",
+            "type": "STRING",
+            "description": "DOI of the book on JSTOR"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "Authors",
+            "type": "STRING",
+            "description": ""
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "ISBN",
+            "type": "STRING",
+            "description": "ISBN of the book (13 digits)"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "eISBN",
+            "type": "STRING",
+            "description": "ISBN of the digital version of the book (13 digits)"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "Copyright_Year",
+            "type": "INTEGER",
+            "description": "Publication year"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "Disciplines",
+            "type": "STRING",
+            "description": "Subject category of the book"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "Usage_Type",
+            "type": "STRING",
+            "description": "For our case it is Open Access"
+          }
+        ],
+        "mode": "NULLABLE",
+        "name": "jstor_institution_metadata",
+        "type": "RECORD",
+        "description": "Metadata derived from JSTOR Institutions"
+      },
+      {
+        "fields": [
+          {
+            "mode": "NULLABLE",
+            "name": "ISBN13",
+            "type": "STRING",
+            "description": "ISBN of the book"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "book_title",
+            "type": "STRING",
+            "description": "Title of the book"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "publisher",
+            "type": "STRING",
+            "description": "The publisher"
+          }
+        ],
+        "mode": "NULLABLE",
+        "name": "oapen_irus_uk_metadata",
+        "type": "RECORD",
+        "description": "Metadata derived from IRUS_UK"
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "metadata",
+    "type": "RECORD",
+    "description": "Metadata on this book, derived and organised by source"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "month",
+        "type": "DATE",
+        "description": "Month of Recorded Metrics"
+      },
+      {
+        "fields": [
+          {
+            "mode": "NULLABLE",
+            "name": "source",
+            "type": "STRING",
+            "description": "The event source"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "count",
+            "type": "INTEGER",
+            "description": "The count of events"
+          }
+        ],
+        "mode": "REPEATED",
+        "name": "crossref_events",
+        "type": "RECORD",
+        "description": "Metrics Derived From Crossref Events"
+      },
+      {
+        "fields": [
+          {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "average_time",
+                "type": "FLOAT",
+                "description": "Average time (in seconds) spent on each page"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "name",
+                    "type": "STRING",
+                    "description": "Country name"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "value",
+                    "type": "INTEGER",
+                    "description": "Number of sessions"
+                  }
+                ],
+                "mode": "REPEATED",
+                "name": "country",
+                "type": "RECORD",
+                "description": "Unique views per users’ country, derived from their IP addresses or Geographical IDs."
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "name",
+                    "type": "STRING",
+                    "description": "Referrer name"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "value",
+                    "type": "INTEGER",
+                    "description": "Number of unique views"
+                  }
+                ],
+                "mode": "REPEATED",
+                "name": "referrer",
+                "type": "RECORD",
+                "description": "Unique views per referrer, the full referring URL including the hostname and path"
+              },
+              {
+                "fields": [
+                  {
+                    "mode": "NULLABLE",
+                    "name": "name",
+                    "type": "STRING",
+                    "description": "Social network name"
+                  },
+                  {
+                    "mode": "NULLABLE",
+                    "name": "value",
+                    "type": "INTEGER",
+                    "description": "Number of unique views"
+                  }
+                ],
+                "mode": "REPEATED",
+                "name": "social_network",
+                "type": "RECORD",
+                "description": "Unique views per social network. This is related to the referring social network for traffic sources; e.g., Google+, Blogger."
+              }
+            ],
+            "mode": "NULLABLE",
+            "name": "unique_views",
+            "type": "RECORD",
+            "description": "Unique views for several different dimensions. Unique views is the number of sessions during which the specified page was viewed at least once. A unique pageview is counted for each page URL + page title combination."
+          }
+        ],
+        "mode": "NULLABLE",
+        "name": "google_analytics",
+        "type": "RECORD",
+        "description": "Metrics derived from Google Analytics"
+      },
+      {
+        "fields": [
+          {
+            "mode": "NULLABLE",
+            "name": "qty",
+            "type": "INTEGER",
+            "description": "The number of units in the transaction. Negative for refunds"
+          },
+          {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "Country_of_Sale",
+                "type": "STRING",
+                "description": "The country where the buyer bought the book"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "qty",
+                "type": "INTEGER",
+                "description": "The number of units in the transaction. Negative for refunds"
+              }
+            ],
+            "mode": "REPEATED",
+            "name": "countries",
+            "type": "RECORD",
+            "description": "The list of countries where buyers brought the book"
+          }
+        ],
+        "mode": "NULLABLE",
+        "name": "google_books_sales",
+        "type": "RECORD",
+        "description": "Metrics derived from Google Books Sales"
+      },
+      {
+        "fields": [
+          {
+            "mode": "NULLABLE",
+            "name": "Book_Visits_BV_",
+            "type": "INTEGER",
+            "description": "A Book Visit is registered each time a unique user views one of your books on Google Books. This number includes informational page views (such as the “About this book” page) as well as preview content page views"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "BV_with_Pages_Viewed",
+            "type": "INTEGER",
+            "description": "The number of Book Visits in which users accessed preview pages of your book. This doesn’t include visits where a user accessed only informational pages for your books"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "Non_Unique_Buy_Clicks",
+            "type": "INTEGER",
+            "description": "The number of clicks on links for purchasing the book on retailer websites (including your website, if you provided a buy link)"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "BV_with_Buy_Clicks",
+            "type": "INTEGER",
+            "description": "The number of visits which included a click on a purchase link"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "Buy_Link_CTR",
+            "type": "FLOAT",
+            "description": "The clickthrough rate for purchase links. The values are percentages"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "Pages_Viewed",
+            "type": "INTEGER",
+            "description": "The total number of unique preview content pages that a user viewed in a given session (counted as a 24-hour period). If a user views the same page of your book twice during a session, only a single page view is registered"
+          }
+        ],
+        "mode": "NULLABLE",
+        "name": "google_books_traffic",
+        "type": "RECORD",
+        "description": "Metrics derived from Google Books Traffic"
+      },
+      {
+        "fields": [
+          {
+            "mode": "NULLABLE",
+            "name": "Country_name",
+            "type": "STRING",
+            "description": "Country Name"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "Total_Item_Requests",
+            "type": "INTEGER",
+            "description": "Total number of request made from that specific country"
+          }
+        ],
+        "mode": "REPEATED",
+        "name": "jstor_country",
+        "type": "RECORD",
+        "description": "Metrics derived from JSTOR Country"
+      },
+      {
+        "fields": [
+          {
+            "mode": "NULLABLE",
+            "name": "Institution",
+            "type": "STRING",
+            "description": "Institution name"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "Total_Item_Requests",
+            "type": "INTEGER",
+            "description": "Total number of request made from that specific institution"
+          }
+        ],
+        "mode": "REPEATED",
+        "name": "jstor_institution",
+        "type": "RECORD",
+        "description": "Metrics derived from JSTOR Institutions"
+      },
+      {
+        "fields": [
+          {
+            "mode": "NULLABLE",
+            "name": "version",
+            "type": "STRING",
+            "description": "Version of the OAPEN IRUS UK API, corresponds to the COUNTER report version"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "title_requests",
+            "type": "INTEGER",
+            "description": "The total number of title requests. Only available for data before 2020-04-01"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "total_item_investigations",
+            "type": "INTEGER",
+            "description": "The total number of item investigations. Only available for data since 2020-04-01"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "total_item_requests",
+            "type": "INTEGER",
+            "description": "The total number of item requests. Only available for data since 2020-04-01"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "unique_item_investigations",
+            "type": "INTEGER",
+            "description": "The number of unique item investigations. Only available for data since 2020-04-01"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "unique_item_requests",
+            "type": "INTEGER",
+            "description": "The number of unique item requests. Only available for data since 2020-04-01"
+          },
+          {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "name",
+                "type": "STRING",
+                "description": "The country name of the client registered by oapen irus uk"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "code",
+                "type": "STRING",
+                "description": "The country code of the client registered by oapen irus uk"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "title_requests",
+                "type": "INTEGER",
+                "description": "The total number of title requests. Only available for data before 2020-04-01"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "total_item_investigations",
+                "type": "INTEGER",
+                "description": "The total number of item investigations. Only available for data since 2020-04-01"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "total_item_requests",
+                "type": "INTEGER",
+                "description": "The total number of item requests. Only available for data since 2020-04-01"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "unique_item_investigations",
+                "type": "INTEGER",
+                "description": "The number of unique item investigations. Only available for data since 2020-04-01"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "unique_item_requests",
+                "type": "INTEGER",
+                "description": "The number of unique item requests. Only available for data since 2020-04-01"
+              }
+            ],
+            "mode": "REPEATED",
+            "name": "country",
+            "type": "RECORD",
+            "description": "Record to store statistics on the country level"
+          },
+          {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "latitude",
+                "type": "FLOAT",
+                "description": "The latitude geolocated from the client’s ip address"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "longitude",
+                "type": "FLOAT",
+                "description": "The longitude geolocated from the client’s ip address"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "city",
+                "type": "STRING",
+                "description": "The city geolocated from the client’s ip address"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "country_name",
+                "type": "STRING",
+                "description": "The country name geolocated from the client’s ip address"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "country_code",
+                "type": "STRING",
+                "description": "The country code geolocated from the client’s ip address"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "title_requests",
+                "type": "INTEGER",
+                "description": "The total number of title requests. Only available for data before 2020-04-01"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "total_item_investigations",
+                "type": "INTEGER",
+                "description": "The total number of item investigations. Only available for data since 2020-04-01"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "total_item_requests",
+                "type": "INTEGER",
+                "description": "The total number of item requests. Only available for data since 2020-04-01"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "unique_item_investigations",
+                "type": "INTEGER",
+                "description": "The number of unique item investigations. Only available for data since 2020-04-01"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "unique_item_requests",
+                "type": "INTEGER",
+                "description": "The number of unique item requests. Only available for data since 2020-04-01"
+              }
+            ],
+            "mode": "REPEATED",
+            "name": "locations",
+            "type": "RECORD",
+            "description": "Record to store statistics on the location level"
+          }
+        ],
+        "mode": "NULLABLE",
+        "name": "oapen_irus_uk",
+        "type": "RECORD",
+        "description": "Metrics derived from IRUS-UK"
+      },
+      {
+        "fields": [
+          {
+            "mode": "NULLABLE",
+            "name": "total_downloads",
+            "type": "INTEGER",
+            "description": "Number of downloads"
+          },
+          {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "country_code",
+                "type": "STRING",
+                "description": "Country code"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "country_name",
+                "type": "STRING",
+                "description": "Country name"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "download_count",
+                "type": "INTEGER",
+                "description": "Number of downloads for the given country"
+              }
+            ],
+            "mode": "REPEATED",
+            "name": "downloads_per_country",
+            "type": "RECORD",
+            "description": "Number of downloads per country"
+          }
+        ],
+        "mode": "NULLABLE",
+        "name": "ucl_discovery",
+        "type": "RECORD",
+        "description": "Metrics derived from UCL Discovery"
+      }
+    ],
+    "mode": "REPEATED",
+    "name": "months",
+    "type": "RECORD",
+    "description": "Linked Metrics from all sources, organised by month of occurance"
+  }
+]

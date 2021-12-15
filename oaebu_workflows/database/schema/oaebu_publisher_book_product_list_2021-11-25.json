@@ -1,0 +1,80 @@
+[
+  {
+    "mode": "NULLABLE",
+    "name": "product_id",
+    "type": "STRING",
+    "description": "Book Product ID"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "work_id",
+    "type": "STRING",
+    "description": "Book Work ID"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "work_family_id",
+    "type": "STRING",
+    "description": "Book Work Family ID"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "ProductForm",
+    "type": "STRING",
+    "description": "The product form of the book"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "usage_flag",
+    "type": "BOOLEAN",
+    "description": "Was there any usage detected, from any source, for this book"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "EditionNumber",
+    "type": "INTEGER",
+    "description": "The edition number of the book"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "time_field",
+    "type": "DATE",
+    "description": "Required for Elasticsearch, generally not used though"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "published_year",
+    "type": "INTEGER",
+    "description": "The published year of the book"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "title",
+    "type": "STRING",
+    "description": "The Books Title"
+  },
+  {
+    "mode": "REPEATED",
+    "name": "bic_subjects",
+    "type": "STRING",
+    "description": "A list of BIC subjects"
+  },
+  {
+    "mode": "REPEATED",
+    "name": "bisac_subjects",
+    "type": "STRING",
+    "description": "A list of BISAC subjects"
+  },
+  {
+    "mode": "REPEATED",
+    "name": "thema_subjects",
+    "type": "STRING",
+    "description": "A list of thema subjects"
+  },
+  {
+    "mode": "REPEATED",
+    "name": "keywords",
+    "type": "STRING",
+    "description": "A list of keywords"
+  }
+]

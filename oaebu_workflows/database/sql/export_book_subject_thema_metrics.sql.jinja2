@@ -13,13 +13,19 @@
 # limitations under the License.
 
 # Author: Richard Hosking #}
+{#
+The purpose of this script it to export the Thema subject metrics section from the book_product table
+Primarily, the goal is to create a flat structure which is suitable for graphing in Kibana
+#}
 
+# Helper Function: Sum up the total number of values for the given bucket
 CREATE TEMP FUNCTION group_counts(counts ARRAY<STRUCT<name STRING, value INT64>>) AS (
   (SELECT
     SUM(value) as value
   FROM UNNEST(counts))
 );
 
+# Helper Function: Get just the unique set of top level Thema Subjects from the provided list
 CREATE TEMP FUNCTION top_level_subjects(subjects ARRAY<STRING>) AS (
   ARRAY(SELECT
     DISTINCT(SUBSTRING(subject, 0, 1)) as top_level

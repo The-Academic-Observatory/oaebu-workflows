@@ -1,0 +1,236 @@
+[
+  {
+    "mode": "NULLABLE",
+    "name": "product_id",
+    "type": "STRING",
+    "description": "Book Product ID"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "work_id",
+    "type": "STRING",
+    "description": "Book Work ID"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "work_family_id",
+    "type": "STRING",
+    "description": "Book Work Family ID"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "title",
+    "type": "STRING",
+    "description": "The title of the book"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "PersonName",
+        "type": "STRING",
+        "description": "The Author's Name"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "ORCID",
+        "type": "STRING",
+        "description": "The Authors ORCID ID"
+      }
+    ],
+    "mode": "REPEATED",
+    "name": "authors",
+    "type": "RECORD",
+    "description": "A list of Book Authors"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "published_year",
+    "type": "INTEGER",
+    "description": "The Books published year"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "month",
+    "type": "DATE",
+    "description": "The month in which the metrics took place"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "unique_views",
+        "type": "INTEGER",
+        "description": "The number of unique views"
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "google_analytics",
+    "type": "RECORD",
+    "description": "Metrics from Google Analytics"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "count",
+        "type": "INTEGER",
+        "description": "Count of events"
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "crossref_events",
+    "type": "RECORD",
+    "description": "Metrics from Crossref Events"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "Book_Visits_BV_",
+        "type": "INTEGER",
+        "description": "A Book Visit is registered each time a unique user views one of your books on Google Books. This number includes informational page views (such as the “About this book” page) as well as preview content page views"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "BV_with_Pages_Viewed",
+        "type": "INTEGER",
+        "description": "The number of Book Visits in which users accessed preview pages of your book. This doesn’t include visits where a user accessed only informational pages for your books"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "Non_Unique_Buy_Clicks",
+        "type": "INTEGER",
+        "description": "The number of clicks on links for purchasing the book on retailer websites (including your website, if you provided a buy link)"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "BV_with_Buy_Clicks",
+        "type": "INTEGER",
+        "description": "The number of visits which included a click on a purchase link"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "Buy_Link_CTR",
+        "type": "FLOAT",
+        "description": "The clickthrough rate for purchase links. The values are percentages"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "Pages_Viewed",
+        "type": "INTEGER",
+        "description": "The total number of unique preview content pages that a user viewed in a given session (counted as a 24-hour period)"
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "google_books_traffic",
+    "type": "RECORD",
+    "description": "Metrics from Google Books Traffic"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "qty",
+        "type": "INTEGER",
+        "description": "Quantity of sales"
+      },
+      {
+        "fields": [
+          {
+            "mode": "NULLABLE",
+            "name": "Country_of_Sale",
+            "type": "STRING",
+            "description": "Country in which sale occured"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "qty",
+            "type": "INTEGER",
+            "description": "Quantity of sales"
+          }
+        ],
+        "mode": "REPEATED",
+        "name": "countries",
+        "type": "RECORD",
+        "description": "A list of Countries"
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "google_books_sales",
+    "type": "RECORD",
+    "description": "Metrics from Google Books Sales"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "Total_Item_Requests",
+        "type": "INTEGER",
+        "description": "Total number of item requests"
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "jstor",
+    "type": "RECORD",
+    "description": "Metrics from JSTOR"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "version",
+        "type": "STRING",
+        "description": "Version of the OAPEN IRUS UK API, corresponds to the COUNTER report version"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "title_requests",
+        "type": "INTEGER",
+        "description": "The total number of title requests. Only available for data before 2020-04-01"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "total_item_investigations",
+        "type": "INTEGER",
+        "description": "The total number of item investigations. Only available for data since 2020-04-01"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "total_item_requests",
+        "type": "INTEGER",
+        "description": "The total number of item requests. Only available for data since 2020-04-01"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "unique_item_investigations",
+        "type": "INTEGER",
+        "description": "The number of unique item investigations. Only available for data since 2020-04-01"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "unique_item_requests",
+        "type": "INTEGER",
+        "description": "The number of unique item requests. Only available for data since 2020-04-01"
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "oapen_irus_uk",
+    "type": "RECORD",
+    "description": "Metrics from IRUS-UK"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "total_downloads",
+        "type": "INTEGER",
+        "description": ""
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "ucl_discovery",
+    "type": "RECORD",
+    "description": "Metrics from UCL Disovery"
+  }
+]

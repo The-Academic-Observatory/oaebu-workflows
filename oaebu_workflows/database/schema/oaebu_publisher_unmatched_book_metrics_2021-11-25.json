@@ -1,0 +1,74 @@
+[
+  {
+    "mode": "NULLABLE",
+    "name": "ISBN",
+    "type": "STRING",
+    "description": "The ISBN13"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "release_date",
+    "type": "DATE",
+    "description": "The release date (month)"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "google_analytics_title",
+    "type": "STRING",
+    "description": "The title of book, as specified in Google Analytics"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "google_books_title",
+    "type": "STRING",
+    "description": "The title of book, as specified in Google Books"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "jstor_title",
+    "type": "STRING",
+    "description": "The title of book, as specified in JSTOR"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "oapen_title",
+    "type": "STRING",
+    "description": "The title of book, as specified in OAPEN/IRUS-UK"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "ucl_discovery_title",
+    "type": "STRING",
+    "description": "The title of book, as specified in UCL Discovery"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "in_google_analytics",
+    "type": "BOOLEAN",
+    "description": "Was this ISBN contained in Google Analytics"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "in_google_books",
+    "type": "BOOLEAN",
+    "description": "Was this ISBN contained in Google Books"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "in_jstor",
+    "type": "BOOLEAN",
+    "description": "Was this ISBN contained in JSTOR"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "in_oapen",
+    "type": "BOOLEAN",
+    "description": "Was this ISBN contained in OAPEN"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "in_ucl_discovery",
+    "type": "BOOLEAN",
+    "description": "Was this ISBN contained in UCL Discovery"
+  }
+]

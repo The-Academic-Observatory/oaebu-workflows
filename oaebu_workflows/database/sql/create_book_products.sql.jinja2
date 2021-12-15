@@ -14,6 +14,12 @@
 
 # Author: Richard Hosking #}
 
+# Helper Function:
+{#
+Output Schema:
+name      STRING    NULLABLE
+value     INTEGER   NULLABLE
+#}
 CREATE TEMP FUNCTION group_items(items ARRAY<STRUCT<name STRING, value INT64>>) as (
   ARRAY(
     (SELECT AS STRUCT
@@ -24,6 +30,12 @@ CREATE TEMP FUNCTION group_items(items ARRAY<STRUCT<name STRING, value INT64>>) 
   )
 );
 
+# Helper Function:
+{#
+Output Schema:
+Country_of_Sale      STRING    NULLABLE
+qty                  INTEGER   NULLABLE
+#}
 CREATE TEMP FUNCTION group_items_google_books_sales(items ARRAY<STRUCT<Country_of_Sale STRING, qty INT64>>) as (
   ARRAY(
     (SELECT AS STRUCT
@@ -34,6 +46,12 @@ CREATE TEMP FUNCTION group_items_google_books_sales(items ARRAY<STRUCT<Country_o
   )
 );
 
+# Helper Function:
+{#
+Output Schema:
+Country_name            STRING    NULLABLE
+Total_Item_Requests     INTEGER   NULLABLE
+#}
 CREATE TEMP FUNCTION group_items_jstor_country(items ARRAY<STRUCT<Country_name STRING, Total_Item_Requests INT64>>) as (
   ARRAY(
     (SELECT AS STRUCT
@@ -44,6 +62,12 @@ CREATE TEMP FUNCTION group_items_jstor_country(items ARRAY<STRUCT<Country_name S
   )
 );
 
+# Helper Function:
+{#
+Output Schema:
+Institution             STRING    NULLABLE
+Total_Item_Requests     INTEGER   NULLABLE
+#}
 CREATE TEMP FUNCTION group_items_jstor_institution(items ARRAY<STRUCT<Institution STRING, Total_Item_Requests INT64>>) as (
   ARRAY(
     (SELECT AS STRUCT
@@ -54,6 +78,17 @@ CREATE TEMP FUNCTION group_items_jstor_institution(items ARRAY<STRUCT<Institutio
   )
 );
 
+# Helper Function:
+{#
+Output Schema:
+name                            STRING    NULLABLE
+code                            STRING    NULLABLE
+title_requests                  INTEGER   NULLABLE
+total_item_investigations       INTEGER   NULLABLE
+total_item_requests             INTEGER   NULLABLE
+unique_item_investigations      INTEGER   NULLABLE
+unique_item_requests            INTEGER   NULLABLE
+#}
 CREATE TEMP FUNCTION group_items_irus_country(items ARRAY<STRUCT<name STRING, code STRING, title_requests INT64, total_item_investigations INT64, total_item_requests INT64, unique_item_investigations INT64, unique_item_requests INT64>>) as (
   ARRAY(
     (SELECT AS STRUCT
@@ -69,6 +104,20 @@ CREATE TEMP FUNCTION group_items_irus_country(items ARRAY<STRUCT<name STRING, co
   )
 );
 
+# Helper Function:
+{#
+Output Schema:
+latitude                        FLOAT    NULLABLE
+longitude                       FLOAT    NULLABLE
+city                            STRING    NULLABLE
+country_name                    STRING    NULLABLE
+country_code                    STRING    NULLABLE
+title_requests                  INTEGER   NULLABLE
+total_item_investigations       INTEGER   NULLABLE
+total_item_requests             INTEGER   NULLABLE
+unique_item_investigations      INTEGER   NULLABLE
+unique_item_requests            INTEGER   NULLABLE
+#}
 CREATE TEMP FUNCTION group_items_irus_location(items ARRAY<STRUCT<latitude FLOAT64, longitude FLOAT64, city STRING, country_name STRING, country_code STRING, title_requests INT64, total_item_investigations INT64, total_item_requests INT64, unique_item_investigations INT64, unique_item_requests INT64>>) as (
   ARRAY(
     (SELECT AS STRUCT
@@ -87,6 +136,13 @@ CREATE TEMP FUNCTION group_items_irus_location(items ARRAY<STRUCT<latitude FLOAT
   )
 );
 
+# Helper Function:
+{#
+Output Schema:
+country_code                    STRING    NULLABLE
+country_name                    STRING    NULLABLE
+download_count                  INTEGER   NULLABLE
+#}
 CREATE TEMP FUNCTION group_items_ucl_country(items ARRAY<STRUCT<download_count INT64, country_name STRING, country_code STRING>>) as (
   ARRAY(
     (SELECT AS STRUCT
@@ -98,6 +154,14 @@ CREATE TEMP FUNCTION group_items_ucl_country(items ARRAY<STRUCT<download_count I
   )
 );
 
+{#
+The purpose of this block of SQL is to create an empty row of data, which comforms to the OAPEN raw data.
+
+Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'oapen_table_id'.
+This will either point to 'empty_oapen' (the name of this SQL block) or the name of the real data table in bigquery.
+The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
+Providng an empty row enable simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
+#}
 WITH empty_oapen as (
     SELECT
         CAST(null as STRING) as ISBN,
@@ -111,13 +175,24 @@ WITH empty_oapen as (
         CAST(null as INT64) as unique_item_investigations,
         CAST(null as INT64) as unique_item_requests,
         [STRUCT(
-            CAST(null as STRING) as name, null as code, CAST(null as INT64) as title_requests, CAST(null as INT64) as total_item_investigations, CAST(null as INT64) as total_item_requests, CAST(null as INT64) as unique_item_investigations, CAST(null as INT64) as unique_item_requests
+            CAST(null as STRING) as name, null as code, CAST(null as INT64) as title_requests, CAST(null as INT64) as total_item_investigations,
+            CAST(null as INT64) as total_item_requests, CAST(null as INT64) as unique_item_investigations, CAST(null as INT64) as unique_item_requests
         )] as country,
         [STRUCT(
-            CAST(null as FLOAT64) as latitude, CAST(null as FLOAT64) as longitude, CAST(null as STRING) as city, CAST(null as STRING) as country_name, CAST(null as STRING) as country_code, CAST(null as INT64) as title_requests, CAST(null as INT64) as total_item_investigations, null as total_item_requests, CAST(null as INT64) as unique_item_investigations, CAST(null as INT64) as unique_item_requests
+            CAST(null as FLOAT64) as latitude, CAST(null as FLOAT64) as longitude, CAST(null as STRING) as city, CAST(null as STRING) as country_name,
+            CAST(null as STRING) as country_code, CAST(null as INT64) as title_requests, CAST(null as INT64) as total_item_investigations,
+            null as total_item_requests, CAST(null as INT64) as unique_item_investigations, CAST(null as INT64) as unique_item_requests
         )] as locations
 ),
 
+{#
+The purpose of this block of SQL is to create an empty row of data, which comforms to the jstor institution raw data.
+
+Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'jstor_institution_table_id'.
+This will either point to 'empty_jstor_institution' (the name of this SQL block) or the name of the real data table in bigquery.
+The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
+Providng an empty row enable simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
+#}
 empty_jstor_institution as (
     SELECT
         Cast(null as STRING) as eISBN,
@@ -133,6 +208,14 @@ empty_jstor_institution as (
         Cast(null as INT64) as Total_Item_Requests
 ),
 
+{#
+The purpose of this block of SQL is to create an empty row of data, which comforms to the jstor country raw data.
+
+Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'jstor_country_table_id'.
+This will either point to 'empty_jstor_country' (the name of this SQL block) or the name of the real data table in bigquery.
+The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
+Providng an empty row enable simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
+#}
 empty_jstor_country as (
     SELECT
         Cast(null as STRING) as eISBN,
@@ -148,6 +231,14 @@ empty_jstor_country as (
         Cast(null as INT64) as Total_Item_Requests
 ),
 
+{#
+The purpose of this block of SQL is to create an empty row of data, which comforms to the google books traffic raw data.
+
+Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'google_books_traffic_table_id'.
+This will either point to 'empty_google_books_traffic' (the name of this SQL block) or the name of the real data table in bigquery.
+The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
+Providng an empty row enable simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
+#}
 empty_google_books_traffic as (
     SELECT
         CAST(NULL as STRING) as Primary_ISBN,
@@ -161,6 +252,14 @@ empty_google_books_traffic as (
         CAST(NULL as FLOAT64) as Buy_Link_CTR
 ),
 
+{#
+The purpose of this block of SQL is to create an empty row of data, which comforms to the google books sales raw data.
+
+Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'google_books_sales_table_id'.
+This will either point to 'empty_google_books_sales' (the name of this SQL block) or the name of the real data table in bigquery.
+The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
+Providng an empty row enable simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
+#}
 empty_google_books_sales as (
     SELECT
         CAST(NULL as STRING) as Primary_ISBN,
@@ -172,6 +271,14 @@ empty_google_books_sales as (
         CAST(NULL as STRING) as Country_of_Sale
 ),
 
+{#
+The purpose of this block of SQL is to create an empty row of data, which comforms to the google analytics raw data.
+
+Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'google_analytics_table_id'.
+This will either point to 'empty_google_analytics' (the name of this SQL block) or the name of the real data table in bigquery.
+The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
+Providng an empty row enable simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
+#}
 empty_google_analytics as (
     SELECT
         CAST(null as STRING) as publication_id,
@@ -186,6 +293,14 @@ empty_google_analytics as (
         ) as unique_views
 ),
 
+{#
+The purpose of this block of SQL is to create an empty row of data, which comforms to the UCL Discovery raw data.
+
+Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'ucl_table_id'.
+This will either point to 'empty_ucl_discovery' (the name of this SQL block) or the name of the real data table in bigquery.
+The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
+Providng an empty row enable simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
+#}
 empty_ucl_discovery as (
     SELECT
         CAST(NULL as STRING) as isbn,
@@ -195,18 +310,32 @@ empty_ucl_discovery as (
         [STRUCT(CAST(null as INT64) as download_count, CAST(NULL as STRING) as country_name, CAST(NULL as STRING) as country_code)] as downloads_per_country
 ),
 
+{#
+
+#}
 empty_work_ids as (
     SELECT
         CAST(NULL as STRING) as isbn13,
         CAST(NULL as STRING) as work_id,
 ),
 
+{#
+
+#}
 empty_work_family_ids as (
     SELECT
         CAST(NULL as STRING) as isbn13,
         CAST(NULL as STRING) as work_family_id,
 ),
 
+{#
+This block of SQL queries data in an ONIX release, and produces a normalised and focused dataset to pass into the next step of this workflow.
+
+The 'project_id', 'onix_dataset_id', and 'onix_release_date' are all passed in as JINJA parameters to ensure the correct raw table is selected for each publisher.
+The query also only selects for product forms that match: "Digital download and online", "Digital (delivered electronically)", or "Digital download"
+
+Also of note, the onix format stores all the different subject classifications together. This query neatly separates out BIC, BISAC, Thema and keywords to their own lists for easier access.
+#}
 onix_ebook_titles_raw as (
     SELECT
         ISBN13,
@@ -214,6 +343,7 @@ onix_ebook_titles_raw as (
             Doi,
             ProductForm,
             EditionNumber,
+            # This IF statement is used to select between two fields to extract the title as different publishers place the title value in different locations
             IF(
                 onix.TitleDetails[SAFE_OFFSET(0)].TitleElements[SAFE_OFFSET(0)].TitleText is not null,
                 onix.TitleDetails[SAFE_OFFSET(0)].TitleElements[SAFE_OFFSET(0)].TitleText,
@@ -222,6 +352,7 @@ onix_ebook_titles_raw as (
                 SUBSTRING(CAST(dates.Date as STRING), 0, 4)
             FROM UNNEST(onix.PublishingDates) as dates
             WHERE dates.PublishingDateRole = "Publication date")[SAFE_OFFSET(0)] as published_year,
+            # The following four sub-queries all pull data from the onix.subjects array, but neatly organised the values into the 4 current classification systems
             ARRAY(
                 SELECT
                     subject.SubjectCode
@@ -255,6 +386,9 @@ onix_ebook_titles_raw as (
     WHERE ProductForm = "Digital download and online" OR ProductForm = "Digital (delivered electronically)" OR ProductForm = "Digital download"
 ),
 
+{#
+The purpose of this query is to dedepulicate any repeated rows as a safely check.
+#}
 onix_ebook_titles as (
     SELECT
         dedupe.*
@@ -267,22 +401,54 @@ onix_ebook_titles as (
 ),
 
 # Google Analytics
+{#
+The purpose of this block of SQL is to organise the metrics from google analytics for easier consumption of downstream queries.
+
+Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'google_analytics_table_id'.
+This will either point to 'empty_google_analytics' (defined above as an empty row) or the name of the real data table in bigquery.
+The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
+Providng an empty row enable simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
+#}
 google_analytics_metrics as (
     SELECT
-        publication_id as ISBN13, release_date, STRUCT(STRUCT(AVG(average_time) as average_time, group_items(ARRAY_CONCAT_AGG(unique_views.country)) as country, group_items(ARRAY_CONCAT_AGG(unique_views.referrer)) as referrer, group_items(ARRAY_CONCAT_AGG(unique_views.social_network)) as social_network) as unique_views) as metrics
+        publication_id as ISBN13,
+        release_date,
+        STRUCT(
+            STRUCT(AVG(average_time) as average_time, group_items(ARRAY_CONCAT_AGG(unique_views.country)) as country,
+            group_items(ARRAY_CONCAT_AGG(unique_views.referrer)) as referrer, group_items(ARRAY_CONCAT_AGG(unique_views.social_network)) as social_network) as unique_views
+        ) as metrics
     FROM `{{ google_analytics_table_id }}`
     WHERE publication_whole_or_part = '(citation)' and publication_type = "book"
     GROUP BY publication_id, release_date
 ),
 
-# Google Books
+# Google Books Sales Metrics
+{#
+The purpose of this block of SQL is to organise the metrics from google book sales for easier consumption of downstream queries.
+
+Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'google_books_sales_table_id'.
+This will either point to 'empty_google_books_sales' (defined above as an empty row) or the name of the real data table in bigquery.
+The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
+Providng an empty row enable simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
+#}
 google_books_sales_metrics as (
     SELECT
-        Primary_ISBN as ISBN13, release_date, STRUCT(SUM(qty) as qty, group_items_google_books_sales(ARRAY_AGG(STRUCT(Country_of_Sale, qty))) as countries) as metrics
+        Primary_ISBN as ISBN13,
+        release_date,
+        STRUCT(SUM(qty) as qty, group_items_google_books_sales(ARRAY_AGG(STRUCT(Country_of_Sale, qty))) as countries) as metrics
     FROM `{{ google_books_sales_table_id }}`
     GROUP BY Primary_ISBN, release_date
 ),
 
+# Google Books Sales Metadata
+{#
+The purpose of this block of SQL is to organise the Metadata from google book sales for easier consumption of downstream queries.
+
+Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'google_books_sales_table_id'.
+This will either point to 'empty_google_books_sales' (defined above as an empty row) or the name of the real data table in bigquery.
+The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
+Providng an empty row enable simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
+#}
 google_books_sales_metadata as (
     SELECT
         Primary_ISBN as ISBN13, MAX(Imprint_Name) as Imprint_Name, MAX(Title) as Title, MAX(Author) as Author
@@ -290,13 +456,36 @@ google_books_sales_metadata as (
     GROUP BY Primary_ISBN
 ),
 
+# Google Books Traffic Metrics
+{#
+The purpose of this block of SQL is to organise the metrics from google book traffic for easier consumption of downstream queries.
+
+Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'google_books_traffic_table_id'.
+This will either point to 'empty_google_books_traffic' (defined above as an empty row) or the name of the real data table in bigquery.
+The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
+Providng an empty row enable simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
+#}
 google_books_traffic_metrics as (
     SELECT
-        Primary_ISBN  as ISBN13, release_date, STRUCT(SUM(Book_Visits_BV_) as Book_Visits_BV_, SUM(BV_with_Pages_Viewed) as BV_with_Pages_Viewed, SUM(Non_Unique_Buy_Clicks) as Non_Unique_Buy_Clicks, SUM(BV_with_Buy_Clicks) as BV_with_Buy_Clicks, SUM(Buy_Link_CTR) as Buy_Link_CTR, SUM(Pages_Viewed) as Pages_Viewed) as metrics
+        Primary_ISBN as ISBN13,
+        release_date,
+        STRUCT(
+            SUM(Book_Visits_BV_) as Book_Visits_BV_, SUM(BV_with_Pages_Viewed) as BV_with_Pages_Viewed, SUM(Non_Unique_Buy_Clicks) as Non_Unique_Buy_Clicks,
+            SUM(BV_with_Buy_Clicks) as BV_with_Buy_Clicks, SUM(Buy_Link_CTR) as Buy_Link_CTR, SUM(Pages_Viewed) as Pages_Viewed
+        ) as metrics
     FROM `{{ google_books_traffic_table_id }}`
     GROUP BY Primary_ISBN, release_date
 ),
 
+# Google Books Traffic Metadata
+{#
+The purpose of this block of SQL is to organise the Metadata from google book traffic for easier consumption of downstream queries.
+
+Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'google_books_traffic_table_id'.
+This will either point to 'empty_google_books_traffic' (defined above as an empty row) or the name of the real data table in bigquery.
+The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
+Providng an empty row enable simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
+#}
 google_books_traffic_metadata as (
     SELECT
         Primary_ISBN  as ISBN13, MAX(title) as Title
@@ -304,7 +493,15 @@ google_books_traffic_metadata as (
     GROUP BY Primary_ISBN
 ),
 
-# JSTOR
+# JSTOR Country Metircs
+{#
+The purpose of this block of SQL is to organise the metrics from JSTOR country for easier consumption of downstream queries.
+
+Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'jstor_country_table_id'.
+This will either point to 'empty_jstor_country' (defined above as an empty row) or the name of the real data table in bigquery.
+The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
+Providng an empty row enable simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
+#}
 jstor_country_metrics as (
     SELECT
         eISBN as ISBN13, release_date, group_items_jstor_country(ARRAY_AGG(STRUCT(Country_name, Total_Item_Requests))) as metrics
@@ -312,13 +509,33 @@ jstor_country_metrics as (
     GROUP BY eISBN, release_date
 ),
 
+# JSTOR Country Metadata
+{#
+The purpose of this block of SQL is to organise the Metadata from JSTOR country for easier consumption of downstream queries.
+
+Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'jstor_country_table_id'.
+This will either point to 'empty_jstor_country' (defined above as an empty row) or the name of the real data table in bigquery.
+The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
+Providng an empty row enable simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
+#}
 jstor_country_metadata as (
     SELECT
-        eISBN as ISBN13, MAX(Book_Title) as Book_Title, MAX(Book_ID) as Book_ID, MAX(Authors) as Authors, MAX(ISBN) as ISBN, eISBN, MAX(Copyright_Year) as Copyright_Year, MAX(Disciplines) as Disciplines, MAX(Usage_Type) as Usage_Type
+        eISBN as ISBN13, MAX(Book_Title) as Book_Title,
+        MAX(Book_ID) as Book_ID, MAX(Authors) as Authors, MAX(ISBN) as ISBN, eISBN,
+        MAX(Copyright_Year) as Copyright_Year, MAX(Disciplines) as Disciplines, MAX(Usage_Type) as Usage_Type
     FROM `{{ jstor_country_table_id }}`
     GROUP BY eISBN
 ),
 
+# JSTOR Institutions Metircs
+{#
+The purpose of this block of SQL is to organise the metrics from JSTOR institution for easier consumption of downstream queries.
+
+Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'jstor_institution_table_id'.
+This will either point to 'empty_jstor_institution' (defined above as an empty row) or the name of the real data table in bigquery.
+The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
+Providng an empty row enable simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
+#}
 jstor_institution_metrics as (
     SELECT
         eISBN as ISBN13, release_date, group_items_jstor_institution(ARRAY_AGG(STRUCT(Institution, Total_Item_Requests))) as metrics
@@ -326,21 +543,56 @@ jstor_institution_metrics as (
     GROUP BY eISBN, release_date
 ),
 
+# JSTOR Institutions Metadata
+{#
+The purpose of this block of SQL is to organise the Metadata from JSTOR institution for easier consumption of downstream queries.
+
+Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'jstor_institution_table_id'.
+This will either point to 'empty_jstor_institution' (defined above as an empty row) or the name of the real data table in bigquery.
+The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
+Providng an empty row enable simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
+#}
 jstor_institution_metadata as (
     SELECT
-        eISBN as ISBN13, MAX(Book_Title) as Book_Title, MAX(Book_ID) as Book_ID, MAX(Authors) as Authors, MAX(ISBN) as ISBN, eISBN, MAX(Copyright_Year) as Copyright_Year, MAX(Disciplines) as Disciplines, MAX(Usage_Type) as Usage_Type
+        eISBN as ISBN13,
+        MAX(Book_Title) as Book_Title, MAX(Book_ID) as Book_ID, MAX(Authors) as Authors, MAX(ISBN) as ISBN, eISBN,
+        MAX(Copyright_Year) as Copyright_Year, MAX(Disciplines) as Disciplines, MAX(Usage_Type) as Usage_Type
     FROM `{{ jstor_institution_table_id }}`
     GROUP BY eISBN
 ),
 
-# OAPEN IRUS UK
+# OAPEN IRUS-UK Metrics
+{#
+The purpose of this block of SQL is to organise the metrics from OAPEN IRUS-UK for easier consumption of downstream queries.
+
+Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'oapen_table_id'.
+This will either point to 'empty_oapen' (defined above as an empty row) or the name of the real data table in bigquery.
+The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
+Providng an empty row enable simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
+#}
 oapen_irus_uk_metrics as (
     SELECT
-        ISBN as ISBN13, release_date, STRUCT(MAX(version) as version, SUM(title_requests) as title_requests, SUM(total_item_investigations) as total_item_investigations, SUM(total_item_requests) as total_item_requests, SUM(unique_item_investigations) as unique_item_investigations, SUM(unique_item_requests) as unique_item_requests, group_items_irus_country(ARRAY_CONCAT_AGG(country)) as country, group_items_irus_location(ARRAY_CONCAT_AGG(locations)) as locations) as metrics
+        ISBN as ISBN13,
+        release_date,
+        STRUCT(
+            MAX(version) as version, SUM(title_requests) as title_requests, SUM(total_item_investigations) as total_item_investigations,
+            SUM(total_item_requests) as total_item_requests, SUM(unique_item_investigations) as unique_item_investigations,
+            SUM(unique_item_requests) as unique_item_requests, group_items_irus_country(ARRAY_CONCAT_AGG(country)) as country,
+            group_items_irus_location(ARRAY_CONCAT_AGG(locations)) as locations
+        ) as metrics
     FROM `{{ oapen_table_id }}`
     GROUP BY ISBN, release_date
 ),
 
+# OAPEN IRUS-UK Metadata
+{#
+The purpose of this block of SQL is to organise the Metadata from OAPEN IRUS-UK for easier consumption of downstream queries.
+
+Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'oapen_table_id'.
+This will either point to 'empty_oapen' (defined above as an empty row) or the name of the real data table in bigquery.
+The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
+Providng an empty row enable simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
+#}
 oapen_irus_uk_metadata as (
     SELECT
         ISBN as ISBN13, MAX(book_title) as book_title, MAX(publisher) as publisher
@@ -348,15 +600,31 @@ oapen_irus_uk_metadata as (
     GROUP BY ISBN
 ),
 
-# UCL Discovery
+# UCL Discovery Metrics
+{#
+The purpose of this block of SQL is to organise the metrics from OAPEN IRUS-UK for easier consumption of downstream queries.
+
+Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'ucl_table_id'.
+This will either point to 'empty_ucl_discovery' (defined above as an empty row) or the name of the real data table in bigquery.
+The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
+Providng an empty row enable simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
+#}
 ucl_discovery_metrics as (
     SELECT
-        isbn as ISBN13, release_date, STRUCT(SUM(total_downloads) as total_downloads, group_items_ucl_country(ARRAY_CONCAT_AGG(downloads_per_country)) as downloads_per_country ) as metrics
+        isbn as ISBN13,
+        release_date,
+        STRUCT(
+            SUM(total_downloads) as total_downloads, group_items_ucl_country(ARRAY_CONCAT_AGG(downloads_per_country)) as downloads_per_country
+        ) as metrics
     FROM `{{ ucl_table_id }}`
     WHERE isbn IS NOT NULL
     GROUP BY isbn, release_date
 ),
 
+# Crossref Events
+{#
+The purpose of this block of SQL is to
+#}
 crossref_events as (
     SELECT
         public_data.isbn as ISBN13,
@@ -366,7 +634,11 @@ crossref_events as (
     GROUP BY public_data.isbn, month_source.month
 ),
 
-
+{#
+The purpose of the block of SQL is to select a unique set of release dates (also read as unique months).
+The secondary purpose of this block is to not include months for which no metrics source has any data for a particular release.
+This ensures that for any book, there is only an array of months for where at least one source of metrics is available
+#}
 unique_releases as (
     SELECT
         DISTINCT(release_date) as release_date,
@@ -385,6 +657,11 @@ unique_releases as (
     ORDER BY release_date DESC
 ),
 
+{#
+The purpose of this query is to link the list of books, obtained via the ONIX feed, to a list of unique months.
+The result, is a row for each ISBN - release_date (month) comhination.
+This is made use of in the following query
+#}
 ebook_months as (
     SELECT
         ISBN13, release_date
@@ -393,6 +670,13 @@ ebook_months as (
     ORDER BY ISBN13, release_date DESC
 ),
 
+{#
+The purpose of this query is to link all the metrics, which are already indexed by release_date (month) to the set of ISBN-Release_date combinations from the above query
+
+The logic is essentially a series of LEFT JOINs, always matching the metric source to the ebook_months.ISBN13 and ebook_months.release_date fields
+Finally, the last line 'GROUP BY ebook_months.ISBN13' groups all the various months into a single row per ISBN, with an ARRAY of STRUCTs
+These STRUCTS (one per month) contain the 'month' as a field, and subfeilds contains all the metrics from each source.
+#}
 metrics as (
     SELECT
         ebook_months.ISBN13,
@@ -420,8 +704,23 @@ metrics as (
     GROUP BY ebook_months.ISBN13
 )
 
+# Main Querry
+{#
+The purpose of this query is to bring together a range of individual sources as compose them into the final query output.
+
+From onix_ebook_titles, we get the list of books and from 'metrics' we we are able join all the metrics that were organised in the query above.
+Then we are able to pull in specific metadata from across all the various sources, as seen in the sequence of LEFT JOINs below
+#}
 SELECT
-    onix_ebook_titles.*, empty_work_ids.work_id, empty_work_family_ids.work_family_id, STRUCT(crossref_objects, chapters, events.overall as events, google_books_sales_metadata as google_books_sales, google_books_traffic_metadata as google_books_traffic, jstor_country_metadata as jstor_metadata, jstor_institution_metadata as jstor_institution_metadata, oapen_irus_uk_metadata as oapen_irus_uk_metadata) as metadata, metrics.months
+    onix_ebook_titles.*,
+    empty_work_ids.work_id,
+    empty_work_family_ids.work_family_id,
+    STRUCT(
+        crossref_objects, chapters, events.overall as events, google_books_sales_metadata as google_books_sales,
+        google_books_traffic_metadata as google_books_traffic, jstor_country_metadata as jstor_metadata,
+        jstor_institution_metadata as jstor_institution_metadata, oapen_irus_uk_metadata as oapen_irus_uk_metadata
+    ) as metadata,
+    metrics.months
 FROM onix_ebook_titles
 LEFT JOIN {% if onix_workflow %} `{{ project_id }}.{{ onix_workflow_dataset }}.onix_workid_isbn{{ release_date.strftime('%Y%m%d') }}` {% else %} empty_work_ids {% endif %} as empty_work_ids on empty_work_ids.isbn13 = onix_ebook_titles.isbn13
 LEFT JOIN {% if onix_workflow %} `{{ project_id }}.{{ onix_workflow_dataset }}.onix_workfamilyid_isbn{{ release_date.strftime('%Y%m%d') }}` {% else %} empty_work_family_ids {% endif %} as empty_work_family_ids on empty_work_family_ids.isbn13 = onix_ebook_titles.isbn13

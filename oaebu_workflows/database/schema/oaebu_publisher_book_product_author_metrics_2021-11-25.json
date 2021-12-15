@@ -1,0 +1,164 @@
+[
+  {
+    "mode": "NULLABLE",
+    "name": "PersonName",
+    "type": "STRING",
+    "description": "Author's Name"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "orcid",
+    "type": "STRING",
+    "description": "Author's ORCID ID"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "unique_books",
+    "type": "INTEGER",
+    "description": "Number of unique Books matched to the author"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "month",
+    "type": "DATE",
+    "description": "Month in which metrics took place"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "unique_views",
+        "type": "INTEGER",
+        "description": "Number of unique views"
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "google_analytics",
+    "type": "RECORD",
+    "description": "Metrics from Google Analytics"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "count",
+        "type": "INTEGER",
+        "description": "Count of events"
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "crossref_events",
+    "type": "RECORD",
+    "description": "Metrics from Crossref events"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "Book_Visits_BV_",
+        "type": "INTEGER",
+        "description": ""
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "BV_with_Pages_Viewed",
+        "type": "INTEGER",
+        "description": ""
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "Non_Unique_Buy_Clicks",
+        "type": "INTEGER",
+        "description": ""
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "BV_with_Buy_Clicks",
+        "type": "INTEGER",
+        "description": ""
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "Buy_Link_CTR",
+        "type": "FLOAT",
+        "description": ""
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "Pages_Viewed",
+        "type": "INTEGER",
+        "description": ""
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "google_books_traffic",
+    "type": "RECORD",
+    "description": "Metrics from Google Books Traffic"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "qty",
+        "type": "INTEGER",
+        "description": "Number of sales"
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "google_books_sales",
+    "type": "RECORD",
+    "description": "Metrics from Google Books Sales"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "Total_Item_Requests",
+        "type": "INTEGER",
+        "description": "The total number of item requests"
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "jstor",
+    "type": "RECORD",
+    "description": "Metrics from JSTOR"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "title_requests",
+        "type": "INTEGER",
+        "description": ""
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "total_item_investigations",
+        "type": "INTEGER",
+        "description": ""
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "total_item_requests",
+        "type": "INTEGER",
+        "description": ""
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "unique_item_investigations",
+        "type": "INTEGER",
+        "description": ""
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "unique_item_requests",
+        "type": "INTEGER",
+        "description": ""
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "oapen_irus_uk",
+    "type": "RECORD",
+    "description": "Metrics from IRUS-UK"
+  }
+]

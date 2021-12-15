@@ -1,0 +1,88 @@
+[
+  {
+    "mode": "NULLABLE",
+    "name": "product_id",
+    "type": "STRING",
+    "description": "Book Product ID"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "work_id",
+    "type": "STRING",
+    "description": "Book Work ID"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "work_family_id",
+    "type": "STRING",
+    "description": "Book Work Family ID"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "title",
+    "type": "STRING",
+    "description": "The title of the book"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "published_year",
+    "type": "INTEGER",
+    "description": "The publisher year of the book"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "month",
+    "type": "DATE",
+    "description": "The month for which the metrics apply to"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "city",
+    "type": "STRING",
+    "description": "The name of the city"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "coordinates",
+    "type": "STRING",
+    "description": "Geographical coordinates of the city"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "title_requests",
+        "type": "INTEGER",
+        "description": "The total number of title requests. Only available for data before 2020-04-01"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "total_item_investigations",
+        "type": "INTEGER",
+        "description": "The total number of item investigations. Only available for data since 2020-04-01"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "total_item_requests",
+        "type": "INTEGER",
+        "description": "The total number of item requests. Only available for data since 2020-04-01"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "unique_item_investigations",
+        "type": "INTEGER",
+        "description": "The number of unique item investigations. Only available for data since 2020-04-01"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "unique_item_requests",
+        "type": "INTEGER",
+        "description": "The number of unique item requests. Only available for data since 2020-04-01"
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "oapen_irus_uk",
+    "type": "RECORD",
+    "description": "Metrics from IRUS-UK"
+  }
+]

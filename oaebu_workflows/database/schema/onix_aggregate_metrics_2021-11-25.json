@@ -1,0 +1,56 @@
+[
+  {
+    "mode": "NULLABLE",
+    "name": "table_size",
+    "type": "INTEGER",
+    "description": "Total Number of Book Products"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "no_isbns",
+    "type": "INTEGER",
+    "description": "Count of how many rows are missing an ISBN"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "no_relatedworks",
+    "type": "INTEGER",
+    "description": "Count of how many rows are a related work"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "no_relatedproducts",
+    "type": "INTEGER",
+    "description": "Count of how many rows are a related product"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "no_doi",
+    "type": "INTEGER",
+    "description": "Count of how many rows are missing a DOI"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "no_productform",
+    "type": "INTEGER",
+    "description": "Count of how many rows are missing a product form"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "no_contributors",
+    "type": "INTEGER",
+    "description": "Count of how many rows are missing contributors"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "no_titledetails",
+    "type": "INTEGER",
+    "description": "Count of how many rows are missing title details"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "no_publisher_urls",
+    "type": "INTEGER",
+    "description": "Count of how many rows are missing a publisher url"
+  }
+]

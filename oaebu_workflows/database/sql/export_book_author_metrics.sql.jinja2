@@ -13,6 +13,10 @@
 # limitations under the License.
 
 # Author: Richard Hosking #}
+{#
+The purpose of this script it to export the book author metrics from the book_product table
+Primarily, the goal is to create a flat structure which is suitable for graphing in Kibana
+#}
 
 CREATE TEMP FUNCTION group_counts(counts ARRAY<STRUCT<name STRING, value INT64>>) AS (
   (SELECT

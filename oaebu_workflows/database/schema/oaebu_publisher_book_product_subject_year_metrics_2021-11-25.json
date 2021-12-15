@@ -1,0 +1,150 @@
+[
+  {
+    "mode": "NULLABLE",
+    "name": "subject",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "published_year",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "unique_books",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "month",
+    "type": "DATE"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "unique_views",
+        "type": "INTEGER"
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "google_analytics",
+    "type": "RECORD"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "count",
+        "type": "INTEGER"
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "crossref_events",
+    "type": "RECORD"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "Book_Visits_BV_",
+        "type": "INTEGER",
+        "description": "A Book Visit is registered each time a unique user views one of your books on Google Books. This number includes informational page views (such as the “About this book” page) as well as preview content page views"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "BV_with_Pages_Viewed",
+        "type": "INTEGER",
+        "description": "The number of Book Visits in which users accessed preview pages of your book. This doesn’t include visits where a user accessed only informational pages for your books"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "Non_Unique_Buy_Clicks",
+        "type": "INTEGER",
+        "description": "The number of clicks on links for purchasing the book on retailer websites (including your website, if you provided a buy link)"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "BV_with_Buy_Clicks",
+        "type": "INTEGER",
+        "description": "The number of visits which included a click on a purchase link"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "Buy_Link_CTR",
+        "type": "FLOAT",
+        "description": "The clickthrough rate for purchase links. The values are percentages"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "Pages_Viewed",
+        "type": "INTEGER",
+        "description": "The total number of unique preview content pages that a user viewed in a given session (counted as a 24-hour period)"
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "google_books_traffic",
+    "type": "RECORD"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "qty",
+        "type": "INTEGER"
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "google_books_sales",
+    "type": "RECORD"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "Total_Item_Requests",
+        "type": "INTEGER"
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "jstor",
+    "type": "RECORD"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "title_requests",
+        "type": "INTEGER",
+        "description": "The total number of title requests. Only available for data before 2020-04-01"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "total_item_investigations",
+        "type": "INTEGER",
+        "description": "The total number of item investigations. Only available for data since 2020-04-01"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "total_item_requests",
+        "type": "INTEGER",
+        "description": "The total number of item requests. Only available for data since 2020-04-01"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "unique_item_investigations",
+        "type": "INTEGER",
+        "description": "The number of unique item investigations. Only available for data since 2020-04-01"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "unique_item_requests",
+        "type": "INTEGER",
+        "description": "The number of unique item requests. Only available for data since 2020-04-01"
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "oapen_irus_uk",
+    "type": "RECORD"
+  }
+]
