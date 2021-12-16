@@ -181,6 +181,7 @@ class OapenMetadataTelescope(StreamTelescope):
             schema_folder,
             schema_prefix=schema_prefix,
             airflow_vars=airflow_vars,
+            load_bigquery_table_kwargs={"ignore_unknown_values": True}
         )
 
         self.add_setup_task(self.check_dependencies)
