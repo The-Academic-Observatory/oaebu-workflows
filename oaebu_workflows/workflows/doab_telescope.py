@@ -190,6 +190,7 @@ class DoabTelescope(StreamTelescope):
             merge_partition_field,
             schema_folder,
             airflow_vars=airflow_vars,
+            load_bigquery_table_kwargs={"ignore_unknown_values": True}
         )
 
         self.add_setup_task(self.check_dependencies)
