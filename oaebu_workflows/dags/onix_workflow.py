@@ -27,7 +27,7 @@ from observatory.api.client.model.dataset import Dataset
 from observatory.api.client.model.dataset_release import DatasetRelease
 from observatory.api.client.model.dataset_storage import DatasetStorage
 from observatory.api.client.model.telescope import Telescope
-from observatory.platform.utils.workflow_utils import make_observatory_api
+from observatory.platform.utils.api import make_observatory_api
 
 
 def is_oaebu_telescope(telescope: Telescope) -> bool:

@@ -18,8 +18,10 @@
 # https://airflow.apache.org/docs/stable/faq.html
 
 from oaebu_workflows.identifiers import TelescopeTypes
-from oaebu_workflows.workflows.google_analytics_telescope import GoogleAnalyticsTelescope
-from observatory.platform.utils.workflow_utils import make_observatory_api
+from oaebu_workflows.workflows.google_analytics_telescope import (
+    GoogleAnalyticsTelescope,
+)
+from observatory.platform.utils.api import make_observatory_api
 
 # Fetch all telescopes
 api = make_observatory_api()

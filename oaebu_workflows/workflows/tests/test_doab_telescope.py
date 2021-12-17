@@ -23,6 +23,13 @@ import pendulum
 from airflow.exceptions import AirflowException
 from click.testing import CliRunner
 from google.cloud import bigquery
+from oaebu_workflows.config import test_fixtures_folder
+from oaebu_workflows.workflows.doab_telescope import (
+    DoabRelease,
+    DoabTelescope,
+    convert,
+    transform_dict,
+)
 from observatory.platform.utils.airflow_utils import AirflowVars
 from observatory.platform.utils.file_utils import get_file_hash
 from observatory.platform.utils.test_utils import (
@@ -30,10 +37,11 @@ from observatory.platform.utils.test_utils import (
     ObservatoryTestCase,
     module_file_path,
 )
-from observatory.platform.utils.workflow_utils import blob_name, create_date_table_id, table_ids_from_path
-
-from oaebu_workflows.config import test_fixtures_folder
-from oaebu_workflows.workflows.doab_telescope import DoabRelease, DoabTelescope, convert, transform_dict
+from observatory.platform.utils.workflow_utils import (
+    blob_name,
+    create_date_table_id,
+    table_ids_from_path,
+)
 
 
 class TestDoabTelescope(ObservatoryTestCase):
@@ -144,7 +152,8 @@ class TestDoabTelescope(ObservatoryTestCase):
                 self.assertEqual(ti.state, "skipped")
 
                 # Test delete old task is skipped for the first release
-                ti = env.run_task(telescope.bq_delete_old.__name__)
+                with patch("observatory.platform.utils.gc_utils.bq_query_bytes_daily_limit_check"):
+                    ti = env.run_task(telescope.bq_delete_old.__name__)
                 self.assertEqual(ti.state, "skipped")
 
                 # Test append new creates table
@@ -217,7 +226,8 @@ class TestDoabTelescope(ObservatoryTestCase):
                 self.assert_table_integrity(table_id, expected_rows)
 
                 # Test task deleted rows from main table
-                env.run_task(telescope.bq_delete_old.__name__)
+                with patch("observatory.platform.utils.gc_utils.bq_query_bytes_daily_limit_check"):
+                    env.run_task(telescope.bq_delete_old.__name__)
                 table_id = f"{self.project_id}.{telescope.dataset_id}.{main_table_id}"
                 expected_rows = 3
                 self.assert_table_integrity(table_id, expected_rows)
