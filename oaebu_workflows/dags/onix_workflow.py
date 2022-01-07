@@ -132,7 +132,7 @@ def get_oaebu_partner_data(organisation_id: int) -> List[OaebuPartner]:
 
                 partners.append(
                     OaebuPartner(
-                        name=telescope.organisation.name,
+                        name=dataset.name,
                         dag_id_prefix=telescope.telescope_type.type_id,
                         gcp_project_id=gcp_project_id,
                         gcp_dataset_id=gcp_dataset_id,
