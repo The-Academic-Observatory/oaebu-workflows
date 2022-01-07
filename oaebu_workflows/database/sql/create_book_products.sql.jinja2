@@ -89,11 +89,11 @@ total_item_requests             INTEGER   NULLABLE
 unique_item_investigations      INTEGER   NULLABLE
 unique_item_requests            INTEGER   NULLABLE
 #}
-CREATE TEMP FUNCTION group_items_irus_country(items ARRAY<STRUCT<name STRING, code INT64, title_requests INT64, total_item_investigations INT64, total_item_requests INT64, unique_item_investigations INT64, unique_item_requests INT64>>) as (
+CREATE TEMP FUNCTION group_items_irus_country(items ARRAY<STRUCT<name STRING, code STRING, title_requests INT64, total_item_investigations INT64, total_item_requests INT64, unique_item_investigations INT64, unique_item_requests INT64>>) as (
   ARRAY(
     (SELECT AS STRUCT
       name,
-      CAST(MAX(code) as STRING) as code,
+      MAX(code) as code,
       SUM(title_requests) as title_requests,
       SUM(total_item_investigations) as total_item_investigations,
       SUM(total_item_requests) as total_item_requests,
