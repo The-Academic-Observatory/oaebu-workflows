@@ -150,7 +150,7 @@ configs = [
         index_keep_info=index_keep_info,
     ),
     ElasticImportConfig(
-        dag_id=make_dag_id(DAG_PREFIX, "university_of_michigan_press"),
+        dag_id=make_dag_id(DAG_PREFIX, "university_of_michigan_press_public"),
         project_id="oaebu-umich-press",
         dataset_id=DATASET_ID,
         bucket_name="oaebu-umich-press-transform",
