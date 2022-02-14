@@ -175,7 +175,7 @@ WITH empty_oapen as (
         CAST(null as INT64) as unique_item_investigations,
         CAST(null as INT64) as unique_item_requests,
         [STRUCT(
-            CAST(null as STRING) as name, null as code, CAST(null as INT64) as title_requests, CAST(null as INT64) as total_item_investigations,
+            CAST(null as STRING) as name, CAST(null as STRING) as code, CAST(null as INT64) as title_requests, CAST(null as INT64) as total_item_investigations,
             CAST(null as INT64) as total_item_requests, CAST(null as INT64) as unique_item_investigations, CAST(null as INT64) as unique_item_requests
         )] as country,
         [STRUCT(
