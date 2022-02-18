@@ -9,4 +9,4 @@
 5) Add docs directory directory to Python path: `set PYTHONPATH=%PYTHONPATH%;C:\Users\MyUser\Documents\oaebu-workflows\docs`. Make sure to replace `MyUser` with the name of your user.
 6) Install documentation dependencies: `pip install -r requirements.txt`
 7) Build documentation: `make html`
-8) To view the documentation, open the `_build\html` folder and open `index.html`.
+8) To view the documentation, open `_build\html\index.html`.
