@@ -66,7 +66,7 @@ def generate_csv(*, schema_dir):
     for schema_file in schema_files:
         filename = os.path.basename(schema_file)
         filename = filename[:-4] + "csv"  # Remove json and add csv suffix
-        with open(schema_file, "r") as f:
+        with open(schema_file, "r", encoding="utf-8") as f:
             data = f.read()
         schema = json.loads(data)
         rows = list()
@@ -84,7 +84,7 @@ def generate_latest_files():
     telescopes are ported to the new template framework anyway.
     """
 
-    table_files = glob("schemas/*.csv")
+    table_files = glob(os.path.join("schemas", "*.csv"))
     r = re.compile(r"\d{4}-\d{2}-\d{2}")
 
     # Build a database of schema files
@@ -111,5 +111,5 @@ def generate_latest_files():
 
 
 if __name__ == "__main__":
-    generate_csv(schema_dir="../oaebu_workflows/database/schema")
+    generate_csv(schema_dir=os.path.join("..", "oaebu_workflows", "database", "schema"))
     generate_latest_files()
