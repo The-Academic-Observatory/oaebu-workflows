@@ -13,6 +13,10 @@
 # limitations under the License.
 
 # Author: Richard Hosking #}
+# create_book_products.sql.jinja2
+
+# Google Analytics type variable used for google_analytics_grouped_metrics
+DECLARE google_analytics_type ARRAY<STRUCT<name STRING, value INT64>>;
 
 # Helper Function:
 {#
@@ -20,7 +24,7 @@ Output Schema:
 name      STRING    NULLABLE
 value     INTEGER   NULLABLE
 #}
-CREATE TEMP FUNCTION group_items(items ARRAY<STRUCT<name STRING, value INT64>>) as (
+CREATE TEMP FUNCTION group_items_google_analytics(items ARRAY<STRUCT<name STRING, value INT64>>) as (
   ARRAY(
     (SELECT AS STRUCT
       name,
@@ -286,10 +290,9 @@ empty_google_analytics as (
         CAST(null as FLOAT64) as average_time,
         CAST(null as STRING) as publication_whole_or_part,
         CAST(null as STRING) as publication_type,
+        CAST(null as STRING) as publication_format,
         STRUCT(
             [STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value)] as country,
-            [STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value)] as referrer,
-            [STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value)] as social_network
         ) as unique_views
 ),
 
@@ -409,18 +412,90 @@ This will either point to 'empty_google_analytics' (defined above as an empty ro
 The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
 Providng an empty row enable simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
 #}
-google_analytics_metrics as (
-    SELECT
-        publication_id as ISBN13,
-        release_date,
-        STRUCT(
-            STRUCT(AVG(average_time) as average_time, group_items(ARRAY_CONCAT_AGG(unique_views.country)) as country,
-            group_items(ARRAY_CONCAT_AGG(unique_views.referrer)) as referrer, group_items(ARRAY_CONCAT_AGG(unique_views.social_network)) as social_network) as unique_views
-        ) as metrics
-    FROM `{{ google_analytics_table_id }}`
-    WHERE publication_whole_or_part = '(citation)' and publication_type = "book"
-    GROUP BY publication_id, release_date
-),
+google_analytics_grouped_metrics AS(
+  SELECT
+    publication_id,
+    release_date,
+    publication_whole_or_part,
+    publication_format,
+  IF
+    (publication_format = 'PDF'
+      AND publication_whole_or_part = 'whole',
+      group_items_google_analytics(ARRAY_CONCAT_AGG(unique_views.country)),
+      google_analytics_type) AS pdf_book_country,
+  IF
+    (publication_format = 'PDF'
+      AND publication_whole_or_part = 'part',
+      group_items_google_analytics(ARRAY_CONCAT_AGG(unique_views.country)),
+      google_analytics_type) AS pdf_chapter_country,
+  IF
+    (publication_format = 'HTML'
+      AND publication_whole_or_part = 'whole',
+      group_items_google_analytics(ARRAY_CONCAT_AGG(unique_views.country)),
+      google_analytics_type) AS html_book_country,
+  IF
+    (publication_format = 'HTML'
+      AND publication_whole_or_part = 'part',
+      group_items_google_analytics(ARRAY_CONCAT_AGG(unique_views.country)),
+      google_analytics_type) AS html_chapter_country,
+  IF
+    (publication_format = 'EPUB'
+      AND publication_whole_or_part = 'whole',
+      group_items_google_analytics(ARRAY_CONCAT_AGG(unique_views.country)),
+      google_analytics_type) AS epub_book_country,
+  IF
+    (publication_format = 'EPUB'
+      AND publication_whole_or_part = 'part',
+      group_items_google_analytics(ARRAY_CONCAT_AGG(unique_views.country)),
+      google_analytics_type) AS epub_chapter_country,
+  IF
+    (publication_format = 'MOBI'
+      AND publication_whole_or_part = 'whole',
+      group_items_google_analytics(ARRAY_CONCAT_AGG(unique_views.country)),
+      google_analytics_type) AS mobi_book_country,
+  IF
+    (publication_format = 'MOBI'
+      AND publication_whole_or_part = 'part',
+      group_items_google_analytics(ARRAY_CONCAT_AGG(unique_views.country)),
+      google_analytics_type) AS mobi_chapter_country,
+  IF
+    (publication_format IN ('PDF','HTML', 'EPUB', 'MOBI')
+      AND publication_whole_or_part IN ('whole', 'part'),
+      group_items_google_analytics(ARRAY_CONCAT_AGG(unique_views.country)),
+      google_analytics_type) AS downloads_total_country,
+  IF
+    (publication_whole_or_part = '(citation)',
+      group_items_google_analytics(ARRAY_CONCAT_AGG(unique_views.country)),
+      google_analytics_type) AS unique_views_country,
+  FROM
+    `{{ google_analytics_table_id }}`
+  WHERE
+    publication_type = "book"
+  GROUP BY
+    publication_id,
+    release_date,
+    publication_whole_or_part,
+    publication_format ),
+
+google_analytics_metrics AS (
+  SELECT
+    publication_id AS ISBN13,
+    release_date,
+    STRUCT( ARRAY_CONCAT_AGG(unique_views_country) AS unique_views_country,
+      group_items_google_analytics(ARRAY_CONCAT_AGG(downloads_total_country)) AS downloads_total_country,
+      ARRAY_CONCAT_AGG(pdf_book_country) AS downloads_pdf_book_country,
+      ARRAY_CONCAT_AGG(pdf_chapter_country) AS downloads_pdf_chapter_country,
+      ARRAY_CONCAT_AGG(html_book_country) AS downloads_html_book_country,
+      ARRAY_CONCAT_AGG(html_chapter_country) AS downloads_html_chapter_country,
+      ARRAY_CONCAT_AGG(epub_book_country) AS downloads_epub_book_country,
+      ARRAY_CONCAT_AGG(epub_chapter_country) AS downloads_epub_chapter_country,
+      ARRAY_CONCAT_AGG(mobi_book_country) AS downloads_mobi_book_country,
+      ARRAY_CONCAT_AGG(mobi_chapter_country) AS downloads_mobi_chapter_country ) AS metrics
+  FROM
+    google_analytics_grouped_metrics
+  GROUP BY
+    publication_id,
+    release_date ),
 
 # Google Books Sales Metrics
 {#
