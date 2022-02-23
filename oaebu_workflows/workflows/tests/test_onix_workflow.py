@@ -1969,7 +1969,6 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                     "book_product_metrics_institution",
                     "institution_list",
                     "book_product_metrics_city",
-                    "book_product_metrics_referrer",
                     "book_product_metrics_events",
                     "book_product_publisher_metrics",
                     "book_product_subject_bic_metrics",
