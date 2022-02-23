@@ -13,10 +13,6 @@
 # limitations under the License.
 
 # Author: Richard Hosking #}
-# create_book_products.sql.jinja2
-
-# Google Analytics type variable used for google_analytics_grouped_metrics
-DECLARE google_analytics_type ARRAY<STRUCT<name STRING, value INT64>>;
 
 # Helper Function:
 {#
@@ -422,51 +418,51 @@ google_analytics_grouped_metrics AS(
     (publication_format = 'PDF'
       AND publication_whole_or_part = 'whole',
       group_items_google_analytics(ARRAY_CONCAT_AGG(unique_views.country)),
-      google_analytics_type) AS pdf_book_country,
+      ARRAY_AGG(STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value))) AS pdf_book_country,
   IF
     (publication_format = 'PDF'
       AND publication_whole_or_part = 'part',
       group_items_google_analytics(ARRAY_CONCAT_AGG(unique_views.country)),
-      google_analytics_type) AS pdf_chapter_country,
+      ARRAY_AGG(STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value))) AS pdf_chapter_country,
   IF
     (publication_format = 'HTML'
       AND publication_whole_or_part = 'whole',
       group_items_google_analytics(ARRAY_CONCAT_AGG(unique_views.country)),
-      google_analytics_type) AS html_book_country,
+      ARRAY_AGG(STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value))) AS html_book_country,
   IF
     (publication_format = 'HTML'
       AND publication_whole_or_part = 'part',
       group_items_google_analytics(ARRAY_CONCAT_AGG(unique_views.country)),
-      google_analytics_type) AS html_chapter_country,
+      ARRAY_AGG(STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value))) AS html_chapter_country,
   IF
     (publication_format = 'EPUB'
       AND publication_whole_or_part = 'whole',
       group_items_google_analytics(ARRAY_CONCAT_AGG(unique_views.country)),
-      google_analytics_type) AS epub_book_country,
+      ARRAY_AGG(STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value))) AS epub_book_country,
   IF
     (publication_format = 'EPUB'
       AND publication_whole_or_part = 'part',
       group_items_google_analytics(ARRAY_CONCAT_AGG(unique_views.country)),
-      google_analytics_type) AS epub_chapter_country,
+      ARRAY_AGG(STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value))) AS epub_chapter_country,
   IF
     (publication_format = 'MOBI'
       AND publication_whole_or_part = 'whole',
       group_items_google_analytics(ARRAY_CONCAT_AGG(unique_views.country)),
-      google_analytics_type) AS mobi_book_country,
+      ARRAY_AGG(STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value))) AS mobi_book_country,
   IF
     (publication_format = 'MOBI'
       AND publication_whole_or_part = 'part',
       group_items_google_analytics(ARRAY_CONCAT_AGG(unique_views.country)),
-      google_analytics_type) AS mobi_chapter_country,
+      ARRAY_AGG(STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value))) AS mobi_chapter_country,
   IF
     (publication_format IN ('PDF','HTML', 'EPUB', 'MOBI')
       AND publication_whole_or_part IN ('whole', 'part'),
       group_items_google_analytics(ARRAY_CONCAT_AGG(unique_views.country)),
-      google_analytics_type) AS downloads_total_country,
+      ARRAY_AGG(STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value))) AS downloads_total_country,
   IF
     (publication_whole_or_part = '(citation)',
       group_items_google_analytics(ARRAY_CONCAT_AGG(unique_views.country)),
-      google_analytics_type) AS unique_views_country,
+      ARRAY_AGG(STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value))) AS unique_views_country,
   FROM
     `{{ google_analytics_table_id }}`
   WHERE
