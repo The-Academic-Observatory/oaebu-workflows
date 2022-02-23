@@ -292,7 +292,7 @@ empty_google_analytics as (
         CAST(null as STRING) as publication_type,
         CAST(null as STRING) as publication_format,
         STRUCT(
-            [STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value)] as country,
+            [STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value)] as country
         ) as unique_views
 ),
 
