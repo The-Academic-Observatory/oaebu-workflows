@@ -284,7 +284,7 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
 
                 for table in export_tables:
                     ti = env.run_task(f"{workflow.export_oaebu_table.__name__}.{table}")
-                    self.assertEqual(expected_state, ti.state, msg=f"{table}, {self.gcp_project_id}")
+                    self.assertEqual(expected_state, ti.state, msg=f"table: {table}")
 
                 # Test conditions
                 release_suffix = release_date.strftime("%Y%m%d")

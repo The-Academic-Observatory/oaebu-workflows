@@ -422,11 +422,6 @@ class OapenWorkflow(Workflow):
                 "file_type": "json",
             },
             {
-                "output_table": "book_product_metrics_referrer",
-                "query_template": "export_book_metrics_referrer.sql.jinja2",
-                "file_type": "json",
-            },
-            {
                 "output_table": "book_product_metrics_events",
                 "query_template": "export_book_metrics_event.sql.jinja2",
                 "file_type": "json",
