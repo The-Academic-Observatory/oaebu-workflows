@@ -36,8 +36,9 @@ WHERE ISBN13 is not null AND month.month is not null AND (month.jstor_country IS
 countries as (
     SELECT
         alpha2,
-        name
-    FROM `academic-observatory.iso.iso3166_countries_and_regions`
+        iso_name,
+        wikipedia_name,
+    FROM `academic-observatory.settings.countries`
 ),
 
 month_country as (
@@ -49,7 +50,9 @@ month_country as (
         published_year,
         month,
         alpha2,
-        name as country_name
+        iso_name as country_name,
+        iso_name as country_iso_name,
+        wikipedia_name as country_wikipedia_name
     FROM months
     CROSS JOIN countries
 ),
@@ -90,15 +93,17 @@ google_analytics_month_country as (
         ISBN13,
         month,
         google.country_name,
-        country_code.country_code,
+        country.alpha2 as country_code,
         value
     FROM (SELECT
         ISBN13,
         month,
-        name as country_name,
+        iso_name as country_name,
+        iso_name as country_iso_name,
+        wikipedia_name as country_wikipedia_name,
         value
     FROM months, UNNEST(google_analytics)) as google
-    LEFT JOIN `academic-observatory.settings.country_to_alpha2` as country_code on country_code.country_name = google.country_name
+    LEFT JOIN `academic-observatory.settings.countries` as country on country.iso_name = google.country_name
 ),
 
 ucl_discovery_month_country as (
