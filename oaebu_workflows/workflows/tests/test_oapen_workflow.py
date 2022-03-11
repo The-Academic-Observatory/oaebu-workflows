@@ -21,14 +21,23 @@ from unittest.mock import MagicMock, patch
 
 import pendulum
 from click.testing import CliRunner
+
+from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.workflows.oapen_workflow import OapenWorkflow, OapenWorkflowRelease
-from observatory.platform.utils.gc_utils import run_bigquery_query
+from observatory.platform.utils.file_utils import load_jsonl
+from observatory.platform.utils.gc_utils import (
+    run_bigquery_query,
+)
 from observatory.platform.utils.test_utils import (
     ObservatoryEnvironment,
     ObservatoryTestCase,
+    Table,
+    bq_load_tables,
     make_dummy_dag,
 )
-from observatory.platform.utils.workflow_utils import make_dag_id
+from observatory.platform.utils.workflow_utils import (
+    make_dag_id,
+)
 
 
 class TestOapenWorkflow(ObservatoryTestCase):
@@ -78,12 +87,8 @@ class TestOapenWorkflow(ObservatoryTestCase):
                     "export_oaebu_table.book_product_metrics_country": [
                         "export_oaebu_table.book_product_metrics_institution"
                     ],
-                    "export_oaebu_table.book_product_metrics_institution": [
-                        "export_oaebu_table.institution_list"
-                    ],
-                    "export_oaebu_table.institution_list": [
-                        "export_oaebu_table.book_product_metrics_city"
-                    ],
+                    "export_oaebu_table.book_product_metrics_institution": ["export_oaebu_table.institution_list"],
+                    "export_oaebu_table.institution_list": ["export_oaebu_table.book_product_metrics_city"],
                     "export_oaebu_table.book_product_metrics_city": [
                         "export_oaebu_table.book_product_metrics_referrer"
                     ],
@@ -144,6 +149,24 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
 
         self.irus_uk_dataset_id = "fixtures"
 
+    def setup_fake_data(self, settings_dataset_id: str, release_date: pendulum.DateTime):
+        country = load_jsonl(test_fixtures_folder("onix_workflow", "country.jsonl"))
+        schema_path = test_fixtures_folder("onix_workflow", "schema")
+        tables = [
+            Table(
+                "country",
+                False,
+                settings_dataset_id,
+                country,
+                "country",
+                schema_path,
+            ),
+        ]
+
+        bq_load_tables(
+            tables=tables, bucket_name=self.gcp_bucket_name, release_date=release_date, data_location=self.data_location
+        )
+
     def test_run_workflow_tests(self):
         """Functional test of the OAPEN workflow"""
 
@@ -156,6 +179,7 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
         oaebu_output_dataset_id = env.add_dataset(prefix="oaebu")
         oaebu_onix_dataset_id = env.add_dataset(prefix="oaebu_onix_dataset")
         oaebu_elastic_dataset_id = env.add_dataset(prefix="data_export")
+        oaebu_settings_dataset_id = env.add_dataset(prefix="settings")
 
         # Create the Observatory environment and run tests
         with env.create(task_logging=True):
@@ -170,6 +194,8 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
                 oaebu_elastic_dataset=oaebu_elastic_dataset_id,
                 irus_uk_dataset_id=self.irus_uk_dataset_id,
                 start_date=start_date,
+                country_project_id=self.gcp_project_id,
+                country_dataset_id=oaebu_settings_dataset_id,
             )
 
             # Override sensor grace period and dag check
@@ -193,6 +219,9 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
             expected_state = "success"
             execution_date = pendulum.datetime(year=2021, month=5, day=16)
             release_date = pendulum.datetime(year=2021, month=5, day=22)
+
+            # Setup fake data
+            self.setup_fake_data(oaebu_settings_dataset_id, release_date)
 
             dag = make_dummy_dag(make_dag_id(self.irus_uk_dag_id_prefix, org_name), execution_date)
             with env.create_dag_run(dag, execution_date):

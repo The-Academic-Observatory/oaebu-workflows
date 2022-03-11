@@ -88,6 +88,8 @@ class OapenWorkflow(Workflow):
         oaebu_onix_dataset: str = "oapen_onix",
         oaebu_intermediate_dataset: str = "oaebu_intermediate",
         oaebu_elastic_dataset: str = "data_export",
+        country_project_id: str = "academic-observatory",
+        country_dataset_id: str = "settings",
         dataset_location: str = "us",
         dataset_description: str = "Oapen workflow tables",
         dag_id: Optional[str] = None,
@@ -152,6 +154,9 @@ class OapenWorkflow(Workflow):
         self.irus_uk_dag_id_prefix = irus_uk_dag_id_prefix
         self.irus_uk_dataset_id = irus_uk_dataset_id
         self.irus_uk_table_id = irus_uk_table_id
+
+        self.country_project_id = country_project_id
+        self.country_dataset_id = country_dataset_id
 
         # Initialise Telesecope base class
         super().__init__(
@@ -369,6 +374,8 @@ class OapenWorkflow(Workflow):
             project_id=project_id,
             dataset_id=self.oaebu_dataset,
             release=release_date,
+            country_project_id=self.country_project_id,
+            country_dataset_id=self.country_dataset_id,
         )
 
         status = create_bigquery_table_from_query(
