@@ -38,7 +38,7 @@ countries as (
         alpha2,
         iso_name,
         wikipedia_name,
-    FROM `academic-observatory.settings.countries`
+    FROM `{{ country_project_id }}.{{ country_dataset_id }}.country`
 ),
 
 month_country as (
@@ -103,7 +103,7 @@ google_analytics_month_country as (
         wikipedia_name as country_wikipedia_name,
         value
     FROM months, UNNEST(google_analytics)) as google
-    LEFT JOIN `academic-observatory.settings.countries` as country on country.iso_name = google.country_name
+    LEFT JOIN `{{ country_project_id }}.{{ country_dataset_id }}.country` as country on country.iso_name = google.country_name
 ),
 
 ucl_discovery_month_country as (

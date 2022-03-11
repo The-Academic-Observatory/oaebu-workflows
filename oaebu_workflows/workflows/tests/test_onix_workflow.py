@@ -20,7 +20,6 @@ import unittest
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
-import observatory.api.server.orm as orm
 import pendulum
 from airflow.exceptions import AirflowException
 from airflow.models.connection import Connection
@@ -28,6 +27,8 @@ from airflow.sensors.base import BaseSensorOperator
 from click.testing import CliRunner
 from google.cloud import bigquery
 from google.cloud.bigquery import SourceFormat
+
+import observatory.api.server.orm as orm
 from oaebu_workflows.config import schema_folder as default_schema_folder
 from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.identifiers import TelescopeTypes
@@ -35,11 +36,11 @@ from oaebu_workflows.workflows.oaebu_partners import OaebuPartner, OaebuPartnerN
 from oaebu_workflows.workflows.onix_workflow import OnixWorkflow, OnixWorkflowRelease
 from observatory.api.server.orm import (
     Dataset,
-    DatasetRelease,
     DatasetStorage,
     Organisation,
 )
 from observatory.platform.utils.airflow_utils import AirflowConns
+from observatory.platform.utils.file_utils import load_jsonl
 from observatory.platform.utils.gc_utils import (
     run_bigquery_query,
     upload_files_to_cloud_storage,
@@ -47,8 +48,12 @@ from observatory.platform.utils.gc_utils import (
 from observatory.platform.utils.test_utils import (
     ObservatoryEnvironment,
     ObservatoryTestCase,
+    Table,
+    bq_load_tables,
     make_dummy_dag,
     module_file_path,
+)
+from observatory.platform.utils.test_utils import (
     random_id,
 )
 from observatory.platform.utils.workflow_utils import (
@@ -509,12 +514,8 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     "export_oaebu_table.book_product_metrics_country": [
                         "export_oaebu_table.book_product_metrics_institution"
                     ],
-                    "export_oaebu_table.book_product_metrics_institution": [
-                        "export_oaebu_table.institution_list"
-                    ],
-                    "export_oaebu_table.institution_list": [
-                        "export_oaebu_table.book_product_metrics_city"
-                    ],
+                    "export_oaebu_table.book_product_metrics_institution": ["export_oaebu_table.institution_list"],
+                    "export_oaebu_table.institution_list": ["export_oaebu_table.book_product_metrics_city"],
                     "export_oaebu_table.book_product_metrics_city": [
                         "export_oaebu_table.book_product_metrics_referrer"
                     ],
@@ -675,12 +676,8 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     "export_oaebu_table.book_product_metrics_country": [
                         "export_oaebu_table.book_product_metrics_institution"
                     ],
-                    "export_oaebu_table.book_product_metrics_institution": [
-                        "export_oaebu_table.institution_list"
-                    ],
-                    "export_oaebu_table.institution_list": [
-                        "export_oaebu_table.book_product_metrics_city"
-                    ],
+                    "export_oaebu_table.book_product_metrics_institution": ["export_oaebu_table.institution_list"],
+                    "export_oaebu_table.institution_list": ["export_oaebu_table.book_product_metrics_city"],
                     "export_oaebu_table.book_product_metrics_city": [
                         "export_oaebu_table.book_product_metrics_referrer"
                     ],
@@ -1654,16 +1651,16 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 dag_id = make_dag_id("onix_workflow", org_name)
                 self.assert_dag_load(dag_id, dag_file)
 
-    def setup_fake_onix_data_table(self, dataset_id: str, release_date: pendulum.DateTime):
+    def setup_fake_onix_data_table(self, dataset_id: str, settings_dataset_id: str, release_date: pendulum.DateTime):
         """Create a new onix data table with its own dataset id and table id, and populate it with some fake data."""
 
         # Upload fixture to bucket
-        files = [test_fixtures_folder("onix_workflow", "onix.json")]
+        files = [test_fixtures_folder("onix_workflow", "onix.jsonl")]
         blobs = [os.path.join(self.test_onix_folder, os.path.basename(file)) for file in files]
         upload_files_to_cloud_storage(bucket_name=self.gcp_bucket_name, blob_names=blobs, file_paths=files)
 
         # Load into bigquery
-        table_id, _ = table_ids_from_path("onix.json")
+        table_id, _ = table_ids_from_path("onix.jsonl")
         bq_load_shard_v2(
             self.schema_path,
             project_id=self.gcp_project_id,
@@ -1678,18 +1675,35 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
             **{},
         )
 
+        country = load_jsonl(test_fixtures_folder("onix_workflow", "country.jsonl"))
+        schema_path = test_fixtures_folder("onix_workflow", "schema")
+        tables = [
+            Table(
+                "country",
+                False,
+                settings_dataset_id,
+                country,
+                "country",
+                schema_path,
+            ),
+        ]
+
+        bq_load_tables(
+            tables=tables, bucket_name=self.gcp_bucket_name, release_date=release_date, data_location=self.data_location
+        )
+
     def setup_fake_partner_data(self, env, release_date: pendulum.DateTime):
         self.fake_partner_dataset = env.add_dataset()
 
         # Upload fixture to bucket
         path = test_fixtures_folder("onix_workflow")
         files = [
-            os.path.join(path, "jstor_country.json"),
-            os.path.join(path, "jstor_institution.json"),
-            os.path.join(path, "google_books_sales.json"),
-            os.path.join(path, "google_books_traffic.json"),
-            os.path.join(path, "oapen_irus_uk.json"),
-            os.path.join(path, "google_analytics.json"),
+            os.path.join(path, "jstor_country.jsonl"),
+            os.path.join(path, "jstor_institution.jsonl"),
+            os.path.join(path, "google_books_sales.jsonl"),
+            os.path.join(path, "google_books_traffic.jsonl"),
+            os.path.join(path, "oapen_irus_uk.jsonl"),
+            os.path.join(path, "google_analytics.jsonl"),
         ]
         blobs = [os.path.join(self.test_onix_folder, os.path.basename(file)) for file in files]
         upload_files_to_cloud_storage(bucket_name=self.gcp_bucket_name, blob_names=blobs, file_paths=files)
@@ -1762,6 +1776,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
         oaebu_intermediate_dataset_id = env.add_dataset(prefix="oaebu_intermediate")
         oaebu_output_dataset_id = env.add_dataset(prefix="oaebu_output")
         oaebu_elastic_dataset_id = env.add_dataset(prefix="oaebu_elastic")
+        oaebu_settings_dataset_id = env.add_dataset(prefix="settings")
 
         # Create the Observatory environment and run tests
         with env.create(task_logging=True):
@@ -1773,11 +1788,11 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 data_partners = data_partners[:-1]
 
             # Create fake data table. There's no guarantee the data was deleted so clean it again just in case.
-            self.setup_fake_onix_data_table(onix_dataset_id, partner_release_date)
+            self.setup_fake_onix_data_table(onix_dataset_id, oaebu_settings_dataset_id, partner_release_date)
 
             # Pull info from Observatory API
-            gcp_bucket_name = (env.transform_bucket,)
-            gcp_project_id = (self.gcp_project_id,)
+            gcp_bucket_name = env.transform_bucket
+            gcp_project_id = self.gcp_project_id
 
             # Expected sensor dag_ids
             sensor_dag_ids = ["onix"] + list(set([partner.dag_id_prefix for partner in data_partners]))
@@ -1789,6 +1804,8 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 org_name=org_name,
                 gcp_project_id=gcp_project_id,
                 gcp_bucket_name=gcp_bucket_name,
+                country_project_id=gcp_project_id,
+                country_dataset_id=oaebu_settings_dataset_id,
                 onix_dataset_id=onix_dataset_id,
                 onix_table_id=self.onix_table_id,
                 data_partners=data_partners,
