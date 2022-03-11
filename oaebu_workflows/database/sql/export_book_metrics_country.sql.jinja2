@@ -98,9 +98,7 @@ google_analytics_month_country as (
     FROM (SELECT
         ISBN13,
         month,
-        iso_name as country_name,
-        iso_name as country_iso_name,
-        wikipedia_name as country_wikipedia_name,
+        name as country_name,
         value
     FROM months, UNNEST(google_analytics)) as google
     LEFT JOIN `{{ country_project_id }}.{{ country_dataset_id }}.country` as country on country.iso_name = google.country_name
@@ -125,6 +123,8 @@ SELECT
     month_country.month,
     month_country.alpha2 as country_code,
     month_country.country_name,
+    month_country.country_iso_name,
+    month_country.country_wikipedia_name,
     STRUCT(jstor.Total_Item_Requests) as jstor,
     STRUCT(oapen.title_requests, oapen.total_item_investigations, oapen.total_item_requests, oapen.unique_item_investigations, oapen.unique_item_requests) as oapen_irus_uk,
     STRUCT(google.value as value) as google_analytics,
