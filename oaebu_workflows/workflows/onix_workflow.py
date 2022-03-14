@@ -223,6 +223,8 @@ class OnixWorkflow(Workflow):
         ao_gcp_project_id: str = "academic-observatory",
         public_book_metadata_dataset_id: str = "observatory",
         public_book_metadata_table_id: str = "book",
+        country_project_id: str = "academic-observatory",
+        country_dataset_id: str = "settings",
         onix_dataset_id: str = "onix",
         onix_table_id: str = "onix",
         schema_folder: str = default_schema_folder(),
@@ -264,6 +266,8 @@ class OnixWorkflow(Workflow):
         self.ao_gcp_project_id = ao_gcp_project_id
         self.public_book_metadata_dataset_id = public_book_metadata_dataset_id
         self.public_book_metadata_table_id = public_book_metadata_table_id
+        self.country_project_id = country_project_id
+        self.country_dataset_id = country_dataset_id
 
         # Initialise Telesecope base class
         super().__init__(
@@ -745,6 +749,8 @@ class OnixWorkflow(Workflow):
             project_id=release.project_id,
             dataset_id=release.oaebu_dataset,
             release=release_date,
+            country_project_id=self.country_project_id,
+            country_dataset_id=self.country_dataset_id,
         )
 
         status = create_bigquery_table_from_query(

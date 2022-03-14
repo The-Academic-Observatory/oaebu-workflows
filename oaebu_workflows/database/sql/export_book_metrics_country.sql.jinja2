@@ -36,8 +36,9 @@ WHERE ISBN13 is not null AND month.month is not null AND (month.jstor_country IS
 countries as (
     SELECT
         alpha2,
-        name
-    FROM `academic-observatory.iso.iso3166_countries_and_regions`
+        iso_name,
+        wikipedia_name,
+    FROM `{{ country_project_id }}.{{ country_dataset_id }}.country`
 ),
 
 month_country as (
@@ -49,7 +50,9 @@ month_country as (
         published_year,
         month,
         alpha2,
-        name as country_name
+        iso_name as country_name,
+        iso_name as country_iso_name,
+        wikipedia_name as country_wikipedia_name
     FROM months
     CROSS JOIN countries
 ),
@@ -90,7 +93,7 @@ google_analytics_month_country as (
         ISBN13,
         month,
         google.country_name,
-        country_code.country_code,
+        country.alpha2 as country_code,
         value
     FROM (SELECT
         ISBN13,
@@ -98,7 +101,7 @@ google_analytics_month_country as (
         name as country_name,
         value
     FROM months, UNNEST(google_analytics)) as google
-    LEFT JOIN `academic-observatory.settings.country_to_alpha2` as country_code on country_code.country_name = google.country_name
+    LEFT JOIN `{{ country_project_id }}.{{ country_dataset_id }}.country` as country on country.iso_name = google.country_name
 ),
 
 ucl_discovery_month_country as (
@@ -120,6 +123,8 @@ SELECT
     month_country.month,
     month_country.alpha2 as country_code,
     month_country.country_name,
+    month_country.country_iso_name,
+    month_country.country_wikipedia_name,
     STRUCT(jstor.Total_Item_Requests) as jstor,
     STRUCT(oapen.title_requests, oapen.total_item_investigations, oapen.total_item_requests, oapen.unique_item_investigations, oapen.unique_item_requests) as oapen_irus_uk,
     STRUCT(google.value as value) as google_analytics,
