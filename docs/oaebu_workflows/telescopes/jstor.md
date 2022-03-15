@@ -19,15 +19,15 @@ The corresponding tables created in BigQuery are `jstor_countryYYYYMMDD` and `js
 +------------------------------+---------+
 | Summary                      |         |
 +==============================+=========+
-| Average runtime              | ? min   |
+| Average runtime              | 5 min   |
 +------------------------------+---------+
-| Average download size        |  ? MB   |
+| Average download size        | 5 MB    |
 +------------------------------+---------+
 | Harvest Type                 |  API    |
 +------------------------------+---------+
 | Harvest Frequency            | Monthly |
 +------------------------------+---------+
-| Runs on remote worker        | True    |
+| Runs on remote worker        | False   |
 +------------------------------+---------+
 | Catchup missed runs          | True    |
 +------------------------------+---------+

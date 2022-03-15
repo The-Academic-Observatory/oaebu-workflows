@@ -11,15 +11,15 @@ Additionally for each eprint the total downloads and downloads per country is ga
 +------------------------------+---------+
 | Summary                      |         |
 +==============================+=========+
-| Average runtime              | ? min   |
+| Average runtime              | 10 min  |
 +------------------------------+---------+
-| Average download size        |  ? MB   |
+| Average download size        | 1.5 MB  |
 +------------------------------+---------+
 | Harvest Type                 |  API    |
 +------------------------------+---------+
 | Harvest Frequency            | Monthly |
 +------------------------------+---------+
-| Runs on remote worker        | True    |
+| Runs on remote worker        | False   |
 +------------------------------+---------+
 | Catchup missed runs          | True    |
 +------------------------------+---------+

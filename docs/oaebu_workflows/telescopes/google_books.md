@@ -17,15 +17,15 @@ The corresponding tables created in BigQuery are `google.google_books_salesYYYYM
 +------------------------------+---------+
 | Summary                      |         |
 +==============================+=========+
-| Average runtime              | ? min   |
+| Average runtime              | 5 min   |
 +------------------------------+---------+
-| Average download size        |  ? MB   |
+| Average download size        | 1-100 MB|
 +------------------------------+---------+
 | Harvest Type                 |  SFTP   |
 +------------------------------+---------+
 | Harvest Frequency            | Monthly |
 +------------------------------+---------+
-| Runs on remote worker        | True    |
+| Runs on remote worker        | False   |
 +------------------------------+---------+
 | Catchup missed runs          | True    |
 +------------------------------+---------+

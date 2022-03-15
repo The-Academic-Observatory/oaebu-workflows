@@ -14,15 +14,15 @@ The corresponding table created in BigQuery is `google.google_analyticsYYYYMMDD`
 +------------------------------+---------+
 | Summary                      |         |
 +==============================+=========+
-| Average runtime              | ? min   |
+| Average runtime              | 5 min   |
 +------------------------------+---------+
-| Average download size        |  ? MB   |
+| Average download size        | 1 MB    |
 +------------------------------+---------+
 | Harvest Type                 | API     |
 +------------------------------+---------+
 | Harvest Frequency            | Monthly |
 +------------------------------+---------+
-| Runs on remote worker        | True    |
+| Runs on remote worker        | False   |
 +------------------------------+---------+
 | Catchup missed runs          | True    |
 +------------------------------+---------+
