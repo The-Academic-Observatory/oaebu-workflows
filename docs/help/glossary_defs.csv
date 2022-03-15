@@ -1,0 +1,23 @@
+Term,Meaning
+COKI,"Curtin Open Knowledge Initiative - a team of data scientists, software developers and researchers at Curtin University, Perth, Australia. "
+Crossref,"Crossref is a Digital Object Identifier (DOI) Registration Agency of the International DOI Foundation, that makes metadata available for all DOIs registered with them. [1]"
+dashboard,"A dashboard is an interactive, up-to-date page of visualisations that aggregate and summarise data from different sources"
+data source,"A public or partner source of data about open access eBooks and their usage, such as views, downloads and online mentions"
+DOAB,Directory of Open Access Books
+eISBN,"An identifier for eBooks used by some publishers and platforms, specifically the manual EBSCO data source in the OAeBU pilot."
+Elasticsearch,Elasticsearch is a search and analytics engine that enables fast searches for large sets of data[2]
+Google Books,Google Books provides paid and free (open access) eBooks[3]
+JSTOR,"JSTOR is a digital library, which offers over 7000 open access eBooks[4]"
+Kibana,"Kibana is a free and open user interface.[5] Kibana is used in the OAeBU project to analyse, search, interact with and visualize the Elasticsearch data."
+OAeBU,Open Access eBook Usage - a project creating a global data trust for usage data on open access (OA) monographs[6]
+OAPEN,"OAPEN is a not-for-profit organisation dedicated to open access, peer-reviewed books, operating three platforms:
+OAPEN Library 
+OAPEN Open Access Books Toolkit 
+Directory of Open Access Books[7]"
+OAPEN IRUS-UK,"OAPEN IRUS-UK - a service for capturing and processing institutional repository usage data, making it possible for institutional repositories to generate COUNTER compliant usage data[8]"
+open access,"Open access (OA) is free access to information, and unrestricted use of electronic resources for all[9]"
+ONIX,ONIX for Books (ONline Information EXchange) is a standard format that book publishers use to share information about the books that they have published.[10]
+publisher,"A scholarly eBook publisher, who partners in the OAeBU pilot to provide their titles, and metrics of their usage"
+shard,"A database shard is a way of storing data, so that load can be spread for large amounts of data[11]"
+SFTP,SSH File Transfer Protocol
+telescope,"A telescope is a data workflow that fetches and ingests data from a data source. Some telescopes run workflows that process and output data to other places. [12] Workflows are built on top of Apache Airflow's Directed Acyclic Graph (DAGs), where a DAG is a collection of organized tasks that you want to schedule and run.[13]"
