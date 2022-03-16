@@ -15,7 +15,7 @@ Additionally for each eprint the total downloads and downloads per country is ga
 +------------------------------+---------+
 | Average download size        | 1.5 MB  |
 +------------------------------+---------+
-| Harvest Type                 |  API    |
+| Harvest Type                 |CSV + API|
 +------------------------------+---------+
 | Harvest Frequency            | Monthly |
 +------------------------------+---------+
