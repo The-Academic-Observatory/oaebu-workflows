@@ -2,17 +2,20 @@
   {
     "mode": "NULLABLE",
     "name": "CountryOfManufacture",
-    "type": "STRING"
+    "type": "STRING",
+    "description": "An ISO code identifying the country of manufacture of a single-item product, or of a multiple-item product\nwhen all items are manufactured in the same country. This information is needed in some countries to meet\nregulatory requirements. Optional and non-repeating."
   },
   {
     "mode": "NULLABLE",
     "name": "RecordSourceName",
-    "type": "STRING"
+    "type": "STRING",
+    "description": "The name of the party which issued the record, as free text. Optional and non-repeating, independently of\nthe occurrence of any other field."
   },
   {
     "mode": "NULLABLE",
     "name": "RecordSourceType",
-    "type": "STRING"
+    "type": "STRING",
+    "description": "An ONIX code which indicates the type of source which has issued the ONIX record. Optional and non-\nrepeating, independently of the occurrence of any other field."
   },
   {
     "fields": [
@@ -25,167 +28,198 @@
                   {
                     "mode": "NULLABLE",
                     "name": "Value",
-                    "type": "STRING"
+                    "type": "STRING",
+                    "description": ""
                   }
                 ],
                 "mode": "NULLABLE",
                 "name": "PartNumber",
-                "type": "RECORD"
+                "type": "RECORD",
+                "description": ""
               },
               {
                 "mode": "NULLABLE",
                 "name": "TitleElementLevel",
-                "type": "STRING"
+                "type": "STRING",
+                "description": ""
               },
               {
                 "fields": [
                   {
                     "mode": "NULLABLE",
                     "name": "Value",
-                    "type": "STRING"
+                    "type": "STRING",
+                    "description": ""
                   }
                 ],
                 "mode": "NULLABLE",
                 "name": "TitlePrefix",
-                "type": "RECORD"
+                "type": "RECORD",
+                "description": ""
               },
               {
                 "mode": "NULLABLE",
                 "name": "TitleWithoutPrefix",
-                "type": "STRING"
+                "type": "STRING",
+                "description": ""
               },
               {
                 "mode": "NULLABLE",
                 "name": "SequenceNumber",
-                "type": "INTEGER"
+                "type": "INTEGER",
+                "description": ""
               },
               {
                 "mode": "NULLABLE",
                 "name": "TitleText",
-                "type": "STRING"
+                "type": "STRING",
+                "description": ""
               }
             ],
             "mode": "REPEATED",
             "name": "TitleElements",
-            "type": "RECORD"
+            "type": "RECORD",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "TitleType",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           }
         ],
         "mode": "REPEATED",
         "name": "TitleDetails",
-        "type": "RECORD"
+        "type": "RECORD",
+        "description": ""
       },
       {
         "fields": [
           {
             "mode": "NULLABLE",
             "name": "CollectionIdType",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "IDValue",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "IDTypeName",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           }
         ],
         "mode": "REPEATED",
         "name": "CollectionIdentifers",
-        "type": "RECORD"
+        "type": "RECORD",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "CollectionType",
-        "type": "STRING"
+        "type": "STRING",
+        "description": ""
       }
     ],
     "mode": "REPEATED",
     "name": "Collections",
-    "type": "RECORD"
+    "type": "RECORD",
+    "description": ""
   },
   {
     "mode": "NULLABLE",
     "name": "EditionNumber",
-    "type": "INTEGER"
+    "type": "INTEGER",
+    "description": "The number of a numbered edition. Optional and non-repeating. Normally sent only for the second and\nsubsequent editions of a work, but by agreement between parties to an ONIX exchange a first edition may\nbe explicitly numbered."
   },
   {
     "mode": "NULLABLE",
     "name": "RecordRef",
-    "type": "STRING"
+    "type": "STRING",
+    "description": ""
   },
   {
     "fields": [
       {
         "mode": "NULLABLE",
         "name": "WorkRelationCode",
-        "type": "STRING"
+        "type": "STRING",
+        "description": ""
       },
       {
         "fields": [
           {
             "mode": "NULLABLE",
             "name": "WorkIDType",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "IDValue",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "IDTypeName",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           }
         ],
         "mode": "REPEATED",
         "name": "WorkIdentifiers",
-        "type": "RECORD"
+        "type": "RECORD",
+        "description": ""
       }
     ],
     "mode": "REPEATED",
     "name": "RelatedWorks",
-    "type": "RECORD"
+    "type": "RECORD",
+    "description": ""
   },
   {
     "fields": [
       {
         "mode": "NULLABLE",
         "name": "TextType",
-        "type": "STRING"
+        "type": "STRING",
+        "description": ""
       },
       {
         "mode": "REPEATED",
         "name": "Text",
-        "type": "STRING"
+        "type": "STRING",
+        "description": ""
       }
     ],
     "mode": "REPEATED",
     "name": "TextContent",
-    "type": "RECORD"
+    "type": "RECORD",
+    "description": ""
   },
   {
     "mode": "REPEATED",
     "name": "CityOfPublications",
-    "type": "STRING"
+    "type": "STRING",
+    "description": ""
   },
   {
     "mode": "NULLABLE",
     "name": "DOI",
-    "type": "STRING"
+    "type": "STRING",
+    "description": ""
   },
   {
     "mode": "REPEATED",
     "name": "EditionType",
-    "type": "STRING"
+    "type": "STRING",
+    "description": ""
   },
   {
     "fields": [
@@ -194,123 +228,146 @@
           {
             "mode": "NULLABLE",
             "name": "ImprintIDType",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "IDValue",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "IDTypeName",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           }
         ],
         "mode": "REPEATED",
         "name": "ImprintIdentifiers",
-        "type": "RECORD"
+        "type": "RECORD",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "ImprintName",
-        "type": "STRING"
+        "type": "STRING",
+        "description": ""
       }
     ],
     "mode": "REPEATED",
     "name": "Imprints",
-    "type": "RECORD"
+    "type": "RECORD",
+    "description": ""
   },
   {
     "fields": [
       {
         "mode": "NULLABLE",
         "name": "PublisherName",
-        "type": "STRING"
+        "type": "STRING",
+        "description": ""
       },
       {
         "fields": [
           {
             "mode": "REPEATED",
             "name": "WebsiteDescriptions",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "WebsiteRole",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "REPEATED",
             "name": "WebsiteLinks",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           }
         ],
         "mode": "REPEATED",
         "name": "Websites",
-        "type": "RECORD"
+        "type": "RECORD",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "PublishingRole",
-        "type": "STRING"
+        "type": "STRING",
+        "description": ""
       }
     ],
     "mode": "REPEATED",
     "name": "Publishers",
-    "type": "RECORD"
+    "type": "RECORD",
+    "description": ""
   },
   {
     "fields": [
       {
         "mode": "NULLABLE",
         "name": "ISBN13",
-        "type": "STRING"
+        "type": "STRING",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "ProductForm",
-        "type": "STRING"
+        "type": "STRING",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "DOI",
-        "type": "STRING"
+        "type": "STRING",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "GTIN_13",
-        "type": "STRING"
+        "type": "STRING",
+        "description": ""
       },
       {
         "mode": "REPEATED",
         "name": "ProductRelationCodes",
-        "type": "STRING"
+        "type": "STRING",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "PID_Proprietary",
-        "type": "STRING"
+        "type": "STRING",
+        "description": ""
       }
     ],
     "mode": "REPEATED",
     "name": "RelatedProducts",
-    "type": "RECORD"
+    "type": "RECORD",
+    "description": ""
   },
   {
     "mode": "NULLABLE",
     "name": "PID_Proprietary",
-    "type": "STRING"
+    "type": "STRING",
+    "description": ""
   },
   {
     "mode": "NULLABLE",
     "name": "ISBN10",
-    "type": "STRING"
+    "type": "STRING",
+    "description": ""
   },
   {
     "mode": "NULLABLE",
     "name": "ISBN13",
-    "type": "STRING"
+    "type": "STRING",
+    "description": ""
   },
   {
     "fields": [
@@ -319,388 +376,461 @@
           {
             "mode": "NULLABLE",
             "name": "TitleWithoutPrefix_TextCaseFlags",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "TitleText_TextCaseFlags",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "Subtitle_TextCaseFlags",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "TitleText",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "TitleText_Language",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "TitleElementLevel",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "Subtitle",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "SequenceNumber",
-            "type": "INTEGER"
+            "type": "INTEGER",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "TitleWithoutPrefix",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "Subtitle_Language",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "fields": [
               {
                 "mode": "NULLABLE",
                 "name": "Value",
-                "type": "STRING"
+                "type": "STRING",
+                "description": ""
               }
             ],
             "mode": "NULLABLE",
             "name": "TitlePrefix",
-            "type": "RECORD"
+            "type": "RECORD",
+            "description": ""
           }
         ],
         "mode": "REPEATED",
         "name": "TitleElements",
-        "type": "RECORD"
+        "type": "RECORD",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "TitleType",
-        "type": "STRING"
+        "type": "STRING",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "TitleStatement",
-        "type": "STRING"
+        "type": "STRING",
+        "description": ""
       }
     ],
     "mode": "REPEATED",
     "name": "TitleDetails",
-    "type": "RECORD"
+    "type": "RECORD",
+    "description": ""
   },
   {
     "fields": [
       {
         "mode": "NULLABLE",
         "name": "PublishingDateRole",
-        "type": "STRING"
+        "type": "STRING",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "Date",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": ""
       }
     ],
     "mode": "REPEATED",
     "name": "PublishingDates",
-    "type": "RECORD"
+    "type": "RECORD",
+    "description": ""
   },
   {
     "mode": "NULLABLE",
     "name": "GTIN_13",
-    "type": "STRING"
+    "type": "STRING",
+    "description": ""
   },
   {
     "fields": [
       {
         "mode": "NULLABLE",
         "name": "CountryCode",
-        "type": "STRING"
+        "type": "STRING",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "LanguageRole",
-        "type": "STRING"
+        "type": "STRING",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "LanguageCode",
-        "type": "STRING"
+        "type": "STRING",
+        "description": ""
       }
     ],
     "mode": "REPEATED",
     "name": "Languages",
-    "type": "RECORD"
+    "type": "RECORD",
+    "description": ""
   },
   {
     "mode": "NULLABLE",
     "name": "ProductForm",
-    "type": "STRING"
+    "type": "STRING",
+    "description": ""
   },
   {
     "fields": [
       {
         "mode": "NULLABLE",
         "name": "LettersAfterNames",
-        "type": "STRING"
+        "type": "STRING",
+        "description": "The seventh part of a structured name of a person who contributed to the creation of the product:\nqualifications and honors following a person’s names, eg ‘CBE FRS’. Optional and non-repeating."
       },
       {
         "mode": "NULLABLE",
         "name": "Gender",
-        "type": "STRING"
+        "type": "STRING",
+        "description": "An optional ONIX code specifying the gender of a personal contributor. Not repeatable. Note that this\nindicates the gender of the contributor’s public identity (which may be pseudonymous) based on\ndesignations used in ISO 5218, rather than the gender identity, biological sex or sexuality of a natural\nperson."
       },
       {
         "mode": "NULLABLE",
         "name": "Proprietary",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "NameType",
-        "type": "STRING"
+        "type": "STRING",
+        "description": "An ONIX code indicating the type of a primary name. Optional, and non-repeating. If omitted, the default is\n‘unspecified’."
       },
       {
         "fields": [
           {
             "mode": "REPEATED",
             "name": "Positions",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "Affiliations",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           }
         ],
         "mode": "REPEATED",
         "name": "ProfessionalAffiliations",
-        "type": "RECORD"
+        "type": "RECORD",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "ORCID",
-        "type": "STRING"
+        "type": "STRING",
+        "description": ""
       },
       {
         "fields": [
           {
             "mode": "NULLABLE",
             "name": "TextFormat",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "Note",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           }
         ],
         "mode": "REPEATED",
         "name": "BiographicalNotes",
-        "type": "RECORD"
+        "type": "RECORD",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "TitlesBeforeNames",
-        "type": "STRING"
+        "type": "STRING",
+        "description": ""
       },
       {
         "mode": "REPEATED",
         "name": "Roles",
-        "type": "STRING"
+        "type": "STRING",
+        "description": ""
       },
       {
         "fields": [
           {
             "mode": "REPEATED",
             "name": "WebsiteDescriptions",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "WebsiteRole",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "REPEATED",
             "name": "WebsiteLinks",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           }
         ],
         "mode": "REPEATED",
         "name": "Websites",
-        "type": "RECORD"
+        "type": "RECORD",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "PersonNameInverted",
-        "type": "STRING"
+        "type": "STRING",
+        "description": ""
       },
       {
         "fields": [
           {
             "mode": "NULLABLE",
             "name": "Date",
-            "type": "INTEGER"
+            "type": "INTEGER",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "Role",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           }
         ],
         "mode": "REPEATED",
         "name": "Dates",
-        "type": "RECORD"
+        "type": "RECORD",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "SequenceNumber",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "PrefixToKey",
-        "type": "STRING"
+        "type": "STRING",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "KeyNames",
-        "type": "STRING"
+        "type": "STRING",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "TitlesAfterNames",
-        "type": "STRING"
+        "type": "STRING",
+        "description": ""
       },
       {
         "mode": "REPEATED",
         "name": "AlternativeNames",
-        "type": "STRING"
+        "type": "STRING",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "NamesBeforeKey",
-        "type": "STRING"
+        "type": "STRING",
+        "description": ""
       },
       {
         "fields": [
           {
             "mode": "NULLABLE",
             "name": "CountryCode",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "REPEATED",
             "name": "Locations",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           },
           {
             "mode": "NULLABLE",
             "name": "Relation",
-            "type": "STRING"
+            "type": "STRING",
+            "description": ""
           }
         ],
         "mode": "REPEATED",
         "name": "Places",
-        "type": "RECORD"
+        "type": "RECORD",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "PersonName",
-        "type": "STRING"
+        "type": "STRING",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "ISNI",
-        "type": "STRING"
+        "type": "STRING",
+        "description": ""
       },
       {
         "mode": "NULLABLE",
         "name": "CorprorateName",
-        "type": "STRING"
+        "type": "STRING",
+        "description": ""
       }
     ],
     "mode": "REPEATED",
     "name": "Contributors",
-    "type": "RECORD"
+    "type": "RECORD",
+    "description": ""
   },
   {
     "mode": "NULLABLE",
     "name": "COKI_ID",
-    "type": "STRING"
+    "type": "STRING",
+    "description": ""
   },
   {
     "fields": [
       {
         "mode": "REPEATED",
         "name": "SubjectHeadingText",
-        "type": "STRING"
+        "type": "STRING",
+        "description": "The text of a subject heading taken from the scheme specified in the <SubjectSchemeIdentifier> element,\nor of free language keywords if the scheme is specified as ‘keywords’; or the text equivalent to the\n<SubjectCode> value, if both code and text are sent. Either <SubjectCode> or <SubjectHeadingText> or\nboth must be present in each occurrence of the <Subject> composite."
       },
       {
         "mode": "NULLABLE",
         "name": "SubjectSchemeIdentifier",
-        "type": "STRING"
+        "type": "STRING",
+        "description": "A number which identifies a version or edition of the subject scheme specified in the associated\n<SubjectSchemeIdentifier> element. Optional and non-repeating."
       },
       {
         "mode": "NULLABLE",
         "name": "SubjectSchemeVersion",
-        "type": "FLOAT"
+        "type": "FLOAT",
+        "description": "A number which identifies a version or edition of the subject scheme specified in the associated\n<SubjectSchemeIdentifier> element. Optional and non-repeating."
       },
       {
         "mode": "NULLABLE",
         "name": "SubjectSchemeName",
-        "type": "STRING"
+        "type": "STRING",
+        "description": "A name identifying a proprietary subject scheme (ie a scheme which is not a standard and for which there is\nno individual identifier code) when <SubjectSchemeIdentifier> is coded ‘24’. Optional and non-repeating."
       },
       {
         "mode": "NULLABLE",
         "name": "SubjectCode",
-        "type": "STRING"
+        "type": "STRING",
+        "description": "A subject class or category code from the scheme specified in the <SubjectSchemeIdentifier> element.\nEither <SubjectCode> or <SubjectHeadingText> or both must be present in each occurrence of the\n<Subject> composite. Non-repeating."
       },
       {
         "mode": "NULLABLE",
         "name": "MainSubject",
-        "type": "BOOLEAN"
+        "type": "BOOLEAN",
+        "description": "An empty element that identifies an instance of the <Subject> composite as representing the main subject\ncategory for the product. The main category may be expressed in more than one subject scheme, ie there\nmay be two or more instances of the <Subject> composite, using different schemes, each carrying the\n<MainSubject/> flag, so long as there is only one main category per scheme. Optional and non-repeating in\neach occurrence of the <Subject> composite."
       }
     ],
     "mode": "REPEATED",
     "name": "Subjects",
-    "type": "RECORD"
+    "type": "RECORD",
+    "description": ""
   },
   {
     "fields": [
       {
         "mode": "NULLABLE",
         "name": "ExtentType",
-        "type": "STRING"
+        "type": "STRING",
+        "description": "An ONIX code which identifies the type of extent carried in the composite, eg running time for an audio or\nvideo product. Mandatory in each occurrence of the <Extent> composite, and non-repeating. From Issue 9\nof the code lists, an extended set of values for <ExtentType> has been defined to allow more accurate\ndescription of pagination."
       },
       {
         "mode": "NULLABLE",
         "name": "ExtentValue",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": "The numeric value of the extent specified in <ExtentType>. Optional, and non-repeating. However, either\n<ExtentValue> or <ExtentValueRoman> must be present in each occurrence of the <Extent> composite;\nand it is very strongly recommended that <ExtentValue> should always be included, even when the original\nproduct uses Roman numerals."
       },
       {
         "mode": "NULLABLE",
         "name": "ExtentUnit",
-        "type": "STRING"
+        "type": "STRING",
+        "description": "An ONIX code indicating the unit used for the <ExtentValue> and the format in which the value is\npresented. Mandatory in each occurrence of the <Extent> composite, and non-repeating."
       },
       {
         "mode": "NULLABLE",
         "name": "ExtentValueRoman",
-        "type": "STRING"
+        "type": "STRING",
+        "description": "The value of the extent expressed in Roman numerals. Optional, and non-repeating. Used only for page\nruns which are numbered in Roman."
       }
     ],
     "mode": "REPEATED",
     "name": "Extent",
-    "type": "RECORD"
+    "type": "RECORD",
+    "description": ""
   }
 ]
