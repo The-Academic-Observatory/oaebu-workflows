@@ -33,7 +33,6 @@ author = "Curtin University"
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    "pbr.sphinxext",
     "sphinx_rtd_theme",
     "sphinx.ext.viewcode",
     "sphinx.ext.intersphinx",
