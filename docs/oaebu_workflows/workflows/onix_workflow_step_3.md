@@ -1,4 +1,5 @@
-# ONIX workflow Step 3 - Exporting to Elasticsearch
+ONIX workflow Step 3 - Exporting to Elasticsearch
+==================================================
 
 Step three of the ONIX workflow is to export the book_product table to a sequence of flattened tables that can be exported to Elasticsearch. The data in these tables is not materially different to the book product table, just organised in a way, better suited for dashboards in Kibana.
 
@@ -17,7 +18,7 @@ This table is a list of each Book Product. It is primarily used for drop-down fi
 
 ``` eval_rst
 .. csv-table::
-   :file: ../schemas/oaebu_publisher_book_product_list_latest.csv
+   :file: ../../schemas/oaebu_publisher_book_product_list_latest.csv
    :width: 100%
    :header-rows: 1
 ```
@@ -30,7 +31,7 @@ This table contains metrics, organised by month, that are linked to each book. T
 
 ``` eval_rst
 .. csv-table::
-   :file: ../schemas/oaebu_publisher_book_product_metrics_latest.csv
+   :file: ../../schemas/oaebu_publisher_book_product_metrics_latest.csv
    :width: 100%
    :header-rows: 1
 ```
@@ -43,7 +44,7 @@ This table contains metrics, organised by month, that are linked to each book.
 
 ``` eval_rst
 .. csv-table::
-   :file: ../schemas/oaebu_publisher_book_product_year_metrics_latest.csv
+   :file: ../../schemas/oaebu_publisher_book_product_year_metrics_latest.csv
    :width: 100%
    :header-rows: 1
 ```
@@ -56,7 +57,7 @@ This table contains metrics, organised by month and city of measured usage, that
 
 ``` eval_rst
 .. csv-table::
-   :file: ../schemas/oaebu_publisher_book_product_metrics_city_latest.csv
+   :file: ../../schemas/oaebu_publisher_book_product_metrics_city_latest.csv
    :width: 100%
    :header-rows: 1
 ```
@@ -69,7 +70,7 @@ This table contains metrics, organised by month and country of measured usage, t
 
 ``` eval_rst
 .. csv-table::
-   :file: ../schemas/oaebu_publisher_book_product_metrics_country_latest.csv
+   :file: ../../schemas/oaebu_publisher_book_product_metrics_country_latest.csv
    :width: 100%
    :header-rows: 1
 ```
@@ -82,7 +83,7 @@ This table contains metrics, organised by month and crossref event type, that ar
 
 ``` eval_rst
 .. csv-table::
-   :file: ../schemas/oaebu_publisher_book_product_metrics_events_latest.csv
+   :file: ../../schemas/oaebu_publisher_book_product_metrics_events_latest.csv
    :width: 100%
    :header-rows: 1
 ```
@@ -95,7 +96,7 @@ This table is a list of each unique Institution where metrics are linked too. It
 
 ``` eval_rst
 .. csv-table::
-   :file: ../schemas/oaebu_publisher_institution_list_latest.csv
+   :file: ../../schemas/oaebu_publisher_institution_list_latest.csv
    :width: 100%
    :header-rows: 1
 ```
@@ -108,7 +109,7 @@ This table contains metrics, organised by month and institution for which there 
 
 ``` eval_rst
 .. csv-table::
-   :file: ../schemas/oaebu_publisher_book_product_metrics_institution_latest.csv
+   :file: ../../schemas/oaebu_publisher_book_product_metrics_institution_latest.csv
    :width: 100%
    :header-rows: 1
 ```
@@ -121,7 +122,7 @@ This table contains metrics, organised by month and location of referrals, that 
 
 ``` eval_rst
 .. csv-table::
-   :file: ../schemas/oaebu_publisher_book_product_metrics_referrer_latest.csv
+   :file: ../../schemas/oaebu_publisher_book_product_metrics_referrer_latest.csv
    :width: 100%
    :header-rows: 1
 ```
@@ -136,7 +137,7 @@ This table contains metrics, organised by month and BIC subject type, that are l
 
 ``` eval_rst
 .. csv-table::
-   :file: ../schemas/oaebu_publisher_book_product_subject_bic_metrics_latest.csv
+   :file: ../../schemas/oaebu_publisher_book_product_subject_bic_metrics_latest.csv
    :width: 100%
    :header-rows: 1
 ```
@@ -149,7 +150,7 @@ This table contains metrics, organised by month and BISAC subject type, that are
 
 ``` eval_rst
 .. csv-table::
-   :file: ../schemas/oaebu_publisher_book_product_subject_bisac_metrics_latest.csv
+   :file: ../../schemas/oaebu_publisher_book_product_subject_bisac_metrics_latest.csv
    :width: 100%
    :header-rows: 1
 ```
@@ -162,7 +163,7 @@ This table contains metrics, organised by month and THEMA subject type, that are
 
 ``` eval_rst
 .. csv-table::
-   :file: ../schemas/oaebu_publisher_book_product_subject_thema_metrics_latest.csv
+   :file: ../../schemas/oaebu_publisher_book_product_subject_thema_metrics_latest.csv
    :width: 100%
    :header-rows: 1
 ```
@@ -175,7 +176,7 @@ This table contains metrics, organised by year and currently just the BIC subjec
 
 ``` eval_rst
 .. csv-table::
-   :file: ../schemas/oaebu_publisher_book_product_subject_year_metrics_latest.csv
+   :file: ../../schemas/oaebu_publisher_book_product_subject_year_metrics_latest.csv
    :width: 100%
    :header-rows: 1
 ```
@@ -190,7 +191,7 @@ This dataset is helpful for understanding where metrics and books defined in the
 
 ``` eval_rst
 .. csv-table::
-   :file: ../schemas/oaebu_publisher_unmatched_book_metrics_latest.csv
+   :file: ../../schemas/oaebu_publisher_unmatched_book_metrics_latest.csv
    :width: 100%
    :header-rows: 1
 ```

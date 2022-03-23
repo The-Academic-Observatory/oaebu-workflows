@@ -43,7 +43,7 @@ If there are any edited or deleted entries, the old versions of these entries wi
 ## Latest schema
 ``` eval_rst
 .. csv-table::
-   :file: ../schemas/doab_latest.csv
+   :file: ../../schemas/doab_latest.csv
    :width: 100%
    :header-rows: 1
 ```

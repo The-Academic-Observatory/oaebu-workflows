@@ -353,7 +353,7 @@ gmail_api: google-cloud-platform://?token=<token>&refresh_token=<refresh_token>&
 
 ``` eval_rst
 .. csv-table::
-   :file: ../schemas/jstor_institution_latest.csv
+   :file: ../../schemas/jstor_institution_latest.csv
    :width: 100%
    :header-rows: 1
 ```
@@ -362,7 +362,7 @@ gmail_api: google-cloud-platform://?token=<token>&refresh_token=<refresh_token>&
 
 ``` eval_rst
 .. csv-table::
-   :file: ../schemas/jstor_country_latest.csv
+   :file: ../../schemas/jstor_country_latest.csv
    :width: 100%
    :header-rows: 1
 ```

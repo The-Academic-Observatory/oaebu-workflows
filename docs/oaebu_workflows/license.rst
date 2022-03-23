@@ -1,11 +1,11 @@
 License
 =======
 
-.. include:: ../LICENSE
+.. include:: ../../LICENSE
    :literal:
 
 Third Party Code
 ----------------
 
-.. include:: ../LICENSES_THIRD_PARTY
+.. include:: ../../LICENSES_THIRD_PARTY
     :literal:

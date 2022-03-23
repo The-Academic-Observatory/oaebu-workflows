@@ -1,4 +1,5 @@
-# ONIX workflow Step 2 - Linking Metircs
+ONIX workflow Step 2 - Linking Metrics
+=======================================
 
 Step 2 of the ONIX workflow takes the metrics fetched through various telescopes, then aggregates and joins them to the book records in the publisher's ONIX feed.
 
@@ -15,7 +16,7 @@ The output is the book_product table, containing one row per unique book, with a
 
 ``` eval_rst
 .. csv-table::
-   :file: ../schemas/book_product_latest.csv
+   :file: ../../schemas/book_product_latest.csv
    :width: 100%
    :header-rows: 1
 ```

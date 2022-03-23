@@ -1,43 +1,22 @@
-==============================
+
+OAeBU Project
+##############################
+
+This project documentation includes how the OAeBU Data Trust works, information on the data sources used, and user guides for the dashboards.
+
+.. toctree::
+    :maxdepth: 2
+
+    oaebu_project/index
+
+
+
 OAeBU Workflows
-==============================
-OAeBU Workflows provides Apache Airflow workflows for fetching, processing and analysing data about Open Access Books.
+##############################
 
-The workflows include: Directory of Open Access Books (DOAB), Google Analytics, Google Books, JSTOR, Oapen IRUS UK,
-Oapen Metadata, Onix, UCL Discovery and an Onix Workflow for combining all of this data.
-
-Telescope Workflows
-====================
-A telescope a type of workflow used to ingest data from different data sources, and to run workflows that process and
-output data to other places. Workflows are built on top of Apache Airflow's DAGs.
+Documentation about the code/files hosted in the OAeBU Worfklows Github repository. This includes (technical) documentation on the telescope/analytical workflows that are a part of this repository, license info & contributing guidelines and auto-generated API reference documentation.
 
 .. toctree::
     :maxdepth: 2
 
-    telescopes/index
-
-Analytic Workflows
-===================
-Analytic workflows process the data ingested by telescope workflows and are also built on top of Apache Airflow DAGs.
-
-.. toctree::
-    :maxdepth: 2
-
-    workflows/index
-
-
-License & Contributing Guidelines
-=================================
-Information about licenses, contributing guidelines etc.
-
-.. toctree::
-    :maxdepth: 1
-
-    license
-
-Python API Reference
-=====================
-Documentation for the academic-observatory-workflow Python API.
-
-.. toctree::
-    :maxdepth: 3
+    oaebu_workflows/index

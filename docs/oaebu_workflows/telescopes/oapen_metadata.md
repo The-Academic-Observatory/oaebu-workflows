@@ -258,7 +258,7 @@ After transformation
 ## Latest schema
 ``` eval_rst
 .. csv-table::
-   :file: ../schemas/oapen_metadata_latest.csv
+   :file: ../../schemas/oapen_metadata_latest.csv
    :width: 100%
    :header-rows: 1
 ```

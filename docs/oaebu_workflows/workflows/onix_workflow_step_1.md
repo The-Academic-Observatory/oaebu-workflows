@@ -1,4 +1,5 @@
-# ONIX workflow Step 1 - Mapping Book Products
+ONIX workflow Step 1 - Mapping Book Products
+=============================================
 
 The ONIX workflow uses the ONIX table created by the ONIX telescope to do the following:
   1. Aggregate book product records into works records. Works are equivalence classes of products, where each product in the class is a manifestation of each other. For example, a PDF and a paperback of the same work.
@@ -24,7 +25,7 @@ The Work ID will be an arbitrary ISBN representative from a product in the equiv
 
 ``` eval_rst
 .. csv-table::
-   :file: ../schemas/onix_workid_isbn_latest.csv
+   :file: ../../schemas/onix_workid_isbn_latest.csv
    :width: 100%
    :header-rows: 1
 ```
@@ -34,7 +35,7 @@ The Work Family ID will be an arbitrary Work ID (ISBN) representative from a wor
 
 ``` eval_rst
 .. csv-table::
-   :file: ../schemas/onix_workfamilyid_isbn_latest.csv
+   :file: ../../schemas/onix_workfamilyid_isbn_latest.csv
    :width: 100%
    :header-rows: 1
 ```
@@ -61,7 +62,7 @@ For each data source, including the intermediate tables, we perform basic qualit
 
 ``` eval_rst
 .. csv-table::
-   :file: ../schemas/onix_aggregate_metrics_latest.csv
+   :file: ../../schemas/onix_aggregate_metrics_latest.csv
    :width: 100%
    :header-rows: 1
 ```
@@ -70,7 +71,7 @@ For each data source, including the intermediate tables, we perform basic qualit
 
 ``` eval_rst
 .. csv-table::
-   :file: ../schemas/onix_workid_isbn_errors_latest.csv
+   :file: ../../schemas/onix_workid_isbn_errors_latest.csv
    :width: 100%
    :header-rows: 1
 ```
