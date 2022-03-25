@@ -101,7 +101,7 @@ google_analytics_month_country as (
         name as country_name,
         value
     FROM months, UNNEST(google_analytics)) as google
-    LEFT JOIN `{{ country_project_id }}.{{ country_dataset_id }}.country` as country on country.iso_name = google.country_name
+    LEFT JOIN `{{ country_project_id }}.{{ country_dataset_id }}.country` as country on country.google_analytics_name = google.country_name
 ),
 
 ucl_discovery_month_country as (
