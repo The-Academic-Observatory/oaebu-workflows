@@ -6,6 +6,8 @@ The ONIX workflow uses the ONIX table created by the ONIX telescope to do the fo
   2. Aggregate work records into work family records. A work family is an equivalence class of works where each work in the class is just a different edition.
   3. Produce intermediate lookup tables mapping ISBN13 -> WorkID and ISBN13 -> WorkFamilyID.
   4. Produce oaebu_intermediate tables that append work_id and work_family_id columns to different data tables with ISBN keys.
+  
+[Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/MEL-773/update_oaebu_docs/oaebu_workflows/workflows/onix_workflow.py)
 
 ## Definitions - Product, Work and Work Families
 
@@ -40,6 +42,15 @@ The Work Family ID will be an arbitrary Work ID (ISBN) representative from a wor
    :header-rows: 1
 ```
 
+## ONIX Work ID ISBN Errors
+
+``` eval_rst
+.. csv-table::
+   :file: ../../schemas/onix_workid_isbn_errors_latest.csv
+   :width: 100%
+   :header-rows: 1
+```
+
 ## Create OAEBU intermediate tables
 For each data partner's tables containing ISBN, create new "matched" tables which extend the original data with new "work_id" and "work_family_id" columns.
 
@@ -66,12 +77,46 @@ For each data source, including the intermediate tables, we perform basic qualit
    :width: 100%
    :header-rows: 1
 ```
+### ONIX Invalid ISBN
 
-### ONIX Work ID ISBN Errors
+Details ISBN13s in the ONIX feed that are not valid.
 
 ``` eval_rst
 .. csv-table::
-   :file: ../../schemas/onix_workid_isbn_errors_latest.csv
+   :file: ../../schemas/onix_invalid_isbn_latest.csv
+   :width: 100%
+   :header-rows: 1
+```
+
+### Data Platform Invalid ISBN
+
+Details ISBN13s in the data source that are not valid.
+
+``` eval_rst
+.. csv-table::
+   :file: ../../schemas/platform_invalid_isbn_latest.csv
+   :width: 100%
+   :header-rows: 1
+```
+
+### Data Platform Invalid ISBN
+
+Details ISBN13s in the data source that are not valid.
+
+``` eval_rst
+.. csv-table::
+   :file: ../../schemas/platform_invalid_isbn_latest.csv
+   :width: 100%
+   :header-rows: 1
+```
+
+### Data Platform Unmatched ISBN
+
+Details ISBN-13s in the data source that were not matched to ISBN-13s in the ONIX feed.
+
+``` eval_rst
+.. csv-table::
+   :file: ../../schemas/platform_unmatched_isbn_latest.csv
    :width: 100%
    :header-rows: 1
 ```
