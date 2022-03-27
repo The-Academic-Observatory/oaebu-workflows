@@ -1,0 +1,20 @@
+[
+    {
+        "mode": "NULLABLE",
+        "name": "ISBN",
+        "type": "STRING",
+        "description": "ISBN13"
+    },
+    {
+        "mode": "NULLABLE",
+        "name": "title",
+        "type": "STRING",
+        "description": "Book title from the data source"
+    },
+    {
+        "mode": "NULLABLE",
+        "name": "release_date",
+        "type": "DATE",
+        "description": "The release date (month)"
+    }
+]
