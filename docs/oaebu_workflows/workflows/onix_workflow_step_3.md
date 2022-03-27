@@ -51,7 +51,7 @@ This table contains metrics, organised by month and author, that are linked to e
 
 ### Book Product Year Metrics Schema
 
-This table contains metrics, organised by month, that are linked to each book.
+This table contains metrics, organised by published year and month, that are linked to each book.
 
 [Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_book_year_metrics.sql.jinja2)
 
@@ -164,6 +164,19 @@ This table contains metrics, organised by month and location of referrals, that 
    :header-rows: 1
 ```
 
+### Book Product Metrics Publisher Schema
+
+This index contains a summary of metrics, organised by month that are linked to each publisher. 
+
+[Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_book_publisher_metrics.sql.jinja2)
+
+``` eval_rst
+.. csv-table::
+   :file: ../../schemas/oaebu_publisher_book_product_publisher_metrics_latest.csv
+   :width: 100%
+   :header-rows: 1
+```
+
 ### Book Product Subjects BIC Schema
 
 This table contains metrics, organised by month and BIC subject type, that are linked to each book.
@@ -205,7 +218,7 @@ This table contains metrics, organised by month and THEMA subject type, that are
 
 ### Book Product Subject Year Schema
 
-This table contains metrics, organised by year and currently just the BIC subject type, that are linked to each book.
+This table contains metrics, organised by published year and month and currently just the BIC subject type, that are linked to each book.
 
 [Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_book_subject_year_metrics.sql.jinja2)
 
@@ -233,6 +246,6 @@ This dataset is helpful for understanding where metrics and books defined in the
 
 ## Export to Elasticsearch
 
-Once the data export tables have been created, they are exorted to Elasticsearch for visualisation in Kibana dashboards.
+Once the data export tables have been created, they are exported to Elasticsearch for visualisation in Kibana dashboards.
 
 [Link to Script](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/dags/elastic_import_workflow.py)
