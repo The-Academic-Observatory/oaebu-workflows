@@ -1,27 +1,21 @@
 [
   {
     "mode": "NULLABLE",
-    "name": "PersonName",
-    "type": "STRING",
-    "description": "Author's Name"
-  },
-  {
-    "mode": "NULLABLE",
-    "name": "orcid",
-    "type": "STRING",
-    "description": "Author's ORCID ID"
+    "name": "published_year",
+    "type": "INTEGER",
+    "description": "Published Year"
   },
   {
     "mode": "NULLABLE",
     "name": "unique_books",
     "type": "INTEGER",
-    "description": "Number of unique Books matched to the author"
+    "description": "The number of unique books published that year in the dataset"
   },
   {
     "mode": "NULLABLE",
     "name": "month",
     "type": "DATE",
-    "description": "Month in which metrics took place"
+    "description": "The month for which the metrics apply to"
   },
   {
     "fields": [
@@ -29,7 +23,7 @@
         "mode": "NULLABLE",
         "name": "unique_views",
         "type": "INTEGER",
-        "description": "Number of unique views"
+        "description": "Unique Views"
       }
     ],
     "mode": "NULLABLE",
@@ -49,7 +43,7 @@
     "mode": "NULLABLE",
     "name": "crossref_events",
     "type": "RECORD",
-    "description": "Metrics from Crossref events"
+    "description": "Metrics from Crossref Events"
   },
   {
     "fields": [
@@ -101,7 +95,7 @@
         "mode": "NULLABLE",
         "name": "qty",
         "type": "INTEGER",
-        "description": "Number of sales"
+        "description": "The number of units in the transaction. Negative for refunds"
       }
     ],
     "mode": "NULLABLE",
@@ -115,7 +109,7 @@
         "mode": "NULLABLE",
         "name": "Total_Item_Requests",
         "type": "INTEGER",
-        "description": "The total number of item requests"
+        "description": "Total number of request made"
       }
     ],
     "mode": "NULLABLE",

@@ -1,27 +1,27 @@
 [
   {
     "mode": "NULLABLE",
-    "name": "PersonName",
+    "name": "subject",
     "type": "STRING",
-    "description": "Author's Name"
+    "description": "BIC subject (top level BIC subjects only)"
   },
   {
     "mode": "NULLABLE",
-    "name": "orcid",
-    "type": "STRING",
-    "description": "Author's ORCID ID"
+    "name": "published_year",
+    "type": "INTEGER",
+    "description": "The published year of the book"
   },
   {
     "mode": "NULLABLE",
     "name": "unique_books",
     "type": "INTEGER",
-    "description": "Number of unique Books matched to the author"
+    "description": "The number of unique books"
   },
   {
     "mode": "NULLABLE",
     "name": "month",
     "type": "DATE",
-    "description": "Month in which metrics took place"
+    "description": "The month in which the metrics occurred"
   },
   {
     "fields": [
@@ -29,7 +29,7 @@
         "mode": "NULLABLE",
         "name": "unique_views",
         "type": "INTEGER",
-        "description": "Number of unique views"
+        "description": "The number of unique views"
       }
     ],
     "mode": "NULLABLE",
@@ -101,7 +101,7 @@
         "mode": "NULLABLE",
         "name": "qty",
         "type": "INTEGER",
-        "description": "Number of sales"
+        "description": "The number of units in the transaction. Negative for refunds"
       }
     ],
     "mode": "NULLABLE",
@@ -115,7 +115,7 @@
         "mode": "NULLABLE",
         "name": "Total_Item_Requests",
         "type": "INTEGER",
-        "description": "The total number of item requests"
+        "description": "Total number of request made"
       }
     ],
     "mode": "NULLABLE",
@@ -159,6 +159,6 @@
     "mode": "NULLABLE",
     "name": "oapen_irus_uk",
     "type": "RECORD",
-    "description": "Metrics from IRUS-UK"
+    "description": "Metrics from OAPEN IRUS-UK"
   }
 ]
