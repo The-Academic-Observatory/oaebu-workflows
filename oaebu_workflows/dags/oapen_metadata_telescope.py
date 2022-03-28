@@ -18,6 +18,12 @@
 # https://airflow.apache.org/docs/stable/faq.html
 
 from oaebu_workflows.workflows.oapen_metadata_telescope import OapenMetadataTelescope
+from observatory.platform.utils.api import make_observatory_api
+from oaebu_workflows.identifiers import TelescopeTypes
 
-workflow = OapenMetadataTelescope()
+# Fetch all telescopes
+api = make_observatory_api()
+telescope_type = api.get_telescope_type(type_id=TelescopeTypes.oapen_metadata)
+telescopes = api.get_telescopes(telescope_type_id=telescope_type.id, limit=1000)
+workflow = OapenMetadataTelescope(workflow_id=telescopes[0].id)
 globals()[workflow.dag_id] = workflow.make_dag()
