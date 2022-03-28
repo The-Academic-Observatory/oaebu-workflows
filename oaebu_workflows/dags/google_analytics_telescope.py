@@ -32,5 +32,5 @@ telescopes = api.get_telescopes(telescope_type_id=telescope_type.id, limit=1000)
 for telescope in telescopes:
     view_id = telescope.extra.get("view_id")
     pagepath_regex = telescope.extra.get("pagepath_regex")
-    workflow = GoogleAnalyticsTelescope(telescope.organisation, view_id, pagepath_regex)
+    workflow = GoogleAnalyticsTelescope(telescope.organisation, view_id, pagepath_regex, workflow_id=telescope.id)
     globals()[workflow.dag_id] = workflow.make_dag()

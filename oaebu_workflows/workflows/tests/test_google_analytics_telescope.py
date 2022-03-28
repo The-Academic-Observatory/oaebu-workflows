@@ -39,6 +39,20 @@ from observatory.platform.utils.test_utils import (
     ObservatoryTestCase,
     module_file_path,
 )
+from observatory.api.testing import ObservatoryApiEnvironment
+from observatory.api.client import ApiClient, Configuration
+from observatory.api.client.api.observatory_api import ObservatoryApi  # noqa: E501
+from observatory.api.client.model.organisation import Organisation
+from observatory.api.client.model.telescope import Telescope
+from observatory.api.client.model.telescope_type import TelescopeType
+from observatory.api.client.model.dataset import Dataset
+from observatory.api.client.model.dataset_release import DatasetRelease
+from observatory.api.client.model.dataset_type import DatasetType
+from observatory.api.client.model.table_type import TableType
+from observatory.platform.utils.release_utils import get_dataset_releases
+from observatory.platform.utils.airflow_utils import AirflowConns
+from airflow.models import Connection
+from airflow.utils.state import State
 
 
 class TestGoogleAnalyticsTelescope(ObservatoryTestCase):
@@ -52,8 +66,68 @@ class TestGoogleAnalyticsTelescope(ObservatoryTestCase):
         super(TestGoogleAnalyticsTelescope, self).__init__(*args, **kwargs)
         self.project_id = os.getenv("TEST_GCP_PROJECT_ID")
         self.data_location = os.getenv("TEST_GCP_DATA_LOCATION")
+
+        # API environment
         self.host = "localhost"
-        self.api_port = 5000
+        self.port = 5001
+        configuration = Configuration(host=f"http://{self.host}:{self.port}")
+        api_client = ApiClient(configuration)
+        self.api = ObservatoryApi(api_client=api_client)  # noqa: E501
+        self.env = ObservatoryApiEnvironment(host=self.host, port=self.port)
+        self.org_name = "UCL Press"
+
+    def setup_api(self, org_name=None):
+        dt = pendulum.now("UTC")
+
+        name = "Google Analytics Telescope"
+        telescope_type = TelescopeType(name=name, type_id=GoogleAnalyticsTelescope.DAG_ID_PREFIX)
+        self.api.put_telescope_type(telescope_type)
+
+        org_name_ = self.org_name if org_name is None else org_name
+
+        organisation = Organisation(
+            name=org_name_,
+            gcp_project_id="project",
+            gcp_download_bucket="download_bucket",
+            gcp_transform_bucket="transform_bucket",
+        )
+        self.api.put_organisation(organisation)
+
+        telescope = Telescope(
+            name=name,
+            telescope_type=TelescopeType(id=1),
+            organisation=Organisation(id=1),
+            extra={},
+        )
+        self.api.put_telescope(telescope)
+
+        table_type = TableType(
+            type_id="partitioned",
+            name="partitioned bq table",
+        )
+        self.api.put_table_type(table_type)
+
+        dataset_type = DatasetType(
+            type_id=GoogleAnalyticsTelescope.DAG_ID_PREFIX,
+            name="ds type",
+            extra={},
+            table_type=TableType(id=1),
+        )
+        self.api.put_dataset_type(dataset_type)
+
+        dataset = Dataset(
+            name="Google Analytics Dataset",
+            address="project.dataset.table",
+            service="bigquery",
+            connection=Telescope(id=1),
+            dataset_type=DatasetType(id=1),
+        )
+        self.api.put_dataset(dataset)
+
+    def setup_connections(self, env):
+        # Add Observatory API connection
+        conn = Connection(conn_id=AirflowConns.OBSERVATORY_API, uri=f"http://:password@{self.host}:{self.port}")
+        env.add_connection(conn)
 
     def test_dag_structure(self):
         """Test that the Google Analytics DAG has the correct structure.
@@ -67,7 +141,8 @@ class TestGoogleAnalyticsTelescope(ObservatoryTestCase):
                 "download_transform": ["upload_transformed"],
                 "upload_transformed": ["bq_load_partition"],
                 "bq_load_partition": ["cleanup"],
-                "cleanup": [],
+                "cleanup": ["add_new_dataset_releases"],
+                "add_new_dataset_releases": [],
             },
             dag,
         )
@@ -77,31 +152,10 @@ class TestGoogleAnalyticsTelescope(ObservatoryTestCase):
         :return: None
         """
 
-        env = ObservatoryEnvironment(self.project_id, self.data_location)
+        env = ObservatoryEnvironment(self.project_id, self.data_location, api_host=self.host, api_port=self.port)
         with env.create():
-            # Add Observatory API connection
-            conn = Connection(conn_id=AirflowConns.OBSERVATORY_API, uri=f"http://:password@{self.host}:{self.api_port}")
-            env.add_connection(conn)
-
-            # Add a telescope
-            dt = pendulum.now("UTC")
-            telescope_type = orm.TelescopeType(
-                name="Google Analytics Telescope", type_id=TelescopeTypes.google_analytics, created=dt, modified=dt
-            )
-            env.api_session.add(telescope_type)
-            organisation = orm.Organisation(name="UCL Press", created=dt, modified=dt)
-            env.api_session.add(organisation)
-            telescope = orm.Telescope(
-                name="UCL Press Google Analytics Telescope",
-                telescope_type=telescope_type,
-                organisation=organisation,
-                modified=dt,
-                created=dt,
-                extra={"view_id": "11235141", "pagepath_regex": r".*regex$"},
-            )
-            env.api_session.add(telescope)
-            env.api_session.commit()
-
+            self.setup_connections(env)
+            self.setup_api()
             dag_file = os.path.join(module_file_path("oaebu_workflows.dags"), "google_analytics_telescope.py")
             self.assert_dag_load("google_analytics_ucl_press", dag_file)
 
@@ -124,7 +178,7 @@ class TestGoogleAnalyticsTelescope(ObservatoryTestCase):
         mock_build.return_value = build("analyticsreporting", "v4", http=http)
 
         # Setup Observatory environment
-        env = ObservatoryEnvironment(self.project_id, self.data_location)
+        env = ObservatoryEnvironment(self.project_id, self.data_location, api_host=self.host, api_port=self.port)
         dataset_id = env.add_dataset()
 
         # Setup Telescope
@@ -136,12 +190,18 @@ class TestGoogleAnalyticsTelescope(ObservatoryTestCase):
             gcp_transform_bucket=env.transform_bucket,
         )
         telescope = GoogleAnalyticsTelescope(
-            organisation=organisation, view_id=self.view_id, pagepath_regex=self.pagepath_regex, dataset_id=dataset_id
+            organisation=organisation,
+            view_id=self.view_id,
+            pagepath_regex=self.pagepath_regex,
+            dataset_id=dataset_id,
+            workflow_id=1,
         )
         dag = telescope.make_dag()
 
         # Create the Observatory environment and run tests
         with env.create():
+            self.setup_connections(env)
+            self.setup_api()
             with env.create_dag_run(dag, execution_date):
                 # Add OAEBU service account connection connection
                 conn = Connection(
@@ -252,6 +312,14 @@ class TestGoogleAnalyticsTelescope(ObservatoryTestCase):
                 env.run_task(telescope.cleanup.__name__)
                 self.assert_cleanup(download_folder, extract_folder, transform_folder)
 
+                # add_dataset_release_task
+                dataset_releases = get_dataset_releases(dataset_id=1)
+                self.assertEqual(len(dataset_releases), 0)
+                ti = env.run_task("add_new_dataset_releases")
+                self.assertEqual(ti.state, State.SUCCESS)
+                dataset_releases = get_dataset_releases(dataset_id=1)
+                self.assertEqual(len(dataset_releases), 1)
+
     @patch("oaebu_workflows.workflows.google_analytics_telescope.build")
     @patch("oaebu_workflows.workflows.google_analytics_telescope.ServiceAccountCredentials")
     def test_telescope_anu(self, mock_account_credentials, mock_build):
@@ -271,7 +339,7 @@ class TestGoogleAnalyticsTelescope(ObservatoryTestCase):
         mock_build.return_value = build("analyticsreporting", "v4", http=http)
 
         # Setup Observatory environment
-        env = ObservatoryEnvironment(self.project_id, self.data_location)
+        env = ObservatoryEnvironment(self.project_id, self.data_location, api_host=self.host, api_port=self.port)
         dataset_id = env.add_dataset()
 
         # Setup Telescope
@@ -283,12 +351,18 @@ class TestGoogleAnalyticsTelescope(ObservatoryTestCase):
             gcp_transform_bucket=env.transform_bucket,
         )
         telescope = GoogleAnalyticsTelescope(
-            organisation=organisation, view_id=self.view_id, pagepath_regex=self.pagepath_regex, dataset_id=dataset_id
+            organisation=organisation,
+            view_id=self.view_id,
+            pagepath_regex=self.pagepath_regex,
+            dataset_id=dataset_id,
+            workflow_id=1,
         )
         dag = telescope.make_dag()
 
         # Create the Observatory environment and run tests
         with env.create():
+            self.setup_connections(env)
+            self.setup_api(org_name=self.organisation_name)
             with env.create_dag_run(dag, execution_date):
                 # Add OAEBU service account connection connection
                 conn = Connection(
@@ -416,6 +490,14 @@ class TestGoogleAnalyticsTelescope(ObservatoryTestCase):
                 )
                 env.run_task(telescope.cleanup.__name__)
                 self.assert_cleanup(download_folder, extract_folder, transform_folder)
+
+                # add_dataset_release_task
+                dataset_releases = get_dataset_releases(dataset_id=1)
+                self.assertEqual(len(dataset_releases), 0)
+                ti = env.run_task("add_new_dataset_releases")
+                self.assertEqual(ti.state, State.SUCCESS)
+                dataset_releases = get_dataset_releases(dataset_id=1)
+                self.assertEqual(len(dataset_releases), 1)
 
 
 def create_http_mock_sequence(organisation_name: str) -> list:

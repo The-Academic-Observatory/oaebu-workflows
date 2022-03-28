@@ -108,6 +108,7 @@ class GoogleAnalyticsTelescope(OrganisationTelescope):
         airflow_vars=None,
         airflow_conns=None,
         schema_prefix: str = "",
+        workflow_id: int = None,
     ):
         """Construct a GoogleAnalyticsTelescope instance.
         :param organisation: the Organisation of which data is processed.
@@ -122,6 +123,7 @@ class GoogleAnalyticsTelescope(OrganisationTelescope):
         :param catchup: whether to catchup the DAG or not.
         :param airflow_vars: list of airflow variable keys, for each variable it is checked if it exists in airflow
         :param schema_prefix: the prefix used to find the schema path.
+        :param workflow_id: api workflow id.
         """
         if airflow_vars is None:
             airflow_vars = [
@@ -153,13 +155,22 @@ class GoogleAnalyticsTelescope(OrganisationTelescope):
             airflow_vars=airflow_vars,
             airflow_conns=airflow_conns,
             schema_prefix=schema_prefix,
+            workflow_id=workflow_id,
         )
 
         self.view_id = view_id
         self.pagepath_regex = pagepath_regex
 
         self.add_setup_task_chain([self.check_dependencies])
-        self.add_task_chain([self.download_transform, self.upload_transformed, self.bq_load_partition, self.cleanup])
+        self.add_task_chain(
+            [
+                self.download_transform,
+                self.upload_transformed,
+                self.bq_load_partition,
+                self.cleanup,
+                self.add_new_dataset_releases,
+            ]
+        )
 
     def make_release(self, **kwargs) -> List[GoogleAnalyticsRelease]:
         """Make release instances. The release is passed as an argument to the function (TelescopeFunction) that is
@@ -201,6 +212,7 @@ class GoogleAnalyticsTelescope(OrganisationTelescope):
         results = releases[0].download_transform(self.view_id, self.pagepath_regex)
         if not results:
             raise AirflowSkipException("No Google Analytics data available to download.")
+
 
 def initialize_analyticsreporting() -> Resource:
     """Initializes an Analytics Reporting API V4 service object.
