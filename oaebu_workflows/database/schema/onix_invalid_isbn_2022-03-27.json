@@ -1,7 +1,7 @@
 [
     {
         "mode": "NULLABLE",
-        "name": "Primary_ISBN",
+        "name": "ISBN13",
         "type": "STRING",
         "description": "ISBN13"
     }
