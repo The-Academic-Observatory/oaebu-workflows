@@ -213,7 +213,7 @@
     "mode": "NULLABLE",
     "name": "DOI",
     "type": "STRING",
-    "description": ""
+    "description": "The product's Digital object identifier."
   },
   {
     "mode": "REPEATED",
@@ -313,25 +313,25 @@
         "mode": "NULLABLE",
         "name": "ISBN13",
         "type": "STRING",
-        "description": ""
+        "description": "The related product's 13-digit International Standard Book Number."
       },
       {
         "mode": "NULLABLE",
         "name": "ProductForm",
         "type": "STRING",
-        "description": ""
+        "description": "An ONIX code which indicates the primary form of a related product. Optional in an occurrence of\n<RelatedProduct>, and non-repeating. If supplied, should be identical to the <ProductForm> element\nsupplied in the <DescriptiveDetail> block of the full ONIX record describing the related product itself."
       },
       {
         "mode": "NULLABLE",
         "name": "DOI",
         "type": "STRING",
-        "description": ""
+        "description": "The related product's digital object identifier."
       },
       {
         "mode": "NULLABLE",
         "name": "GTIN_13",
         "type": "STRING",
-        "description": ""
+        "description": "The related product's 13-digit global trade item number."
       },
       {
         "mode": "REPEATED",
@@ -343,7 +343,7 @@
         "mode": "NULLABLE",
         "name": "PID_Proprietary",
         "type": "STRING",
-        "description": ""
+        "description": "The related product's proprietary product ID."
       }
     ],
     "mode": "REPEATED",
@@ -355,19 +355,19 @@
     "mode": "NULLABLE",
     "name": "PID_Proprietary",
     "type": "STRING",
-    "description": ""
+    "description": "The product's proprietary product identifier."
   },
   {
     "mode": "NULLABLE",
     "name": "ISBN10",
     "type": "STRING",
-    "description": ""
+    "description": "The product's 10-digit International Standard Book Number."
   },
   {
     "mode": "NULLABLE",
     "name": "ISBN13",
     "type": "STRING",
-    "description": ""
+    "description": "The product's 13-digit International Standard Book Number."
   },
   {
     "fields": [
@@ -377,61 +377,61 @@
             "mode": "NULLABLE",
             "name": "TitleWithoutPrefix_TextCaseFlags",
             "type": "STRING",
-            "description": ""
+            "description": "TitleWithoutPrefix textcase attribute."
           },
           {
             "mode": "NULLABLE",
             "name": "TitleText_TextCaseFlags",
             "type": "STRING",
-            "description": ""
+            "description": "TitleText textcase attribute."
           },
           {
             "mode": "NULLABLE",
             "name": "Subtitle_TextCaseFlags",
             "type": "STRING",
-            "description": ""
+            "description": "Subtitle textcase attribute."
           },
           {
             "mode": "NULLABLE",
             "name": "TitleText",
             "type": "STRING",
-            "description": ""
+            "description": "The text of a title element, excluding any subtitle. Optional and non-repeating, may only be used where\n<TitlePrefix>, <NoPrefix/> and <TitleWithoutPrefix> are not used."
           },
           {
             "mode": "NULLABLE",
             "name": "TitleText_Language",
             "type": "STRING",
-            "description": ""
+            "description": "TitleText language attribute."
           },
           {
             "mode": "NULLABLE",
             "name": "TitleElementLevel",
             "type": "STRING",
-            "description": ""
+            "description": "An ONIX code indicating the level of a title element: collection level, subcollection level, or product level.\nMandatory in each occurrence of the <TitleElement> composite, and non-repeating."
           },
           {
             "mode": "NULLABLE",
             "name": "Subtitle",
             "type": "STRING",
-            "description": ""
+            "description": "The text of a subtitle, if any. ‘Subtitle’ means any added words which appear with the title element given in\nan occurrence of the <TitleElement> composite, and which amplify and explain the title element, but which\nare not considered to be part of the title element itself. Optional and non-repeating."
           },
           {
             "mode": "NULLABLE",
             "name": "SequenceNumber",
             "type": "INTEGER",
-            "description": ""
+            "description": "A number which specifies a single overall sequence of title elements, which is the preferred order for\ndisplay of the various title elements when constructing a complete title. Optional and non-repeating. It is\nstrongly recommended that where there are multiple title elements within a <TitleDetail> composite, each\noccurrence of the <TitleElement> composite should carry a <SequenceNumber>."
           },
           {
             "mode": "NULLABLE",
             "name": "TitleWithoutPrefix",
             "type": "STRING",
-            "description": ""
+            "description": "The text of a title element without the title prefix; and excluding any subtitle. Optional and non-repeating;\ncan only be used if one of the <NoPrefix/> or <TitlePrefix> element is also present."
           },
           {
             "mode": "NULLABLE",
             "name": "Subtitle_Language",
             "type": "STRING",
-            "description": ""
+            "description": "Language attribute."
           },
           {
             "fields": [
@@ -439,37 +439,37 @@
                 "mode": "NULLABLE",
                 "name": "Value",
                 "type": "STRING",
-                "description": ""
+                "description": "TitlePrefix value."
               }
             ],
             "mode": "NULLABLE",
             "name": "TitlePrefix",
             "type": "RECORD",
-            "description": ""
+            "description": "Text at the beginning of a title element which is to be ignored for alphabetical sorting. Optional and non-\nrepeating; can only be used when <TitleText> is omitted, and if the <TitleWithoutPrefix> element is also\npresent. These two elements may be used in combination in applications where it is necessary to\ndistinguish an initial word or character string which is to be ignored for filing purposes, eg in library systems\nand in some bookshop databases."
           }
         ],
         "mode": "REPEATED",
         "name": "TitleElements",
         "type": "RECORD",
-        "description": ""
+        "description": "A group of data elements which together represent an element of a title. At least one title element is\nmandatory in each occurrence of the <TitleDetail> composite. The composite is repeatable with different\nsequence numbers and/or title element levels, each repeat carrying a different part of the title. An instance\nof the <TitleElement> composite must include at least one of: <PartNumber>; <YearOfAnnual>;\n<TitleText>, <NoPrefix/> together with <TitleWithoutPrefix>, or <TitlePrefix> together with\n<TitleWithoutPrefix>. In other words it must carry either the text of a title or a part or year designation; and it\nmay carry both."
       },
       {
         "mode": "NULLABLE",
         "name": "TitleType",
         "type": "STRING",
-        "description": ""
+        "description": "An ONIX code indicating the type of a title. Mandatory in each occurrence of the <TitleDetail> composite,\nand non-repeating."
       },
       {
         "mode": "NULLABLE",
         "name": "TitleStatement",
         "type": "STRING",
-        "description": ""
+        "description": "Free text showing how the overall title (including any collection level title, if the collection title is treated as\npart of the product title and included in P.6) should be presented in any display, particularly when a\nstandard concatenation of individual title elements from Group P.6 (in the order specified by the\n<SequenceNumber> data elements) would not give a satisfactory result. Optional and non-repeating. When\nthis field is sent, the recipient should use it to replace all title detail sent in Group P.6 for display purposes\nonly. The individual title element detail must also be sent, for indexing and retrieval purposes."
       }
     ],
     "mode": "REPEATED",
     "name": "TitleDetails",
     "type": "RECORD",
-    "description": ""
+    "description": "A group of data elements which together give the text of a title and specify its type. At least one title detail\nelement is mandatory in each occurrence of the <DescriptiveDetail> composite, to give the primary form of\nthe product title. The composite is repeatable with different title types."
   },
   {
     "fields": [
@@ -495,7 +495,7 @@
     "mode": "NULLABLE",
     "name": "GTIN_13",
     "type": "STRING",
-    "description": ""
+    "description": "The product's 13-digit global trade item number."
   },
   {
     "fields": [
@@ -547,7 +547,7 @@
         "mode": "NULLABLE",
         "name": "Proprietary",
         "type": "INTEGER",
-        "description": ""
+        "description": "The contributor's proprietary identifier."
       },
       {
         "mode": "NULLABLE",
@@ -561,25 +561,25 @@
             "mode": "REPEATED",
             "name": "Positions",
             "type": "STRING",
-            "description": ""
+            "description": "A professional position held by a contributor to the product at the time of its creation. Optional, and\nrepeatable to provide parallel text in multiple languages. The language attribute is optional for a single\ninstance of <ProfessionalPosition>, but must be included in each instance if <ProfessionalPosition> is\nrepeated."
           },
           {
             "mode": "NULLABLE",
             "name": "Affiliations",
             "type": "STRING",
-            "description": ""
+            "description": "An organization to which a contributor to the product was affiliated at the time of its creation, and – if the\n<ProfessionalPosition> element is also present – where s/he held that position. Optional and non-repeating."
           }
         ],
         "mode": "REPEATED",
         "name": "ProfessionalAffiliations",
         "type": "RECORD",
-        "description": ""
+        "description": "An optional group of data elements which together identify a contributor’s professional position and/or\naffiliation, repeatable to allow multiple positions and affiliations to be specified."
       },
       {
         "mode": "NULLABLE",
         "name": "ORCID",
         "type": "STRING",
-        "description": ""
+        "description": "A 16-digit ORCID ID that uniquely identifies the author."
       },
       {
         "fields": [
@@ -587,31 +587,31 @@
             "mode": "NULLABLE",
             "name": "TextFormat",
             "type": "STRING",
-            "description": ""
+            "description": "The textformat attribute."
           },
           {
             "mode": "NULLABLE",
             "name": "Note",
             "type": "STRING",
-            "description": ""
+            "description": "The biographical note."
           }
         ],
         "mode": "REPEATED",
         "name": "BiographicalNotes",
         "type": "RECORD",
-        "description": ""
+        "description": "A biographical note about a contributor to the product. (See the <TextContent> composite in Group P.14 for\na biographical note covering all contributors to a product in a single text.) Optional, and repeatable to\nprovide parallel biographical notes in multiple languages. The language attribute is optional for a single\ninstance of <BiographicalNote>, but must be included in each instance if <BiographicalNote> is repeated.\nMay occur with a person name or with a corporate name. A biographical note in ONIX should always\ncontain the name of the person or body concerned, and it should always be presented as a piece of\ncontinuous text consisting of full sentences. Some recipients of ONIX data feeds will not accept text which\nhas embedded URLs. A contributor website link can be sent using the <Website> composite below."
       },
       {
         "mode": "NULLABLE",
         "name": "TitlesBeforeNames",
         "type": "STRING",
-        "description": ""
+        "description": "The first part of a structured name of a person who contributed to the creation of the product: qualifications\nand/or titles preceding a person’s names, eg ‘Professor’ or ‘HRH Prince’ or ‘Saint’. Optional and non-\nrepeating: see Group P.7 introductory text for valid options."
       },
       {
         "mode": "REPEATED",
         "name": "Roles",
         "type": "STRING",
-        "description": ""
+        "description": "An ONIX code indicating the role played by a person or corporate body in the creation of the product.\nMandatory in each occurrence of a <Contributor> composite, and may be repeated if the same person or\ncorporate body has more than one role in relation to the product."
       },
       {
         "fields": [
@@ -619,31 +619,31 @@
             "mode": "REPEATED",
             "name": "WebsiteDescriptions",
             "type": "STRING",
-            "description": ""
+            "description": "Free text describing the nature of the website which is linked through the <WebsiteLink> element. Optional,\nand repeatable to provide parallel descriptive text in multiple languages. The language attribute is optional\nfor a single instance of <WebsiteDescription>, but must be included in each instance if\n<WebsiteDescription> is repeated."
           },
           {
             "mode": "NULLABLE",
             "name": "WebsiteRole",
             "type": "STRING",
-            "description": ""
+            "description": "An ONIX code which identifies the role or purpose of the website which is linked through the <WebsiteLink>\nelement. Optional and non-repeating."
           },
           {
             "mode": "REPEATED",
             "name": "WebsiteLinks",
             "type": "STRING",
-            "description": ""
+            "description": "The URL for the website. Mandatory in each occurrence of the <Website> composite, and repeatable to\nprovide multiple URLs where the website content is available in multiple languages. The language attribute\nis optional for a single instance of <WebsiteLink>, but must be included in each instance if <WebsiteLink> is\nrepeated."
           }
         ],
         "mode": "REPEATED",
         "name": "Websites",
         "type": "RECORD",
-        "description": ""
+        "description": "An optional group of data elements which together identify and provide a pointer to a website which is\nrelated to the person or organization identified in an occurrence of the <Contributor> composite. Repeatable\nto provide links to multiple websites."
       },
       {
         "mode": "NULLABLE",
         "name": "PersonNameInverted",
         "type": "STRING",
-        "description": ""
+        "description": "The name of a person who contributed to the creation of the product, presented with the element used for\nalphabetical sorting placed first (‘inverted order’). Optional and non-repeating: see Group P.7 introductory\ntext for valid options."
       },
       {
         "fields": [
@@ -651,55 +651,55 @@
             "mode": "NULLABLE",
             "name": "Date",
             "type": "INTEGER",
-            "description": ""
+            "description": "The date specified in the <ContributorDateRole> field. Mandatory in each occurrence of the\n<ContributorDate> composite, and non-repeating. <Date> may carry a dateformat attribute: if the attribute is\nmissing, then <DateFormat> indicates the format of the date; if both dateformat attribute and <DateFormat>\nelement are missing, the default format is YYYYMMDD."
           },
           {
             "mode": "NULLABLE",
             "name": "Role",
             "type": "STRING",
-            "description": ""
+            "description": "An ONIX code indicating the significance of the date in relation to the contributor name. Mandatory in each\noccurrence of the <ContributorDate> composite, and non-repeating."
           }
         ],
         "mode": "REPEATED",
         "name": "Dates",
         "type": "RECORD",
-        "description": ""
+        "description": "A group of data elements which together specify a date associated with the person or organization identified\nin an occurrence of the <Contributor> composite, eg birth or death. Optional, and repeatable to allow\nmultiple dates to be specified."
       },
       {
         "mode": "NULLABLE",
         "name": "SequenceNumber",
         "type": "INTEGER",
-        "description": ""
+        "description": "A number which specifies a single overall sequence of title elements, which is the preferred order for\ndisplay of the various title elements when constructing a complete title. Optional and non-repeating. It is\nstrongly recommended that where there are multiple title elements within a <TitleDetail> composite, each\noccurrence of the <TitleElement> composite should carry a <SequenceNumber>."
       },
       {
         "mode": "NULLABLE",
         "name": "PrefixToKey",
         "type": "STRING",
-        "description": ""
+        "description": "The third part of a structured name of a person who contributed to the creation of the product: a prefix which\nprecedes the key name(s) but which is not to be treated as part of the key name, eg ‘van’ in Ludwig van\nBeethoven. This element may also be used for titles that appear after given names and before key names,\neg ‘Lord’ in Alfred, Lord Tennyson. Optional and non-repeating."
       },
       {
         "mode": "NULLABLE",
         "name": "KeyNames",
         "type": "STRING",
-        "description": ""
+        "description": "The fourth part of a structured name of a person who contributed to the creation of the product: key\nname(s), ie the name elements normally used to open an entry in an alphabetical list, eg ‘Smith’ or ‘Garcia\nMarquez’ or ‘Madonna’ or ‘Francis de Sales’ (in Saint Francis de Sales). Non-repeating. Required if name\npart elements P.7.11 to P.7.18 are used."
       },
       {
         "mode": "NULLABLE",
         "name": "TitlesAfterNames",
         "type": "STRING",
-        "description": ""
+        "description": "The eighth part of a structured name of a person who contributed to the creation of the product: titles\nfollowing a person’s names, eg ‘Duke of Edinburgh’. Optional and non-repeating."
       },
       {
         "mode": "REPEATED",
         "name": "AlternativeNames",
         "type": "STRING",
-        "description": ""
+        "description": "A group of data elements which together represent an alternative name of a contributor, and specify its\ntype. The <AlternativeName> composite is optional, and is repeatable to provide multiple alternative names\nfor the contributor."
       },
       {
         "mode": "NULLABLE",
         "name": "NamesBeforeKey",
         "type": "STRING",
-        "description": ""
+        "description": "The second part of a structured name of a person who contributed to the creation of the product: name(s)\nand/or initial(s) preceding a person’s key name(s), eg James J. Optional and non-repeating."
       },
       {
         "fields": [
@@ -707,25 +707,25 @@
             "mode": "NULLABLE",
             "name": "CountryCode",
             "type": "STRING",
-            "description": ""
+            "description": "A code identifying a country with which a contributor is particularly associated. Optional and non-repeatable.\nThere must be an occurrence of either the <CountryCode> or the <RegionCode> elements in each\noccurrence of <ContributorPlace>."
           },
           {
             "mode": "REPEATED",
             "name": "Locations",
             "type": "STRING",
-            "description": ""
+            "description": "The name of a city or town location within the specified country or region with which a contributor is\nparticularly associated. Optional, and repeatable to provide parallel names for a single location in multiple\nlanguages (eg Baile Átha Cliath and Dublin, or Bruxelles and Brussel). The language attribute is optional for\na single instance of <LocationName>, but must be included in each instance if <LocationName> is\nrepeated."
           },
           {
             "mode": "NULLABLE",
             "name": "Relation",
             "type": "STRING",
-            "description": ""
+            "description": "An ONIX code identifying the relationship between a contributor and a geographical location. Mandatory in\neach occurrence of <ContributorPlace> and non-repeating."
           }
         ],
         "mode": "REPEATED",
         "name": "Places",
         "type": "RECORD",
-        "description": ""
+        "description": "An optional group of data elements which together identify a geographical location with which a contributor\nis associated, used to support ‘local interest’ promotions. Repeatable to identify multiple geographical\nlocations, each usually with a different relationship to the contributor."
       },
       {
         "mode": "NULLABLE",
@@ -737,7 +737,7 @@
         "mode": "NULLABLE",
         "name": "ISNI",
         "type": "STRING",
-        "description": ""
+        "description": "16-digit International Standard Name Identifier number."
       },
       {
         "mode": "NULLABLE",
@@ -755,7 +755,7 @@
     "mode": "NULLABLE",
     "name": "COKI_ID",
     "type": "STRING",
-    "description": "To delete"
+    "description": "The product's internal COKI identifier."
   },
   {
     "fields": [
