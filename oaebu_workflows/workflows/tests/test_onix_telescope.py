@@ -39,6 +39,20 @@ from observatory.platform.utils.workflow_utils import (
     blob_name,
     workflow_path,
 )
+from observatory.api.testing import ObservatoryApiEnvironment
+from observatory.api.client import ApiClient, Configuration
+from observatory.api.client.api.observatory_api import ObservatoryApi  # noqa: E501
+from observatory.api.client.model.organisation import Organisation
+from observatory.api.client.model.telescope import Telescope
+from observatory.api.client.model.telescope_type import TelescopeType
+from observatory.api.client.model.dataset import Dataset
+from observatory.api.client.model.dataset_release import DatasetRelease
+from observatory.api.client.model.dataset_type import DatasetType
+from observatory.api.client.model.table_type import TableType
+from observatory.platform.utils.release_utils import get_dataset_releases
+from observatory.platform.utils.airflow_utils import AirflowConns
+from airflow.models import Connection
+from airflow.utils.state import State
 
 
 class TestOnixTelescope(ObservatoryTestCase):
@@ -62,6 +76,66 @@ class TestOnixTelescope(ObservatoryTestCase):
         self.dataset_location = "us"
         self.date_regex = "\\d{8}"
         self.date_format = "%Y%m%d"
+
+        # API environment
+        self.host = "localhost"
+        self.port = 5001
+        configuration = Configuration(host=f"http://{self.host}:{self.port}")
+        api_client = ApiClient(configuration)
+        self.api = ObservatoryApi(api_client=api_client)  # noqa: E501
+        self.env = ObservatoryApiEnvironment(host=self.host, port=self.port)
+        self.org_name = "Curtin Press"
+
+    def setup_api(self):
+        dt = pendulum.now("UTC")
+
+        name = "Ucl Discovery Telescope"
+        telescope_type = TelescopeType(name=name, type_id=OnixTelescope.DAG_ID_PREFIX)
+        self.api.put_telescope_type(telescope_type)
+
+        organisation = Organisation(
+            name=self.org_name,
+            gcp_project_id="project",
+            gcp_download_bucket="download_bucket",
+            gcp_transform_bucket="transform_bucket",
+        )
+        self.api.put_organisation(organisation)
+
+        telescope = Telescope(
+            name=name,
+            telescope_type=TelescopeType(id=1),
+            organisation=Organisation(id=1),
+            extra={},
+        )
+        self.api.put_telescope(telescope)
+
+        table_type = TableType(
+            type_id="partitioned",
+            name="partitioned bq table",
+        )
+        self.api.put_table_type(table_type)
+
+        dataset_type = DatasetType(
+            type_id=OnixTelescope.DAG_ID_PREFIX,
+            name="ds type",
+            extra={},
+            table_type=TableType(id=1),
+        )
+        self.api.put_dataset_type(dataset_type)
+
+        dataset = Dataset(
+            name="Ucl Discovery Dataset",
+            address="project.dataset.table",
+            service="bigquery",
+            connection=Telescope(id=1),
+            dataset_type=DatasetType(id=1),
+        )
+        self.api.put_dataset(dataset)
+
+    def setup_connections(self, env):
+        # Add Observatory API connection
+        conn = Connection(conn_id=AirflowConns.OBSERVATORY_API, uri=f"http://:password@{self.host}:{self.port}")
+        env.add_connection(conn)
 
     def test_dag_structure(self):
         """Test that the ONIX DAG has the correct structure.
@@ -89,7 +163,8 @@ class TestOnixTelescope(ObservatoryTestCase):
                 "upload_transformed": ["bq_load"],
                 "bq_load": ["move_files_to_finished"],
                 "move_files_to_finished": ["cleanup"],
-                "cleanup": [],
+                "cleanup": ["add_new_dataset_releases"],
+                "add_new_dataset_releases": [],
             },
             dag,
         )
@@ -102,31 +177,13 @@ class TestOnixTelescope(ObservatoryTestCase):
 
         env = ObservatoryEnvironment(self.project_id, self.data_location, api_host=self.host, api_port=self.api_port)
         with env.create():
-            # Add Observatory API connection
-            conn = Connection(conn_id=AirflowConns.OBSERVATORY_API, uri=f"http://:password@{self.host}:{self.api_port}")
-            env.add_connection(conn)
+            env = ObservatoryEnvironment(self.project_id, self.data_location, api_host=self.host, api_port=self.port)
 
-            # Add an ONIX telescope
-            dt = pendulum.now("UTC")
-            telescope_type = orm.TelescopeType(
-                name="ONIX Telescope", type_id=TelescopeTypes.onix, created=dt, modified=dt
-            )
-            env.api_session.add(telescope_type)
-            organisation = orm.Organisation(name="Curtin Press", created=dt, modified=dt)
-            env.api_session.add(organisation)
-            telescope = orm.Telescope(
-                name="Curtin Press ONIX Telescope",
-                telescope_type=telescope_type,
-                organisation=organisation,
-                modified=dt,
-                created=dt,
-                extra={"date_regex": self.date_regex, "date_format": self.date_format},
-            )
-            env.api_session.add(telescope)
-            env.api_session.commit()
-
-            dag_file = os.path.join(module_file_path("oaebu_workflows.dags"), "onix_telescope.py")
-            self.assert_dag_load("onix_curtin_press", dag_file)
+            with env.create():
+                self.setup_connections(env)
+                self.setup_api()
+                dag_file = os.path.join(module_file_path("oaebu_workflows.dags"), "onix_telescope.py")
+                self.assert_dag_load("onix_curtin_press", dag_file)
 
     def test_telescope(self):
         """Test the ONIX telescope end to end.
@@ -135,13 +192,15 @@ class TestOnixTelescope(ObservatoryTestCase):
         """
 
         # Setup Observatory environment
-        env = ObservatoryEnvironment(self.project_id, self.data_location)
+        env = ObservatoryEnvironment(self.project_id, self.data_location, api_host=self.host, api_port=self.port)
         sftp_server = SftpServer(host=self.host, port=self.sftp_port)
         dataset_id = env.add_dataset()
 
         # Create the Observatory environment and run tests
 
         with env.create():
+            self.setup_connections(env)
+            self.setup_api()
             with sftp_server.create() as sftp_root:
                 # Setup Telescope
                 execution_date = pendulum.datetime(year=2021, month=3, day=31)
@@ -154,6 +213,7 @@ class TestOnixTelescope(ObservatoryTestCase):
                     date_regex=self.date_regex,
                     date_format=self.date_format,
                     dataset_id=dataset_id,
+                    workflow_id=1,
                 )
                 dag = telescope.make_dag()
 
@@ -257,3 +317,11 @@ class TestOnixTelescope(ObservatoryTestCase):
                     self.assertEqual(ti.state, State.SUCCESS)
 
                     self.assert_cleanup(download_folder, extract_folder, transform_folder)
+
+                    # add_dataset_release_task
+                    dataset_releases = get_dataset_releases(dataset_id=1)
+                    self.assertEqual(len(dataset_releases), 0)
+                    ti = env.run_task("add_new_dataset_releases")
+                    self.assertEqual(ti.state, State.SUCCESS)
+                    dataset_releases = get_dataset_releases(dataset_id=1)
+                    self.assertEqual(len(dataset_releases), 1)

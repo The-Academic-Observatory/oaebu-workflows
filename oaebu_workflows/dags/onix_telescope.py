@@ -45,5 +45,6 @@ for telescope in telescopes:
         dataset_location=dataset_location,
         date_regex=date_regex,
         date_format=date_format,
+        workflow_id=telescope.id,
     )
     globals()[workflow.dag_id] = workflow.make_dag()
