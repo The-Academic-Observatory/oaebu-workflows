@@ -26,3 +26,4 @@ class TelescopeTypes:
     onix = "onix"
     onix_workflow = "onix_workflow"
     ucl_discovery = "ucl_discovery"
+    doab = "doab"

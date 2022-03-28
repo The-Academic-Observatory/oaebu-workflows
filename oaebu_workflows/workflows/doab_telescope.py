@@ -163,16 +163,18 @@ class DoabTelescope(StreamTelescope):
     """
 
     CSV_URL = "https://directory.doabooks.org/download-export?format=csv"
+    DAG_ID = "doab"
 
     def __init__(
         self,
-        dag_id: str = "doab",
+        dag_id: str = DAG_ID,
         start_date: pendulum.DateTime = pendulum.datetime(2018, 5, 14),
         schedule_interval: str = "@monthly",
         dataset_id: str = "doab",
         merge_partition_field: str = "id",
         schema_folder: str = default_schema_folder(),
         airflow_vars: list = None,
+        workflow_id: int = None,
     ):
         if airflow_vars is None:
             airflow_vars = [
@@ -190,14 +192,15 @@ class DoabTelescope(StreamTelescope):
             merge_partition_field,
             schema_folder,
             airflow_vars=airflow_vars,
-            load_bigquery_table_kwargs={"ignore_unknown_values": True}
+            workflow_id=workflow_id,
+            load_bigquery_table_kwargs={"ignore_unknown_values": True},
         )
 
         self.add_setup_task(self.check_dependencies)
         self.add_task_chain(
             [self.download, self.upload_downloaded, self.transform, self.upload_transformed, self.bq_load_partition]
         )
-        self.add_task_chain([self.bq_delete_old, self.bq_append_new, self.cleanup], trigger_rule="none_failed")
+        self.add_task_chain([self.bq_delete_old, self.bq_append_new, self.cleanup, self.add_new_dataset_releases])
 
     def make_release(self, **kwargs) -> "DoabRelease":
         # Make Release instance
