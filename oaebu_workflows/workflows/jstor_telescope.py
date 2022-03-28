@@ -168,6 +168,7 @@ class JstorTelescope(OrganisationTelescope):
         airflow_vars: List = None,
         airflow_conns: List = None,
         max_active_runs: int = 1,
+        workflow_id: int = None,
     ):
         """Construct a JstorTelescope instance.
         :param organisation: the Organisation of which data is processed.
@@ -182,6 +183,7 @@ class JstorTelescope(OrganisationTelescope):
         :param catchup: whether to catchup the DAG or not.
         :param airflow_vars: list of airflow variable keys, for each variable it is checked if it exists in airflow
         :param max_active_runs: the maximum number of DAG runs that can be run at once.
+        :param workflow_id: api workflow id.
         """
 
         if airflow_vars is None:
@@ -211,12 +213,20 @@ class JstorTelescope(OrganisationTelescope):
             airflow_vars=airflow_vars,
             airflow_conns=airflow_conns,
             max_active_runs=max_active_runs,
+            workflow_id=workflow_id,
         )
         self.publisher_id = publisher_id
 
         self.add_setup_task_chain([self.check_dependencies, self.list_reports, self.download_reports])
         self.add_task_chain(
-            [self.upload_downloaded, self.transform, self.upload_transformed, self.bq_load_partition, self.cleanup]
+            [
+                self.upload_downloaded,
+                self.transform,
+                self.upload_transformed,
+                self.bq_load_partition,
+                self.cleanup,
+                self.add_new_dataset_releases,
+            ]
         )
 
     def make_release(self, **kwargs) -> List[JstorRelease]:
