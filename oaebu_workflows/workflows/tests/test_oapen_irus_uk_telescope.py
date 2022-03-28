@@ -39,6 +39,20 @@ from observatory.platform.utils.test_utils import (
 )
 from observatory.platform.utils.workflow_utils import blob_name, table_ids_from_path
 from requests import Response
+from observatory.api.testing import ObservatoryApiEnvironment
+from observatory.api.client import ApiClient, Configuration
+from observatory.api.client.api.observatory_api import ObservatoryApi  # noqa: E501
+from observatory.api.client.model.organisation import Organisation
+from observatory.api.client.model.telescope import Telescope
+from observatory.api.client.model.telescope_type import TelescopeType
+from observatory.api.client.model.dataset import Dataset
+from observatory.api.client.model.dataset_release import DatasetRelease
+from observatory.api.client.model.dataset_type import DatasetType
+from observatory.api.client.model.table_type import TableType
+from observatory.platform.utils.release_utils import get_dataset_releases
+from observatory.platform.utils.airflow_utils import AirflowConns
+from airflow.models import Connection
+from airflow.utils.state import State
 
 from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.identifiers import TelescopeTypes
@@ -73,6 +87,69 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
         self.download_path = test_fixtures_folder("oapen_irus_uk", "download.jsonl.gz")
         self.transform_hash = "0b111b2f"
 
+        # API environment
+        self.host = "localhost"
+        self.port = 5001
+        configuration = Configuration(host=f"http://{self.host}:{self.port}")
+        api_client = ApiClient(configuration)
+        self.api = ObservatoryApi(api_client=api_client)  # noqa: E501
+        self.env = ObservatoryApiEnvironment(host=self.host, port=self.port)
+        self.org_name = "UCL Press"
+
+    def setup_api(self, env=None):
+        dt = pendulum.now("UTC")
+
+        name = "Oapen Metadata Telescope"
+        telescope_type = TelescopeType(name=name, type_id=OapenIrusUkTelescope.DAG_ID_PREFIX)
+        self.api.put_telescope_type(telescope_type)
+
+        gcp_download_bucket = env.download_bucket if env else "download_bucket"
+        gcp_transform_bucket = env.transform_bucket if env else "transform_bucket"
+
+        organisation = Organisation(
+            name=self.org_name,
+            gcp_project_id=self.project_id,
+            gcp_download_bucket=gcp_download_bucket,
+            gcp_transform_bucket=gcp_transform_bucket,
+        )
+        self.api.put_organisation(organisation)
+
+        telescope = Telescope(
+            name=name,
+            telescope_type=TelescopeType(id=1),
+            organisation=Organisation(id=1),
+            extra={},
+        )
+        self.api.put_telescope(telescope)
+
+        table_type = TableType(
+            type_id="partitioned",
+            name="partitioned bq table",
+        )
+        self.api.put_table_type(table_type)
+
+        dataset_type = DatasetType(
+            type_id=OapenIrusUkTelescope.DAG_ID_PREFIX,
+            name="ds type",
+            extra={},
+            table_type=TableType(id=1),
+        )
+        self.api.put_dataset_type(dataset_type)
+
+        dataset = Dataset(
+            name="Oapen Metadata Dataset",
+            address="project.dataset.table",
+            service="bigquery",
+            connection=Telescope(id=1),
+            dataset_type=DatasetType(id=1),
+        )
+        self.api.put_dataset(dataset)
+
+    def setup_connections(self, env):
+        # Add Observatory API connection
+        conn = Connection(conn_id=AirflowConns.OBSERVATORY_API, uri=f"http://:password@{self.host}:{self.port}")
+        env.add_connection(conn)
+
     def test_dag_structure(self):
         """Test that the Oapen Irus Uk DAG has the correct structure.
         :return: None
@@ -90,7 +167,8 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
                 "download_transform": ["upload_transformed"],
                 "upload_transformed": ["bq_load_partition"],
                 "bq_load_partition": ["cleanup"],
-                "cleanup": [],
+                "cleanup": ["add_new_dataset_releases"],
+                "add_new_dataset_releases": [],
             },
             dag,
         )
@@ -100,31 +178,11 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
         :return: None
         """
 
-        env = ObservatoryEnvironment(self.project_id, self.data_location)
+        env = ObservatoryEnvironment(self.project_id, self.data_location, api_host=self.host, api_port=self.port)
+
         with env.create():
-            # Add Observatory API connection
-            conn = Connection(conn_id=AirflowConns.OBSERVATORY_API, uri=f"http://:password@{self.host}:{self.api_port}")
-            env.add_connection(conn)
-
-            # Add a telescope
-            dt = pendulum.now("UTC")
-            telescope_type = orm.TelescopeType(
-                name="OAPEN Irus UK Telescope", type_id=TelescopeTypes.oapen_irus_uk, created=dt, modified=dt
-            )
-            env.api_session.add(telescope_type)
-            organisation = orm.Organisation(name="UCL Press", created=dt, modified=dt)
-            env.api_session.add(organisation)
-            telescope = orm.Telescope(
-                name="UCL Press OAPEN Irus UK Telescope",
-                telescope_type=telescope_type,
-                organisation=organisation,
-                modified=dt,
-                created=dt,
-                extra=self.extra,
-            )
-            env.api_session.add(telescope)
-            env.api_session.commit()
-
+            self.setup_connections(env)
+            self.setup_api()
             dag_file = os.path.join(module_file_path("oaebu_workflows.dags"), "oapen_irus_uk_telescope.py")
             self.assert_dag_load("oapen_irus_uk_ucl_press", dag_file)
 
@@ -136,7 +194,7 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
         :return: None.
         """
         # Setup Observatory environment
-        env = ObservatoryEnvironment(self.project_id, self.data_location)
+        env = ObservatoryEnvironment(self.project_id, self.data_location, api_host=self.host, api_port=self.port)
         dataset_id = env.add_dataset()
 
         # Setup Telescope
@@ -152,6 +210,7 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
             publisher_name_v4=self.extra.get("publisher_name_v4"),
             publisher_uuid_v5=self.extra.get("publisher_uuid_v5"),
             dataset_id=dataset_id,
+            workflow_id=1,
         )
         # Fake oapen project and bucket
         OapenIrusUkTelescope.OAPEN_PROJECT_ID = env.project_id
@@ -198,6 +257,8 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
 
         # Create the Observatory environment and run tests
         with env.create(task_logging=True):
+            self.setup_connections(env)
+            self.setup_api(env=env)
             with env.create_dag_run(dag, execution_date):
                 # Add airflow connections
                 conn = Connection(conn_id=AirflowConns.GEOIP_LICENSE_KEY, uri="http://email_address:password@")
@@ -267,6 +328,14 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
 
                 # Delete oapen bucket
                 env._delete_bucket(OapenIrusUkTelescope.OAPEN_BUCKET)
+
+                # add_dataset_release_task
+                dataset_releases = get_dataset_releases(dataset_id=1)
+                self.assertEqual(len(dataset_releases), 0)
+                ti = env.run_task("add_new_dataset_releases")
+                self.assertEqual(ti.state, State.SUCCESS)
+                dataset_releases = get_dataset_releases(dataset_id=1)
+                self.assertEqual(len(dataset_releases), 1)
 
     @patch("observatory.platform.utils.workflow_utils.Variable.get")
     @patch("oaebu_workflows.workflows.oapen_irus_uk_telescope.upload_source_code_to_bucket")

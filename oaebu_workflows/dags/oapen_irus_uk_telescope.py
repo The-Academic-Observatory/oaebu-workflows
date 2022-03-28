@@ -32,5 +32,6 @@ for telescope in telescopes:
         telescope.organisation,
         telescope.extra.get("publisher_name_v4", ""),
         telescope.extra.get("publisher_uuid_v5", ""),
+        workflow_id=1,
     )
     globals()[workflow.dag_id] = workflow.make_dag()

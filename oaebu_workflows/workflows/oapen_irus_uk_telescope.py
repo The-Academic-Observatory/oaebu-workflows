@@ -243,6 +243,7 @@ class OapenIrusUkTelescope(OrganisationTelescope):
         airflow_conns: List = None,
         max_active_runs=5,
         max_cloud_function_instances: int = 0,
+        workflow_id: int = None,
     ):
 
         """The OAPEN irus uk telescope.
@@ -260,6 +261,7 @@ class OapenIrusUkTelescope(OrganisationTelescope):
         :param airflow_vars: list of airflow variable keys, for each variable it is checked if it exists in airflow.
         :param airflow_conns: list of airflow connection keys, for each connection it is checked if it exists in airflow
         :param max_cloud_function_instances: the maximum cloud function instances.
+        :param workflow_id: api workflow id.
         """
 
         if airflow_vars is None:
@@ -301,6 +303,7 @@ class OapenIrusUkTelescope(OrganisationTelescope):
             airflow_vars=airflow_vars,
             airflow_conns=airflow_conns,
             max_active_runs=max_active_runs,
+            workflow_id=workflow_id,
             table_descriptions=table_descriptions,
         )
         self.max_cloud_function_instances = max_cloud_function_instances
@@ -316,6 +319,7 @@ class OapenIrusUkTelescope(OrganisationTelescope):
         self.add_task(self.upload_transformed)
         self.add_task(self.bq_load_partition)
         self.add_task(self.cleanup)
+        self.add_task(self.add_new_dataset_releases)
 
     def make_release(self, **kwargs) -> List[OapenIrusUkRelease]:
         """Create a list of OapenIrusUkRelease instances for a given month.
