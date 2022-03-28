@@ -92,7 +92,7 @@ Details ISBN13s in the ONIX feed that are not valid.
 
 ### Data Platform Invalid ISBN
 
-Details ISBN13s in the data source that are not valid.
+Details ISBN13s in the data source that are not valid. An example schema is below, as data platforms may use different name fields (e.g, 'ISBN', 'publication_id', 'Primary_ISBN').
 
 ``` eval_rst
 .. csv-table::
