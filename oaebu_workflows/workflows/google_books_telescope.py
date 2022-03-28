@@ -170,6 +170,7 @@ class GoogleBooksTelescope(OrganisationTelescope):
         catchup: bool = False,
         airflow_vars=None,
         airflow_conns=None,
+        workflow_id: int = None,
     ):
         """Construct a GoogleBooksTelescope instance.
 
@@ -182,6 +183,7 @@ class GoogleBooksTelescope(OrganisationTelescope):
         :param catchup: whether to catchup the DAG or not.
         :param airflow_vars: list of airflow variable keys, for each variable it is checked if it exists in airflow
         :param airflow_conns: list of airflow connection keys, for each connection it is checked if it exists in airflow
+        :param workflow_id: api workflow id.
         """
         if airflow_vars is None:
             airflow_vars = [
@@ -207,6 +209,7 @@ class GoogleBooksTelescope(OrganisationTelescope):
             catchup=catchup,
             airflow_vars=airflow_vars,
             airflow_conns=airflow_conns,
+            workflow_id=workflow_id,
         )
         self.sftp_folders = SftpFolders(dag_id, organisation.name)
         self.sftp_regex = r"^Google(SalesTransaction|BooksTraffic)Report_\d{4}_\d{2}.csv$"
@@ -230,6 +233,7 @@ class GoogleBooksTelescope(OrganisationTelescope):
                 self.bq_load_partition,
                 self.move_files_to_finished,
                 self.cleanup,
+                self.add_new_dataset_releases,
             ]
         )
 
