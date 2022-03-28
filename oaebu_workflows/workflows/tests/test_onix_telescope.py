@@ -175,15 +175,12 @@ class TestOnixTelescope(ObservatoryTestCase):
         :return: None
         """
 
-        env = ObservatoryEnvironment(self.project_id, self.data_location, api_host=self.host, api_port=self.api_port)
+        env = ObservatoryEnvironment(self.project_id, self.data_location, api_host=self.host, api_port=self.port)
         with env.create():
-            env = ObservatoryEnvironment(self.project_id, self.data_location, api_host=self.host, api_port=self.port)
-
-            with env.create():
-                self.setup_connections(env)
-                self.setup_api()
-                dag_file = os.path.join(module_file_path("oaebu_workflows.dags"), "onix_telescope.py")
-                self.assert_dag_load("onix_curtin_press", dag_file)
+            self.setup_connections(env)
+            self.setup_api()
+            dag_file = os.path.join(module_file_path("oaebu_workflows.dags"), "onix_telescope.py")
+            self.assert_dag_load("onix_curtin_press", dag_file)
 
     def test_telescope(self):
         """Test the ONIX telescope end to end.
