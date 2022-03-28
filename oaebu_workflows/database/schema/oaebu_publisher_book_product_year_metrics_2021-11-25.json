@@ -15,7 +15,7 @@
     "mode": "NULLABLE",
     "name": "month",
     "type": "DATE",
-    "description": ""
+    "description": "The month for which the metrics apply to"
   },
   {
     "fields": [
