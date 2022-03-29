@@ -8,6 +8,7 @@ OAeBU Workflows provides Apache Airflow workflows for fetching, processing and a
 ![Python package](https://github.com/The-Academic-Observatory/oaebu-workflows/workflows/Unit%20Tests/badge.svg)
 [![Documentation Status](https://readthedocs.org/projects/oaebu-workflows/badge/?version=latest)](https://oaebu-workflows.readthedocs.io/en/latest/?badge=latest)
 [![codecov](https://codecov.io/gh/The-Academic-Observatory/oaebu-workflows/branch/develop/graph/badge.svg?token=YEB00O777L)](https://codecov.io/gh/The-Academic-Observatory/oaebu-workflows)
+[![DOI](https://zenodo.org/badge/401298548.svg)](https://zenodo.org/badge/latestdoi/401298548)
 
 ## Telescope Workflows
 A telescope a type of workflow used to ingest data from different data sources, and to run workflows that process and
