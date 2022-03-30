@@ -44,6 +44,11 @@
       "name": "Kathryn Napier"
     },
     {
+      "orcid": "0000-0001-9542-1577",
+      "affiliation": "Centre for Culture and Technology, Curtin University",
+      "name": "Niamh Quigley"
+    },
+    {
       "orcid": "0000-0002-0068-716X",
       "affiliation": "Centre for Culture and Technology, Curtin University",
       "name": "Cameron Neylon"
@@ -52,11 +57,6 @@
       "orcid": "0000-0001-6551-8140",
       "affiliation": "Centre for Culture and Technology, Curtin University",
       "name": "Lucy Montgomery"
-    },
-    {
-      "orcid": "0000-0001-9542-1577",
-      "affiliation": "Centre for Culture and Technology, Curtin University",
-      "name": "Niamh Quigley"
     }
   ]
 }
