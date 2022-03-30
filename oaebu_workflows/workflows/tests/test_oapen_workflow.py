@@ -89,12 +89,7 @@ class TestOapenWorkflow(ObservatoryTestCase):
                     ],
                     "export_oaebu_table.book_product_metrics_institution": ["export_oaebu_table.institution_list"],
                     "export_oaebu_table.institution_list": ["export_oaebu_table.book_product_metrics_city"],
-                    "export_oaebu_table.book_product_metrics_city": [
-                        "export_oaebu_table.book_product_metrics_referrer"
-                    ],
-                    "export_oaebu_table.book_product_metrics_referrer": [
-                        "export_oaebu_table.book_product_metrics_events"
-                    ],
+                    "export_oaebu_table.book_product_metrics_city": ["export_oaebu_table.book_product_metrics_events"],
                     "export_oaebu_table.book_product_metrics_events": [
                         "export_oaebu_table.book_product_publisher_metrics"
                     ],
@@ -272,7 +267,6 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
                     "book_product_metrics_institution",
                     "institution_list",
                     "book_product_metrics_city",
-                    "book_product_metrics_referrer",
                     "book_product_metrics_events",
                     "book_product_publisher_metrics",
                     "book_product_subject_bic_metrics",
@@ -285,7 +279,7 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
 
                 for table in export_tables:
                     ti = env.run_task(f"{workflow.export_oaebu_table.__name__}.{table}")
-                    self.assertEqual(expected_state, ti.state)
+                    self.assertEqual(expected_state, ti.state, msg=f"table: {table}")
 
                 # Test conditions
                 release_suffix = release_date.strftime("%Y%m%d")

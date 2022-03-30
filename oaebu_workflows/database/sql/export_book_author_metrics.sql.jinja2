@@ -29,7 +29,16 @@ SELECT
     MAX(author.ORCID) as orcid,
     count(ISBN13) as unique_books,
     month.month,
-    STRUCT(group_counts(ARRAY_CONCAT_AGG(month.google_analytics.unique_views.country)) as unique_views) as google_analytics,
+    STRUCT(
+        group_counts(ARRAY_CONCAT_AGG(month.google_analytics.unique_views_country)) as unique_views,
+        group_counts(ARRAY_CONCAT_AGG(month.google_analytics.downloads_total_country)) as downloads,
+        group_counts(ARRAY_CONCAT_AGG(month.google_analytics.downloads_pdf_book_country)) as downloads_pdf_book,
+        group_counts(ARRAY_CONCAT_AGG(month.google_analytics.downloads_pdf_chapter_country)) as downloads_pdf_chapter,
+        group_counts(ARRAY_CONCAT_AGG(month.google_analytics.downloads_html_chapter_country)) as downloads_html_chapter,
+        group_counts(ARRAY_CONCAT_AGG(month.google_analytics.downloads_epub_book_country)) as downloads_epub_book,
+        group_counts(ARRAY_CONCAT_AGG(month.google_analytics.downloads_epub_chapter_country)) as downloads_epub_chapter,
+        group_counts(ARRAY_CONCAT_AGG(month.google_analytics.downloads_mobi_book_country)) as downloads_mobi_book
+    ) as google_analytics,
     STRUCT(group_counts(ARRAY_CONCAT_AGG(month.crossref_events)) as count) as crossref_events,
     STRUCT(
         SUM(month.google_books_traffic.Book_Visits_BV_) as Book_Visits_BV_,

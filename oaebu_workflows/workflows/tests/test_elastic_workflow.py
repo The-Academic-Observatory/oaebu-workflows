@@ -85,12 +85,6 @@ class TestElasticImportWorkflow(ObservatoryTestCase):
                 ),
             ),
             (
-                "oaebu_anu_press_book_product_metrics_referrer",
-                render_template(
-                    os.path.join(path, "oaebu-metrics-referrer-mappings.json.jinja2"), aggregation_level=aggregate_level
-                ),
-            ),
-            (
                 "oaebu_anu_press_book_product_publisher_metrics",
                 render_template(
                     os.path.join(path, "oaebu-publisher-metrics-mappings.json.jinja2"),

@@ -516,12 +516,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     ],
                     "export_oaebu_table.book_product_metrics_institution": ["export_oaebu_table.institution_list"],
                     "export_oaebu_table.institution_list": ["export_oaebu_table.book_product_metrics_city"],
-                    "export_oaebu_table.book_product_metrics_city": [
-                        "export_oaebu_table.book_product_metrics_referrer"
-                    ],
-                    "export_oaebu_table.book_product_metrics_referrer": [
-                        "export_oaebu_table.book_product_metrics_events"
-                    ],
+                    "export_oaebu_table.book_product_metrics_city": ["export_oaebu_table.book_product_metrics_events"],
                     "export_oaebu_table.book_product_metrics_events": [
                         "export_oaebu_table.book_product_publisher_metrics"
                     ],
@@ -678,12 +673,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     ],
                     "export_oaebu_table.book_product_metrics_institution": ["export_oaebu_table.institution_list"],
                     "export_oaebu_table.institution_list": ["export_oaebu_table.book_product_metrics_city"],
-                    "export_oaebu_table.book_product_metrics_city": [
-                        "export_oaebu_table.book_product_metrics_referrer"
-                    ],
-                    "export_oaebu_table.book_product_metrics_referrer": [
-                        "export_oaebu_table.book_product_metrics_events"
-                    ],
+                    "export_oaebu_table.book_product_metrics_city": ["export_oaebu_table.book_product_metrics_events"],
                     "export_oaebu_table.book_product_metrics_events": [
                         "export_oaebu_table.book_product_publisher_metrics"
                     ],
@@ -1979,7 +1969,6 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                     "book_product_metrics_institution",
                     "institution_list",
                     "book_product_metrics_city",
-                    "book_product_metrics_referrer",
                     "book_product_metrics_events",
                     "book_product_publisher_metrics",
                     "book_product_subject_bic_metrics",
