@@ -36,24 +36,40 @@ authors:
       University
     orcid: 'https://orcid.org/0000-0001-5903-6620'
   - given-names: Alkim
-    orcid: 'https://orcid.org/0000-0001-6813-8362'
     family-names: Ozaygen
-  - family-names: Lange
+    affiliation: >-
+      Centre for Culture and Technology, Curtin
+      University
+    orcid: 'https://orcid.org/0000-0001-6813-8362'
+  - given-names: Rebecca
+    family-names: Lange
+    affiliation: >-
+      Curtin Institute for Computation, Curtin
+      University
     orcid: 'https://orcid.org/0000-0002-9449-4384'
-    given-names: Rebecca
   - given-names: Kathryn R
     family-names: Napier
+    affiliation: >-
+      Curtin Institute for Computation, Curtin
+      University
     orcid: 'https://orcid.org/0000-0003-1202-7238'
-  - family-names: Quigley
-    given-names: Niamh
+  - given-names: Niamh
+    family-names: Quigley
+    affiliation: >-
+      Centre for Culture and Technology, Curtin
+      University
     orcid: 'https://orcid.org/0000-0001-9542-1577'
-  - family-names: Neylon
+  - given-names: Cameron
+    family-names: Neylon
+    affiliation: >-
+      Centre for Culture and Technology, Curtin
+      University
     orcid: 'https://orcid.org/0000-0002-0068-716X'
-    given-names: Cameron
-  - family-names: Montgomery
-    orcid: 'https://orcid.org/0000-0001-6551-8140'
-    given-names: Lucy
-doi: 10.5281/zenodo.6366691
+  - given-names: Lucy
+    family-names: Montgomery
+    affiliation: >-
+      Centre for Culture and Technology, Curtin
+      University
+      orcid: 'https://orcid.org/0000-0001-6551-8140'
+doi: 10.5281/zenodo.6366690
 license: Apache-2.0
-version: 2022.03.0
-date-released: '2022-03-18'
