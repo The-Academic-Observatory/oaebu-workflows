@@ -1,7 +1,7 @@
 ONIX workflow Step 3 - Exporting to Elasticsearch
 ==================================================
 
-Step three of the ONIX workflow is to export the book_product table to a sequence of flattened tables that can be exported to Elasticsearch. The data in these tables is not materially different to the book product table, just organised in a way, better suited for dashboards in Kibana.
+Step three of the ONIX workflow is to export the book_product table to a sequence of flattened data export tables that can be exported to Elasticsearch. The data in these tables is not materially different to the book product table, just organised in a way, better suited for dashboards in Kibana.
 
 ``` eval_rst
 .. image:: ../static/onix_workflow_3.png
@@ -36,15 +36,41 @@ This table contains metrics, organised by month, that are linked to each book. T
    :header-rows: 1
 ```
 
+### Book Product Author Metrics Schema
+
+This table contains metrics, organised by month and author, that are linked to each author.
+
+[Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_book_author_metrics.sql.jinja2)
+
+``` eval_rst
+.. csv-table::
+   :file: ../../schemas/oaebu_publisher_book_product_author_metrics_latest.csv
+   :width: 100%
+   :header-rows: 1
+```
+
 ### Book Product Year Metrics Schema
 
-This table contains metrics, organised by month, that are linked to each book.
+This table contains metrics, organised by published year and month, that are linked to each book.
 
 [Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_book_year_metrics.sql.jinja2)
 
 ``` eval_rst
 .. csv-table::
    :file: ../../schemas/oaebu_publisher_book_product_year_metrics_latest.csv
+   :width: 100%
+   :header-rows: 1
+```
+
+### Book Product Event Metrics Schema
+
+This table contains metrics, organised by month and crossref event type, that are linked to each book.
+
+[Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_book_metrics_event.sql.jinja2)
+
+``` eval_rst
+.. csv-table::
+   :file: ../../schemas/oaebu_publisher_book_product_metrics_events_latest.csv
    :width: 100%
    :header-rows: 1
 ```
@@ -75,6 +101,17 @@ This table contains metrics, organised by month and country of measured usage, t
    :header-rows: 1
 ```
 
+### Country List Schema
+
+This table is a list of each unique Country or Territory. It is primarily used for drop-down fields.
+
+``` eval_rst
+.. csv-table::
+   :file: ../../schemas/oaebu_public_data_country_list_latest.csv
+   :width: 100%
+   :header-rows: 1
+```
+ 
 ### Book Product Metrics Events Schema
 
 This table contains metrics, organised by month and crossref event type, that are linked to each book.
@@ -90,7 +127,7 @@ This table contains metrics, organised by month and crossref event type, that ar
 
 ### Institution List Schema
 
-This table is a list of each unique Institution where metrics are linked too. It is primarily used for drop-down fields, or where a list of all the books independent of metrics is desired.
+This table is a list of each unique Institution where metrics are linked too. It is primarily used for drop-down fields, or where a list of all the institutions independent of metrics is desired.
 
 [Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_book_metrics_institution.sql.jinja2)
 
@@ -127,7 +164,18 @@ This table contains metrics, organised by month and location of referrals, that 
    :header-rows: 1
 ```
 
-## Book Subject Metrics
+### Book Product Metrics Publisher Schema
+
+This index contains a summary of metrics, organised by month that are linked to each publisher. 
+
+[Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_book_publisher_metrics.sql.jinja2)
+
+``` eval_rst
+.. csv-table::
+   :file: ../../schemas/oaebu_publisher_book_product_publisher_metrics_latest.csv
+   :width: 100%
+   :header-rows: 1
+```
 
 ### Book Product Subjects BIC Schema
 
@@ -170,7 +218,7 @@ This table contains metrics, organised by month and THEMA subject type, that are
 
 ### Book Product Subject Year Schema
 
-This table contains metrics, organised by year and currently just the BIC subject type, that are linked to each book.
+This table contains metrics, organised by published year and month and currently just the BIC subject type, that are linked to each book.
 
 [Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_book_subject_year_metrics.sql.jinja2)
 
@@ -195,3 +243,9 @@ This dataset is helpful for understanding where metrics and books defined in the
    :width: 100%
    :header-rows: 1
 ```
+
+## Export to Elasticsearch
+
+Once the data export tables have been created, they are exported to Elasticsearch for visualisation in Kibana dashboards.
+
+[Link to Script](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/dags/elastic_import_workflow.py)

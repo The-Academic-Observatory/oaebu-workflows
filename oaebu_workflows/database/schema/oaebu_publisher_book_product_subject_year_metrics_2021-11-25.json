@@ -2,46 +2,54 @@
   {
     "mode": "NULLABLE",
     "name": "subject",
-    "type": "STRING"
+    "type": "STRING",
+    "description": "BIC subject (top level BIC subjects only)"
   },
   {
     "mode": "NULLABLE",
     "name": "published_year",
-    "type": "INTEGER"
+    "type": "INTEGER",
+    "description": "The published year of the book"
   },
   {
     "mode": "NULLABLE",
     "name": "unique_books",
-    "type": "INTEGER"
+    "type": "INTEGER",
+    "description": "The number of unique books"
   },
   {
     "mode": "NULLABLE",
     "name": "month",
-    "type": "DATE"
+    "type": "DATE",
+    "description": "The month in which the metrics occurred"
   },
   {
     "fields": [
       {
         "mode": "NULLABLE",
         "name": "unique_views",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": "The number of unique views"
       }
     ],
     "mode": "NULLABLE",
     "name": "google_analytics",
-    "type": "RECORD"
+    "type": "RECORD",
+    "description": "Metrics from Google Analytics"
   },
   {
     "fields": [
       {
         "mode": "NULLABLE",
         "name": "count",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": "Count of events"
       }
     ],
     "mode": "NULLABLE",
     "name": "crossref_events",
-    "type": "RECORD"
+    "type": "RECORD",
+    "description": "Metrics from Crossref events"
   },
   {
     "fields": [
@@ -84,31 +92,36 @@
     ],
     "mode": "NULLABLE",
     "name": "google_books_traffic",
-    "type": "RECORD"
+    "type": "RECORD",
+    "description": "Metrics from Google Books Traffic"
   },
   {
     "fields": [
       {
         "mode": "NULLABLE",
         "name": "qty",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": "The number of units in the transaction. Negative for refunds"
       }
     ],
     "mode": "NULLABLE",
     "name": "google_books_sales",
-    "type": "RECORD"
+    "type": "RECORD",
+    "description": "Metrics from Google Books Sales"
   },
   {
     "fields": [
       {
         "mode": "NULLABLE",
         "name": "Total_Item_Requests",
-        "type": "INTEGER"
+        "type": "INTEGER",
+        "description": "Total number of request made"
       }
     ],
     "mode": "NULLABLE",
     "name": "jstor",
-    "type": "RECORD"
+    "type": "RECORD",
+    "description": "Metrics from JSTOR"
   },
   {
     "fields": [
@@ -145,6 +158,7 @@
     ],
     "mode": "NULLABLE",
     "name": "oapen_irus_uk",
-    "type": "RECORD"
+    "type": "RECORD",
+    "description": "Metrics from OAPEN IRUS-UK"
   }
 ]
