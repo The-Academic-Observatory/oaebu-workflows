@@ -3,7 +3,6 @@ message: "If you use this software, please cite it as below."
 title: "OAeBU Workflows"
 url: "https://github.com/The-Academic-Observatory/oaebu-workflows"
 doi: 10.5281/zenodo.6366690
-license: Apache-2.0
 authors:
   - given-names: "Richard"
     family-names: "Hosking"
