@@ -1,8 +1,8 @@
 Project Background
 =======================
 
-## OAeBU Data Trust 
-The OAeBU pilot (2020 to 2022) was a two-year project funded by the Andrew W. Mellon Foundation (<https://digital.library.unt.edu/ark:/67531/metadc1596980/>). The project developed systems for gathering information about open access eBooks and their usage from multiple data sources, combining and presenting it in a series of online interactive visualization dashboards for eBook publisher partners. 
+## Developing a Pilot Data Trust for Open Access eBook Usage
+The project, Developing a Pilot Data Trust for Open Access eBook Usage ('the OAeBU pilot', January 2020 to March 2022) was a two-year project funded by the Andrew W. Mellon Foundation (<https://digital.library.unt.edu/ark:/67531/metadc1596980/>). The project developed systems for gathering information about open access eBooks and their usage from multiple data sources, combining and presenting it in a series of online interactive visualization dashboards for eBook publisher partners. 
 
 Presenting usage information can be complex, because open access eBooks can be hosted in multiple repositories, in different file formats (PDF, EPUB, MOBI, HTML), and in different levels (whole book or by chapter). Each repository provides book content to different audiences in different ways. 
 
