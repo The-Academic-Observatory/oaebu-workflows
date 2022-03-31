@@ -7,7 +7,7 @@ This section of the help guide contains frequently asking questions about using 
 * [The title I am looking for is in some dashboards but not others](#the-title-i-am-looking-for-is-in-some-dashboards-but-not-others)
 * [I can’t find a specific author in the ‘Select Author’ dropdown](#i-cant-find-a-specific-author-in-the-select-author-dropdown)
 * [Why is there a relatively low number of ISBNs with usage data?](#why-is-there-a-relatively-low-number-of-isbns-with-usage-data)
-* [I can only see data for one title/author/country/institution](#i-can-only-see-data-for-one-titleauthorcountryinstitution)
+* [I can only see data for one title/author/country/institution](#i-can-only-see-data-for-one-title-author-country-or-institution)
 * [I’m trying to use ‘Options’ on a visualisation and getting an error](#im-trying-to-use-options-on-a-visualisation-and-getting-an-error)
 
 ## I’m having trouble accessing the dashboards or viewing some visualisations
@@ -54,7 +54,7 @@ If a book is not yet released, the Title and ISBN may be in the OAeBU dashboards
 ## Why is there a relatively low number of ISBNs with usage data?
 This can happen when only partial data is available for the current month, or for the last few months. Data is transferred from our data sources at different frequencies, with Crossref events data and  ONIX feeds  generally updated weekly, with usage data updated approximately monthly. Find out more in the user documentation about [OAeBU workflows](../../oaebu_workflows/index).
 
-## I can only see data for one title/author/country/institution
+## I can only see data for one title, author, country or institution
 There could be filters applied in the dashboard. First try clearing all filters applied in the filter dropdowns. For example, to remove all authors from the ‘Select Author(s)/Volume Editor(s)’ filter, click on the X in a circle icon. 
 
 ``` eval_rst
