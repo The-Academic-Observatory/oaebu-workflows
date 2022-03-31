@@ -151,19 +151,6 @@ This table contains metrics, organised by month and institution for which there 
    :header-rows: 1
 ```
 
-### Book Product Metrics Referrer Schema
-
-This table contains metrics, organised by month and location of referrals, that are linked to each book. Referrals are gathered using a standard feature of the modern web, where new requests to a website often contain a referral field that specifies the website where a link was clicked that brought the end user to your website.
-
-[Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_book_metrics_referrer.sql.jinja2)
-
-``` eval_rst
-.. csv-table::
-   :file: ../../schemas/oaebu_publisher_book_product_metrics_referrer_latest.csv
-   :width: 100%
-   :header-rows: 1
-```
-
 ### Book Product Metrics Publisher Schema
 
 This index contains a summary of metrics, organised by month that are linked to each publisher. 
