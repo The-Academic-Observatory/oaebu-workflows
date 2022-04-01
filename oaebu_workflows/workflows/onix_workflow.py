@@ -233,6 +233,7 @@ class OnixWorkflow(Workflow):
         schedule_interval: Optional[str] = "@weekly",
         catchup: Optional[bool] = False,
         data_partners: List[OaebuPartner] = None,
+        workflow_id: int = None,
     ):
         """Initialises the workflow object.
         :param org_name: Organisation name.
@@ -246,6 +247,7 @@ class OnixWorkflow(Workflow):
         :param schedule_interval: Scheduled interval for running the DAG.
         :param catchup: Whether to catch up missed DAG runs.
         :param data_partners: OAEBU data sources.
+        :param workflow_id: api workflow id.
         """
 
         self.dag_id = dag_id
@@ -271,7 +273,11 @@ class OnixWorkflow(Workflow):
 
         # Initialise Telesecope base class
         super().__init__(
-            dag_id=self.dag_id, start_date=start_date, schedule_interval=schedule_interval, catchup=catchup
+            dag_id=self.dag_id,
+            start_date=start_date,
+            schedule_interval=schedule_interval,
+            catchup=catchup,
+            workflow_id=workflow_id,
         )
 
         # Wait for data partner workflows to finish
@@ -312,6 +318,9 @@ class OnixWorkflow(Workflow):
 
         # Cleanup tasks
         self.add_task(self.cleanup)
+
+        # Create DatasetRelease records
+        self.add_task(self.add_new_dataset_releases)
 
     def get_isbn_utils_sql_string(self) -> str:
         """Load the ISBN utils sql functions.
