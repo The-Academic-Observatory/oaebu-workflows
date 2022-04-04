@@ -1,4 +1,19 @@
 {
+  "title": "OAeBU Workflows",
+  "description": "<p>OAeBU Workflows provides Apache Airflow workflows for fetching, processing and analysing data about Open Access Books.&nbsp;The workflows include: Directory of Open Access Books (DOAB), Google Analytics, Google Books, JSTOR, Oapen IRUS UK, Oapen Metadata, Onix, UCL Discovery and an Onix Workflow for combining all of this data.</p>\n\n<p><strong>Contributors</strong><br>\nConceptualization: Richard Hosking, Aniek Roelofs, Cameron Neylon, and Lucy Montgomery.<br>\nData curation: Richard Hosking, Aniek Roelofs, James P. Diprose, Rebecca N. Handcock, Alkim Ozaygen, and Rebecca Lange.<br>\nFormal analysis: Richard Hosking, Aniek Roelofs, and Rebecca N. Handcock.<br>\nFunding acquisition: Cameron Neylon and Lucy Montgomery.<br>\nInvestigation: Richard Hosking, Aniek Roelofs, Tuan-Yow Chien, James P. Diprose, Rebecca N. Handcock, Alkim Ozaygen, and Kathryn R. Napier.<br>\nMethodology: Richard Hosking, Aniek Roelofs, Tuan-Yow Chien, and James P. Diprose.<br>\nProject administration: Richard Hosking, Kathryn R. Napier, Cameron Neylon, and Lucy Montgomery.<br>\nResources: Richard Hosking, Aniek Roelofs, and James P. Diprose. Software: Richard Hosking, Aniek Roelofs, Tuan-Yow Chien, and James P. Diprose.<br>\nSupervision: Richard Hosking, James P. Diprose, Kathryn R. Napier, Cameron Neylon, and Lucy Montgomery.<br>\nValidation: Richard Hosking, Aniek Roelofs, Tuan-Yow Chien, Rebecca N. Handcock, and Kathryn R. Napier.<br>\nVisualization: Richard Hosking, Rebecca N. Handcock, and Kathryn R. Napier.<br>\nWriting - original draft: Richard Hosking, Aniek Roelofs, Tuan-Yow Chien, James P. Diprose, and Niamh Quigley.<br>\nWriting - review &amp; editing: Richard Hosking, Aniek Roelofs, Rebecca N. Handcock, Kathryn R. Napier, and Niamh Quigley.</p>",
+  "notes": "The Curtin Open Knowledge Initiative (COKI) is a strategic initiative of the Research Office at Curtin, the Faculty of Humanities, School of Media, Creative Arts and Social Inquiry and the Curtin Institute for Computation, with additional support from the Andrew W. Mellon Foundation and the Arcadia Fund, a charitable fund of Lisbet Rausing and Peter Baldwin.",
+  "communities": [
+    {
+      "identifier": "coki"
+    }
+  ],
+  "keywords": [
+    "books",
+    "open access books",
+    "apache airflow",
+    "workflow",
+    "coki"
+  ],
   "license": {
     "id": "Apache-2.0"
   },
