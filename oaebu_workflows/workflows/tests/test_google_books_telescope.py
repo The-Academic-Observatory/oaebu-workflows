@@ -93,9 +93,9 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
 
         organisation = Organisation(
             name=self.org_name,
-            gcp_project_id="project",
-            gcp_download_bucket="download_bucket",
-            gcp_transform_bucket="transform_bucket",
+            project_id="project",
+            download_bucket="download_bucket",
+            transform_bucket="transform_bucket",
         )
         self.api.put_organisation(organisation)
 
@@ -244,9 +244,9 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
                         execution_date = pendulum.datetime(year=2021, month=3, day=31)
                         org = Organisation(
                             name=self.organisation_name,
-                            gcp_project_id=self.project_id,
-                            gcp_download_bucket=env.download_bucket,
-                            gcp_transform_bucket=env.transform_bucket,
+                            project_id=self.project_id,
+                            download_bucket=env.download_bucket,
+                            transform_bucket=env.transform_bucket,
                         )
                         telescope = GoogleBooksTelescope(
                             org, accounts=setup["accounts"], dataset_id=dataset_id, workflow_id=1
@@ -404,9 +404,9 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
             # Objects to create release instance
             org = Organisation(
                 name=self.organisation_name,
-                gcp_project_id=self.project_id,
-                gcp_download_bucket="download_bucket",
-                gcp_transform_bucket="transform_bucket",
+                project_id=self.project_id,
+                download_bucket="download_bucket",
+                transform_bucket="transform_bucket",
             )
             telescope = GoogleBooksTelescope(org, accounts=None, dataset_id="dataset_id")
             file_path = test_fixtures_folder("google_books", "GoogleSalesTransactionReport_2020_02.csv")

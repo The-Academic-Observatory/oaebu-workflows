@@ -179,7 +179,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         def __init__(self):
             self.organisation = Organisation(
                 name="test",
-                gcp_project_id="project_id",
+                project_id="project_id",
             )
 
     def __init__(self, *args, **kwargs):
@@ -198,14 +198,14 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 dag_id="onix_workflow_test",
                 release_date=pendulum.datetime(2021, 1, 1),
                 onix_release_date=pendulum.datetime(2021, 1, 1),
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
                 onix_dataset_id="",
                 onix_table_id="onix",
             )
             wf = OnixWorkflow(
                 org_name=self.telescope.organisation.name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
             )
 
@@ -232,7 +232,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             wf = OnixWorkflow(
                 org_name=self.telescope.organisation.name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
                 dag_id="dagid",
             )
@@ -241,7 +241,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 dag_id="dagid",
                 release_date=pendulum.datetime(2021, 1, 1),
                 onix_release_date=pendulum.datetime(2021, 1, 1),
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
                 onix_dataset_id="",
                 onix_table_id="onix",
@@ -267,7 +267,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             wf = OnixWorkflow(
                 org_name=self.telescope.organisation.name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
             )
 
@@ -275,7 +275,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 dag_id="onix_workflow_test",
                 release_date=pendulum.datetime(2021, 1, 1),
                 onix_release_date=pendulum.datetime(2021, 1, 1),
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
                 onix_dataset_id="onix",
                 onix_table_id="onix",
@@ -350,7 +350,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             wf = OnixWorkflow(
                 org_name=self.telescope.organisation.name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
             )
             records = wf.get_onix_records("project_id", "ds_id", "table_id")
@@ -364,7 +364,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             wf = OnixWorkflow(
                 org_name=self.telescope.organisation.name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
             )
 
@@ -386,7 +386,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             wf = OnixWorkflow(
                 org_name=self.telescope.organisation.name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
             )
 
@@ -401,7 +401,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             wf = OnixWorkflow(
                 org_name=self.telescope.organisation.name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
             )
 
@@ -409,7 +409,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 dag_id="onix_workflow_test",
                 release_date=pendulum.datetime(2021, 1, 1),
                 onix_release_date=pendulum.datetime(2021, 1, 1),
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
                 onix_dataset_id="onix",
                 onix_table_id="onix",
@@ -467,7 +467,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             wf = OnixWorkflow(
                 org_name=self.telescope.organisation.name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
                 data_partners=data_partners,
             )
@@ -615,7 +615,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             wf = OnixWorkflow(
                 org_name=org_name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
                 data_partners=data_partners,
             )
@@ -737,7 +737,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
             with CliRunner().isolated_filesystem():
                 wf = OnixWorkflow(
                     org_name=self.telescope.organisation.name,
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                 )
 
@@ -745,7 +745,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     dag_id="onix_workflow_test",
                     release_date=pendulum.datetime(2021, 1, 1),
                     onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                     onix_dataset_id="onix",
                     onix_table_id="onix",
@@ -852,7 +852,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
             with CliRunner().isolated_filesystem():
                 wf = OnixWorkflow(
                     org_name=self.telescope.organisation.name,
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                 )
 
@@ -860,7 +860,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     dag_id="onix_workflow_test",
                     release_date=pendulum.datetime(2021, 1, 1),
                     onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                     onix_dataset_id="onix",
                     onix_table_id="onix",
@@ -893,7 +893,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             wf = OnixWorkflow(
                 org_name=self.telescope.organisation.name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
             )
             with patch(
@@ -907,7 +907,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                             dag_id="onix_workflow_test",
                             release_date=pendulum.datetime(2021, 1, 1),
                             onix_release_date=pendulum.datetime(2021, 1, 1),
-                            gcp_project_id=self.telescope.organisation.gcp_project_id,
+                            gcp_project_id=self.telescope.organisation.project_id,
                             gcp_bucket_name=self.bucket_name,
                             onix_dataset_id="onix",
                             onix_table_id="onix",
@@ -957,7 +957,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             wf = OnixWorkflow(
                 org_name=self.telescope.organisation.name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
                 dag_id="dagid",
                 data_partners=data_partners,
@@ -967,7 +967,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 dag_id="onix_workflow_test",
                 release_date=pendulum.datetime(2021, 1, 1),
                 onix_release_date=pendulum.datetime(2021, 1, 1),
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
                 onix_dataset_id="onix",
                 onix_table_id="onix",
@@ -1020,7 +1020,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             wf = OnixWorkflow(
                 org_name=self.telescope.organisation.name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
             )
             mock_bq_table_query.return_value = True
@@ -1029,7 +1029,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     dag_id="onix_workflow_test",
                     release_date=pendulum.datetime(2021, 1, 1),
                     onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                     onix_dataset_id="onix",
                     onix_table_id="onix",
@@ -1058,7 +1058,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     dag_id="onix_workflow_test",
                     release_date=pendulum.datetime(2021, 1, 1),
                     onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                     onix_dataset_id="onix",
                     onix_table_id="onix",
@@ -1071,7 +1071,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             wf = OnixWorkflow(
                 org_name=self.telescope.organisation.name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
             )
             mock_bq_table_query.return_value = True
@@ -1080,7 +1080,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     dag_id="onix_workflow_test",
                     release_date=pendulum.datetime(2021, 1, 1),
                     onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                     onix_dataset_id="onix",
                     onix_table_id="onix",
@@ -1109,7 +1109,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     dag_id="onix_workflow_test",
                     release_date=pendulum.datetime(2021, 1, 1),
                     onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                     onix_dataset_id="onix",
                     onix_table_id="onix",
@@ -1137,7 +1137,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             wf = OnixWorkflow(
                 org_name=self.telescope.organisation.name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
                 data_partners=data_partners,
             )
@@ -1147,7 +1147,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     dag_id="onix_workflow_test",
                     release_date=pendulum.datetime(2021, 1, 1),
                     onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                     onix_dataset_id="onix",
                     onix_table_id="onix",
@@ -1165,7 +1165,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     dag_id="onix_workflow_test",
                     release_date=pendulum.datetime(2021, 1, 1),
                     onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                     onix_dataset_id="onix",
                     onix_table_id="onix",
@@ -1211,7 +1211,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             wf = OnixWorkflow(
                 org_name=self.telescope.organisation.name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
                 data_partners=data_partners,
             )
@@ -1221,7 +1221,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     dag_id="onix_workflow_test",
                     release_date=pendulum.datetime(2021, 1, 1),
                     onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                     onix_dataset_id="onix",
                     onix_table_id="onix",
@@ -1239,7 +1239,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     dag_id="onix_workflow_test",
                     release_date=pendulum.datetime(2021, 1, 1),
                     onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                     onix_dataset_id="onix",
                     onix_table_id="onix",
@@ -1285,7 +1285,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             wf = OnixWorkflow(
                 org_name=self.telescope.organisation.name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
                 data_partners=data_partners,
             )
@@ -1295,7 +1295,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     dag_id="onix_workflow_test",
                     release_date=pendulum.datetime(2021, 1, 1),
                     onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                     onix_dataset_id="onix",
                     onix_table_id="onix",
@@ -1313,7 +1313,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     dag_id="onix_workflow_test",
                     release_date=pendulum.datetime(2021, 1, 1),
                     onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                     onix_dataset_id="onix",
                     onix_table_id="onix",
@@ -1357,7 +1357,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             wf = OnixWorkflow(
                 org_name=self.telescope.organisation.name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
                 data_partners=data_partners,
             )
@@ -1367,7 +1367,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     dag_id="onix_workflow_test",
                     release_date=pendulum.datetime(2021, 1, 1),
                     onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                     onix_dataset_id="onix",
                     onix_table_id="onix",
@@ -1385,7 +1385,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     dag_id="onix_workflow_test",
                     release_date=pendulum.datetime(2021, 1, 1),
                     onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                     onix_dataset_id="onix",
                     onix_table_id="onix",
@@ -1429,7 +1429,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             wf = OnixWorkflow(
                 org_name=self.telescope.organisation.name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
                 data_partners=data_partners,
             )
@@ -1439,7 +1439,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     dag_id="onix_workflow_test",
                     release_date=pendulum.datetime(2021, 1, 1),
                     onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                     onix_dataset_id="onix",
                     onix_table_id="onix",
@@ -1457,7 +1457,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     dag_id="onix_workflow_test",
                     release_date=pendulum.datetime(2021, 1, 1),
                     onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                     onix_dataset_id="onix",
                     onix_table_id="onix",
@@ -1503,7 +1503,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             wf = OnixWorkflow(
                 org_name=self.telescope.organisation.name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
                 data_partners=data_partners,
             )
@@ -1513,7 +1513,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     dag_id="onix_workflow_test",
                     release_date=pendulum.datetime(2021, 1, 1),
                     onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                     onix_dataset_id="onix",
                     onix_table_id="onix",
@@ -1546,7 +1546,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     dag_id="onix_workflow_test",
                     release_date=pendulum.datetime(2021, 1, 1),
                     onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                     onix_dataset_id="onix",
                     onix_table_id="onix",
@@ -1612,9 +1612,9 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
         for org in orgs:
             organisation = Organisation(
                 name=org,
-                gcp_project_id="project",
-                gcp_download_bucket="download_bucket",
-                gcp_transform_bucket="transform_bucket",
+                project_id="project",
+                download_bucket="download_bucket",
+                transform_bucket="transform_bucket",
             )
             organisation = self.api.put_organisation(organisation)
 

@@ -119,9 +119,9 @@ class TestJstorTelescope(ObservatoryTestCase):
 
         organisation = Organisation(
             name=self.org_name,
-            gcp_project_id="project",
-            gcp_download_bucket="download_bucket",
-            gcp_transform_bucket="transform_bucket",
+            project_id="project",
+            download_bucket="download_bucket",
+            transform_bucket="transform_bucket",
         )
         self.api.put_organisation(organisation)
 
@@ -221,9 +221,9 @@ class TestJstorTelescope(ObservatoryTestCase):
         execution_date = pendulum.datetime(year=2020, month=11, day=1)
         organisation = Organisation(
             name=self.organisation_name,
-            gcp_project_id=self.project_id,
-            gcp_download_bucket=env.download_bucket,
-            gcp_transform_bucket=env.transform_bucket,
+            project_id=self.project_id,
+            download_bucket=env.download_bucket,
+            transform_bucket=env.transform_bucket,
         )
         telescope = JstorTelescope(
             organisation=organisation, publisher_id=self.extra.get("publisher_id"), dataset_id=dataset_id, workflow_id=1

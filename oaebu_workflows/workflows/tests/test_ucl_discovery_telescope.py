@@ -95,9 +95,9 @@ class TestUclDiscoveryTelescope(ObservatoryTestCase):
 
         organisation = Organisation(
             name=self.org_name,
-            gcp_project_id="project",
-            gcp_download_bucket="download_bucket",
-            gcp_transform_bucket="transform_bucket",
+            project_id="project",
+            download_bucket="download_bucket",
+            transform_bucket="transform_bucket",
         )
         self.api.put_organisation(organisation)
 
@@ -190,9 +190,9 @@ class TestUclDiscoveryTelescope(ObservatoryTestCase):
         execution_date = pendulum.datetime(year=2021, month=4, day=1)
         organisation = Organisation(
             name=self.organisation_name,
-            gcp_project_id=self.project_id,
-            gcp_download_bucket=env.download_bucket,
-            gcp_transform_bucket=env.transform_bucket,
+            project_id=self.project_id,
+            download_bucket=env.download_bucket,
+            transform_bucket=env.transform_bucket,
         )
         telescope = UclDiscoveryTelescope(organisation=organisation, dataset_id=dataset_id, workflow_id=1)
         dag = telescope.make_dag()
@@ -280,9 +280,9 @@ class TestUclDiscoveryTelescope(ObservatoryTestCase):
         """
         organisation = Organisation(
             name=self.organisation_name,
-            gcp_project_id=self.project_id,
-            gcp_download_bucket="download_bucket",
-            gcp_transform_bucket="transform_bucket",
+            project_id=self.project_id,
+            download_bucket="download_bucket",
+            transform_bucket="transform_bucket",
         )
         telescope = UclDiscoveryTelescope(organisation=organisation, dataset_id="dataset_id")
         release = UclDiscoveryRelease(

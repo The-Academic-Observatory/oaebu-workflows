@@ -108,9 +108,9 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
 
         organisation = Organisation(
             name=self.org_name,
-            gcp_project_id=self.project_id,
-            gcp_download_bucket=gcp_download_bucket,
-            gcp_transform_bucket=gcp_transform_bucket,
+            project_id=self.project_id,
+            download_bucket=gcp_download_bucket,
+            transform_bucket=gcp_transform_bucket,
         )
         self.api.put_organisation(organisation)
 
@@ -201,9 +201,9 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
         execution_date = pendulum.datetime(year=2021, month=2, day=14)
         organisation = Organisation(
             name=self.organisation_name,
-            gcp_project_id=self.project_id,
-            gcp_download_bucket=env.download_bucket,
-            gcp_transform_bucket=env.transform_bucket,
+            project_id=self.project_id,
+            download_bucket=env.download_bucket,
+            transform_bucket=env.transform_bucket,
         )
         telescope = OapenIrusUkTelescope(
             organisation=organisation,
@@ -381,9 +381,9 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
             # Create release instance
             org = Organisation(
                 name=self.organisation_name,
-                gcp_project_id=self.project_id,
-                gcp_download_bucket="download_bucket",
-                gcp_transform_bucket="transform_bucket",
+                project_id=self.project_id,
+                download_bucket="download_bucket",
+                transform_bucket="transform_bucket",
             )
             telescope = OapenIrusUkTelescope(
                 org, publisher_name_v4="publisher", publisher_uuid_v5="publisherUUID", dataset_id="dataset_id"
@@ -460,9 +460,9 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
             mock_variable_get.return_value = os.path.join(os.getcwd(), "data")
             org = Organisation(
                 name=self.organisation_name,
-                gcp_project_id=self.project_id,
-                gcp_download_bucket="download_bucket",
-                gcp_transform_bucket="transform_bucket",
+                project_id=self.project_id,
+                download_bucket="download_bucket",
+                transform_bucket="transform_bucket",
             )
 
             # Test new platform and old platform
