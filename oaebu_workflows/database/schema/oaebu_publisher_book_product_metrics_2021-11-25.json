@@ -231,6 +231,6 @@
     "mode": "NULLABLE",
     "name": "ucl_discovery",
     "type": "RECORD",
-    "description": "Metrics from UCL Disovery"
+    "description": "Metrics from UCL Discovery"
   }
 ]
