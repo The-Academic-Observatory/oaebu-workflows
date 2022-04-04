@@ -27,6 +27,16 @@ from airflow.models.connection import Connection
 from click.testing import CliRunner
 from googleapiclient.discovery import build
 from googleapiclient.http import RequestMockBuilder
+from oaebu_workflows.config import test_fixtures_folder
+from oaebu_workflows.identifiers import WorkflowTypes
+from oaebu_workflows.workflows.oapen_irus_uk_telescope import (
+    OapenIrusUkRelease,
+    OapenIrusUkTelescope,
+    call_cloud_function,
+    cloud_function_exists,
+    create_cloud_function,
+    upload_source_code_to_bucket,
+)
 from observatory.api.client.model.organisation import Organisation
 from observatory.api.server import orm
 from observatory.platform.utils.airflow_utils import AirflowConns
@@ -44,7 +54,7 @@ from observatory.api.client import ApiClient, Configuration
 from observatory.api.client.api.observatory_api import ObservatoryApi  # noqa: E501
 from observatory.api.client.model.organisation import Organisation
 from observatory.api.client.model.telescope import Telescope
-from observatory.api.client.model.telescope_type import TelescopeType
+from observatory.api.client.model.workflow_type import WorkflowType
 from observatory.api.client.model.dataset import Dataset
 from observatory.api.client.model.dataset_release import DatasetRelease
 from observatory.api.client.model.dataset_type import DatasetType
@@ -100,8 +110,8 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
         dt = pendulum.now("UTC")
 
         name = "Oapen Metadata Telescope"
-        telescope_type = TelescopeType(name=name, type_id=OapenIrusUkTelescope.DAG_ID_PREFIX)
-        self.api.put_telescope_type(telescope_type)
+        workflow_type = WorkflowType(name=name, type_id=OapenIrusUkTelescope.DAG_ID_PREFIX)
+        self.api.put_workflow_type(workflow_type)
 
         gcp_download_bucket = env.download_bucket if env else "download_bucket"
         gcp_transform_bucket = env.transform_bucket if env else "transform_bucket"
@@ -116,7 +126,7 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
 
         telescope = Telescope(
             name=name,
-            telescope_type=TelescopeType(id=1),
+            workflow_type=WorkflowType(id=1),
             organisation=Organisation(id=1),
             extra={},
         )

@@ -31,7 +31,7 @@ from google.cloud.bigquery import SourceFormat
 import observatory.api.server.orm as orm
 from oaebu_workflows.config import schema_folder as default_schema_folder
 from oaebu_workflows.config import test_fixtures_folder
-from oaebu_workflows.identifiers import TelescopeTypes
+from oaebu_workflows.identifiers import WorkflowTypes
 from oaebu_workflows.workflows.oaebu_partners import OaebuPartner, OaebuPartnerName
 from oaebu_workflows.workflows.onix_workflow import OnixWorkflow, OnixWorkflowRelease
 from observatory.api.server.orm import (
@@ -66,7 +66,7 @@ from observatory.api.client import ApiClient, Configuration
 from observatory.api.client.api.observatory_api import ObservatoryApi  # noqa: E501
 from observatory.api.client.model.organisation import Organisation
 from observatory.api.client.model.telescope import Telescope
-from observatory.api.client.model.telescope_type import TelescopeType
+from observatory.api.client.model.workflow_type import WorkflowType
 from observatory.api.client.model.dataset import Dataset
 from observatory.api.client.model.dataset_release import DatasetRelease
 from observatory.api.client.model.dataset_type import DatasetType
@@ -1586,11 +1586,11 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
         dt = pendulum.now("UTC")
 
         name = "Onix Workflow"
-        telescope_type = TelescopeType(name=name, type_id=OnixWorkflow.DAG_ID_PREFIX)
-        self.api.put_telescope_type(telescope_type)
+        workflow_type = WorkflowType(name=name, type_id=OnixWorkflow.DAG_ID_PREFIX)
+        self.api.put_workflow_type(workflow_type)
 
-        telescope_type = TelescopeType(name="onix telescope", type_id="onix")
-        self.api.put_telescope_type(telescope_type)
+        workflow_type = WorkflowType(name="onix telescope", type_id="onix")
+        self.api.put_workflow_type(workflow_type)
 
         table_type = TableType(
             type_id="partitioned",
@@ -1620,7 +1620,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
 
             telescope = Telescope(
                 name=name,
-                telescope_type=TelescopeType(id=2),  # onix telescope
+                workflow_type=WorkflowType(id=2),  # onix telescope
                 organisation=Organisation(id=organisation.id),
                 extra={},
             )
@@ -1628,7 +1628,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
 
             telescope = Telescope(
                 name=name,
-                telescope_type=TelescopeType(id=1),
+                workflow_type=WorkflowType(id=1),
                 organisation=Organisation(id=organisation.id),
                 extra={},
             )

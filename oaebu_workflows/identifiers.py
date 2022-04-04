@@ -15,8 +15,8 @@
 # Author: James Diprose
 
 
-class TelescopeTypes:
-    """The type_id's for known TelescopeTypes"""
+class WorkflowTypes:
+    """The type_id's for known WorkflowTypes"""
 
     google_analytics = "google_analytics"
     google_books = "google_books"

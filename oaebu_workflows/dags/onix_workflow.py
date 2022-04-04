@@ -20,7 +20,7 @@
 from typing import List, Tuple
 
 from airflow.exceptions import AirflowException
-from oaebu_workflows.identifiers import TelescopeTypes
+from oaebu_workflows.identifiers import WorkflowTypes
 from oaebu_workflows.workflows.oaebu_partners import OaebuPartner
 from oaebu_workflows.workflows.onix_workflow import OnixWorkflow
 from observatory.api.client.model.dataset import Dataset
@@ -122,7 +122,7 @@ def get_oaebu_partner_data(organisation_id: int) -> List[OaebuPartner]:
             partners.append(
                 OaebuPartner(
                     name=dataset.name,
-                    dag_id_prefix=telescope.telescope_type.type_id,
+                    dag_id_prefix=telescope.workflow_type.type_id,
                     gcp_project_id=gcp_project_id,
                     gcp_dataset_id=gcp_dataset_id,
                     gcp_table_id=gcp_table_id,
@@ -137,8 +137,8 @@ def get_oaebu_partner_data(organisation_id: int) -> List[OaebuPartner]:
 
 # Fetch all ONIX telescopes
 api = make_observatory_api()
-telescope_type = api.get_telescope_type(type_id=TelescopeTypes.onix)
-telescopes = api.get_telescopes(telescope_type_id=telescope_type.id, limit=1000)
+workflow_type = api.get_workflow_type(type_id=WorkflowTypes.onix)
+telescopes = api.get_telescopes(workflow_type_id=workflow_type.id, limit=1000)
 
 # Create workflows for each organisation
 for telescope in telescopes:
