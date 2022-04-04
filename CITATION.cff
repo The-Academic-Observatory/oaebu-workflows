@@ -1,59 +1,29 @@
-# This CITATION.cff file was generated with cffinit.
-# Visit https://bit.ly/cffinit to generate yours today!
-
 cff-version: 1.2.0
-title: The Academic Observatory - OAeBU Workflows
-message: 'If you use this software, please cite it as below.'
-type: software
+message: "If you use this software, please cite it as below."
+title: "OAeBU Workflows"
+url: "https://github.com/The-Academic-Observatory/oaebu-workflows"
+doi: 10.5281/zenodo.6366690
 authors:
-  - given-names: Richard
-    family-names: Hosking
-    affiliation: >-
-      Centre for Culture and Technology, Curtin
-      University
-    orcid: 'https://orcid.org/0000-0001-8288-5241'
-  - given-names: Aniek
-    family-names: Roelofs
-    affiliation: >-
-      Curtin Institute for Computation, Curtin
-      University
-    orcid: 'https://orcid.org/0000-0003-0485-3388'
-  - given-names: Tuan-Yow
-    family-names: Chien
-    affiliation: >-
-      Centre for Culture and Technology, Curtin
-      University
-  - given-names: James P
-    family-names: Diprose
-    affiliation: >-
-      Centre for Culture and Technology, Curtin
-      University
-    orcid: 'https://orcid.org/0000-0002-5094-3571'
-  - given-names: Rebecca N
-    family-names: Handcock
-    affiliation: >-
-      Curtin Institute for Computation, Curtin
-      University
-    orcid: 'https://orcid.org/0000-0001-5903-6620'
-  - given-names: Alkim
-    orcid: 'https://orcid.org/0000-0001-6813-8362'
-    family-names: Ozaygen
-  - family-names: Lange
-    orcid: 'https://orcid.org/0000-0002-9449-4384'
-    given-names: Rebecca
-  - given-names: Kathryn R
-    family-names: Napier
-    orcid: 'https://orcid.org/0000-0003-1202-7238'
-  - family-names: Quigley
-    given-names: Niamh
-    orcid: 'https://orcid.org/0000-0001-9542-1577'
-  - family-names: Neylon
-    orcid: 'https://orcid.org/0000-0002-0068-716X'
-    given-names: Cameron
-  - family-names: Montgomery
-    orcid: 'https://orcid.org/0000-0001-6551-8140'
-    given-names: Lucy
-doi: 10.5281/zenodo.6366691
-license: Apache-2.0
-version: 2022.03.0
-date-released: '2022-03-18'
+  - given-names: "Richard"
+    family-names: "Hosking"
+  - given-names: "Aniek"
+    family-names: "Roelofs"
+  - given-names: "Tuan-Yow"
+    family-names: "Chien"
+  - given-names: "James P"
+    family-names: "Diprose"
+  - given-names: "Rebecca N"
+    family-names: "Handcock"
+  - given-names: "Alkim"
+    family-names: "Ozaygen"
+  - given-names: "Rebecca"
+    family-names: "Lange"
+  - given-names: "Kathryn R"
+    family-names: "Napier"
+  - given-names: "Niamh"
+    family-names: "Quigley"
+  - given-names: "Cameron"
+    family-names: "Neylon"
+  - given-names: "Lucy"
+    family-names: "Montgomery"
+  
