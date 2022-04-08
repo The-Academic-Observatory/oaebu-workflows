@@ -741,7 +741,7 @@
       },
       {
         "mode": "NULLABLE",
-        "name": "CorporateName",
+        "name": "CorprorateName",
         "type": "STRING",
         "description": "The name of a corporate body which contributed to the creation of the product, unstructured. Optional and\nnon-repeating: see Group P.7 introductory text for valid options."
       }
