@@ -21,21 +21,21 @@ from oaebu_workflows.identifiers import WorkflowTypes
 from oaebu_workflows.workflows.onix_telescope import OnixTelescope
 from observatory.platform.utils.api import make_observatory_api
 
-# Fetch all ONIX telescopes
+# Fetch all ONIX workflows
 api = make_observatory_api()
 workflow_type = api.get_workflow_type(type_id=WorkflowTypes.onix)
-telescopes = api.get_telescopes(workflow_type_id=workflow_type.id, limit=1000)
+workflows = api.get_workflows(workflow_type_id=workflow_type.id, limit=1000)
 
 # Make all ONIX telescopes
-for telescope in telescopes:
-    organisation = telescope.organisation
+for workflow in workflows:
+    organisation = workflow.organisation
     organisation_name = organisation.name
     project_id = organisation.gcp_project_id
     download_bucket = organisation.gcp_download_bucket
     transform_bucket = organisation.gcp_transform_bucket
     dataset_location = "us"
-    date_regex = telescope.extra.get("date_regex")
-    date_format = telescope.extra.get("date_format")
+    date_regex = workflow.extra.get("date_regex")
+    date_format = workflow.extra.get("date_format")
 
     workflow = OnixTelescope(
         organisation_name=organisation_name,
@@ -45,6 +45,6 @@ for telescope in telescopes:
         dataset_location=dataset_location,
         date_regex=date_regex,
         date_format=date_format,
-        workflow_id=telescope.id,
+        workflow_id=workflow.id,
     )
     globals()[workflow.dag_id] = workflow.make_dag()

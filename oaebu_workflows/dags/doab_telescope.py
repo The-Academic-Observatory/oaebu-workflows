@@ -24,6 +24,6 @@ from observatory.platform.utils.api import make_observatory_api
 # Fetch all telescopes
 api = make_observatory_api()
 workflow_type = api.get_workflow_type(type_id=WorkflowTypes.doab)
-telescopes = api.get_telescopes(workflow_type_id=workflow_type.id, limit=1000)
-workflow = DoabTelescope(workflow_id=telescopes[0].id)
+workflows = api.get_workflows(workflow_type_id=workflow_type.id, limit=1000)
+workflow = DoabTelescope(workflow_id=workflows[0].id)
 globals()[workflow.dag_id] = workflow.make_dag()

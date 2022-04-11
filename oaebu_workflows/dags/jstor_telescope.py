@@ -21,12 +21,12 @@ from oaebu_workflows.identifiers import WorkflowTypes
 from oaebu_workflows.workflows.jstor_telescope import JstorTelescope
 from observatory.platform.utils.api import make_observatory_api
 
-# Fetch all telescopes
+# Fetch all workflows
 api = make_observatory_api()
 workflow_type = api.get_workflow_type(type_id=WorkflowTypes.jstor)
-telescopes = api.get_telescopes(workflow_type_id=workflow_type.id, limit=1000)
+workflows = api.get_workflows(workflow_type_id=workflow_type.id, limit=1000)
 
-# Make all telescopes
-for telescope in telescopes:
-    workflow = JstorTelescope(telescope.organisation, telescope.extra.get("publisher_id"), workflow_id=telescope.id)
+# Make all workflows
+for workflow in workflows:
+    workflow = JstorTelescope(workflow.organisation, workflow.extra.get("publisher_id"), workflow_id=workflow.id)
     globals()[workflow.dag_id] = workflow.make_dag()

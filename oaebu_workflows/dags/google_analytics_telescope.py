@@ -26,11 +26,11 @@ from observatory.platform.utils.api import make_observatory_api
 # Fetch all telescopes
 api = make_observatory_api()
 workflow_type = api.get_workflow_type(type_id=WorkflowTypes.google_analytics)
-telescopes = api.get_telescopes(workflow_type_id=workflow_type.id, limit=1000)
+workflows = api.get_workflows(workflow_type_id=workflow_type.id, limit=1000)
 
-# Make all telescopes
-for telescope in telescopes:
-    view_id = telescope.extra.get("view_id")
-    pagepath_regex = telescope.extra.get("pagepath_regex")
-    workflow = GoogleAnalyticsTelescope(telescope.organisation, view_id, pagepath_regex, workflow_id=telescope.id)
+# Make all workflows
+for workflow in workflows:
+    view_id = workflow.extra.get("view_id")
+    pagepath_regex = workflow.extra.get("pagepath_regex")
+    workflow = GoogleAnalyticsTelescope(workflow.organisation, view_id, pagepath_regex, workflow_id=workflow.id)
     globals()[workflow.dag_id] = workflow.make_dag()

@@ -21,13 +21,13 @@ from oaebu_workflows.identifiers import WorkflowTypes
 from oaebu_workflows.workflows.google_books_telescope import GoogleBooksTelescope
 from observatory.platform.utils.api import make_observatory_api
 
-# Fetch all telescopes
+# Fetch all workflows
 api = make_observatory_api()
 workflow_type = api.get_workflow_type(type_id=WorkflowTypes.google_books)
-telescopes = api.get_telescopes(workflow_type_id=workflow_type.id, limit=1000)
+workflows = api.get_workflows(workflow_type_id=workflow_type.id, limit=1000)
 
-# Make all telescopes
-for telescope in telescopes:
-    accounts = telescope.extra.get("accounts") if telescope.extra else None
-    workflow = GoogleBooksTelescope(telescope.organisation, accounts, workflow_id=telescope.id)
+# Make all workflows
+for workflow in workflows:
+    accounts = workflow.extra.get("accounts") if workflow.extra else None
+    workflow = GoogleBooksTelescope(workflow.organisation, accounts, workflow_id=workflow.id)
     globals()[workflow.dag_id] = workflow.make_dag()

@@ -28,10 +28,8 @@ from click.testing import CliRunner
 from google.cloud import bigquery
 from google.cloud.bigquery import SourceFormat
 
-import observatory.api.server.orm as orm
 from oaebu_workflows.config import schema_folder as default_schema_folder
 from oaebu_workflows.config import test_fixtures_folder
-from oaebu_workflows.identifiers import WorkflowTypes
 from oaebu_workflows.workflows.oaebu_partners import OaebuPartner, OaebuPartnerName
 from oaebu_workflows.workflows.onix_workflow import OnixWorkflow, OnixWorkflowRelease
 from observatory.api.server.orm import (
@@ -65,10 +63,9 @@ from observatory.api.testing import ObservatoryApiEnvironment
 from observatory.api.client import ApiClient, Configuration
 from observatory.api.client.api.observatory_api import ObservatoryApi  # noqa: E501
 from observatory.api.client.model.organisation import Organisation
-from observatory.api.client.model.telescope import Telescope
+from observatory.api.client.model.workflow import Workflow
 from observatory.api.client.model.workflow_type import WorkflowType
 from observatory.api.client.model.dataset import Dataset
-from observatory.api.client.model.dataset_release import DatasetRelease
 from observatory.api.client.model.dataset_type import DatasetType
 from observatory.api.client.model.table_type import TableType
 from observatory.platform.utils.release_utils import get_dataset_releases
@@ -1618,27 +1615,27 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
             )
             organisation = self.api.put_organisation(organisation)
 
-            telescope = Telescope(
+            telescope = Workflow(
                 name=name,
                 workflow_type=WorkflowType(id=2),  # onix telescope
                 organisation=Organisation(id=organisation.id),
                 extra={},
             )
-            self.api.put_telescope(telescope)
+            self.api.put_workflow(telescope)
 
-            telescope = Telescope(
+            telescope = Workflow(
                 name=name,
                 workflow_type=WorkflowType(id=1),
                 organisation=Organisation(id=organisation.id),
                 extra={},
             )
-            telescope = self.api.put_telescope(telescope)
+            telescope = self.api.put_workflow(telescope)
 
             dataset = Dataset(
                 name="Onix Workflow Example Dataset",
                 address="project.dataset.table",
                 service="bigquery",
-                connection=Telescope(id=telescope.id),
+                connection=Workflow(id=telescope.id),
                 dataset_type=DatasetType(id=1),
             )
             self.api.put_dataset(dataset)

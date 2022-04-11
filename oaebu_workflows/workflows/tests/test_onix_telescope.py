@@ -17,12 +17,10 @@
 import os
 import shutil
 
-import observatory.api.server.orm as orm
 import pendulum
 from airflow.models.connection import Connection
 from airflow.utils.state import State
 from oaebu_workflows.config import test_fixtures_folder
-from oaebu_workflows.identifiers import WorkflowTypes
 from oaebu_workflows.workflows.onix_telescope import OnixTelescope
 from observatory.platform.utils.airflow_utils import AirflowConns
 from observatory.platform.utils.file_utils import get_file_hash
@@ -43,10 +41,9 @@ from observatory.api.testing import ObservatoryApiEnvironment
 from observatory.api.client import ApiClient, Configuration
 from observatory.api.client.api.observatory_api import ObservatoryApi  # noqa: E501
 from observatory.api.client.model.organisation import Organisation
-from observatory.api.client.model.telescope import Telescope
+from observatory.api.client.model.workflow import Workflow
 from observatory.api.client.model.workflow_type import WorkflowType
 from observatory.api.client.model.dataset import Dataset
-from observatory.api.client.model.dataset_release import DatasetRelease
 from observatory.api.client.model.dataset_type import DatasetType
 from observatory.api.client.model.table_type import TableType
 from observatory.platform.utils.release_utils import get_dataset_releases
@@ -101,13 +98,13 @@ class TestOnixTelescope(ObservatoryTestCase):
         )
         self.api.put_organisation(organisation)
 
-        telescope = Telescope(
+        telescope = Workflow(
             name=name,
             workflow_type=WorkflowType(id=1),
             organisation=Organisation(id=1),
             extra={},
         )
-        self.api.put_telescope(telescope)
+        self.api.put_workflow(telescope)
 
         table_type = TableType(
             type_id="partitioned",
@@ -127,7 +124,7 @@ class TestOnixTelescope(ObservatoryTestCase):
             name="Ucl Discovery Dataset",
             address="project.dataset.table",
             service="bigquery",
-            connection=Telescope(id=1),
+            connection=Workflow(id=1),
             dataset_type=DatasetType(id=1),
         )
         self.api.put_dataset(dataset)
