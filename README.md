@@ -32,10 +32,10 @@ Oapen Metadata, Onix, UCL Discovery and an Onix Workflow for combining all of th
 ## Documentation
 For detailed documentation about the Book Usage Data Workflows see the Read the Docs website  [https://oaebu-workflows.readthedocs.io](https://oaebu-workflows.readthedocs.io)
 
-## Requirements
+## Other requirements to create the Book Usage Datasets
 The Observatory Platform, an environment for fetching, processing and analysing data, see the Repository  [https://github.com/The-Academic-Observatory/observatory-platform](https://github.com/The-Academic-Observatory/observatory-platform)
 
 The Academic Observatory Workflows, which provides Apache Airflow workflows for fetching, processing and analysing data about academic institutions, see the Repository  [https://github.com/The-Academic-Observatory/academic-observatory-workflows](https://github.com/The-Academic-Observatory/academic-observatory-workflows)
 
-The Onix Parser, a command line tool that transforms ONIX files into a format suitable for loading into BigQuery, see see the Repository  [https://github.com/The-Academic-Observatory/onix-parser](https://github.com/The-Academic-Observatory/onix-parser)
+The Onix Parser, a command line tool that transforms ONIX files into a format suitable for loading into BigQuery, see the Repository  [https://github.com/The-Academic-Observatory/onix-parser](https://github.com/The-Academic-Observatory/onix-parser)
 
