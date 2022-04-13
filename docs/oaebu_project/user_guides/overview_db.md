@@ -7,7 +7,7 @@ The ‘Overview’ dashboard presents a summary of all open access eBooks publis
     :width: 200
 ```    
 
-For the OAeBU pilot, data sources of usage data cover different time periods. For example, the University of Michigan Press has data sources for the following time periods:
+For the pilot project, data sources of usage data cover different time periods. For example, the University of Michigan Press has data sources for the following time periods:
 * Usage data is from September 2020 for Google Books
 * Usage data is from January 2018 onwards for JSTOR
 * Usage data is from January 2018 to March 2020 for OAPEN (Counter 4), and from April 2020 for OAPEN (Counter 5) 

@@ -4,7 +4,7 @@ Fulcrum is a “community-developed, open-source platform for digital scholarshi
 
 In Fulcrum, DOIs are allocated to any digital content within eBooks, for example images and audio files. The Parent Title and Parent DOI are used for the eBook, and one Parent DOI can include multiple DOIs. In the default dashboard displayed, the number of downloads is the sum of downloads across all DOIs in Fulcrum, not just the parent DOIs. 
 
-For the OAeBU pilot, the Fulcrum data source is a manual data upload for the University of Michigan Press, and usage data is available from April 2020 for both paid and open access eBooks. 
+For the pilot project, the Fulcrum data source is a manual data upload for the University of Michigan Press, and usage data is available from April 2020 for both paid and open access eBooks. 
 
 The University of Michigan Press Ebook Collection can be accessed at: 
 <https://www.fulcrum.org/michigan> 

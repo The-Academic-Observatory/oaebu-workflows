@@ -1,7 +1,7 @@
 Public Data Sources
 ==========================
 
-The public data sources are where data is publicly available, rather than data provided by a specific partner.
+The public data sources are where data is publicly available, rather than data provided by a specific pilot project dashboard partner.
 
 ## Crossref – Metadata
 Crossref is a non-for-profit membership organization, and an official Digital Object Identifier (DOI) Registration Agency of the International DOI Foundation. They make metadata available for all DOIs registered with Crossref (<https://www.crossref.org/community/>).

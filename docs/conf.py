@@ -23,8 +23,8 @@ from generate_schema_csv import generate_csv, generate_latest_files
 
 # -- Project information -----------------------------------------------------
 
-project = "Oaebu Workflows"
-copyright = "2020-2021 Curtin University"
+project = "Book Usage Data Workflows"
+copyright = "2020-2022 Curtin University"
 author = "Curtin University"
 
 # -- General configuration ---------------------------------------------------

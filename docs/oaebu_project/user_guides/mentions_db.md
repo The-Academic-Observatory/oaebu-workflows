@@ -2,7 +2,7 @@
 
 Crossref Event Data captures online discussion about research outputs including eBooks, such as ‘a citation in a dataset or patent, a mention in a news article, Wikipedia page or on a blog, or discussion and comment on social media’ (<https://www.crossref.org/services/event-data/>).
 
-For the OAeBU pilot, the Crossref Event data for the University of Michigan Press is from May 2018 onwards, and the event sources are:
+For the pilot project, the Crossref Event data for the University of Michigan Press is from May 2018 onwards, and the event sources are:
 * Crossref - relationships, references, and links to DataCite registered content
 * Datacite - links to Crossref registered content
 * Twitter - Mentions in tweets

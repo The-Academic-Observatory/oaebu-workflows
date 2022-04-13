@@ -1,7 +1,7 @@
 # MUSE Dashboard
 Project MUSE provides a platform which hosts journals and books from multiple publishers including University of Michigan Press and University College London. Some of the MUSE offerings are open access eBooks (<https://about.muse.jhu.edu/muse/open-access-overview/>). To see open access book titles on Project MUSE, go to <https://muse.jhu.edu/search?action=oa_browse>
 
-For the OAeBU pilot, the MUSE data source is a manual data upload for the University of Michigan Press, and usage data is available from January 2020. 
+For the pilot project, the MUSE data source is a manual data upload for the University of Michigan Press, and usage data is available from January 2020. 
 
 The sections of this dashboard are:
 * [Filters](#filters)

@@ -5,7 +5,7 @@ The ONIX workflow uses the ONIX table created by the ONIX telescope to do the fo
   1. Aggregate book product records into works records. Works are equivalence classes of products, where each product in the class is a manifestation of each other. For example, a PDF and a paperback of the same work.
   2. Aggregate work records into work family records. A work family is an equivalence class of works where each work in the class is just a different edition.
   3. Produce intermediate lookup tables mapping ISBN13 -> WorkID and ISBN13 -> WorkFamilyID.
-  4. Produce oaebu_intermediate tables that append work_id and work_family_id columns to different data tables with ISBN keys.
+  4. Produce intermediate tables that append work_id and work_family_id columns to different data tables with ISBN keys.
   
 [Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/workflows/onix_workflow.py)
 
@@ -53,7 +53,7 @@ The Work Family ID will be an arbitrary Work ID (ISBN) representative from a wor
    :header-rows: 1
 ```
 
-## Create OAEBU intermediate tables
+## Create intermediate tables
 For each data partner's tables containing ISBN, create new "matched" tables which extend the original data with new "work_id" and "work_family_id" columns.
 
 The schemas for these tables are identical to the raw Telescope's schemas, with the addition of work_ids and work_family_ids.

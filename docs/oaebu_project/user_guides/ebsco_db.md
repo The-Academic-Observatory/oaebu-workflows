@@ -3,7 +3,7 @@
 EBSCO hosts collections of different publications including eBooks, some of which are open access. They provide data about the usage of these eBooks to publishers, such as University of Michigan Press. The eISBN used in the EBSCO data source is one of the identifiers for eBooks used by some publishers and platforms. To access EBSCO open access book titles, libraries can sign up here:
 <https://more.ebsco.com/ebooks-open-access-2021.html>
 
-For the OAeBU pilot, the EBSCO data source is a manual data upload that was developed specifically for the University of Michigan Press. Usage data is available from January 2021.
+For the pilot project, the EBSCO data source is a manual data upload that was developed specifically for the University of Michigan Press. Usage data is available from January 2021.
 
 The sections of this dashboard are:
 * [Filters](#filters)

@@ -1,5 +1,5 @@
 
-OAeBU Project
+Developing a Pilot Data Trust for Open Access Ebook Usage (2020-2022) Project
 ##############################
 
 Overview

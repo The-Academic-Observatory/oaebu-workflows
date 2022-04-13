@@ -14,13 +14,13 @@
        A dashboard is an interactive, up-to-date page of visualisations that aggregate and summarise data from different sources
 
     data source	
-       A public or partner source of data about open access eBooks and their usage, such as views, downloads and online mentions
+       A public or pilot project dashboard partner source of data about open access eBooks and their usage, such as views, downloads and online mentions
 
     DOAB	
        Directory of Open Access Books
 
     eISBN	
-       An identifier for eBooks used by some publishers and platforms, specifically the manual EBSCO data source in the OAeBU pilot
+       An identifier for eBooks used by some publishers and platforms, specifically the manual EBSCO data source in the pilot project
 
     Elasticsearch	
        Elasticsearch is a search and analytics engine that enables fast searches for large sets of data [2]_
@@ -32,10 +32,10 @@
        JSTOR is a digital library, which offers over 7000 open access eBooks [4]_
 
     Kibana	
-       Kibana is a free and open user interface.[5]_  Kibana is used in the OAeBU project to analyse, search, interact with and visualize the Elasticsearch data
+       Kibana is a free and open user interface to Elasticsearch.[5]_  Kibana is used in the 2020-2022 data dashboard pilot to analyse, search, interact with and visualize the Elasticsearch data
 
     OAeBU	
-       Open Access eBook Usage - a project creating a global data trust for usage data on open access (OA) monographs [6]_
+       Open Access eBook Usage (2020 - 2022) - a term used to refer to the Mellon Foundation funded pilot project Developing a Pilot Data Trust for Open Access Ebook Usage  [6]_
 
     OAPEN	
        OAPEN is a not-for-profit organisation dedicated to open access, peer-reviewed books, operating three platforms: OAPEN Library; OAPEN Open Access Books Toolkit; and Directory of Open Access Books [7]_
@@ -50,7 +50,7 @@
        ONIX for Books (ONline Information eXchange) is a standard format that book publishers use to share information about the books that they have published [10]_
 
     publisher	
-       A scholarly eBook publisher, who partners in the OAeBU pilot to provide their titles, and metrics of their usage
+       A scholarly eBook publisher, who participated in the pilot project to provide metadata for their titles, and metrics of their usage
 
     shard	
        A database shard is a way of storing data, so that load can be spread for large amounts of data [11]_
