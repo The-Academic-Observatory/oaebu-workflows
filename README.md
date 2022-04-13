@@ -1,6 +1,6 @@
-# OAeBU Workflows
+# Book Usage Data Workflows
 
-OAeBU Workflows provides Apache Airflow workflows for fetching, processing and analysing data about Open Access Books.
+Book Usage Data Workflows provides Apache Airflow workflows for fetching, processing and analysing data about Open Access Books.
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python Version](https://img.shields.io/badge/python-3.7-blue)](https://img.shields.io/badge/python-3.7-blue)
@@ -28,5 +28,14 @@ Oapen Metadata, Onix, UCL Discovery and an Onix Workflow for combining all of th
 | <img src="docs/logos/onix.svg" alt="Onix" width="150" /> | ONIX is a standard format that book publishers use to share information about the books that they have published. Publishers that have ONIX feeds are given credentials and access to their own upload folder on the Mellon SFTP server. The publisher uploads their ONIX feed to their upload folder on a weekly, fortnightly or monthly basis. The ONIX telescope downloads, transforms (with the ONIX parser Java command line tool) and then loads the ONIX data into BigQuery for further processing |
 | <img src="docs/logos/ucl.svg" alt="UCL Discovery" width="150" /> | UCL Discovery is UCL's open access repository, showcasing and providing access to the full texts of UCL research publications.The metadata for all eprints is obtained from their publicly available CSV file (https://discovery.ucl.ac.uk/cgi/search/advanced).  |
 
+
 ## Documentation
-For detailed documentation about the OAeBU Workflows see the Read the Docs website [https://oaebu-workflows.readthedocs.io](https://oaebu-workflows.readthedocs.io)
+For detailed documentation about the Book Usage Data Workflows see the [https://oaebu-workflows.readthedocs.io](https://oaebu-workflows.readthedocs.io)
+
+## Requirements
+The Observatory Platform, an environment for fetching, processing and analysing data, see  [https://github.com/The-Academic-Observatory/observatory-platform](https://github.com/The-Academic-Observatory/observatory-platform)
+
+The Academic Observatory Workflows, which provides Apache Airflow workflows for fetching, processing and analysing data about academic institutions, see [https://github.com/The-Academic-Observatory/academic-observatory-workflows](https://github.com/The-Academic-Observatory/academic-observatory-workflows)
+
+The Onix Parser, a command line tool that transforms ONIX files into a format suitable for loading into BigQuery, see [https://github.com/The-Academic-Observatory/onix-parser](https://github.com/The-Academic-Observatory/onix-parser)
+
