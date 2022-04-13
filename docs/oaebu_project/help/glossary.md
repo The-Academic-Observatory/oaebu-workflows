@@ -14,7 +14,7 @@
        A dashboard is an interactive, up-to-date page of visualisations that aggregate and summarise data from different sources
 
     data source	
-       A public or ilot project dashboard partner source of data about open access eBooks and their usage, such as views, downloads and online mentions
+       A public or pilot project dashboard partner source of data about open access eBooks and their usage, such as views, downloads and online mentions
 
     DOAB	
        Directory of Open Access Books
@@ -32,10 +32,10 @@
        JSTOR is a digital library, which offers over 7000 open access eBooks [4]_
 
     Kibana	
-       Kibana is a free and open user interface to Elasticserach.[5]_  Kibana is used in the 2020-2022 data dashboard pilot to analyse, search, interact with and visualize the Elasticsearch data
+       Kibana is a free and open user interface to Elasticsearch.[5]_  Kibana is used in the 2020-2022 data dashboard pilot to analyse, search, interact with and visualize the Elasticsearch data
 
     OAeBU	
-       Open Access eBook Usage (2020 - 2022) - a term used to refer to the Mellon Foundation funded pilot project Developing a Pilot Data Trust for Open Access eBook Usage  [6]_
+       Open Access eBook Usage (2020 - 2022) - a term used to refer to the Mellon Foundation funded pilot project Developing a Pilot Data Trust for Open Access Ebook Usage  [6]_
 
     OAPEN	
        OAPEN is a not-for-profit organisation dedicated to open access, peer-reviewed books, operating three platforms: OAPEN Library; OAPEN Open Access Books Toolkit; and Directory of Open Access Books [7]_

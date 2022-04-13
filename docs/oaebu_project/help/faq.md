@@ -1,6 +1,6 @@
 # Frequently Asked Questions
 
-This section of the help pilot project dashboards:
+This section of the help guide contains frequently asking questions about using the pilot project dashboards:
 * [I’m having trouble seeing some visualisations](#im-having-trouble-accessing-the-dashboards-or-viewing-some-visualisations)
 * [Some of the usage data is missing for a specific book title](#some-of-the-usage-data-is-missing-for-a-specific-book-title)
 * [I can’t find a specific title](#i-cant-find-a-specific-title)
