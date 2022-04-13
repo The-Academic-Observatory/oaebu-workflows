@@ -1,5 +1,5 @@
 # Institutions Dashboard
-The ‘Institutions’ dashboard shows usage data (or downloads of eBook chapters) by institutions. For the OAeBU pilot, this data comes from JSTOR, and the data is available from January 2018 onwards. For more information about JSTOR
+The ‘Institutions’ dashboard shows usage data (or downloads of eBook chapters) by institutions. For the pilot project, this data comes from JSTOR, and the data is available from January 2018 onwards. For more information about JSTOR
 see the [partner data](../overview/partner_data) section of this help guide. 
 
 The sections of this dashboard are:

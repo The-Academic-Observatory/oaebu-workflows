@@ -1,6 +1,6 @@
 # Frequently Asked Questions
 
-This section of the help guide contains frequently asking questions about using the OAeBU Pilot dashboards:
+This section of the help pilot project dashboards:
 * [I’m having trouble seeing some visualisations](#im-having-trouble-accessing-the-dashboards-or-viewing-some-visualisations)
 * [Some of the usage data is missing for a specific book title](#some-of-the-usage-data-is-missing-for-a-specific-book-title)
 * [I can’t find a specific title](#i-cant-find-a-specific-title)
@@ -49,10 +49,10 @@ For publishers, the [Data Quality](../user_guides/data_qual_db.md) and [Overview
 The dashboards are built on usage data from different data sources. Sometimes a title is in one data source but not another, hence it may not appear in all Title/ISBN filters across all dashboards. 
 
 ## I can’t find a specific author in the ‘Select Author’ dropdown
-If a book is not yet released, the Title and ISBN may be in the OAeBU dashboards, but without the author details. 
+If a book is not yet released, the Title and ISBN may be in the pilot project dashboards, but without the author details. 
 
 ## Why is there a relatively low number of ISBNs with usage data?
-This can happen when only partial data is available for the current month, or for the last few months. Data is transferred from our data sources at different frequencies, with Crossref events data and  ONIX feeds  generally updated weekly, with usage data updated approximately monthly. Find out more in the user documentation about [OAeBU workflows](../../oaebu_workflows/index).
+This can happen when only partial data is available for the current month, or for the last few months. Data is transferred from our data sources at different frequencies, with Crossref events data and  ONIX feeds  generally updated weekly, with usage data updated approximately monthly. Find out more in the user documentation about [Book Usage Data Workflows](../../oaebu_workflows/index).
 
 ## I can only see data for one title, author, country or institution
 There could be filters applied in the dashboard. First try clearing all filters applied in the filter dropdowns. For example, to remove all authors from the ‘Select Author(s)/Volume Editor(s)’ filter, click on the X in a circle icon. 
