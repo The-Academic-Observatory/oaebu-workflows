@@ -11,7 +11,7 @@ The data sources in the pilot project included general bibliographic data from p
 The online dashboard enables pilot project dashboard partners to see the usage of the eBooks they have published in terms of views, downloads and online mentions and events. Pilot project dashboard partners can also view which countries and institutions are using their eBooks, and which subjects are represented in their open access eBook collections. The data shown in the dashboards is visible only to each pilot project dashboard partner about their own collection. However, the University of Michigan Press have shared their online dashboards publicly, with no login details required: 
 
 Link to public dashboards embedded in the University of Michigan Press website: 
-* <https://ebc.press.umich.edu/impact/> 
+* <https://ebc.press.umich.edu/impact/#oa-book-usage> 
 
 Direct link to the University of Michigan Press public dashboards: 
 * <https://tinyurl.com/umpress-public>
@@ -22,7 +22,7 @@ The pilot project dashboard partners that took part in the pilot project were: t
 ## More Information
 More information about this pilot project is available:
 * on the Developing a Pilot Data Trust for Open Access Ebook Usage (2020-2022) project webpage (<https://educopia.org/data_trust/>), and
-* the Zenodo repository community ‘Open Access Ebook Usage Data’ (<https://zenodo.org/communities/oaebu/>).
+* the Zenodo repository community ‘Open Access Ebook Usage Data’ (<https://zenodo.org/communities/2020to2022-developing-pilot-data-trust-for-oa-book-usage/>).
 
 ## Contact
 If you have any questions about the pilot project code and documentation, please contact:
