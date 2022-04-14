@@ -23,7 +23,7 @@ The corresponding tables created in BigQuery are `google.google_books_salesYYYYM
 +------------------------------+---------+
 | Harvest Type                 |  SFTP   |
 +------------------------------+---------+
-| Harvest Frequency            | Monthly |
+| Harvest Frequency            | Weekly  |
 +------------------------------+---------+
 | Runs on remote worker        | False   |
 +------------------------------+---------+
