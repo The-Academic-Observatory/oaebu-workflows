@@ -116,7 +116,7 @@ class TestGoogleAnalyticsTelescope(ObservatoryTestCase):
             name="Google Analytics Dataset",
             address="project.dataset.table",
             service="bigquery",
-            connection=Workflow(id=1),
+            workflow=Workflow(id=1),
             dataset_type=DatasetType(id=1),
         )
         self.api.put_dataset(dataset)

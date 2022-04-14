@@ -1635,7 +1635,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 name="Onix Workflow Example Dataset",
                 address="project.dataset.table",
                 service="bigquery",
-                connection=Workflow(id=telescope.id),
+                workflow=Workflow(id=telescope.id),
                 dataset_type=DatasetType(id=1),
             )
             self.api.put_dataset(dataset)
