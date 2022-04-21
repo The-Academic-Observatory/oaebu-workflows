@@ -30,6 +30,7 @@ from google.auth.transport.requests import AuthorizedSession
 from google.cloud import bigquery
 from google.oauth2.service_account import IDTokenCredentials
 from googleapiclient.discovery import Resource, build
+from googleapiclient.errors import HttpError
 from oaebu_workflows.config import schema_folder as default_schema_folder
 from oauth2client.service_account import ServiceAccountCredentials
 from observatory.api.client.model.organisation import Organisation
@@ -120,10 +121,10 @@ class OapenIrusUkRelease(OrganisationRelease):
 
         # initialise cloud functions api
         creds = ServiceAccountCredentials.from_json_keyfile_name(os.environ.get(environment_vars.CREDENTIALS))
-        service = build("cloudfunctions", "v1", credentials=creds, cache_discovery=False)
+        service = build("cloudfunctions", "v2beta", credentials=creds, cache_discovery=False, static_discovery=False)
 
         # update or create cloud function
-        exists = cloud_function_exists(service, location, full_name)
+        exists = cloud_function_exists(service, full_name)
         if not exists or upload is True:
             update = True if exists else False
             success, msg = create_cloud_function(
@@ -148,7 +149,8 @@ class OapenIrusUkRelease(OrganisationRelease):
         source_bucket = OapenIrusUkTelescope.OAPEN_BUCKET
         function_name = OapenIrusUkTelescope.FUNCTION_NAME
         function_region = OapenIrusUkTelescope.FUNCTION_REGION
-        function_url = f"https://{function_region}-{oapen_project_id}.cloudfunctions.net/{function_name}"
+        location = f"projects/{oapen_project_id}/locations/{function_region}"
+        full_name = f"{location}/functions/{function_name}"
         geoip_license_key = BaseHook.get_connection(AirflowConns.GEOIP_LICENSE_KEY).password
 
         # get the publisher_uuid or publisher_id, both are set to empty strings when publisher id is 'oapen'
@@ -159,8 +161,15 @@ class OapenIrusUkRelease(OrganisationRelease):
         username = BaseHook.get_connection(airflow_conn).login
         password = BaseHook.get_connection(airflow_conn).password
 
+        # initialise cloud functions api
+        creds = ServiceAccountCredentials.from_json_keyfile_name(os.environ.get(environment_vars.CREDENTIALS))
+        service = build("cloudfunctions", "v2beta", credentials=creds, cache_discovery=False, static_discovery=False)
+
+        # Get cloud function uri
+        function_uri = cloud_function_exists(service, full_name)
+
         call_cloud_function(
-            function_url,
+            function_uri,
             self.release_date.strftime("%Y-%m"),
             username,
             password,
@@ -205,7 +214,7 @@ class OapenIrusUkTelescope(OrganisationTelescope):
 
     OAPEN_PROJECT_ID = "oapen-usage-data-gdpr-proof"  # The oapen project id.
     OAPEN_BUCKET = f"{OAPEN_PROJECT_ID}_cloud-function"  # Storage bucket with the source code
-    FUNCTION_NAME = "oapen_access_stats"  # Name of the google cloud function
+    FUNCTION_NAME = "oapen-access-stats"  # Name of the google cloud function
     FUNCTION_REGION = "europe-west1"  # Region of the google cloud function
     FUNCTION_SOURCE_URL = (
         "https://github.com/The-Academic-Observatory/oapen-irus-uk-cloud-function/releases/"
@@ -388,20 +397,19 @@ def upload_source_code_to_bucket(
     return success, upload
 
 
-def cloud_function_exists(service: Resource, location: str, full_name: str) -> bool:
+def cloud_function_exists(service: Resource, full_name: str) -> Optional[str]:
     """Check if cloud function with a given name already exists
 
     :param service: Cloud function service
-    :param location: Location of the cloud function
     :param full_name: Name of the cloud function
-    :return: True if cloud function exists, else False
+    :return: URI if cloud function exists, else None
     """
-    response = service.projects().locations().functions().list(parent=location).execute()
-    if response:
-        for function in response["functions"]:
-            if function["name"] == full_name:
-                return True
-    return False
+    try:
+        response = service.projects().locations().functions().get(name=full_name).execute()
+        uri = response["serviceConfig"]["uri"]
+    except HttpError:
+        return None
+    return uri
 
 
 def create_cloud_function(
@@ -426,15 +434,19 @@ def create_cloud_function(
     """
     body = {
         "name": full_name,
+        "environment": "GEN_2",
         "description": "Pulls oapen irus uk data and replaces ip addresses with city and country info.",
-        "entryPoint": "download",
-        "runtime": "python37",
-        "timeout": "540s",  # maximum
-        "availableMemoryMb": 4096,  # maximum
-        "maxInstances": max_active_runs,
-        "ingressSettings": "ALLOW_ALL",
-        "sourceArchiveUrl": os.path.join("gs://" + source_bucket, blob_name),
-        "httpsTrigger": {"securityLevel": "SECURE_ALWAYS"},
+        "buildConfig": {
+            "runtime": "python39",
+            "entryPoint": "download",
+            "source": {"storageSource": {"bucket": source_bucket, "object": blob_name}},
+        },
+        "serviceConfig": {
+            "timeoutSeconds": 900,
+            "availableMemory": "4096M",
+            "maxInstanceCount": max_active_runs,
+            "allTrafficOnLatestRevision": True,
+        },
     }
     if update:
         update_mask = ",".join(body.keys())
@@ -445,28 +457,38 @@ def create_cloud_function(
             .patch(name=full_name, updateMask=update_mask, body=body)
             .execute()
         )
-        logging.info("Patching cloud function")
+        logging.info(f"Patching cloud function, response: {response}")
     else:
-        response = service.projects().locations().functions().create(location=location, body=body).execute()
-        logging.info("Creating cloud function")
+        response = (
+            service.projects()
+            .locations()
+            .functions()
+            .create(parent=location, functionId=OapenIrusUkTelescope.FUNCTION_NAME, body=body)
+            .execute()
+        )
+        logging.info(f"Creating cloud function, response: {response}")
 
     operation_name = response.get("name")
     done = response.get("done")
     while not done:
         time.sleep(10)
-        response = service.operations().get(name=operation_name).execute()
+        response = service.projects().locations().operations().get(name=operation_name).execute()
         done = response.get("done")
 
     error = response.get("error")
-    resp = response.get("response")
-    success = True if resp else False
-    msg = resp if success else error
+    response = response.get("response")
+    if response:
+        msg = response
+        success = True
+    else:
+        msg = error
+        success = False
 
     return success, msg
 
 
 def call_cloud_function(
-    function_url: str,
+    function_uri: str,
     release_date: str,
     username: str,
     password: str,
@@ -482,7 +504,7 @@ def call_cloud_function(
     iteration, however for the old platform two files have to be downloaded separately for each publisher,
     this might take longer than the timeout time of the cloud function, so the process is split up in multiple calls.
 
-    :param function_url: Url of the cloud function
+    :param function_uri: URI of the cloud function
     :param release_date: The release date in YYYY-MM
     :param username: Oapen username (email or requestor_id)
     :param password: Oapen password (password or api_key)
@@ -494,7 +516,7 @@ def call_cloud_function(
     :return: None
     """
     creds = IDTokenCredentials.from_service_account_file(
-        os.environ.get(environment_vars.CREDENTIALS), target_audience=function_url
+        os.environ.get(environment_vars.CREDENTIALS), target_audience=function_uri
     )
     authed_session = AuthorizedSession(creds)
     data = {
@@ -510,7 +532,7 @@ def call_cloud_function(
     finished = False
     while not finished:
         response = authed_session.post(
-            function_url, data=json.dumps(data), headers={"Content-Type": "application/json"}, timeout=550
+            function_uri, data=json.dumps(data), headers={"Content-Type": "application/json"}, timeout=550
         )
         logging.info(f"Call cloud function response status code: {response.status_code}, reason: {response.reason}")
         if response.status_code != 200:
