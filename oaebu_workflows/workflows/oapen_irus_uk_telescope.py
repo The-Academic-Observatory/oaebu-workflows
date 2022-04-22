@@ -31,7 +31,6 @@ from google.cloud import bigquery
 from google.oauth2.service_account import IDTokenCredentials
 from googleapiclient.discovery import Resource, build
 from googleapiclient.errors import HttpError
-from oaebu_workflows.config import schema_folder as default_schema_folder
 from oauth2client.service_account import ServiceAccountCredentials
 from observatory.api.client.model.organisation import Organisation
 from observatory.platform.utils.airflow_utils import AirflowConns, AirflowVars
@@ -54,6 +53,8 @@ from observatory.platform.workflows.organisation_telescope import (
     OrganisationRelease,
     OrganisationTelescope,
 )
+
+from oaebu_workflows.config import schema_folder as default_schema_folder
 
 
 class OapenIrusUkRelease(OrganisationRelease):
@@ -218,9 +219,9 @@ class OapenIrusUkTelescope(OrganisationTelescope):
     FUNCTION_REGION = "europe-west1"  # Region of the google cloud function
     FUNCTION_SOURCE_URL = (
         "https://github.com/The-Academic-Observatory/oapen-irus-uk-cloud-function/releases/"
-        "download/v1.1.5/oapen-irus-uk-cloud-function.zip"
+        "download/v1.1.6/oapen-irus-uk-cloud-function.zip"
     )  # URL to the zipped source code of the cloud function
-    FUNCTION_MD5_HASH = "ffed057f0443485d93c2d35553bbfdf1"  # MD5 hash of the zipped source code
+    FUNCTION_MD5_HASH = "e9b350a31a43314a994404631dcfae3a"  # MD5 hash of the zipped source code
     FUNCTION_BLOB_NAME = "cloud_function_source_code.zip"  # blob name of zipped source code
 
     def __init__(
