@@ -164,7 +164,7 @@ class GoogleBooksTelescope(OrganisationTelescope):
         accounts: Optional[List[str]],
         dag_id: Optional[str] = None,
         start_date: pendulum.DateTime = pendulum.datetime(2018, 1, 1),
-        schedule_interval: str = "@monthly",
+        schedule_interval: str = "@weekly",
         dataset_id: str = "google",
         schema_folder: str = default_schema_folder(),
         catchup: bool = False,
