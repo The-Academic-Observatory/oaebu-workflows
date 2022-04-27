@@ -19,16 +19,16 @@
 from dataclasses import dataclass
 
 
-class OaebuPartnerName:
+class OaebuDatasetType:
     """OAEBU partner name constants."""
 
-    google_analytics = "Google Analytics"
-    google_books_sales = "Google Books Sales"
-    google_books_traffic = "Google Books Traffic"
-    jstor_country = "JSTOR Country"
-    jstor_institution = "JSTOR Institution"
-    oapen_irus_uk = "OAPEN IRUS UK"
-    ucl_discovery = "UCL Discovery"
+    google_analytics = "google_analytics"
+    google_books_sales = "google_books_sales"
+    google_books_traffic = "google_books_traffic"
+    jstor_country = "jstor_country"
+    jstor_institution = "jstor_institution"
+    oapen_irus_uk = "oapen_irus_uk"
+    ucl_discovery = "ucl_discovery"
 
 
 @dataclass

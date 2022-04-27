@@ -27,7 +27,7 @@ from airflow.exceptions import AirflowException
 from google.cloud.bigquery import SourceFormat
 from oaebu_workflows.config import schema_folder as default_schema_folder
 from oaebu_workflows.config import sql_folder
-from oaebu_workflows.workflows.oaebu_partners import OaebuPartner, OaebuPartnerName
+from oaebu_workflows.workflows.oaebu_partners import OaebuPartner, OaebuDatasetType
 from oaebu_workflows.workflows.onix_telescope import OnixTelescope
 from oaebu_workflows.workflows.onix_work_aggregation import (
     BookWorkAggregator,
@@ -714,16 +714,16 @@ class OnixWorkflow(Workflow):
         # Book Product
         fn = partial(
             self.create_oaebu_book_product_table,
-            include_google_analytics=OaebuPartnerName.google_analytics in data_partner_datasets,
-            include_google_books=OaebuPartnerName.google_books_traffic in data_partner_datasets,
-            include_jstor=OaebuPartnerName.jstor_country in data_partner_datasets,
-            include_oapen=OaebuPartnerName.oapen_irus_uk in data_partner_datasets,
-            include_ucl=OaebuPartnerName.ucl_discovery in data_partner_datasets,
-            google_analytics_dataset=data_partner_datasets.get(OaebuPartnerName.google_analytics, None),
-            google_books_dataset=data_partner_datasets.get(OaebuPartnerName.google_books_traffic, None),
-            jstor_dataset=data_partner_datasets.get(OaebuPartnerName.jstor_country, None),
-            oapen_dataset=data_partner_datasets.get(OaebuPartnerName.oapen_irus_uk, None),
-            ucl_dataset=data_partner_datasets.get(OaebuPartnerName.ucl_discovery, None),
+            include_google_analytics=OaebuDatasetType.google_analytics in data_partner_datasets,
+            include_google_books=OaebuDatasetType.google_books_traffic in data_partner_datasets,
+            include_jstor=OaebuDatasetType.jstor_country in data_partner_datasets,
+            include_oapen=OaebuDatasetType.oapen_irus_uk in data_partner_datasets,
+            include_ucl=OaebuDatasetType.ucl_discovery in data_partner_datasets,
+            google_analytics_dataset=data_partner_datasets.get(OaebuDatasetType.google_analytics, None),
+            google_books_dataset=data_partner_datasets.get(OaebuDatasetType.google_books_traffic, None),
+            jstor_dataset=data_partner_datasets.get(OaebuDatasetType.jstor_country, None),
+            oapen_dataset=data_partner_datasets.get(OaebuDatasetType.oapen_irus_uk, None),
+            ucl_dataset=data_partner_datasets.get(OaebuDatasetType.ucl_discovery, None),
         )
 
         # Populate the __name__ attribute of the partial object (it lacks one by default).
@@ -957,21 +957,21 @@ class OnixWorkflow(Workflow):
         # Export QA Metrics
         fn = partial(
             self.export_oaebu_qa_metrics,
-            include_google_analytics=OaebuPartnerName.google_analytics in data_partner_tables,
-            include_google_books=OaebuPartnerName.google_books_traffic in data_partner_tables,
-            include_jstor=OaebuPartnerName.jstor_country in data_partner_tables,
-            include_oapen=OaebuPartnerName.oapen_irus_uk in data_partner_tables,
-            include_ucl=OaebuPartnerName.ucl_discovery in data_partner_tables,
-            google_analytics_table=data_partner_tables.get(OaebuPartnerName.google_analytics, None),
-            google_books_table=data_partner_tables.get(OaebuPartnerName.google_books_traffic, None),
-            jstor_table=data_partner_tables.get(OaebuPartnerName.jstor_country, None),
-            oapen_table=data_partner_tables.get(OaebuPartnerName.oapen_irus_uk, None),
-            ucl_table=data_partner_tables.get(OaebuPartnerName.ucl_discovery, None),
-            google_analytics_isbn=data_partner_isbns.get(OaebuPartnerName.google_analytics, None),
-            google_books_isbn=data_partner_isbns.get(OaebuPartnerName.google_books_traffic, None),
-            jstor_isbn=data_partner_isbns.get(OaebuPartnerName.jstor_country, None),
-            oapen_isbn=data_partner_isbns.get(OaebuPartnerName.oapen_irus_uk, None),
-            ucl_isbn=data_partner_isbns.get(OaebuPartnerName.ucl_discovery, None),
+            include_google_analytics=OaebuDatasetType.google_analytics in data_partner_tables,
+            include_google_books=OaebuDatasetType.google_books_traffic in data_partner_tables,
+            include_jstor=OaebuDatasetType.jstor_country in data_partner_tables,
+            include_oapen=OaebuDatasetType.oapen_irus_uk in data_partner_tables,
+            include_ucl=OaebuDatasetType.ucl_discovery in data_partner_tables,
+            google_analytics_table=data_partner_tables.get(OaebuDatasetType.google_analytics, None),
+            google_books_table=data_partner_tables.get(OaebuDatasetType.google_books_traffic, None),
+            jstor_table=data_partner_tables.get(OaebuDatasetType.jstor_country, None),
+            oapen_table=data_partner_tables.get(OaebuDatasetType.oapen_irus_uk, None),
+            ucl_table=data_partner_tables.get(OaebuDatasetType.ucl_discovery, None),
+            google_analytics_isbn=data_partner_isbns.get(OaebuDatasetType.google_analytics, None),
+            google_books_isbn=data_partner_isbns.get(OaebuDatasetType.google_books_traffic, None),
+            jstor_isbn=data_partner_isbns.get(OaebuDatasetType.jstor_country, None),
+            oapen_isbn=data_partner_isbns.get(OaebuDatasetType.oapen_irus_uk, None),
+            ucl_isbn=data_partner_isbns.get(OaebuDatasetType.ucl_discovery, None),
         )
 
         # Populate the __name__ attribute of the partial object (it lacks one by default).
@@ -989,17 +989,17 @@ class OnixWorkflow(Workflow):
         for data_partner in data_partners:
 
             if (
-                data_partner.name == OaebuPartnerName.jstor_country
-                or data_partner.name == OaebuPartnerName.jstor_institution
+                data_partner.name == OaebuDatasetType.jstor_country
+                or data_partner.name == OaebuDatasetType.jstor_institution
             ):
                 self.create_oaebu_data_qa_jstor_tasks(data_partner)
-            elif data_partner.name == OaebuPartnerName.oapen_irus_uk:
+            elif data_partner.name == OaebuDatasetType.oapen_irus_uk:
                 self.create_oaebu_data_qa_oapen_irus_uk_tasks(data_partner)
-            elif data_partner.name == OaebuPartnerName.google_books_sales:
+            elif data_partner.name == OaebuDatasetType.google_books_sales:
                 self.create_oaebu_data_qa_google_books_sales_tasks(data_partner)
-            elif data_partner.name == OaebuPartnerName.google_books_traffic:
+            elif data_partner.name == OaebuDatasetType.google_books_traffic:
                 self.create_oaebu_data_qa_google_books_traffic_tasks(data_partner)
-            elif data_partner.name == OaebuPartnerName.google_analytics:
+            elif data_partner.name == OaebuDatasetType.google_analytics:
                 self.create_oaebu_data_qa_google_analytics_tasks(data_partner)
 
             self.create_oaebu_data_qa_intermediate_tasks(data_partner)

@@ -120,7 +120,7 @@ def get_oaebu_partner_data(organisation_id: int) -> List[OaebuPartner]:
 
             partners.append(
                 OaebuPartner(
-                    name=dataset.name,
+                    name=dataset.dataset_type.type_id,
                     dag_id_prefix=workflow.workflow_type.type_id,
                     gcp_project_id=gcp_project_id,
                     gcp_dataset_id=gcp_dataset_id,
