@@ -120,6 +120,8 @@ To make use of the Cloud Function described above it is required to enable two A
 See the [Google support answer](https://support.google.com/googleapi/answer/6158841?hl=en) for info on how to enable an API. The API's that need to be enabled are:
 - Cloud Functions API
 - Cloud build API
+- Cloud Run Admin API
+- Artifact Registry API
 
 Inside the OAPEN Google project, add the airflow Google service account (<airflow_project_id>@<airflow_project_id>.iam.gserviceaccount.com, where airflow_project_id is the project where airflow is hosted). 
 This can be done from the 'IAM & Admin' menu and 'IAM' tab. Then, assign the following permissions to this account:  
@@ -130,10 +132,11 @@ This can be done from the 'IAM & Admin' menu and 'IAM' tab. Then, assign the fol
 
 Additionally, it is required to assign the role of service account user to the service account of the Cloud Function, with the airflow service account as a member.
 The Cloud SDK command for this is:  
-`gcloud iam service-accounts add-iam-policy-binding <OAPEN_project_id>@appspot.gserviceaccount.com --member=<airflow_project_id@airflow_project_id.iam.gserviceaccount.com> --role=roles/iam.serviceAccountUser`
+`gcloud iam service-accounts add-iam-policy-binding <OAPEN_project_id>-compute@developer.gserviceaccount.com 
+--member=<airflow_project_id@airflow_project_id.iam.gserviceaccount.com> --role=roles/iam.serviceAccountUser`
 
 Alternatively, it can be done with the Google Cloud console, from the 'IAM & Admin' menu and 'Service Accounts' tab.  
-Click on the service account of the Cloud Function: `<OAPEN_project_id>@appspot.gserviceaccount.com`.  
+Click on the service account of the Cloud Function: `<OAPEN_project_id>-compute@developer.gserviceaccount.com`.  
 In the 'permissions' tab, click 'Grant Access', add the airflow service account as a member `<airflow_project_id@airflow_project_id.iam.gserviceaccount.com>` and assign the role 'Service Account User'.
 
 ## Airflow connections

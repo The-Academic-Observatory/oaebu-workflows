@@ -19,23 +19,14 @@ import os
 from unittest.mock import ANY, MagicMock, patch
 from urllib.parse import quote
 
+import httplib2
 import httpretty
 import pendulum
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.models.connection import Connection
 from click.testing import CliRunner
 from googleapiclient.discovery import build
-from googleapiclient.http import HttpMockSequence
-from oaebu_workflows.config import test_fixtures_folder
-from oaebu_workflows.identifiers import TelescopeTypes
-from oaebu_workflows.workflows.oapen_irus_uk_telescope import (
-    OapenIrusUkRelease,
-    OapenIrusUkTelescope,
-    call_cloud_function,
-    cloud_function_exists,
-    create_cloud_function,
-    upload_source_code_to_bucket,
-)
+from googleapiclient.http import RequestMockBuilder
 from observatory.api.client.model.organisation import Organisation
 from observatory.api.server import orm
 from observatory.platform.utils.airflow_utils import AirflowConns
@@ -48,6 +39,17 @@ from observatory.platform.utils.test_utils import (
 )
 from observatory.platform.utils.workflow_utils import blob_name, table_ids_from_path
 from requests import Response
+
+from oaebu_workflows.config import test_fixtures_folder
+from oaebu_workflows.identifiers import TelescopeTypes
+from oaebu_workflows.workflows.oapen_irus_uk_telescope import (
+    OapenIrusUkRelease,
+    OapenIrusUkTelescope,
+    call_cloud_function,
+    cloud_function_exists,
+    create_cloud_function,
+    upload_source_code_to_bucket,
+)
 
 
 class TestOapenIrusUkTelescope(ObservatoryTestCase):
@@ -157,35 +159,37 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
 
         # Mock the Google Cloud Functions API service
         mock_account_credentials.from_json_keyfile_dict.return_value = ""
-        http = HttpMockSequence(
-            [
-                (
-                    {"status": "200"},
+        request_builder = RequestMockBuilder(
+            {
+                "cloudfunctions.projects.locations.functions.get": (
+                    None,
                     json.dumps(
                         {
-                            "functions": [
-                                {
-                                    "name": f"projects/{OapenIrusUkTelescope.OAPEN_PROJECT_ID}/locations/"
-                                    f"{OapenIrusUkTelescope.FUNCTION_REGION}/functions/"
-                                    f"{OapenIrusUkTelescope.FUNCTION_NAME}"
-                                }
-                            ]
+                            "name": "projects/project-id/locations/us-central1/functions/function-2",
+                            "serviceConfig": {"uri": "https://oapen-access-stats-kkinbzaigla-ew.a.run.app"},
                         }
                     ),
                 ),
-                (
-                    {"status": "200"},
+                "cloudfunctions.projects.locations.functions.patch": (
+                    None,
                     json.dumps(
                         {
-                            "name": "operations/d29ya2Zsb3dzLWRldi91cy1jZW50cmFsMS9vYXBlbl9hY2Nlc3Nfc3RhdHMvWnlmSEdWZDBHTGc",
+                            "name": "projects/project-id/locations/us-central1/operations/d29ya2Z",
                             "done": True,
                             "response": {"message": "response"},
                         }
                     ),
                 ),
-            ]
+            },
+            check_unexpected=True,
         )
-        mock_build.return_value = build("cloudfunctions", "v1", http=http)
+        mock_build.return_value = build(
+            "cloudfunctions",
+            "v2beta",
+            cache_discovery=False,
+            static_discovery=False,
+            requestBuilder=request_builder,
+        )
 
         dag = telescope.make_dag()
 
@@ -224,10 +228,7 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
                         json=lambda: {"entries": 100, "unprocessed_publishers": None},
                         reason="unit test",
                     )
-                    url = (
-                        f"https://{OapenIrusUkTelescope.FUNCTION_REGION}-{OapenIrusUkTelescope.OAPEN_PROJECT_ID}."
-                        f"cloudfunctions.net/{OapenIrusUkTelescope.FUNCTION_NAME}"
-                    )
+                    url = "https://oapen-access-stats-kkinbzaigla-ew.a.run.app"
                     httpretty.register_uri(httpretty.POST, url, body="")
                     env.run_task(telescope.call_cloud_function.__name__)
 
@@ -292,7 +293,7 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
                 telescope.OAPEN_BUCKET,
                 telescope.FUNCTION_BLOB_NAME,
             )
-            mock_function_exists.assert_called_once_with(ANY, location, full_name)
+            mock_function_exists.assert_called_once_with(ANY, full_name)
             if create or update:
                 mock_create_function.assert_called_once_with(
                     ANY,
@@ -362,7 +363,10 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
     @patch("observatory.platform.utils.workflow_utils.Variable.get")
     @patch("oaebu_workflows.workflows.oapen_irus_uk_telescope.BaseHook.get_connection")
     @patch("oaebu_workflows.workflows.oapen_irus_uk_telescope.call_cloud_function")
-    def test_release_call_cloud_function(self, mock_call_function, mock_conn_get, mock_variable_get):
+    @patch("oaebu_workflows.workflows.oapen_irus_uk_telescope.cloud_function_exists")
+    def test_release_call_cloud_function(
+        self, mock_function_exists, mock_call_function, mock_conn_get, mock_variable_get
+    ):
         """Test the call_cloud_function method of the OapenIrusUkRelease
 
         :param mock_variable_get: Mock Airflow Variable 'data'
@@ -378,6 +382,10 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
             ),
         }
         mock_conn_get.side_effect = lambda x: connections[x]
+
+        # Set URI to function url
+        function_url = "https://oapen-access-stats-kkinbzfjal-ew.a.run.app"
+        mock_function_exists.return_value = function_url
 
         with CliRunner().isolated_filesystem():
             mock_variable_get.return_value = os.path.join(os.getcwd(), "data")
@@ -398,11 +406,6 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
                         org, publisher_name_v4=publisher[0], publisher_uuid_v5=publisher[1], dataset_id="dataset_id"
                     )
                     release = OapenIrusUkRelease(telescope.dag_id, pendulum.parse(date + "-01"), org)
-                    function_url = (
-                        f"https://{telescope.FUNCTION_REGION}-{telescope.OAPEN_PROJECT_ID}"
-                        f".cloudfunctions.net/{telescope.FUNCTION_NAME}"
-                    )
-
                     release.call_cloud_function(telescope.publisher_name_v4, telescope.publisher_uuid_v5)
 
                     # Test that the call function is called with the correct args
@@ -459,32 +462,42 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
         """Test the function that checks whether the cloud function exists
         :return: None.
         """
-        http = HttpMockSequence(
-            [
-                (
-                    {"status": "200"},
+        requests = [
+            # Cloud function exists
+            {
+                "response": (
+                    None,
                     json.dumps(
-                        {"functions": [{"name": "projects/project-id/locations/us-central1/functions/function-1"}]}
+                        {
+                            "name": "projects/project-id/locations/us-central1/functions/function-2",
+                            "serviceConfig": {"uri": "https://oapen-access-stats-kkinbzaigla-ew.a.run.app"},
+                        }
                     ),
                 ),
-                (
-                    {"status": "200"},
-                    json.dumps(
-                        {"functions": [{"name": "projects/project-id/locations/us-central1/functions/function-2"}]}
-                    ),
-                ),
-            ]
-        )
-        service = build("cloudfunctions", "v1", http=http)
-        location = "projects/project-id/locations/us-central1"
-        full_name = "projects/project-id/locations/us-central1/functions/function-2"
-        # With http where cloud function does not exists
-        exists = cloud_function_exists(service, location=location, full_name=full_name)
-        self.assertFalse(exists)
+                "uri": "https://oapen-access-stats-kkinbzaigla-ew.a.run.app",
+            },
+            # Cloud function does not exist
+            {"response": (httplib2.Response({"status": 404, "reason": "HttpError"}), b"{}"), "uri": None},
+        ]
+        for request in requests:
+            with self.subTest(request=request):
+                request_builder = RequestMockBuilder(
+                    {
+                        "cloudfunctions.projects.locations.functions.get": request["response"],
+                    },
+                    check_unexpected=True,
+                )
+                service = build(
+                    "cloudfunctions",
+                    "v2beta",
+                    cache_discovery=False,
+                    static_discovery=False,
+                    requestBuilder=request_builder,
+                )
 
-        # With http where cloud function exists
-        exists = cloud_function_exists(service, location=location, full_name=full_name)
-        self.assertTrue(exists)
+                full_name = "projects/project-id/locations/us-central1/functions/function-2"
+                uri = cloud_function_exists(service, full_name=full_name)
+                self.assertEqual(request["uri"], uri)
 
     def test_create_cloud_function(self):
         """Test the function that creates the cloud function
@@ -496,95 +509,88 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
         blob_name = "source_code.zip"
         max_active_runs = 1
 
-        # Test creating cloud function, no error
-        http = HttpMockSequence(
-            [
-                (
-                    {"status": "200"},
+        requests = [
+            # Creating cloud function, no error
+            {
+                "method_id": "cloudfunctions.projects.locations.functions.create",
+                "response": (
+                    None,
                     json.dumps(
                         {
-                            "name": "operations/d29ya2Zsb3dzLWRldi91cy1jZW50cmFsMS9vYXBlbl9hY2Nlc3Nfc3RhdHMvWnlmSEdWZDBHTGc"
-                        }
-                    ),
-                ),
-                (
-                    {"status": "200"},
-                    json.dumps(
-                        {
-                            "name": "operations/d29ya2Zsb3dzLWRldi91cy1jZW50cmFsMS9vYXBlbl9hY2Nlc3Nfc3RhdHMvWnlmSEdWZDBHTGc",
+                            "name": "projects/project-id/locations/us-central1/operations/d29ya2Z",
                             "done": True,
                             "response": {"message": "response"},
                         }
                     ),
                 ),
-            ]
-        )
-        service = build("cloudfunctions", "v1", http=http)
-        success, msg = create_cloud_function(
-            service, location, full_name, source_bucket, blob_name, max_active_runs, update=False
-        )
-        self.assertTrue(success)
-        self.assertDictEqual({"message": "response"}, msg)
-
-        # Test updating/patching cloud function, no error
-        http = HttpMockSequence(
-            [
-                (
-                    {"status": "200"},
+                "success": True,
+                "msg": {"message": "response"},
+            },
+            # Updating/patching cloud function, no error
+            {
+                "method_id": "cloudfunctions.projects.locations.functions.patch",
+                "response": (
+                    None,
                     json.dumps(
                         {
-                            "name": "operations/d29ya2Zsb3dzLWRldi91cy1jZW50cmFsMS9vYXBlbl9hY2Nlc3Nfc3RhdHMvWnlmSEdWZDBHTGc"
-                        }
-                    ),
-                ),
-                (
-                    {"status": "200"},
-                    json.dumps(
-                        {
-                            "name": "operations/d29ya2Zsb3dzLWRldi91cy1jZW50cmFsMS9vYXBlbl9hY2Nlc3Nfc3RhdHMvWnlmSEdWZDBHTGc",
+                            "name": "projects/project-id/locations/us-central1/operations/d29ya2Z",
                             "done": True,
                             "response": {"message": "response"},
                         }
                     ),
                 ),
-            ]
-        )
-        service = build("cloudfunctions", "v1", http=http)
-        success, msg = create_cloud_function(
-            service, location, full_name, source_bucket, blob_name, max_active_runs, update=True
-        )
-        self.assertTrue(success)
-        self.assertDictEqual({"message": "response"}, msg)
-
-        # Test creating cloud function, error
-        http = HttpMockSequence(
-            [
-                (
-                    {"status": "200"},
+                "success": True,
+                "msg": {"message": "response"},
+            },
+            # Creating cloud function, error
+            {
+                "method_id": "cloudfunctions.projects.locations.functions.create",
+                "response": (
+                    None,
                     json.dumps(
                         {
-                            "name": "operations/d29ya2Zsb3dzLWRldi91cy1jZW50cmFsMS9vYXBlbl9hY2Nlc3Nfc3RhdHMvWnlmSEdWZDBHTGc"
-                        }
-                    ),
-                ),
-                (
-                    {"status": "200"},
-                    json.dumps(
-                        {
-                            "name": "operations/d29ya2Zsb3dzLWRldi91cy1jZW50cmFsMS9vYXBlbl9hY2Nlc3Nfc3RhdHMvWnlmSEdWZDBHTGc",
+                            "name": "projects/project-id/locations/us-central1/operations/d29ya2Z",
                             "done": True,
                             "error": {"message": "error"},
                         }
                     ),
                 ),
-            ]
-        )
-        service = build("cloudfunctions", "v1", http=http)
-        success, msg = create_cloud_function(
-            service, location, full_name, source_bucket, blob_name, max_active_runs, update=False
-        )
-        self.assertFalse(success)
-        self.assertDictEqual({"message": "error"}, msg)
+                "success": False,
+                "msg": {"message": "error"},
+            },
+        ]
+
+        for request in requests:
+            with self.subTest(request=request):
+                request_builder = RequestMockBuilder(
+                    {
+                        request["method_id"]: (
+                            None,
+                            json.dumps(
+                                {
+                                    "name": "projects/project-id/locations/us-central1/operations/d29ya2Z",
+                                    "done": False,
+                                }
+                            ),
+                        ),
+                        "cloudfunctions.projects.locations.operations.get": request["response"],
+                    },
+                    check_unexpected=True,
+                )
+                service = build(
+                    "cloudfunctions",
+                    "v2beta",
+                    cache_discovery=False,
+                    static_discovery=False,
+                    requestBuilder=request_builder,
+                )
+
+                update = request["method_id"] == "cloudfunctions.projects.locations.functions.patch"
+                success, msg = create_cloud_function(
+                    service, location, full_name, source_bucket, blob_name, max_active_runs, update=update
+                )
+                self.assertEqual(request["success"], success)
+                self.assertDictEqual(request["msg"], msg)
 
     @patch("oaebu_workflows.workflows.oapen_irus_uk_telescope.AuthorizedSession.post")
     def test_call_cloud_function(self, mock_authorized_session):
