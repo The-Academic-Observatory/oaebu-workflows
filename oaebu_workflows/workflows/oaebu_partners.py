@@ -19,18 +19,6 @@
 from dataclasses import dataclass
 
 
-class OaebuDatasetType:
-    """OAEBU partner name constants."""
-
-    google_analytics = "google_analytics"
-    google_books_sales = "google_books_sales"
-    google_books_traffic = "google_books_traffic"
-    jstor_country = "jstor_country"
-    jstor_institution = "jstor_institution"
-    oapen_irus_uk = "oapen_irus_uk"
-    ucl_discovery = "ucl_discovery"
-
-
 @dataclass
 class OaebuPartner:
     """Temporary class for storing information about data sources we are using to produce oaebu intermediate tables for.  Change or remove this later when Observatory API is more mature.
