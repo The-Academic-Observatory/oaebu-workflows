@@ -63,7 +63,6 @@ from airflow.models import Connection
 from airflow.utils.state import State
 
 from oaebu_workflows.config import test_fixtures_folder
-from oaebu_workflows.identifiers import TelescopeTypes
 from oaebu_workflows.workflows.oapen_irus_uk_telescope import (
     OapenIrusUkRelease,
     OapenIrusUkTelescope,
