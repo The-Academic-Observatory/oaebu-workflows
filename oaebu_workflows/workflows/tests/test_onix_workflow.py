@@ -42,10 +42,6 @@ from observatory.api.client.model.table_type import TableType
 from observatory.api.client.model.workflow import Workflow
 from observatory.api.client.model.workflow_type import WorkflowType
 from observatory.api.server.dataset_type import DatasetTypeId
-from observatory.api.server.orm import (
-    Dataset,
-    Organisation,
-)
 from observatory.api.testing import ObservatoryApiEnvironment
 from observatory.platform.utils.airflow_utils import AirflowConns
 from observatory.platform.utils.file_utils import load_jsonl
