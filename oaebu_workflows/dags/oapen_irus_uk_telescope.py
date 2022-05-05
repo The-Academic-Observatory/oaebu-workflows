@@ -17,20 +17,21 @@
 # The keywords airflow and DAG are required to load the DAGs from this file, see bullet 2 in the Apache Airflow FAQ:
 # https://airflow.apache.org/docs/stable/faq.html
 
-from oaebu_workflows.identifiers import TelescopeTypes
+from oaebu_workflows.identifiers import WorkflowTypes
 from oaebu_workflows.workflows.oapen_irus_uk_telescope import OapenIrusUkTelescope
 from observatory.platform.utils.api import make_observatory_api
 
-# Fetch all telescopes
+# Fetch all workflows
 api = make_observatory_api()
-telescope_type = api.get_telescope_type(type_id=TelescopeTypes.oapen_irus_uk)
-telescopes = api.get_telescopes(telescope_type_id=telescope_type.id, limit=1000)
+workflow_type = api.get_workflow_type(type_id=WorkflowTypes.oapen_irus_uk)
+workflows = api.get_workflows(workflow_type_id=workflow_type.id, limit=1000)
 
-# Make all telescopes
-for telescope in telescopes:
+# Make all workflows
+for workflow in workflows:
     workflow = OapenIrusUkTelescope(
-        telescope.organisation,
-        telescope.extra.get("publisher_name_v4", ""),
-        telescope.extra.get("publisher_uuid_v5", ""),
+        workflow.organisation,
+        workflow.extra.get("publisher_name_v4", ""),
+        workflow.extra.get("publisher_uuid_v5", ""),
+        workflow_id=1,
     )
     globals()[workflow.dag_id] = workflow.make_dag()

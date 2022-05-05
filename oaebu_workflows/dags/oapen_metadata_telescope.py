@@ -18,6 +18,12 @@
 # https://airflow.apache.org/docs/stable/faq.html
 
 from oaebu_workflows.workflows.oapen_metadata_telescope import OapenMetadataTelescope
+from observatory.platform.utils.api import make_observatory_api
+from oaebu_workflows.identifiers import WorkflowTypes
 
-workflow = OapenMetadataTelescope()
+# Fetch all workflows
+api = make_observatory_api()
+workflow_type = api.get_workflow_type(type_id=WorkflowTypes.oapen_metadata)
+workflows = api.get_workflows(workflow_type_id=workflow_type.id, limit=1000)
+workflow = OapenMetadataTelescope(workflow_id=workflows[0].id)
 globals()[workflow.dag_id] = workflow.make_dag()

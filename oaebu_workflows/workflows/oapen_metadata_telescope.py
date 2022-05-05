@@ -141,9 +141,11 @@ class OapenMetadataTelescope(StreamTelescope):
 
     CSV_URL = "https://library.oapen.org/download-export?format=csv"
 
+    DAG_ID = "oapen_metadata"
+
     def __init__(
         self,
-        dag_id: str = "oapen_metadata",
+        dag_id: str = DAG_ID,
         start_date: pendulum.DateTime = pendulum.datetime(2018, 5, 14),
         schedule_interval: str = "@weekly",
         dataset_id: str = "oapen",
@@ -151,6 +153,7 @@ class OapenMetadataTelescope(StreamTelescope):
         schema_folder: str = default_schema_folder(),
         schema_prefix: str = "oapen_",
         airflow_vars: List = None,
+        workflow_id: int = None,
     ):
         """Construct a OapenMetadataTelescope instance.
 
@@ -162,6 +165,7 @@ class OapenMetadataTelescope(StreamTelescope):
         :param schema_folder: the SQL schema path.
         :param schema_prefix: the prefix used to find the schema path
         :param airflow_vars: list of airflow variable keys, for each variable it is checked if it exists in airflow
+        :param workflow_id: api workflow id.
         """
 
         if airflow_vars is None:
@@ -181,6 +185,7 @@ class OapenMetadataTelescope(StreamTelescope):
             schema_folder,
             schema_prefix=schema_prefix,
             airflow_vars=airflow_vars,
+            workflow_id=workflow_id,
             load_bigquery_table_kwargs={"ignore_unknown_values": True},
         )
 
@@ -188,7 +193,7 @@ class OapenMetadataTelescope(StreamTelescope):
         self.add_task_chain(
             [self.download, self.upload_downloaded, self.transform, self.upload_transformed, self.bq_load_partition]
         )
-        self.add_task_chain([self.bq_delete_old, self.bq_append_new, self.cleanup], trigger_rule="none_failed")
+        self.add_task_chain([self.bq_delete_old, self.bq_append_new, self.cleanup, self.add_new_dataset_releases])
 
     def make_release(self, **kwargs) -> OapenMetadataRelease:
         # Make Release instance

@@ -27,7 +27,8 @@ from airflow.exceptions import AirflowException
 from google.cloud.bigquery import SourceFormat
 from oaebu_workflows.config import schema_folder as default_schema_folder
 from oaebu_workflows.config import sql_folder
-from oaebu_workflows.workflows.oaebu_partners import OaebuPartner, OaebuPartnerName
+from oaebu_workflows.workflows.oaebu_partners import OaebuPartner
+from observatory.api.server.dataset_type import DatasetTypeId
 from oaebu_workflows.workflows.onix_telescope import OnixTelescope
 from oaebu_workflows.workflows.onix_work_aggregation import (
     BookWorkAggregator,
@@ -233,6 +234,7 @@ class OnixWorkflow(Workflow):
         schedule_interval: Optional[str] = "@weekly",
         catchup: Optional[bool] = False,
         data_partners: List[OaebuPartner] = None,
+        workflow_id: int = None,
     ):
         """Initialises the workflow object.
         :param org_name: Organisation name.
@@ -246,6 +248,7 @@ class OnixWorkflow(Workflow):
         :param schedule_interval: Scheduled interval for running the DAG.
         :param catchup: Whether to catch up missed DAG runs.
         :param data_partners: OAEBU data sources.
+        :param workflow_id: api workflow id.
         """
 
         self.dag_id = dag_id
@@ -271,7 +274,11 @@ class OnixWorkflow(Workflow):
 
         # Initialise Telesecope base class
         super().__init__(
-            dag_id=self.dag_id, start_date=start_date, schedule_interval=schedule_interval, catchup=catchup
+            dag_id=self.dag_id,
+            start_date=start_date,
+            schedule_interval=schedule_interval,
+            catchup=catchup,
+            workflow_id=workflow_id,
         )
 
         # Wait for data partner workflows to finish
@@ -312,6 +319,9 @@ class OnixWorkflow(Workflow):
 
         # Cleanup tasks
         self.add_task(self.cleanup)
+
+        # Create DatasetRelease records
+        self.add_task(self.add_new_dataset_releases)
 
     def get_isbn_utils_sql_string(self) -> str:
         """Load the ISBN utils sql functions.
@@ -700,21 +710,21 @@ class OnixWorkflow(Workflow):
         :param data_partners: List of oaebu partner data.
         """
 
-        data_partner_datasets = {data.name: data.gcp_dataset_id for data in data_partners}
+        data_partner_datasets = {data.dataset_type_id: data.gcp_dataset_id for data in data_partners}
 
         # Book Product
         fn = partial(
             self.create_oaebu_book_product_table,
-            include_google_analytics=OaebuPartnerName.google_analytics in data_partner_datasets,
-            include_google_books=OaebuPartnerName.google_books_traffic in data_partner_datasets,
-            include_jstor=OaebuPartnerName.jstor_country in data_partner_datasets,
-            include_oapen=OaebuPartnerName.oapen_irus_uk in data_partner_datasets,
-            include_ucl=OaebuPartnerName.ucl_discovery in data_partner_datasets,
-            google_analytics_dataset=data_partner_datasets.get(OaebuPartnerName.google_analytics, None),
-            google_books_dataset=data_partner_datasets.get(OaebuPartnerName.google_books_traffic, None),
-            jstor_dataset=data_partner_datasets.get(OaebuPartnerName.jstor_country, None),
-            oapen_dataset=data_partner_datasets.get(OaebuPartnerName.oapen_irus_uk, None),
-            ucl_dataset=data_partner_datasets.get(OaebuPartnerName.ucl_discovery, None),
+            include_google_analytics=DatasetTypeId.google_analytics in data_partner_datasets,
+            include_google_books=DatasetTypeId.google_books_traffic in data_partner_datasets,
+            include_jstor=DatasetTypeId.jstor_country in data_partner_datasets,
+            include_oapen=DatasetTypeId.oapen_irus_uk in data_partner_datasets,
+            include_ucl=DatasetTypeId.ucl_discovery in data_partner_datasets,
+            google_analytics_dataset=data_partner_datasets.get(DatasetTypeId.google_analytics, None),
+            google_books_dataset=data_partner_datasets.get(DatasetTypeId.google_books_traffic, None),
+            jstor_dataset=data_partner_datasets.get(DatasetTypeId.jstor_country, None),
+            oapen_dataset=data_partner_datasets.get(DatasetTypeId.oapen_irus_uk, None),
+            ucl_dataset=data_partner_datasets.get(DatasetTypeId.ucl_discovery, None),
         )
 
         # Populate the __name__ attribute of the partial object (it lacks one by default).
@@ -942,27 +952,27 @@ class OnixWorkflow(Workflow):
             self.add_task(fn)
 
         # Export QA Metrics
-        data_partner_tables = {data.name: data.gcp_table_id for data in data_partners}
-        data_partner_isbns = {data.name: data.isbn_field_name for data in data_partners}
+        data_partner_tables = {data.dataset_type_id: data.gcp_table_id for data in data_partners}
+        data_partner_isbns = {data.dataset_type_id: data.isbn_field_name for data in data_partners}
 
         # Export QA Metrics
         fn = partial(
             self.export_oaebu_qa_metrics,
-            include_google_analytics=OaebuPartnerName.google_analytics in data_partner_tables,
-            include_google_books=OaebuPartnerName.google_books_traffic in data_partner_tables,
-            include_jstor=OaebuPartnerName.jstor_country in data_partner_tables,
-            include_oapen=OaebuPartnerName.oapen_irus_uk in data_partner_tables,
-            include_ucl=OaebuPartnerName.ucl_discovery in data_partner_tables,
-            google_analytics_table=data_partner_tables.get(OaebuPartnerName.google_analytics, None),
-            google_books_table=data_partner_tables.get(OaebuPartnerName.google_books_traffic, None),
-            jstor_table=data_partner_tables.get(OaebuPartnerName.jstor_country, None),
-            oapen_table=data_partner_tables.get(OaebuPartnerName.oapen_irus_uk, None),
-            ucl_table=data_partner_tables.get(OaebuPartnerName.ucl_discovery, None),
-            google_analytics_isbn=data_partner_isbns.get(OaebuPartnerName.google_analytics, None),
-            google_books_isbn=data_partner_isbns.get(OaebuPartnerName.google_books_traffic, None),
-            jstor_isbn=data_partner_isbns.get(OaebuPartnerName.jstor_country, None),
-            oapen_isbn=data_partner_isbns.get(OaebuPartnerName.oapen_irus_uk, None),
-            ucl_isbn=data_partner_isbns.get(OaebuPartnerName.ucl_discovery, None),
+            include_google_analytics=DatasetTypeId.google_analytics in data_partner_tables,
+            include_google_books=DatasetTypeId.google_books_traffic in data_partner_tables,
+            include_jstor=DatasetTypeId.jstor_country in data_partner_tables,
+            include_oapen=DatasetTypeId.oapen_irus_uk in data_partner_tables,
+            include_ucl=DatasetTypeId.ucl_discovery in data_partner_tables,
+            google_analytics_table=data_partner_tables.get(DatasetTypeId.google_analytics, None),
+            google_books_table=data_partner_tables.get(DatasetTypeId.google_books_traffic, None),
+            jstor_table=data_partner_tables.get(DatasetTypeId.jstor_country, None),
+            oapen_table=data_partner_tables.get(DatasetTypeId.oapen_irus_uk, None),
+            ucl_table=data_partner_tables.get(DatasetTypeId.ucl_discovery, None),
+            google_analytics_isbn=data_partner_isbns.get(DatasetTypeId.google_analytics, None),
+            google_books_isbn=data_partner_isbns.get(DatasetTypeId.google_books_traffic, None),
+            jstor_isbn=data_partner_isbns.get(DatasetTypeId.jstor_country, None),
+            oapen_isbn=data_partner_isbns.get(DatasetTypeId.oapen_irus_uk, None),
+            ucl_isbn=data_partner_isbns.get(DatasetTypeId.ucl_discovery, None),
         )
 
         # Populate the __name__ attribute of the partial object (it lacks one by default).
@@ -980,17 +990,17 @@ class OnixWorkflow(Workflow):
         for data_partner in data_partners:
 
             if (
-                data_partner.name == OaebuPartnerName.jstor_country
-                or data_partner.name == OaebuPartnerName.jstor_institution
+                data_partner.dataset_type_id == DatasetTypeId.jstor_country
+                or data_partner.dataset_type_id == DatasetTypeId.jstor_institution
             ):
                 self.create_oaebu_data_qa_jstor_tasks(data_partner)
-            elif data_partner.name == OaebuPartnerName.oapen_irus_uk:
+            elif data_partner.dataset_type_id == DatasetTypeId.oapen_irus_uk:
                 self.create_oaebu_data_qa_oapen_irus_uk_tasks(data_partner)
-            elif data_partner.name == OaebuPartnerName.google_books_sales:
+            elif data_partner.dataset_type_id == DatasetTypeId.google_books_sales:
                 self.create_oaebu_data_qa_google_books_sales_tasks(data_partner)
-            elif data_partner.name == OaebuPartnerName.google_books_traffic:
+            elif data_partner.dataset_type_id == DatasetTypeId.google_books_traffic:
                 self.create_oaebu_data_qa_google_books_traffic_tasks(data_partner)
-            elif data_partner.name == OaebuPartnerName.google_analytics:
+            elif data_partner.dataset_type_id == DatasetTypeId.google_analytics:
                 self.create_oaebu_data_qa_google_analytics_tasks(data_partner)
 
             self.create_oaebu_data_qa_intermediate_tasks(data_partner)

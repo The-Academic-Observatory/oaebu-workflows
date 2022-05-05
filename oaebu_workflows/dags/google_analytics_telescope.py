@@ -17,7 +17,7 @@
 # The keywords airflow and DAG are required to load the DAGs from this file, see bullet 2 in the Apache Airflow FAQ:
 # https://airflow.apache.org/docs/stable/faq.html
 
-from oaebu_workflows.identifiers import TelescopeTypes
+from oaebu_workflows.identifiers import WorkflowTypes
 from oaebu_workflows.workflows.google_analytics_telescope import (
     GoogleAnalyticsTelescope,
 )
@@ -25,12 +25,12 @@ from observatory.platform.utils.api import make_observatory_api
 
 # Fetch all telescopes
 api = make_observatory_api()
-telescope_type = api.get_telescope_type(type_id=TelescopeTypes.google_analytics)
-telescopes = api.get_telescopes(telescope_type_id=telescope_type.id, limit=1000)
+workflow_type = api.get_workflow_type(type_id=WorkflowTypes.google_analytics)
+workflows = api.get_workflows(workflow_type_id=workflow_type.id, limit=1000)
 
-# Make all telescopes
-for telescope in telescopes:
-    view_id = telescope.extra.get("view_id")
-    pagepath_regex = telescope.extra.get("pagepath_regex")
-    workflow = GoogleAnalyticsTelescope(telescope.organisation, view_id, pagepath_regex)
+# Make all workflows
+for workflow in workflows:
+    view_id = workflow.extra.get("view_id")
+    pagepath_regex = workflow.extra.get("pagepath_regex")
+    workflow = GoogleAnalyticsTelescope(workflow.organisation, view_id, pagepath_regex, workflow_id=workflow.id)
     globals()[workflow.dag_id] = workflow.make_dag()

@@ -220,6 +220,7 @@ class OnixTelescope(SnapshotTelescope):
         catchup: bool = False,
         airflow_vars: List = None,
         airflow_conns: List = None,
+        workflow_id: int = None,
     ):
         """Construct an OnixTelescope instance.
 
@@ -241,6 +242,7 @@ class OnixTelescope(SnapshotTelescope):
         :param catchup: whether to catchup the DAG or not.
         :param airflow_vars: list of airflow variable keys, for each variable, it is checked if it exists in airflow.
         :param airflow_conns: list of airflow connection keys, for each connection, it is checked if it exists in airflow.
+        :param workflow_id: api workflow id.
         """
 
         if airflow_vars is None:
@@ -278,6 +280,7 @@ class OnixTelescope(SnapshotTelescope):
             catchup=catchup,
             airflow_vars=airflow_vars,
             airflow_conns=airflow_conns,
+            workflow_id=workflow_id,
         )
 
         # self.organisation = organisation
@@ -291,6 +294,7 @@ class OnixTelescope(SnapshotTelescope):
         self.add_task(self.bq_load)
         self.add_task(self.move_files_to_finished)
         self.add_task(self.cleanup)
+        self.add_task(self.add_new_dataset_releases)
 
     def list_release_info(self, **kwargs):
         """Lists all ONIX releases and publishes their file names as an XCom.

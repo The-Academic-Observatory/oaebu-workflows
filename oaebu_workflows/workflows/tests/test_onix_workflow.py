@@ -22,29 +22,34 @@ from unittest.mock import MagicMock, patch
 
 import pendulum
 from airflow.exceptions import AirflowException
-from airflow.models.connection import Connection
+from airflow.models import Connection
 from airflow.sensors.base import BaseSensorOperator
+from airflow.utils.state import State
 from click.testing import CliRunner
 from google.cloud import bigquery
 from google.cloud.bigquery import SourceFormat
 
-import observatory.api.server.orm as orm
 from oaebu_workflows.config import schema_folder as default_schema_folder
 from oaebu_workflows.config import test_fixtures_folder
-from oaebu_workflows.identifiers import TelescopeTypes
-from oaebu_workflows.workflows.oaebu_partners import OaebuPartner, OaebuPartnerName
+from oaebu_workflows.workflows.oaebu_partners import OaebuPartner
 from oaebu_workflows.workflows.onix_workflow import OnixWorkflow, OnixWorkflowRelease
-from observatory.api.server.orm import (
-    Dataset,
-    DatasetStorage,
-    Organisation,
-)
+from observatory.api.client import ApiClient, Configuration
+from observatory.api.client.api.observatory_api import ObservatoryApi  # noqa: E501
+from observatory.api.client.model.dataset import Dataset
+from observatory.api.client.model.dataset_type import DatasetType
+from observatory.api.client.model.organisation import Organisation
+from observatory.api.client.model.table_type import TableType
+from observatory.api.client.model.workflow import Workflow
+from observatory.api.client.model.workflow_type import WorkflowType
+from observatory.api.server.dataset_type import DatasetTypeId
+from observatory.api.testing import ObservatoryApiEnvironment
 from observatory.platform.utils.airflow_utils import AirflowConns
 from observatory.platform.utils.file_utils import load_jsonl
 from observatory.platform.utils.gc_utils import (
     run_bigquery_query,
     upload_files_to_cloud_storage,
 )
+from observatory.platform.utils.release_utils import get_dataset_releases
 from observatory.platform.utils.test_utils import (
     ObservatoryEnvironment,
     ObservatoryTestCase,
@@ -166,14 +171,12 @@ class TestOnixWorkflow(ObservatoryTestCase):
         def __init__(self):
             self.organisation = Organisation(
                 name="test",
-                gcp_project_id="project_id",
+                project_id="project_id",
             )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.telescope = TestOnixWorkflow.MockTelescopeResponse()
-        self.host = "localhost"
-        self.api_port = 5000
         self.project_id = os.getenv("TESTS_GOOGLE_CLOUD_PROJECT_ID")
         self.data_location = os.getenv("TESTS_DATA_LOCATION")
         self.bucket_name = "bucket_name"
@@ -187,14 +190,14 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 dag_id="onix_workflow_test",
                 release_date=pendulum.datetime(2021, 1, 1),
                 onix_release_date=pendulum.datetime(2021, 1, 1),
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
                 onix_dataset_id="",
                 onix_table_id="onix",
             )
             wf = OnixWorkflow(
                 org_name=self.telescope.organisation.name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
             )
 
@@ -221,7 +224,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             wf = OnixWorkflow(
                 org_name=self.telescope.organisation.name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
                 dag_id="dagid",
             )
@@ -230,7 +233,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 dag_id="dagid",
                 release_date=pendulum.datetime(2021, 1, 1),
                 onix_release_date=pendulum.datetime(2021, 1, 1),
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
                 onix_dataset_id="",
                 onix_table_id="onix",
@@ -256,7 +259,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             wf = OnixWorkflow(
                 org_name=self.telescope.organisation.name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
             )
 
@@ -264,7 +267,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 dag_id="onix_workflow_test",
                 release_date=pendulum.datetime(2021, 1, 1),
                 onix_release_date=pendulum.datetime(2021, 1, 1),
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
                 onix_dataset_id="onix",
                 onix_table_id="onix",
@@ -339,7 +342,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             wf = OnixWorkflow(
                 org_name=self.telescope.organisation.name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
             )
             records = wf.get_onix_records("project_id", "ds_id", "table_id")
@@ -353,7 +356,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             wf = OnixWorkflow(
                 org_name=self.telescope.organisation.name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
             )
 
@@ -375,7 +378,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             wf = OnixWorkflow(
                 org_name=self.telescope.organisation.name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
             )
 
@@ -390,7 +393,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             wf = OnixWorkflow(
                 org_name=self.telescope.organisation.name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
             )
 
@@ -398,7 +401,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 dag_id="onix_workflow_test",
                 release_date=pendulum.datetime(2021, 1, 1),
                 onix_release_date=pendulum.datetime(2021, 1, 1),
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
                 onix_dataset_id="onix",
                 onix_table_id="onix",
@@ -412,7 +415,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
     def test_dag_structure_ignore_google_analytics(self):
         data_partners = [
             OaebuPartner(
-                name=OaebuPartnerName.jstor_country,
+                dataset_type_id=DatasetTypeId.jstor_country,
                 dag_id_prefix="jstor",
                 gcp_project_id="project",
                 gcp_dataset_id="dataset",
@@ -422,7 +425,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 sharded=False,
             ),
             OaebuPartner(
-                name=OaebuPartnerName.oapen_irus_uk,
+                dataset_type_id=DatasetTypeId.oapen_irus_uk,
                 dag_id_prefix="oapen_irus_uk",
                 gcp_project_id="project",
                 gcp_dataset_id="dataset",
@@ -432,7 +435,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 sharded=False,
             ),
             OaebuPartner(
-                name=OaebuPartnerName.google_books_sales,
+                dataset_type_id=DatasetTypeId.google_books_sales,
                 dag_id_prefix="google_books",
                 gcp_project_id="project",
                 gcp_dataset_id="dataset",
@@ -442,7 +445,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 sharded=False,
             ),
             OaebuPartner(
-                name=OaebuPartnerName.google_books_traffic,
+                dataset_type_id=DatasetTypeId.google_books_traffic,
                 dag_id_prefix="google_books",
                 gcp_project_id="project",
                 gcp_dataset_id="dataset",
@@ -456,7 +459,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             wf = OnixWorkflow(
                 org_name=self.telescope.organisation.name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
                 data_partners=data_partners,
             )
@@ -540,7 +543,8 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     ],
                     "export_oaebu_table.book_product_author_metrics": ["export_oaebu_qa_metrics"],
                     "export_oaebu_qa_metrics": ["cleanup"],
-                    "cleanup": [],
+                    "cleanup": ["add_new_dataset_releases"],
+                    "add_new_dataset_releases": [],
                 },
                 dag,
             )
@@ -548,7 +552,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
     def test_dag_structure_with_google_analytics(self):
         data_partners = [
             OaebuPartner(
-                name=OaebuPartnerName.jstor_country,
+                dataset_type_id=DatasetTypeId.jstor_country,
                 dag_id_prefix="jstor",
                 gcp_project_id="project",
                 gcp_dataset_id="dataset",
@@ -558,7 +562,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 sharded=False,
             ),
             OaebuPartner(
-                name=OaebuPartnerName.oapen_irus_uk,
+                dataset_type_id=DatasetTypeId.oapen_irus_uk,
                 dag_id_prefix="oapen_irus_uk",
                 gcp_project_id="project",
                 gcp_dataset_id="dataset",
@@ -568,7 +572,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 sharded=False,
             ),
             OaebuPartner(
-                name=OaebuPartnerName.google_books_sales,
+                dataset_type_id=DatasetTypeId.google_books_sales,
                 dag_id_prefix="google_books",
                 gcp_project_id="project",
                 gcp_dataset_id="dataset",
@@ -578,7 +582,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 sharded=False,
             ),
             OaebuPartner(
-                name=OaebuPartnerName.google_books_traffic,
+                dataset_type_id=DatasetTypeId.google_books_traffic,
                 dag_id_prefix="google_books",
                 gcp_project_id="project",
                 gcp_dataset_id="dataset",
@@ -588,7 +592,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 sharded=False,
             ),
             OaebuPartner(
-                name=OaebuPartnerName.google_analytics,
+                dataset_type_id=DatasetTypeId.google_analytics,
                 dag_id_prefix="google_analytics",
                 gcp_project_id="project",
                 gcp_dataset_id="dataset",
@@ -603,7 +607,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             wf = OnixWorkflow(
                 org_name=org_name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
                 data_partners=data_partners,
             )
@@ -697,7 +701,8 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     ],
                     "export_oaebu_table.book_product_author_metrics": ["export_oaebu_qa_metrics"],
                     "export_oaebu_qa_metrics": ["cleanup"],
-                    "cleanup": [],
+                    "cleanup": ["add_new_dataset_releases"],
+                    "add_new_dataset_releases": [],
                 },
                 dag,
             )
@@ -724,7 +729,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
             with CliRunner().isolated_filesystem():
                 wf = OnixWorkflow(
                     org_name=self.telescope.organisation.name,
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                 )
 
@@ -732,7 +737,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     dag_id="onix_workflow_test",
                     release_date=pendulum.datetime(2021, 1, 1),
                     onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                     onix_dataset_id="onix",
                     onix_table_id="onix",
@@ -839,7 +844,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
             with CliRunner().isolated_filesystem():
                 wf = OnixWorkflow(
                     org_name=self.telescope.organisation.name,
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                 )
 
@@ -847,7 +852,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     dag_id="onix_workflow_test",
                     release_date=pendulum.datetime(2021, 1, 1),
                     onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                     onix_dataset_id="onix",
                     onix_table_id="onix",
@@ -880,7 +885,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             wf = OnixWorkflow(
                 org_name=self.telescope.organisation.name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
             )
             with patch(
@@ -894,7 +899,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                             dag_id="onix_workflow_test",
                             release_date=pendulum.datetime(2021, 1, 1),
                             onix_release_date=pendulum.datetime(2021, 1, 1),
-                            gcp_project_id=self.telescope.organisation.gcp_project_id,
+                            gcp_project_id=self.telescope.organisation.project_id,
                             gcp_bucket_name=self.bucket_name,
                             onix_dataset_id="onix",
                             onix_table_id="onix",
@@ -916,7 +921,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
     ):
         data_partners = [
             OaebuPartner(
-                name="Test Partner",
+                dataset_type_id="Test Partner",
                 dag_id_prefix="test_dag",
                 gcp_project_id="test_project",
                 gcp_dataset_id="test_dataset",
@@ -926,7 +931,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 sharded=True,
             ),
             OaebuPartner(
-                name="Test Partner",
+                dataset_type_id="Test Partner",
                 dag_id_prefix="test_dag",
                 gcp_project_id="test_project",
                 gcp_dataset_id="test_dataset",
@@ -944,7 +949,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             wf = OnixWorkflow(
                 org_name=self.telescope.organisation.name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
                 dag_id="dagid",
                 data_partners=data_partners,
@@ -954,7 +959,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 dag_id="onix_workflow_test",
                 release_date=pendulum.datetime(2021, 1, 1),
                 onix_release_date=pendulum.datetime(2021, 1, 1),
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
                 onix_dataset_id="onix",
                 onix_table_id="onix",
@@ -1007,7 +1012,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             wf = OnixWorkflow(
                 org_name=self.telescope.organisation.name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
             )
             mock_bq_table_query.return_value = True
@@ -1016,7 +1021,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     dag_id="onix_workflow_test",
                     release_date=pendulum.datetime(2021, 1, 1),
                     onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                     onix_dataset_id="onix",
                     onix_table_id="onix",
@@ -1045,7 +1050,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     dag_id="onix_workflow_test",
                     release_date=pendulum.datetime(2021, 1, 1),
                     onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                     onix_dataset_id="onix",
                     onix_table_id="onix",
@@ -1058,7 +1063,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             wf = OnixWorkflow(
                 org_name=self.telescope.organisation.name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
             )
             mock_bq_table_query.return_value = True
@@ -1067,7 +1072,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     dag_id="onix_workflow_test",
                     release_date=pendulum.datetime(2021, 1, 1),
                     onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                     onix_dataset_id="onix",
                     onix_table_id="onix",
@@ -1096,7 +1101,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     dag_id="onix_workflow_test",
                     release_date=pendulum.datetime(2021, 1, 1),
                     onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                     onix_dataset_id="onix",
                     onix_table_id="onix",
@@ -1111,7 +1116,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
 
         data_partners = [
             OaebuPartner(
-                name=OaebuPartnerName.jstor_country,
+                dataset_type_id=DatasetTypeId.jstor_country,
                 dag_id_prefix="jstor",
                 gcp_project_id="project",
                 gcp_dataset_id="jstor",
@@ -1124,7 +1129,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             wf = OnixWorkflow(
                 org_name=self.telescope.organisation.name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
                 data_partners=data_partners,
             )
@@ -1134,7 +1139,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     dag_id="onix_workflow_test",
                     release_date=pendulum.datetime(2021, 1, 1),
                     onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                     onix_dataset_id="onix",
                     onix_table_id="onix",
@@ -1152,7 +1157,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     dag_id="onix_workflow_test",
                     release_date=pendulum.datetime(2021, 1, 1),
                     onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                     onix_dataset_id="onix",
                     onix_table_id="onix",
@@ -1185,7 +1190,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
 
         data_partners = [
             OaebuPartner(
-                name=OaebuPartnerName.google_books_sales,
+                dataset_type_id=DatasetTypeId.google_books_sales,
                 dag_id_prefix="google_books",
                 gcp_project_id="project",
                 gcp_dataset_id="google_books",
@@ -1198,7 +1203,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             wf = OnixWorkflow(
                 org_name=self.telescope.organisation.name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
                 data_partners=data_partners,
             )
@@ -1208,7 +1213,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     dag_id="onix_workflow_test",
                     release_date=pendulum.datetime(2021, 1, 1),
                     onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                     onix_dataset_id="onix",
                     onix_table_id="onix",
@@ -1226,7 +1231,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     dag_id="onix_workflow_test",
                     release_date=pendulum.datetime(2021, 1, 1),
                     onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                     onix_dataset_id="onix",
                     onix_table_id="onix",
@@ -1259,7 +1264,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
 
         data_partners = [
             OaebuPartner(
-                name=OaebuPartnerName.google_books_traffic,
+                dataset_type_id=DatasetTypeId.google_books_traffic,
                 dag_id_prefix="google_books",
                 gcp_project_id="project",
                 gcp_dataset_id="google_books",
@@ -1272,7 +1277,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             wf = OnixWorkflow(
                 org_name=self.telescope.organisation.name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
                 data_partners=data_partners,
             )
@@ -1282,7 +1287,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     dag_id="onix_workflow_test",
                     release_date=pendulum.datetime(2021, 1, 1),
                     onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                     onix_dataset_id="onix",
                     onix_table_id="onix",
@@ -1300,7 +1305,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     dag_id="onix_workflow_test",
                     release_date=pendulum.datetime(2021, 1, 1),
                     onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                     onix_dataset_id="onix",
                     onix_table_id="onix",
@@ -1331,7 +1336,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
 
         data_partners = [
             OaebuPartner(
-                name=OaebuPartnerName.oapen_irus_uk,
+                dataset_type_id=DatasetTypeId.oapen_irus_uk,
                 dag_id_prefix="oapen_irus_uk",
                 gcp_project_id="project",
                 gcp_dataset_id="irus_uk",
@@ -1344,7 +1349,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             wf = OnixWorkflow(
                 org_name=self.telescope.organisation.name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
                 data_partners=data_partners,
             )
@@ -1354,7 +1359,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     dag_id="onix_workflow_test",
                     release_date=pendulum.datetime(2021, 1, 1),
                     onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                     onix_dataset_id="onix",
                     onix_table_id="onix",
@@ -1372,7 +1377,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     dag_id="onix_workflow_test",
                     release_date=pendulum.datetime(2021, 1, 1),
                     onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                     onix_dataset_id="onix",
                     onix_table_id="onix",
@@ -1403,7 +1408,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
 
         data_partners = [
             OaebuPartner(
-                name=OaebuPartnerName.oapen_irus_uk,
+                dataset_type_id=DatasetTypeId.oapen_irus_uk,
                 dag_id_prefix="google_analytics",
                 gcp_project_id="project",
                 gcp_dataset_id="google",
@@ -1416,7 +1421,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             wf = OnixWorkflow(
                 org_name=self.telescope.organisation.name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
                 data_partners=data_partners,
             )
@@ -1426,7 +1431,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     dag_id="onix_workflow_test",
                     release_date=pendulum.datetime(2021, 1, 1),
                     onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                     onix_dataset_id="onix",
                     onix_table_id="onix",
@@ -1444,7 +1449,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     dag_id="onix_workflow_test",
                     release_date=pendulum.datetime(2021, 1, 1),
                     onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                     onix_dataset_id="onix",
                     onix_table_id="onix",
@@ -1477,7 +1482,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
 
         data_partners = [
             OaebuPartner(
-                name=OaebuPartnerName.jstor_country,
+                dataset_type_id=DatasetTypeId.jstor_country,
                 dag_id_prefix="jstor",
                 gcp_project_id="project",
                 gcp_dataset_id="jstor",
@@ -1490,7 +1495,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             wf = OnixWorkflow(
                 org_name=self.telescope.organisation.name,
-                gcp_project_id=self.telescope.organisation.gcp_project_id,
+                gcp_project_id=self.telescope.organisation.project_id,
                 gcp_bucket_name=self.bucket_name,
                 data_partners=data_partners,
             )
@@ -1500,7 +1505,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     dag_id="onix_workflow_test",
                     release_date=pendulum.datetime(2021, 1, 1),
                     onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                     onix_dataset_id="onix",
                     onix_table_id="onix",
@@ -1533,7 +1538,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     dag_id="onix_workflow_test",
                     release_date=pendulum.datetime(2021, 1, 1),
                     onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.gcp_project_id,
+                    gcp_project_id=self.telescope.organisation.project_id,
                     gcp_bucket_name=self.bucket_name,
                     onix_dataset_id="onix",
                     onix_table_id="onix",
@@ -1552,8 +1557,6 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.host = "localhost"
-        self.api_port = 5000
         self.gcp_project_id = os.getenv("TEST_GCP_PROJECT_ID")
         self.data_location = os.getenv("TEST_GCP_DATA_LOCATION")
         self.timestamp = pendulum.now()
@@ -1562,79 +1565,92 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
         self.onix_table_id = "onix"
         self.test_onix_folder = random_id()  # "onix_workflow_test_onix_table"
 
+        # API environment
+        self.host = "localhost"
+        self.port = 5001
+        configuration = Configuration(host=f"http://{self.host}:{self.port}")
+        api_client = ApiClient(configuration)
+        self.api = ObservatoryApi(api_client=api_client)  # noqa: E501
+        self.env = ObservatoryApiEnvironment(host=self.host, port=self.port)
+        self.org_name = "Curtin Press"
+
+    def setup_api(self, orgs=None):
+        dt = pendulum.now("UTC")
+
+        name = "Onix Workflow"
+        workflow_type = WorkflowType(name=name, type_id=OnixWorkflow.DAG_ID_PREFIX)
+        self.api.put_workflow_type(workflow_type)
+
+        workflow_type = WorkflowType(name="onix telescope", type_id="onix")
+        self.api.put_workflow_type(workflow_type)
+
+        table_type = TableType(
+            type_id="partitioned",
+            name="partitioned bq table",
+        )
+        self.api.put_table_type(table_type)
+
+        dataset_type = DatasetType(
+            type_id=OnixWorkflow.DAG_ID_PREFIX,
+            name="ds type",
+            extra={},
+            table_type=TableType(id=1),
+        )
+        self.api.put_dataset_type(dataset_type)
+
+        if orgs is None:
+            orgs = [self.org_name]
+
+        for org in orgs:
+            organisation = Organisation(
+                name=org,
+                project_id="project",
+                download_bucket="download_bucket",
+                transform_bucket="transform_bucket",
+            )
+            organisation = self.api.put_organisation(organisation)
+
+            telescope = Workflow(
+                name=name,
+                workflow_type=WorkflowType(id=2),  # onix telescope
+                organisation=Organisation(id=organisation.id),
+                extra={},
+            )
+            self.api.put_workflow(telescope)
+
+            telescope = Workflow(
+                name=name,
+                workflow_type=WorkflowType(id=1),
+                organisation=Organisation(id=organisation.id),
+                extra={},
+            )
+            telescope = self.api.put_workflow(telescope)
+
+            dataset = Dataset(
+                name="Onix Workflow Example Dataset",
+                address="project.dataset.table",
+                service="bigquery",
+                workflow=Workflow(id=telescope.id),
+                dataset_type=DatasetType(id=1),
+            )
+            self.api.put_dataset(dataset)
+
+    def setup_connections(self, env):
+        # Add Observatory API connection
+        conn = Connection(conn_id=AirflowConns.OBSERVATORY_API, uri=f"http://:password@{self.host}:{self.port}")
+        env.add_connection(conn)
+
     def test_dag_load(self):
         """Test that the DAG loads for each organisation"""
 
         dag_file = os.path.join(module_file_path("oaebu_workflows.dags"), "onix_workflow.py")
         org_names = ["ANU Press", "UCL Press", "University of Michigan Press"]
 
-        env = ObservatoryEnvironment(
-            self.gcp_project_id, self.data_location, api_host=self.host, api_port=self.api_port
-        )
+        env = ObservatoryEnvironment(self.gcp_project_id, self.data_location, api_host=self.host, api_port=self.port)
         with env.create():
             # Add Observatory API connection
-            conn = Connection(conn_id=AirflowConns.OBSERVATORY_API, uri=f"http://:password@{self.host}:{self.api_port}")
-            env.add_connection(conn)
-
-            # Setup ONIX telescopes
-            dt = pendulum.now("UTC")
-            telescope_type = orm.TelescopeType(
-                name="ONIX Telescope", type_id=TelescopeTypes.onix, created=dt, modified=dt
-            )
-            env.api_session.add(telescope_type)
-            for org_name in org_names:
-                organisation = orm.Organisation(name=org_name, created=dt, modified=dt)
-                env.api_session.add(organisation)
-                telescope = orm.Telescope(
-                    name=f"{org_name} ONIX Telescope",
-                    telescope_type=telescope_type,
-                    organisation=organisation,
-                    modified=dt,
-                    created=dt,
-                )
-                env.api_session.add(telescope)
-            env.api_session.commit()
-
-            # Load oaebu partners
-            telescope_type = orm.TelescopeType(name="Dummy Telescope", type_id="dummy", created=dt, modified=dt)
-            env.api_session.add(telescope_type)
-            org_name = org_names[0]
-            organisation = orm.Organisation(name=org_name, created=dt, modified=dt)
-            env.api_session.add(organisation)
-            telescope = orm.Telescope(
-                name=f"{org_name} Dummy Telescope",
-                telescope_type=telescope_type,
-                organisation=organisation,
-                extra={"groups": ["oaebu"]},
-                modified=dt,
-                created=dt,
-            )
-            env.api_session.add(telescope)
-            env.api_session.commit()
-
-            dataset = Dataset(
-                name="dataset",
-                extra={"isbn_field_name": "isbn", "title_field_name": "title"},
-                connection=telescope,
-                created=dt,
-                modified=dt,
-            )
-
-            env.api_session.add(dataset)
-            env.api_session.commit()
-
-            # Create
-            dict_ = {
-                "dataset": {"id": 1},
-                "service": "google",
-                "address": "project.dataset.table",
-                "extra": {"table_type": "sharded"},
-                "created": dt,
-                "modified": dt,
-            }
-            obj = DatasetStorage(**dict_)
-            env.api_session.add(obj)
-            env.api_session.commit()
+            self.setup_connections(env)
+            self.setup_api(orgs=org_names)
 
             # Check that all DAGs load
             for org_name in org_names:
@@ -1679,7 +1695,11 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
         ]
 
         bq_load_tables(
-            tables=tables, bucket_name=self.gcp_bucket_name, release_date=release_date, data_location=self.data_location
+            tables=tables,
+            bucket_name=self.gcp_bucket_name,
+            release_date=release_date,
+            data_location=self.data_location,
+            project_id=self.gcp_project_id,
         )
 
     def setup_fake_partner_data(self, env, release_date: pendulum.DateTime):
@@ -1726,20 +1746,20 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
 
         # Make partners
         partners = []
-        for (name, isbn_field_name, title_field_name, dag_id_prefix), table_id in zip(
+        for (dataset_type_id, isbn_field_name, title_field_name, dag_id_prefix), table_id in zip(
             [
-                (OaebuPartnerName.jstor_country, "ISBN", "Book_Title", "jstor"),
-                (OaebuPartnerName.jstor_institution, "ISBN", "Book_Title", "jstor"),
-                (OaebuPartnerName.google_books_sales, "Primary_ISBN", "Title", "google_books"),
-                (OaebuPartnerName.google_books_traffic, "Primary_ISBN", "Title", "google_books"),
-                (OaebuPartnerName.oapen_irus_uk, "ISBN", "book_title", "oapen_irus_uk"),
-                (OaebuPartnerName.google_analytics, "publication_id", "title", "google_analytics"),
+                (DatasetTypeId.jstor_country, "ISBN", "Book_Title", "jstor"),
+                (DatasetTypeId.jstor_institution, "ISBN", "Book_Title", "jstor"),
+                (DatasetTypeId.google_books_sales, "Primary_ISBN", "Title", "google_books"),
+                (DatasetTypeId.google_books_traffic, "Primary_ISBN", "Title", "google_books"),
+                (DatasetTypeId.oapen_irus_uk, "ISBN", "book_title", "oapen_irus_uk"),
+                (DatasetTypeId.google_analytics, "publication_id", "title", "google_analytics"),
             ],
             table_ids,
         ):
             partners.append(
                 OaebuPartner(
-                    name=name,
+                    dataset_type_id=dataset_type_id,
                     dag_id_prefix=dag_id_prefix,
                     gcp_project_id=self.gcp_project_id,
                     gcp_dataset_id=self.fake_partner_dataset,
@@ -1756,7 +1776,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
         """Functional test of the ONIX workflow"""
 
         # Setup Observatory environment
-        env = ObservatoryEnvironment(self.gcp_project_id, self.data_location, enable_api=False)
+        env = ObservatoryEnvironment(self.gcp_project_id, self.data_location, api_host=self.host, api_port=self.port)
 
         # Create datasets
         partner_release_date = pendulum.datetime(2021, 1, 1)
@@ -1771,6 +1791,8 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
         # Create the Observatory environment and run tests
         with env.create(task_logging=True):
             self.gcp_bucket_name = env.transform_bucket
+            self.setup_connections(env)
+            self.setup_api(orgs=[org_name])
 
             # Setup data partners, remove Google Analytics (the last partner) from these tests
             data_partners = self.setup_fake_partner_data(env, partner_release_date)
@@ -1800,6 +1822,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 onix_table_id=self.onix_table_id,
                 data_partners=data_partners,
                 start_date=start_date,
+                workflow_id=2,
             )
 
             # Skip dag existence check in sensor.
@@ -2195,6 +2218,14 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
 
                 # Cleanup
                 env.run_task(telescope.cleanup.__name__)
+
+                # add_dataset_release_task
+                dataset_releases = get_dataset_releases(dataset_id=1)
+                self.assertEqual(len(dataset_releases), 0)
+                ti = env.run_task("add_new_dataset_releases")
+                self.assertEqual(ti.state, State.SUCCESS)
+                dataset_releases = get_dataset_releases(dataset_id=1)
+                self.assertEqual(len(dataset_releases), 1)
 
     def test_telescope(self):
         """Test that ONIX Workflow runs when Google Analytics is not included"""

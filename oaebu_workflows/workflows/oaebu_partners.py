@@ -19,23 +19,11 @@
 from dataclasses import dataclass
 
 
-class OaebuPartnerName:
-    """OAEBU partner name constants."""
-
-    google_analytics = "Google Analytics"
-    google_books_sales = "Google Books Sales"
-    google_books_traffic = "Google Books Traffic"
-    jstor_country = "JSTOR Country"
-    jstor_institution = "JSTOR Institution"
-    oapen_irus_uk = "OAPEN IRUS UK"
-    ucl_discovery = "UCL Discovery"
-
-
 @dataclass
 class OaebuPartner:
-    """Temporary class for storing information about data sources we are using to produce oaebu intermediate tables for.  Change or remove this later when Observatory API is more mature.
+    """Class for storing information about data sources we are using to produce oaebu intermediate tables for.
 
-    :param name: Name of the data partner.
+    :param dataset_type_id: the dataset type id.
     :param dag_id_prefix: The prefix of the DAG id that the data originates from.
     :param gcp_project_id: GCP Project ID.
     :param gcp_dataset_id: GCP Dataset ID.
@@ -45,7 +33,7 @@ class OaebuPartner:
     :param sharded: whether the table is sharded or not.
     """
 
-    name: str
+    dataset_type_id: str
     dag_id_prefix: str
     gcp_project_id: str
     gcp_dataset_id: str

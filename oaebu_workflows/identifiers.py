@@ -15,13 +15,16 @@
 # Author: James Diprose
 
 
-class TelescopeTypes:
-    """The type_id's for known TelescopeTypes"""
+class WorkflowTypes:
+    """The type_id's for known WorkflowTypes"""
 
     google_analytics = "google_analytics"
     google_books = "google_books"
     jstor = "jstor"
     oapen_irus_uk = "oapen_irus_uk"
+    oapen_metadata = "oapen_metadata"
     onix = "onix"
     onix_workflow = "onix_workflow"
     ucl_discovery = "ucl_discovery"
+    doab = "doab"
+    oapen_workflow = "oapen_workflow"

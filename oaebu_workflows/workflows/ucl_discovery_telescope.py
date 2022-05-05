@@ -215,9 +215,10 @@ class UclDiscoveryTelescope(OrganisationTelescope):
         schedule_interval: str = "@monthly",
         dataset_id: str = "ucl",
         schema_folder: str = default_schema_folder(),
-        catchup:bool = True,
+        catchup: bool = True,
         airflow_vars: list = None,
         max_active_runs: int = 10,
+        workflow_id: int = None,
     ):
         """Construct a UclDiscoveryTelescope instance.
         :param organisation: the Organisation of which data is processed.
@@ -228,6 +229,7 @@ class UclDiscoveryTelescope(OrganisationTelescope):
         :param schema_folder: the SQL schema path.
         :param airflow_vars: list of airflow variable keys, for each variable it is checked if it exists in airflow.
         :param max_active_runs: the maximum number of DAG runs to execute in parallel.
+        :param workflow_id: api workflow id.
         """
 
         if airflow_vars is None:
@@ -251,6 +253,7 @@ class UclDiscoveryTelescope(OrganisationTelescope):
             catchup=catchup,
             airflow_vars=airflow_vars,
             max_active_runs=max_active_runs,
+            workflow_id=workflow_id,
         )
         self.add_setup_task(self.check_dependencies)
         self.add_task_chain(
@@ -261,6 +264,7 @@ class UclDiscoveryTelescope(OrganisationTelescope):
                 self.upload_transformed,
                 self.bq_load_partition,
                 self.cleanup,
+                self.add_new_dataset_releases,
             ]
         )
 
@@ -298,6 +302,7 @@ class UclDiscoveryTelescope(OrganisationTelescope):
         """
         # Transform each release
         releases[0].transform()
+
 
 def get_downloads_per_country(countries_url: str) -> Tuple[List[dict], int]:
     """Requests info on downloads per country for a specific eprint id

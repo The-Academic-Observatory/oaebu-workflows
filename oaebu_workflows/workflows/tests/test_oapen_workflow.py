@@ -38,6 +38,19 @@ from observatory.platform.utils.test_utils import (
 from observatory.platform.utils.workflow_utils import (
     make_dag_id,
 )
+from observatory.api.testing import ObservatoryApiEnvironment
+from observatory.api.client import ApiClient, Configuration
+from observatory.api.client.api.observatory_api import ObservatoryApi  # noqa: E501
+from observatory.api.client.model.organisation import Organisation
+from observatory.api.client.model.workflow import Workflow
+from observatory.api.client.model.workflow_type import WorkflowType
+from observatory.api.client.model.dataset import Dataset
+from observatory.api.client.model.dataset_type import DatasetType
+from observatory.api.client.model.table_type import TableType
+from observatory.platform.utils.release_utils import get_dataset_releases
+from observatory.platform.utils.airflow_utils import AirflowConns
+from airflow.models import Connection
+from airflow.utils.state import State
 
 
 class TestOapenWorkflow(ObservatoryTestCase):
@@ -112,7 +125,8 @@ class TestOapenWorkflow(ObservatoryTestCase):
                         "export_oaebu_table.book_product_author_metrics"
                     ],
                     "export_oaebu_table.book_product_author_metrics": ["cleanup"],
-                    "cleanup": [],
+                    "cleanup": ["add_new_dataset_releases"],
+                    "add_new_dataset_releases": [],
                 },
                 dag,
             )
@@ -144,6 +158,65 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
 
         self.irus_uk_dataset_id = "fixtures"
 
+        # API environment
+        self.host = "localhost"
+        self.port = 5001
+        configuration = Configuration(host=f"http://{self.host}:{self.port}")
+        api_client = ApiClient(configuration)
+        self.api = ObservatoryApi(api_client=api_client)  # noqa: E501
+        self.env = ObservatoryApiEnvironment(host=self.host, port=self.port)
+
+    def setup_api(self):
+        dt = pendulum.now("UTC")
+
+        name = "Oapen Workflow"
+        workflow_type = WorkflowType(name=name, type_id=OapenWorkflow.DAG_ID_PREFIX)
+        self.api.put_workflow_type(workflow_type)
+
+        organisation = Organisation(
+            name=self.org_name,
+            project_id="project",
+            download_bucket="download_bucket",
+            transform_bucket="transform_bucket",
+        )
+        self.api.put_organisation(organisation)
+
+        telescope = Workflow(
+            name=name,
+            workflow_type=WorkflowType(id=1),
+            organisation=Organisation(id=1),
+            extra={},
+        )
+        self.api.put_workflow(telescope)
+
+        table_type = TableType(
+            type_id="partitioned",
+            name="partitioned bq table",
+        )
+        self.api.put_table_type(table_type)
+
+        dataset_type = DatasetType(
+            type_id=OapenWorkflow.DAG_ID_PREFIX,
+            name="ds type",
+            extra={},
+            table_type=TableType(id=1),
+        )
+        self.api.put_dataset_type(dataset_type)
+
+        dataset = Dataset(
+            name="Oapen Example Dataset",
+            address="project.dataset.table",
+            service="bigquery",
+            workflow=Workflow(id=1),
+            dataset_type=DatasetType(id=1),
+        )
+        self.api.put_dataset(dataset)
+
+    def setup_connections(self, env):
+        # Add Observatory API connection
+        conn = Connection(conn_id=AirflowConns.OBSERVATORY_API, uri=f"http://:password@{self.host}:{self.port}")
+        env.add_connection(conn)
+
     def setup_fake_data(self, settings_dataset_id: str, release_date: pendulum.DateTime):
         country = load_jsonl(test_fixtures_folder("onix_workflow", "country.jsonl"))
         schema_path = test_fixtures_folder("onix_workflow", "schema")
@@ -159,14 +232,18 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
         ]
 
         bq_load_tables(
-            tables=tables, bucket_name=self.gcp_bucket_name, release_date=release_date, data_location=self.data_location
+            tables=tables,
+            bucket_name=self.gcp_bucket_name,
+            release_date=release_date,
+            data_location=self.data_location,
+            project_id=self.gcp_project_id,
         )
 
     def test_run_workflow_tests(self):
         """Functional test of the OAPEN workflow"""
 
         # Setup Observatory environment
-        env = ObservatoryEnvironment(self.gcp_project_id, self.data_location, enable_api=False)
+        env = ObservatoryEnvironment(self.gcp_project_id, self.data_location, api_port=self.port, api_host=self.host)
         org_name = self.org_name
 
         # Create datasets
@@ -179,6 +256,8 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
         # Create the Observatory environment and run tests
         with env.create(task_logging=True):
             self.gcp_bucket_name = env.transform_bucket
+            self.setup_connections(env)
+            self.setup_api()
 
             # Setup workflow
             start_date = pendulum.datetime(year=2021, month=5, day=9)
@@ -191,6 +270,7 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
                 start_date=start_date,
                 country_project_id=self.gcp_project_id,
                 country_dataset_id=oaebu_settings_dataset_id,
+                workflow_id=1,
             )
 
             # Override sensor grace period and dag check
@@ -300,9 +380,9 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
                 # Ensure there are no duplicates
                 sql = f"""  SELECT
                                 count
-                            FROM(SELECT 
+                            FROM(SELECT
                                 COUNT(*) as count
-                                FROM {self.gcp_project_id}.{oaebu_elastic_dataset_id}.{self.gcp_project_id.replace('-', '_')}_book_product_metrics{release_suffix} 
+                                FROM {self.gcp_project_id}.{oaebu_elastic_dataset_id}.{self.gcp_project_id.replace('-', '_')}_book_product_metrics{release_suffix}
                                 GROUP BY product_id, month)
                             WHERE count > 1"""
                 records = run_bigquery_query(sql)
@@ -310,3 +390,11 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
 
                 # Cleanup
                 env.run_task(workflow.cleanup.__name__)
+
+                # add_dataset_release_task
+                dataset_releases = get_dataset_releases(dataset_id=1)
+                self.assertEqual(len(dataset_releases), 0)
+                ti = env.run_task("add_new_dataset_releases")
+                self.assertEqual(ti.state, State.SUCCESS)
+                dataset_releases = get_dataset_releases(dataset_id=1)
+                self.assertEqual(len(dataset_releases), 1)

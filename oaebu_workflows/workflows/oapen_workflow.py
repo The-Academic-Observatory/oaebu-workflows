@@ -97,6 +97,7 @@ class OapenWorkflow(Workflow):
         schedule_interval: Optional[str] = "@weekly",
         catchup: Optional[bool] = False,
         airflow_vars: List = None,
+        workflow_id: int = None,
     ):
         """Initialises the workflow object.
         :param ao_gcp_project_id: GCP project ID for the Academic Observatory.
@@ -115,6 +116,7 @@ class OapenWorkflow(Workflow):
         :param schedule_interval: Scheduled interval for running the DAG.
         :param catchup: Whether to catch up missed DAG runs.
         :param airflow_vars: list of airflow variable keys, for each variable it is checked if it exists in airflow.
+        :param workflow_id: api workflow id.
         """
 
         self.dag_id = dag_id
@@ -165,6 +167,7 @@ class OapenWorkflow(Workflow):
             schedule_interval=schedule_interval,
             catchup=catchup,
             airflow_vars=airflow_vars,
+            workflow_id=workflow_id,
         )
 
         with self.parallel_tasks():
@@ -206,6 +209,9 @@ class OapenWorkflow(Workflow):
 
         # Cleanup tasks
         self.add_task(self.cleanup)
+
+        # DatasetRelease creation
+        self.add_task(self.add_new_dataset_releases)
 
     def make_release(self, **kwargs) -> OapenWorkflowRelease:
         """Creates a release object.

@@ -20,43 +20,40 @@
 from typing import List, Tuple
 
 from airflow.exceptions import AirflowException
-from oaebu_workflows.identifiers import TelescopeTypes
+from oaebu_workflows.identifiers import WorkflowTypes
 from oaebu_workflows.workflows.oaebu_partners import OaebuPartner
 from oaebu_workflows.workflows.onix_workflow import OnixWorkflow
 from observatory.api.client.model.dataset import Dataset
-from observatory.api.client.model.dataset_release import DatasetRelease
-from observatory.api.client.model.dataset_storage import DatasetStorage
-from observatory.api.client.model.telescope import Telescope
+from observatory.api.client.model.workflow import Workflow
 from observatory.platform.utils.api import make_observatory_api
+import json
 
 
-def is_oaebu_telescope(telescope: Telescope) -> bool:
-    """Determine whether a telescope is an OAEBU telescope.
+def is_oaebu_telescope(workflow: Workflow) -> bool:
+    """Determine whether a workflow is an OAEBU telescope.
 
-    :param telescope: Telescope to check.
-    :return: Whether the telescope is used for OAEBU.
+    :param workflow: workflow to check.
+    :return: Whether the workflow is used for OAEBU.
     """
 
-    if telescope.extra is None:
+    if workflow.tags is None:
         return False
 
-    groups = telescope.extra.get("groups", None)
-    if groups is None or "oaebu" not in groups:
-        return False
-    return True
+    tags = json.loads(workflow.tags)
+    return "oaebu" in tags
 
 
-def get_gcp_address(storage: DatasetStorage) -> Tuple[str, str, str]:
+def get_gcp_address(dataset: Dataset) -> Tuple[str, str, str]:
     """Get the project id, dataset id, and table id from a GCP storage location.
 
-    :param storage: Dataset storage info.
+    :param dataset: Dataset info.
     :return: project id, dataset id, table id.
     """
 
-    if storage.service != "google":
+    if dataset.service != "bigquery":
         raise AirflowException("Unsupported DatasetStorage type")
 
-    return storage.address.split(".")
+    return dataset.address.split(".")
 
 
 def get_isbn_field_name(dataset: Dataset) -> str:
@@ -66,10 +63,10 @@ def get_isbn_field_name(dataset: Dataset) -> str:
     :return: ISBN field name.
     """
 
-    if dataset.extra is None:
+    if dataset.dataset_type.extra is None:
         return False
 
-    isbn_field_name = dataset.extra.get("isbn_field_name", None)
+    isbn_field_name = dataset.dataset_type.extra.get("isbn_field_name", None)
     if isbn_field_name is None:
         raise AirflowException("isbn_field_name missing from Dataset extra")
 
@@ -83,31 +80,24 @@ def get_title_field_name(dataset: Dataset) -> str:
     :return: Title field name.
     """
 
-    if dataset.extra is None:
+    if dataset.dataset_type.extra is None:
         return False
 
-    title_field_name = dataset.extra.get("title_field_name", None)
+    title_field_name = dataset.dataset_type.extra.get("title_field_name", None)
     if title_field_name is None:
         raise AirflowException("title_field_name missing from Dataset extra")
 
     return title_field_name
 
 
-def is_sharded(storage: DatasetStorage) -> bool:
-    """Determine if a dataset storage table is sharded.
+def is_sharded(dataset: Dataset) -> bool:
+    """Determine if a dataset is sharded.
 
-    :param storage: Dataset storage info.
+    :param dataset: Dataset info.
     :return: Whether the table is sharded.
     """
 
-    if storage.extra is None:
-        return False
-
-    table_type = storage.extra.get("table_type", None)
-    if table_type is None:
-        raise AirflowException("DatasetStorage table_type not found")
-
-    return table_type == "sharded"
+    return dataset.dataset_type.table_type.type_id == "sharded"
 
 
 def get_oaebu_partner_data(organisation_id: int) -> List[OaebuPartner]:
@@ -117,52 +107,51 @@ def get_oaebu_partner_data(organisation_id: int) -> List[OaebuPartner]:
     :return: List of OAEBU partner dataset information.
     """
 
-    telescopes = api.get_telescopes(organisation_id=organisation_id, limit=1000)
+    workflows = api.get_workflows(organisation_id=organisation_id, limit=1000)
     partners = list()
 
-    for telescope in telescopes:
-        if not is_oaebu_telescope(telescope):
+    for workflow in workflows:
+        if not is_oaebu_telescope(workflow):
             continue
 
-        datasets = api.get_datasets(telescope_id=telescope.id, limit=1000)
+        datasets = api.get_datasets(workflow_id=workflow.id, limit=1000)
         for dataset in datasets:
-            storages = api.get_dataset_storages(dataset_id=dataset.id, limit=1000)
-            for storage in storages:
-                gcp_project_id, gcp_dataset_id, gcp_table_id = get_gcp_address(storage)
+            gcp_project_id, gcp_dataset_id, gcp_table_id = get_gcp_address(dataset)
 
-                partners.append(
-                    OaebuPartner(
-                        name=dataset.name,
-                        dag_id_prefix=telescope.telescope_type.type_id,
-                        gcp_project_id=gcp_project_id,
-                        gcp_dataset_id=gcp_dataset_id,
-                        gcp_table_id=gcp_table_id,
-                        isbn_field_name=get_isbn_field_name(dataset),
-                        title_field_name=get_title_field_name(dataset),
-                        sharded=is_sharded(storage),
-                    )
+            partners.append(
+                OaebuPartner(
+                    dataset_type_id=dataset.dataset_type.type_id,
+                    dag_id_prefix=workflow.workflow_type.type_id,
+                    gcp_project_id=gcp_project_id,
+                    gcp_dataset_id=gcp_dataset_id,
+                    gcp_table_id=gcp_table_id,
+                    isbn_field_name=get_isbn_field_name(dataset),
+                    title_field_name=get_title_field_name(dataset),
+                    sharded=is_sharded(dataset),
                 )
+            )
 
     return partners
 
 
 # Fetch all ONIX telescopes
 api = make_observatory_api()
-telescope_type = api.get_telescope_type(type_id=TelescopeTypes.onix)
-telescopes = api.get_telescopes(telescope_type_id=telescope_type.id, limit=1000)
+workflow_type = api.get_workflow_type(type_id=WorkflowTypes.onix)
+workflows = api.get_workflows(workflow_type_id=workflow_type.id, limit=1000)
 
 # Create workflows for each organisation
-for telescope in telescopes:
-    org_name = telescope.organisation.name
-    gcp_project_id = telescope.organisation.gcp_project_id
-    gcp_bucket_name = telescope.organisation.gcp_transform_bucket
-    data_partners = get_oaebu_partner_data(telescope.organisation.id)
+for workflow in workflows:
+    org_name = workflow.organisation.name
+    gcp_project_id = workflow.organisation.gcp_project_id
+    gcp_bucket_name = workflow.organisation.gcp_transform_bucket
+    data_partners = get_oaebu_partner_data(workflow.organisation.id)
 
     workflow = OnixWorkflow(
         org_name=org_name,
         gcp_project_id=gcp_project_id,
         gcp_bucket_name=gcp_bucket_name,
         data_partners=data_partners,
+        workflow_id=workflow.id,
     )
 
     globals()[workflow.dag_id] = workflow.make_dag()
