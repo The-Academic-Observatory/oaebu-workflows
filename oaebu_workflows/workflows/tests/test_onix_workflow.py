@@ -22,8 +22,9 @@ from unittest.mock import MagicMock, patch
 
 import pendulum
 from airflow.exceptions import AirflowException
-from airflow.models.connection import Connection
+from airflow.models import Connection
 from airflow.sensors.base import BaseSensorOperator
+from airflow.utils.state import State
 from click.testing import CliRunner
 from google.cloud import bigquery
 from google.cloud.bigquery import SourceFormat
@@ -31,18 +32,28 @@ from google.cloud.bigquery import SourceFormat
 from oaebu_workflows.config import schema_folder as default_schema_folder
 from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.workflows.oaebu_partners import OaebuPartner
-from observatory.api.server.dataset_type import DatasetTypeId
 from oaebu_workflows.workflows.onix_workflow import OnixWorkflow, OnixWorkflowRelease
+from observatory.api.client import ApiClient, Configuration
+from observatory.api.client.api.observatory_api import ObservatoryApi  # noqa: E501
+from observatory.api.client.model.dataset import Dataset
+from observatory.api.client.model.dataset_type import DatasetType
+from observatory.api.client.model.organisation import Organisation
+from observatory.api.client.model.table_type import TableType
+from observatory.api.client.model.workflow import Workflow
+from observatory.api.client.model.workflow_type import WorkflowType
+from observatory.api.server.dataset_type import DatasetTypeId
 from observatory.api.server.orm import (
     Dataset,
     Organisation,
 )
+from observatory.api.testing import ObservatoryApiEnvironment
 from observatory.platform.utils.airflow_utils import AirflowConns
 from observatory.platform.utils.file_utils import load_jsonl
 from observatory.platform.utils.gc_utils import (
     run_bigquery_query,
     upload_files_to_cloud_storage,
 )
+from observatory.platform.utils.release_utils import get_dataset_releases
 from observatory.platform.utils.test_utils import (
     ObservatoryEnvironment,
     ObservatoryTestCase,
@@ -60,19 +71,6 @@ from observatory.platform.utils.workflow_utils import (
     make_dag_id,
     table_ids_from_path,
 )
-from observatory.api.testing import ObservatoryApiEnvironment
-from observatory.api.client import ApiClient, Configuration
-from observatory.api.client.api.observatory_api import ObservatoryApi  # noqa: E501
-from observatory.api.client.model.organisation import Organisation
-from observatory.api.client.model.workflow import Workflow
-from observatory.api.client.model.workflow_type import WorkflowType
-from observatory.api.client.model.dataset import Dataset
-from observatory.api.client.model.dataset_type import DatasetType
-from observatory.api.client.model.table_type import TableType
-from observatory.platform.utils.release_utils import get_dataset_releases
-from observatory.platform.utils.airflow_utils import AirflowConns
-from airflow.models import Connection
-from airflow.utils.state import State
 
 
 class TestOnixWorkflowRelease(unittest.TestCase):
@@ -421,7 +419,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
     def test_dag_structure_ignore_google_analytics(self):
         data_partners = [
             OaebuPartner(
-                name=DatasetTypeId.jstor_country,
+                dataset_type_id=DatasetTypeId.jstor_country,
                 dag_id_prefix="jstor",
                 gcp_project_id="project",
                 gcp_dataset_id="dataset",
@@ -431,7 +429,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 sharded=False,
             ),
             OaebuPartner(
-                name=DatasetTypeId.oapen_irus_uk,
+                dataset_type_id=DatasetTypeId.oapen_irus_uk,
                 dag_id_prefix="oapen_irus_uk",
                 gcp_project_id="project",
                 gcp_dataset_id="dataset",
@@ -441,7 +439,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 sharded=False,
             ),
             OaebuPartner(
-                name=DatasetTypeId.google_books_sales,
+                dataset_type_id=DatasetTypeId.google_books_sales,
                 dag_id_prefix="google_books",
                 gcp_project_id="project",
                 gcp_dataset_id="dataset",
@@ -451,7 +449,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 sharded=False,
             ),
             OaebuPartner(
-                name=DatasetTypeId.google_books_traffic,
+                dataset_type_id=DatasetTypeId.google_books_traffic,
                 dag_id_prefix="google_books",
                 gcp_project_id="project",
                 gcp_dataset_id="dataset",
@@ -558,7 +556,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
     def test_dag_structure_with_google_analytics(self):
         data_partners = [
             OaebuPartner(
-                name=DatasetTypeId.jstor_country,
+                dataset_type_id=DatasetTypeId.jstor_country,
                 dag_id_prefix="jstor",
                 gcp_project_id="project",
                 gcp_dataset_id="dataset",
@@ -568,7 +566,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 sharded=False,
             ),
             OaebuPartner(
-                name=DatasetTypeId.oapen_irus_uk,
+                dataset_type_id=DatasetTypeId.oapen_irus_uk,
                 dag_id_prefix="oapen_irus_uk",
                 gcp_project_id="project",
                 gcp_dataset_id="dataset",
@@ -578,7 +576,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 sharded=False,
             ),
             OaebuPartner(
-                name=DatasetTypeId.google_books_sales,
+                dataset_type_id=DatasetTypeId.google_books_sales,
                 dag_id_prefix="google_books",
                 gcp_project_id="project",
                 gcp_dataset_id="dataset",
@@ -588,7 +586,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 sharded=False,
             ),
             OaebuPartner(
-                name=DatasetTypeId.google_books_traffic,
+                dataset_type_id=DatasetTypeId.google_books_traffic,
                 dag_id_prefix="google_books",
                 gcp_project_id="project",
                 gcp_dataset_id="dataset",
@@ -598,7 +596,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 sharded=False,
             ),
             OaebuPartner(
-                name=DatasetTypeId.google_analytics,
+                dataset_type_id=DatasetTypeId.google_analytics,
                 dag_id_prefix="google_analytics",
                 gcp_project_id="project",
                 gcp_dataset_id="dataset",
@@ -927,7 +925,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
     ):
         data_partners = [
             OaebuPartner(
-                name="Test Partner",
+                dataset_type_id="Test Partner",
                 dag_id_prefix="test_dag",
                 gcp_project_id="test_project",
                 gcp_dataset_id="test_dataset",
@@ -937,7 +935,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 sharded=True,
             ),
             OaebuPartner(
-                name="Test Partner",
+                dataset_type_id="Test Partner",
                 dag_id_prefix="test_dag",
                 gcp_project_id="test_project",
                 gcp_dataset_id="test_dataset",
@@ -1122,7 +1120,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
 
         data_partners = [
             OaebuPartner(
-                name=DatasetTypeId.jstor_country,
+                dataset_type_id=DatasetTypeId.jstor_country,
                 dag_id_prefix="jstor",
                 gcp_project_id="project",
                 gcp_dataset_id="jstor",
@@ -1196,7 +1194,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
 
         data_partners = [
             OaebuPartner(
-                name=DatasetTypeId.google_books_sales,
+                dataset_type_id=DatasetTypeId.google_books_sales,
                 dag_id_prefix="google_books",
                 gcp_project_id="project",
                 gcp_dataset_id="google_books",
@@ -1270,7 +1268,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
 
         data_partners = [
             OaebuPartner(
-                name=DatasetTypeId.google_books_traffic,
+                dataset_type_id=DatasetTypeId.google_books_traffic,
                 dag_id_prefix="google_books",
                 gcp_project_id="project",
                 gcp_dataset_id="google_books",
@@ -1342,7 +1340,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
 
         data_partners = [
             OaebuPartner(
-                name=DatasetTypeId.oapen_irus_uk,
+                dataset_type_id=DatasetTypeId.oapen_irus_uk,
                 dag_id_prefix="oapen_irus_uk",
                 gcp_project_id="project",
                 gcp_dataset_id="irus_uk",
@@ -1414,7 +1412,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
 
         data_partners = [
             OaebuPartner(
-                name=DatasetTypeId.oapen_irus_uk,
+                dataset_type_id=DatasetTypeId.oapen_irus_uk,
                 dag_id_prefix="google_analytics",
                 gcp_project_id="project",
                 gcp_dataset_id="google",
@@ -1488,7 +1486,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
 
         data_partners = [
             OaebuPartner(
-                name=DatasetTypeId.jstor_country,
+                dataset_type_id=DatasetTypeId.jstor_country,
                 dag_id_prefix="jstor",
                 gcp_project_id="project",
                 gcp_dataset_id="jstor",
@@ -1752,7 +1750,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
 
         # Make partners
         partners = []
-        for (name, isbn_field_name, title_field_name, dag_id_prefix), table_id in zip(
+        for (dataset_type_id, isbn_field_name, title_field_name, dag_id_prefix), table_id in zip(
             [
                 (DatasetTypeId.jstor_country, "ISBN", "Book_Title", "jstor"),
                 (DatasetTypeId.jstor_institution, "ISBN", "Book_Title", "jstor"),
@@ -1765,7 +1763,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
         ):
             partners.append(
                 OaebuPartner(
-                    name=name,
+                    dataset_type_id=dataset_type_id,
                     dag_id_prefix=dag_id_prefix,
                     gcp_project_id=self.gcp_project_id,
                     gcp_dataset_id=self.fake_partner_dataset,

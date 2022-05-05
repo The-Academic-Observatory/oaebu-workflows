@@ -710,7 +710,7 @@ class OnixWorkflow(Workflow):
         :param data_partners: List of oaebu partner data.
         """
 
-        data_partner_datasets = {data.name: data.gcp_dataset_id for data in data_partners}
+        data_partner_datasets = {data.dataset_type_id: data.gcp_dataset_id for data in data_partners}
 
         # Book Product
         fn = partial(
@@ -952,8 +952,8 @@ class OnixWorkflow(Workflow):
             self.add_task(fn)
 
         # Export QA Metrics
-        data_partner_tables = {data.name: data.gcp_table_id for data in data_partners}
-        data_partner_isbns = {data.name: data.isbn_field_name for data in data_partners}
+        data_partner_tables = {data.dataset_type_id: data.gcp_table_id for data in data_partners}
+        data_partner_isbns = {data.dataset_type_id: data.isbn_field_name for data in data_partners}
 
         # Export QA Metrics
         fn = partial(
@@ -990,17 +990,17 @@ class OnixWorkflow(Workflow):
         for data_partner in data_partners:
 
             if (
-                data_partner.name == DatasetTypeId.jstor_country
-                or data_partner.name == DatasetTypeId.jstor_institution
+                data_partner.dataset_type_id == DatasetTypeId.jstor_country
+                or data_partner.dataset_type_id == DatasetTypeId.jstor_institution
             ):
                 self.create_oaebu_data_qa_jstor_tasks(data_partner)
-            elif data_partner.name == DatasetTypeId.oapen_irus_uk:
+            elif data_partner.dataset_type_id == DatasetTypeId.oapen_irus_uk:
                 self.create_oaebu_data_qa_oapen_irus_uk_tasks(data_partner)
-            elif data_partner.name == DatasetTypeId.google_books_sales:
+            elif data_partner.dataset_type_id == DatasetTypeId.google_books_sales:
                 self.create_oaebu_data_qa_google_books_sales_tasks(data_partner)
-            elif data_partner.name == DatasetTypeId.google_books_traffic:
+            elif data_partner.dataset_type_id == DatasetTypeId.google_books_traffic:
                 self.create_oaebu_data_qa_google_books_traffic_tasks(data_partner)
-            elif data_partner.name == DatasetTypeId.google_analytics:
+            elif data_partner.dataset_type_id == DatasetTypeId.google_analytics:
                 self.create_oaebu_data_qa_google_analytics_tasks(data_partner)
 
             self.create_oaebu_data_qa_intermediate_tasks(data_partner)
