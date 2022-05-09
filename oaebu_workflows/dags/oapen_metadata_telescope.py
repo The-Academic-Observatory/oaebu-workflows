@@ -24,6 +24,7 @@ from oaebu_workflows.identifiers import WorkflowTypes
 # Fetch all workflows
 api = make_observatory_api()
 workflow_type = api.get_workflow_type(type_id=WorkflowTypes.oapen_metadata)
-workflows = api.get_workflows(workflow_type_id=workflow_type.id, limit=1000)
-workflow = OapenMetadataTelescope(workflow_id=workflows[0].id)
-globals()[workflow.dag_id] = workflow.make_dag()
+workflows = api.get_workflows(workflow_type_id=workflow_type.id, limit=1)
+if len(workflows):
+    workflow = OapenMetadataTelescope(workflow_id=workflows[0].id)
+    globals()[workflow.dag_id] = workflow.make_dag()
