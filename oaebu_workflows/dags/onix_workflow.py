@@ -50,8 +50,8 @@ def get_gcp_address(dataset: Dataset) -> Tuple[str, str, str]:
     :return: project id, dataset id, table id.
     """
 
-    if dataset.service != "bigquery":
-        raise AirflowException("Unsupported DatasetStorage type")
+    if dataset.service != "google":
+        raise AirflowException("Unsupported Service type")
 
     return dataset.address.split(".")
 
@@ -136,7 +136,7 @@ def get_oaebu_partner_data(organisation_id: int) -> List[OaebuPartner]:
 
 # Fetch all ONIX telescopes
 api = make_observatory_api()
-workflow_type = api.get_workflow_type(type_id=WorkflowTypes.onix)
+workflow_type = api.get_workflow_type(type_id=WorkflowTypes.onix_workflow)
 workflows = api.get_workflows(workflow_type_id=workflow_type.id, limit=1000)
 
 # Create workflows for each organisation
