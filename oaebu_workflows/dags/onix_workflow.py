@@ -142,8 +142,8 @@ workflows = api.get_workflows(workflow_type_id=workflow_type.id, limit=1000)
 # Create workflows for each organisation
 for workflow in workflows:
     org_name = workflow.organisation.name
-    gcp_project_id = workflow.organisation.gcp_project_id
-    gcp_bucket_name = workflow.organisation.gcp_transform_bucket
+    gcp_project_id = workflow.organisation.project_id
+    gcp_bucket_name = workflow.organisation.transform_bucket
     data_partners = get_oaebu_partner_data(workflow.organisation.id)
 
     workflow = OnixWorkflow(

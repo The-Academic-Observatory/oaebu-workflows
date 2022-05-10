@@ -30,9 +30,9 @@ workflows = api.get_workflows(workflow_type_id=workflow_type.id, limit=1000)
 for workflow in workflows:
     organisation = workflow.organisation
     organisation_name = organisation.name
-    project_id = organisation.gcp_project_id
-    download_bucket = organisation.gcp_download_bucket
-    transform_bucket = organisation.gcp_transform_bucket
+    project_id = organisation.project_id
+    download_bucket = organisation.download_bucket
+    transform_bucket = organisation.transform_bucket
     dataset_location = "us"
     date_regex = workflow.extra.get("date_regex")
     date_format = workflow.extra.get("date_format")
