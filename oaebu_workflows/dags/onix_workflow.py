@@ -64,7 +64,7 @@ def get_isbn_field_name(dataset: Dataset) -> str:
     """
 
     if dataset.dataset_type.extra is None:
-        return False
+        raise AirflowException("dataset_type.extra missing")
 
     isbn_field_name = dataset.dataset_type.extra.get("isbn_field_name", None)
     if isbn_field_name is None:
@@ -81,7 +81,7 @@ def get_title_field_name(dataset: Dataset) -> str:
     """
 
     if dataset.dataset_type.extra is None:
-        return False
+        raise AirflowException("dataset_type.extra missing")
 
     title_field_name = dataset.dataset_type.extra.get("title_field_name", None)
     if title_field_name is None:
