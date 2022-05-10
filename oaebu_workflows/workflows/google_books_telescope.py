@@ -26,8 +26,8 @@ from airflow.exceptions import AirflowException
 from airflow.models.taskinstance import TaskInstance
 from google.cloud import bigquery
 
-from observatory.api.client.model.organisation import Organisation
 from oaebu_workflows.config import schema_folder as default_schema_folder
+from observatory.api.client.model.organisation import Organisation
 from observatory.platform.utils.airflow_utils import AirflowConns, AirflowVars
 from observatory.platform.utils.file_utils import list_to_jsonl_gz
 from observatory.platform.utils.workflow_utils import (

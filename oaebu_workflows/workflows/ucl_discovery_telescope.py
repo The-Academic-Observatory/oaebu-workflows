@@ -25,13 +25,13 @@ import pendulum
 from airflow.exceptions import AirflowException, AirflowSkipException
 from google.cloud import bigquery
 
-from observatory.api.client.model.organisation import Organisation
 from oaebu_workflows.config import schema_folder as default_schema_folder
+from observatory.api.client.model.organisation import Organisation
 from observatory.platform.utils.airflow_utils import AirflowVars
 from observatory.platform.utils.file_utils import list_to_jsonl_gz
-from observatory.platform.workflows.organisation_telescope import OrganisationRelease, OrganisationTelescope
 from observatory.platform.utils.url_utils import retry_session
 from observatory.platform.utils.workflow_utils import add_partition_date, make_dag_id
+from observatory.platform.workflows.organisation_telescope import OrganisationRelease, OrganisationTelescope
 
 
 class UclDiscoveryRelease(OrganisationRelease):

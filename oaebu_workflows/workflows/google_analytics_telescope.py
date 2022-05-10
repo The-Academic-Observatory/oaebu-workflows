@@ -28,8 +28,8 @@ from google.cloud import bigquery
 from googleapiclient.discovery import Resource, build
 from oauth2client.service_account import ServiceAccountCredentials
 
-from observatory.api.client.model.organisation import Organisation
 from oaebu_workflows.config import schema_folder as default_schema_folder
+from observatory.api.client.model.organisation import Organisation
 from observatory.platform.utils.airflow_utils import AirflowConns, AirflowVars
 from observatory.platform.utils.file_utils import list_to_jsonl_gz
 from observatory.platform.utils.workflow_utils import add_partition_date, make_dag_id

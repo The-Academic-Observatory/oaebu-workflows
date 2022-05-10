@@ -37,13 +37,13 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import Resource, build
 from tenacity import retry, stop_after_attempt, wait_exponential, wait_fixed
 
-from observatory.api.client.model.organisation import Organisation
 from oaebu_workflows.config import schema_folder as default_schema_folder
+from observatory.api.client.model.organisation import Organisation
 from observatory.platform.utils.airflow_utils import AirflowConns, AirflowVars
 from observatory.platform.utils.file_utils import list_to_jsonl_gz
-from observatory.platform.utils.workflow_utils import add_partition_date, convert, make_dag_id
-from observatory.platform.utils.workflow_utils import SubFolder, workflow_path
 from observatory.platform.utils.url_utils import get_user_agent
+from observatory.platform.utils.workflow_utils import SubFolder, workflow_path
+from observatory.platform.utils.workflow_utils import add_partition_date, convert, make_dag_id
 from observatory.platform.workflows.organisation_telescope import OrganisationRelease, OrganisationTelescope
 
 

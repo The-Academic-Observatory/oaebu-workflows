@@ -25,15 +25,16 @@ from typing import List, Optional
 import pendulum
 from airflow.exceptions import AirflowException
 from google.cloud.bigquery import SourceFormat
+
 from oaebu_workflows.config import schema_folder as default_schema_folder
 from oaebu_workflows.config import sql_folder
 from oaebu_workflows.workflows.oaebu_partners import OaebuPartner
-from observatory.api.server.dataset_type import DatasetTypeId
 from oaebu_workflows.workflows.onix_telescope import OnixTelescope
 from oaebu_workflows.workflows.onix_work_aggregation import (
     BookWorkAggregator,
     BookWorkFamilyAggregator,
 )
+from observatory.api.server.dataset_type import DatasetTypeId
 from observatory.platform.utils.dag_run_sensor import DagRunSensor
 from observatory.platform.utils.file_utils import list_to_jsonl_gz
 from observatory.platform.utils.gc_utils import (
