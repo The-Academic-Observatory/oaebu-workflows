@@ -22,6 +22,7 @@ import os
 from typing import List, Tuple
 
 import pendulum
+from pendulum.exceptions import ParserError
 from airflow.exceptions import AirflowException
 
 from oaebu_workflows.config import schema_folder as default_schema_folder
@@ -266,8 +267,11 @@ def transform_value_to_list(k: str, v: str) -> Tuple[list, list]:
         v = v.replace(",", "||")
     v = list(dict.fromkeys([x.strip() for x in v.split("||")]))
     if k == "dc.date.issued":
-        # Use rjust to create 4 digit year number < 1000 on linux, e.g. 215 -> 0215
-        v = [pendulum.parse(date).to_date_string().rjust(10, "0") for date in v]
+        try:
+            # Use rjust to create 4 digit year number < 1000 on linux, e.g. 215 -> 0215
+            v = [pendulum.parse(date).to_date_string().rjust(10, "0") for date in v]
+        except ParserError:
+            v = []
     if k == "dc.subject.classification":
         for c in v:
             if c.startswith("bic Book Industry Communication::"):
