@@ -32,6 +32,8 @@ from google.oauth2.service_account import IDTokenCredentials
 from googleapiclient.discovery import Resource, build
 from googleapiclient.errors import HttpError
 from oauth2client.service_account import ServiceAccountCredentials
+
+from oaebu_workflows.config import schema_folder as default_schema_folder
 from observatory.api.client.model.organisation import Organisation
 from observatory.platform.utils.airflow_utils import AirflowConns, AirflowVars
 from observatory.platform.utils.file_utils import get_file_hash, list_to_jsonl_gz
@@ -53,8 +55,6 @@ from observatory.platform.workflows.organisation_telescope import (
     OrganisationRelease,
     OrganisationTelescope,
 )
-
-from oaebu_workflows.config import schema_folder as default_schema_folder
 
 
 class OapenIrusUkRelease(OrganisationRelease):

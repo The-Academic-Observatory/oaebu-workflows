@@ -22,6 +22,8 @@ from typing import Tuple
 import pendulum
 from airflow.exceptions import AirflowException
 from pendulum.parsing.exceptions import ParserError
+
+from oaebu_workflows.config import schema_folder as default_schema_folder
 from observatory.platform.utils.airflow_utils import AirflowVars
 from observatory.platform.utils.file_utils import list_to_jsonl_gz
 from observatory.platform.utils.url_utils import get_user_agent, retry_session
@@ -30,7 +32,6 @@ from observatory.platform.workflows.stream_telescope import (
     StreamRelease,
     StreamTelescope,
 )
-from oaebu_workflows.config import schema_folder as default_schema_folder
 
 
 class DoabRelease(StreamRelease):

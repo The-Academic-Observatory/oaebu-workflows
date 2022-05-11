@@ -50,8 +50,8 @@ def get_gcp_address(dataset: Dataset) -> Tuple[str, str, str]:
     :return: project id, dataset id, table id.
     """
 
-    if dataset.service != "bigquery":
-        raise AirflowException("Unsupported DatasetStorage type")
+    if dataset.service != "google":
+        raise AirflowException("Unsupported Service type")
 
     return dataset.address.split(".")
 
@@ -64,7 +64,7 @@ def get_isbn_field_name(dataset: Dataset) -> str:
     """
 
     if dataset.dataset_type.extra is None:
-        return False
+        raise AirflowException("dataset_type.extra missing")
 
     isbn_field_name = dataset.dataset_type.extra.get("isbn_field_name", None)
     if isbn_field_name is None:
@@ -81,7 +81,7 @@ def get_title_field_name(dataset: Dataset) -> str:
     """
 
     if dataset.dataset_type.extra is None:
-        return False
+        raise AirflowException("dataset_type.extra missing")
 
     title_field_name = dataset.dataset_type.extra.get("title_field_name", None)
     if title_field_name is None:
@@ -136,14 +136,14 @@ def get_oaebu_partner_data(organisation_id: int) -> List[OaebuPartner]:
 
 # Fetch all ONIX telescopes
 api = make_observatory_api()
-workflow_type = api.get_workflow_type(type_id=WorkflowTypes.onix)
+workflow_type = api.get_workflow_type(type_id=WorkflowTypes.onix_workflow)
 workflows = api.get_workflows(workflow_type_id=workflow_type.id, limit=1000)
 
 # Create workflows for each organisation
 for workflow in workflows:
     org_name = workflow.organisation.name
-    gcp_project_id = workflow.organisation.gcp_project_id
-    gcp_bucket_name = workflow.organisation.gcp_transform_bucket
+    gcp_project_id = workflow.organisation.project_id
+    gcp_bucket_name = workflow.organisation.transform_bucket
     data_partners = get_oaebu_partner_data(workflow.organisation.id)
 
     workflow = OnixWorkflow(
