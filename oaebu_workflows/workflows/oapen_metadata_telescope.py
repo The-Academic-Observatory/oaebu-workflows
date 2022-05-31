@@ -25,6 +25,7 @@ import pendulum
 from pendulum.exceptions import ParserError
 from airflow.exceptions import AirflowException
 
+from oaebu_workflows.api_type_ids import DatasetTypeId
 from oaebu_workflows.config import schema_folder as default_schema_folder
 from observatory.platform.utils.airflow_utils import AirflowVars
 from observatory.platform.utils.file_utils import list_to_jsonl_gz
@@ -156,6 +157,7 @@ class OapenMetadataTelescope(StreamTelescope):
         schema_prefix: str = "oapen_",
         airflow_vars: List = None,
         workflow_id: int = None,
+        dataset_type_id: str = DatasetTypeId.oapen_metadata,
     ):
         """Construct a OapenMetadataTelescope instance.
 
@@ -188,6 +190,7 @@ class OapenMetadataTelescope(StreamTelescope):
             schema_prefix=schema_prefix,
             airflow_vars=airflow_vars,
             workflow_id=workflow_id,
+            dataset_type_id=dataset_type_id,
             load_bigquery_table_kwargs={"ignore_unknown_values": True},
         )
 
