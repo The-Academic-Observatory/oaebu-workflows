@@ -148,6 +148,7 @@ class OapenMetadataTelescope(StreamTelescope):
 
     def __init__(
         self,
+        workflow_id: int,
         dag_id: str = DAG_ID,
         start_date: pendulum.DateTime = pendulum.datetime(2018, 5, 14),
         schedule_interval: str = "@weekly",
@@ -156,7 +157,6 @@ class OapenMetadataTelescope(StreamTelescope):
         schema_folder: str = default_schema_folder(),
         schema_prefix: str = "oapen_",
         airflow_vars: List = None,
-        workflow_id: int = None,
         dataset_type_id: str = DatasetTypeId.oapen_metadata,
     ):
         """Construct a OapenMetadataTelescope instance.

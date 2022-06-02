@@ -148,7 +148,7 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
 
         :return: None
         """
-        dag = OapenMetadataTelescope().make_dag()
+        dag = OapenMetadataTelescope(workflow_id=1).make_dag()
         self.assert_dag_structure(
             {
                 "check_dependencies": ["download"],
@@ -348,7 +348,7 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
     def test_airflow_vars(self):
         """Cover case when airflow_vars is given."""
 
-        telescope = OapenMetadataTelescope(airflow_vars=[AirflowVars.DOWNLOAD_BUCKET])
+        telescope = OapenMetadataTelescope(workflow_id=1, airflow_vars=[AirflowVars.DOWNLOAD_BUCKET])
         self.assertEqual(set(telescope.airflow_vars), {AirflowVars.DOWNLOAD_BUCKET, AirflowVars.TRANSFORM_BUCKET})
 
     @patch("observatory.platform.utils.workflow_utils.Variable.get")
