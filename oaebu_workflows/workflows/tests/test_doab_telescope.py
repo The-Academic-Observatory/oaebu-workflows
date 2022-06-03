@@ -15,7 +15,6 @@
 # Author: Aniek Roelofs
 
 import os
-from datetime import timedelta
 from unittest.mock import patch
 
 import httpretty
@@ -23,6 +22,8 @@ import pendulum
 from airflow.exceptions import AirflowException
 from click.testing import CliRunner
 from google.cloud import bigquery
+
+from oaebu_workflows.api_type_ids import DatasetTypeId
 from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.workflows.doab_telescope import (
     DoabRelease,
@@ -115,7 +116,7 @@ class TestDoabTelescope(ObservatoryTestCase):
         self.api.put_table_type(table_type)
 
         dataset_type = DatasetType(
-            type_id=DoabTelescope.DAG_ID,
+            type_id=DatasetTypeId.doab,
             name="ds type",
             extra={},
             table_type=TableType(id=1),
@@ -141,7 +142,7 @@ class TestDoabTelescope(ObservatoryTestCase):
         :return: None
         """
 
-        dag = DoabTelescope().make_dag()
+        dag = DoabTelescope(workflow_id=1).make_dag()
         self.assert_dag_structure(
             {
                 "check_dependencies": ["download"],
@@ -347,7 +348,7 @@ class TestDoabTelescope(ObservatoryTestCase):
     def test_airflow_vars(self):
         """Cover case when airflow_vars is given."""
 
-        telescope = DoabTelescope(airflow_vars=[AirflowVars.DOWNLOAD_BUCKET])
+        telescope = DoabTelescope(workflow_id=1, airflow_vars=[AirflowVars.DOWNLOAD_BUCKET])
         self.assertEqual(set(telescope.airflow_vars), {AirflowVars.DOWNLOAD_BUCKET, AirflowVars.TRANSFORM_BUCKET})
 
     @patch("observatory.platform.utils.workflow_utils.Variable.get")

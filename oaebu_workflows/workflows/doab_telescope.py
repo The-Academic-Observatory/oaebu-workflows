@@ -23,6 +23,7 @@ import pendulum
 from airflow.exceptions import AirflowException
 from pendulum.parsing.exceptions import ParserError
 
+from oaebu_workflows.api_type_ids import DatasetTypeId
 from oaebu_workflows.config import schema_folder as default_schema_folder
 from observatory.platform.utils.airflow_utils import AirflowVars
 from observatory.platform.utils.file_utils import list_to_jsonl_gz
@@ -168,6 +169,7 @@ class DoabTelescope(StreamTelescope):
 
     def __init__(
         self,
+        workflow_id: int,
         dag_id: str = DAG_ID,
         start_date: pendulum.DateTime = pendulum.datetime(2018, 5, 14),
         schedule_interval: str = "@monthly",
@@ -175,7 +177,7 @@ class DoabTelescope(StreamTelescope):
         merge_partition_field: str = "id",
         schema_folder: str = default_schema_folder(),
         airflow_vars: list = None,
-        workflow_id: int = None,
+        dataset_type_id: str = DatasetTypeId.doab,
     ):
         if airflow_vars is None:
             airflow_vars = [
@@ -194,6 +196,7 @@ class DoabTelescope(StreamTelescope):
             schema_folder,
             airflow_vars=airflow_vars,
             workflow_id=workflow_id,
+            dataset_type_id=dataset_type_id,
             load_bigquery_table_kwargs={"ignore_unknown_values": True},
         )
 
