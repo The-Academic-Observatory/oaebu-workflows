@@ -35,6 +35,7 @@ def get_workflow_type_info():
     workflow_type_info["ucl_discovery"] = WorkflowType(type_id="ucl_discovery", name="UCL Discovery")
     return workflow_type_info
 
+
 if __name__ == "__main__":
     api = get_api_client()
     workflow_type_info = get_workflow_type_info()
