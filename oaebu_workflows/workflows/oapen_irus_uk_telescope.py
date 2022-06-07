@@ -219,11 +219,11 @@ class OapenIrusUkTelescope(OrganisationTelescope):
     FUNCTION_REGION = "europe-west1"  # Region of the google cloud function
     FUNCTION_SOURCE_URL = (
         "https://github.com/The-Academic-Observatory/oapen-irus-uk-cloud-function/releases/"
-        "download/v1.1.6/oapen-irus-uk-cloud-function.zip"
+        "download/v1.1.7/oapen-irus-uk-cloud-function.zip"
     )  # URL to the zipped source code of the cloud function
-    FUNCTION_MD5_HASH = "60312045007a628abc7bf50c36b20058"  # MD5 hash of the zipped source code
+    FUNCTION_MD5_HASH = "0b43068db2bf9bb19caa7438dc40ca2b"  # MD5 hash of the zipped source code
     FUNCTION_BLOB_NAME = "cloud_function_source_code.zip"  # blob name of zipped source code
-    FUNCTION_TIMEOUT = 900  # Timeout of cloud function in seconds. Maximum of 60 minutes,
+    FUNCTION_TIMEOUT = 1500  # Timeout of cloud function in seconds. Maximum of 60 minutes,
     # see https://cloud.google.com/functions/docs/2nd-gen/overview#enhanced_infrastructure
 
     def __init__(
