@@ -41,7 +41,7 @@ from observatory.api.client.model.organisation import Organisation
 from observatory.api.client.model.table_type import TableType
 from observatory.api.client.model.workflow import Workflow
 from observatory.api.client.model.workflow_type import WorkflowType
-from oaebu_workflows.dataset_type_info import get_dataset_type_info
+from oaebu_workflows.seed.dataset_type_info import get_dataset_type_info
 from observatory.api.testing import ObservatoryApiEnvironment
 from observatory.platform.utils.airflow_utils import AirflowConns
 from observatory.platform.utils.file_utils import load_jsonl
@@ -68,8 +68,8 @@ from observatory.platform.utils.workflow_utils import (
     table_ids_from_path,
 )
 from observatory.api.utils import seed_table_type, seed_dataset_type
-from observatory.api.table_type_info import get_table_type_info
-from oaebu_workflows.dataset_type_info import get_dataset_type_info
+from oaebu_workflows.seed.table_type_info import get_table_type_info
+from oaebu_workflows.seed.dataset_type_info import get_dataset_type_info
 from sqlalchemy import table
 
 

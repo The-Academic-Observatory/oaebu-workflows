@@ -34,7 +34,7 @@ from oaebu_workflows.workflows.onix_work_aggregation import (
     BookWorkAggregator,
     BookWorkFamilyAggregator,
 )
-from observatory.api.server.dataset_type import DatasetTypeId
+from oaebu_workflows.api_type_ids import DatasetTypeId
 from observatory.platform.utils.dag_run_sensor import DagRunSensor
 from observatory.platform.utils.file_utils import list_to_jsonl_gz
 from observatory.platform.utils.gc_utils import (
@@ -55,7 +55,7 @@ from observatory.platform.utils.workflow_utils import (
 )
 from observatory.platform.workflows.workflow import AbstractRelease, Workflow
 from observatory.platform.utils.api import make_observatory_api
-from oaebu_workflows.dataset_type_info import get_dataset_type_info
+from oaebu_workflows.seed.dataset_type_info import get_dataset_type_info
 
 class OnixWorkflowRelease(AbstractRelease):
     """
