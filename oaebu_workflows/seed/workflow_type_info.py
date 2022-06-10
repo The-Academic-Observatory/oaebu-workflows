@@ -26,27 +26,27 @@ def get_workflow_type_info():
     workflow_type_info = OrderedDict()
     workflow_type_info[WorkflowTypeId.doab] = WorkflowType(
         type_id=WorkflowTypeId.doab,
-        name="DOAB",
+        name="DOAB Telescope",
     )
     workflow_type_info[WorkflowTypeId.google_analytics] = WorkflowType(
         type_id=WorkflowTypeId.google_analytics,
-        name="Google Analytics",
+        name="Google Analytics Telescope",
     )
     workflow_type_info[WorkflowTypeId.google_books] = WorkflowType(
         type_id=WorkflowTypeId.google_books,
-        name="Google Books",
+        name="Google Books Telescope",
     )
     workflow_type_info[WorkflowTypeId.jstor] = WorkflowType(
         type_id=WorkflowTypeId.jstor,
-        name="JSTOR",
+        name="JSTOR Telescope",
     )
     workflow_type_info[WorkflowTypeId.oapen_irus_uk] = WorkflowType(
         type_id=WorkflowTypeId.oapen_irus_uk,
-        name="OAPEN IRUS UK",
+        name="OAPEN IRUS-UK Telescope",
     )
     workflow_type_info[WorkflowTypeId.oapen_metadata] = WorkflowType(
         type_id=WorkflowTypeId.oapen_metadata,
-        name="OAPEN Metadata",
+        name="OAPEN Metadata Telescope",
     )
     workflow_type_info[WorkflowTypeId.oapen_workflow] = WorkflowType(
         type_id=WorkflowTypeId.oapen_workflow,
@@ -54,7 +54,7 @@ def get_workflow_type_info():
     )
     workflow_type_info[WorkflowTypeId.onix] = WorkflowType(
         type_id=WorkflowTypeId.onix,
-        name="ONIX",
+        name="ONIX Telescope",
     )
     workflow_type_info[WorkflowTypeId.onix_workflow] = WorkflowType(
         type_id=WorkflowTypeId.onix_workflow,
@@ -62,7 +62,7 @@ def get_workflow_type_info():
     )
     workflow_type_info[WorkflowTypeId.ucl_discovery] = WorkflowType(
         type_id=WorkflowTypeId.ucl_discovery,
-        name="UCL Discovery",
+        name="UCL Discovery Telescope",
     )
     return workflow_type_info
 

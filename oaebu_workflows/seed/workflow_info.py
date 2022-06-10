@@ -30,104 +30,119 @@ def get_workflow_info(api: ObservatoryApi):
     orgids = get_organisation_ids(api)
 
     workflow_info = OrderedDict()
-    workflow_info["DOAB Telescope"] = Workflow(
-        name="DOAB Telescope",
+    name="DOAB Telescope"
+    workflow_info[name] = Workflow(
+        name=name,
         workflow_type=WorkflowType(id=wftids[WorkflowTypeId.doab]),
         extra={},
         tags=None,
     )
-    workflow_info["OAPEN Metadata Telescope"] = Workflow(
-        name="OAPEN Metadata Telescope",
+    name="OAPEN Metadata Telescope"
+    workflow_info[name] = Workflow(
+        name=name,
         workflow_type=WorkflowType(id=wftids[WorkflowTypeId.oapen_metadata]),
         extra={},
         tags=None,
     )
-    workflow_info["ANU Press ONIX Telescope"] = Workflow(
-        name="ANU Press ONIX Telescope",
+    name="ANU Press ONIX Telescope"
+    workflow_info[name] = Workflow(
+        name=name,
         organisation=Organisation(id=orgids["ANU Press"]),
         workflow_type=WorkflowType(id=wftids[WorkflowTypeId.onix]),
         extra={"date_format": "%Y%m%d", "date_regex": "\\d{8}"},
         tags=None,
     )
-    workflow_info["UCL Press ONIX Telescope"] = Workflow(
-        name="UCL Press ONIX Telescope",
+    name="UCL Press ONIX Telescope"
+    workflow_info[name] = Workflow(
+        name=name,
         organisation=Organisation(id=orgids["UCL Press"]),
         workflow_type=WorkflowType(id=wftids[WorkflowTypeId.onix]),
         extra={"date_format": "%Y%m%d", "date_regex": "\\d{8}"},
         tags=None,
     )
-    workflow_info["Witts University Press ONIX Telescope"] = Workflow(
-        name="Witts University Press ONIX Telescope",
+    name="Witts University Press ONIX Telescope"
+    workflow_info[name] = Workflow(
+        name=name,
         organisation=Organisation(id=orgids["Wits University Press"]),
         workflow_type=WorkflowType(id=wftids[WorkflowTypeId.onix]),
         extra={"date_format": "%Y%m%d", "date_regex": "\\d{8}"},
         tags=None,
     )
-    workflow_info["UoMP ONIX Telescope"] = Workflow(
-        name="UoMP ONIX Telescope",
+    name="UoMP ONIX Telescope"
+    workflow_info[name] = Workflow(
+        name=name,
         organisation=Organisation(id=orgids["University of Michigan Press"]),
         workflow_type=WorkflowType(id=wftids[WorkflowTypeId.onix]),
         extra={"date_format": "%Y%m%d", "date_regex": "\\d{8}"},
         tags=None,
     )
-    workflow_info["ANU Press Google Analytics Telescope"] = Workflow(
-        name="ANU Press Google Analytics Telescope",
+    name="ANU Press Google Analytics Telescope"
+    workflow_info[name] = Workflow(
+        name=name,
         organisation=Organisation(id=orgids["ANU Press"]),
         workflow_type=WorkflowType(id=wftids[WorkflowTypeId.google_analytics]),
         extra={"pagepath_regex": "", "view_id": "1422597"},
         tags='["oaebu"]',
     )
-    workflow_info["ANU Press Google Books Telescope"] = Workflow(
-        name="ANU Press Google Books Telescope",
+    name="ANU Press Google Books Telescope"
+    workflow_info[name] = Workflow(
+        name=name,
         organisation=Organisation(id=orgids["ANU Press"]),
         workflow_type=WorkflowType(id=wftids[WorkflowTypeId.google_books]),
         extra={},
         tags='["oaebu"]',
     )
-    workflow_info["UCL Press Google Books Telescope"] = Workflow(
-        name="UCL Press Google Books Telescope",
+    name="UCL Press Google Books Telescope"
+    workflow_info[name] = Workflow(
+        name=name,
         organisation=Organisation(id=orgids["UCL Press"]),
         workflow_type=WorkflowType(id=wftids["google_books"]),
         extra={},
         tags='["oaebu"]',
     )
-    workflow_info["UoMP Google Books Telescope"] = Workflow(
-        name="UoMP Google Books Telescope",
+    name="UoMP Google Books Telescope"
+    workflow_info[name] = Workflow(
+        name=name,
         organisation=Organisation(id=orgids["University of Michigan Press"]),
         workflow_type=WorkflowType(id=wftids[WorkflowTypeId.google_books]),
         extra={},
         tags='["oaebu"]',
     )
-    workflow_info["ANU Press JSTOR Telescope"] = Workflow(
-        name="ANU Press JSTOR Telescope",
+    name="ANU Press JSTOR Telescope"
+    workflow_info[name] = Workflow(
+        name=name,
         organisation=Organisation(id=orgids["ANU Press"]),
         workflow_type=WorkflowType(id=wftids[WorkflowTypeId.jstor]),
         extra={"publisher_id": "anupress"},
         tags='["oaebu"]',
     )
-    workflow_info["UoMP JSTOR Telescope"] = Workflow(
-        name="UoMP JSTOR Telescope",
+    name="UoMP JSTOR Telescope"
+    workflow_info[name] = Workflow(
+        name=name,
         organisation=Organisation(id=orgids["University of Michigan Press"]),
         workflow_type=WorkflowType(id=wftids[WorkflowTypeId.jstor]),
         extra={"publisher_id": "universityofmichiganpress"},
         tags='["oaebu"]',
     )
-    workflow_info["UCL Press JSTOR Telescope"] = Workflow(
-        name="UCL Press JSTOR Telescope",
+    name="UCL Press JSTOR Telescope"
+    workflow_info[name] = Workflow(
+        name=name,
         organisation=Organisation(id=orgids["UCL Press"]),
         workflow_type=WorkflowType(id=wftids[WorkflowTypeId.jstor]),
         extra={"publisher_id": "uclpress"},
         tags='["oaebu"]',
     )
-    workflow_info["Wits Press JSTOR Telescope"] = Workflow(
-        name="Wits Press JSTOR Telescope",
+    name="Wits Press JSTOR Telescope"
+    workflow_info[name] = Workflow(
+        name=name,
         organisation=Organisation(id=orgids["Wits University Press"]),
         workflow_type=WorkflowType(id=wftids[WorkflowTypeId.jstor]),
         extra={"publisher_id": "witsup"},
         tags='["oaebu"]',
     )
-    workflow_info["UCL Press OAPEN IRUS-UK Telescope"] = Workflow(
-        name="UCL Press OAPEN IRUS-UK Telescope",
+    name="UCL Press OAPEN IRUS-UK Telescope"
+    workflow_info[name] = Workflow(
+        name=name,
         organisation=Organisation(id=orgids["UCL Press"]),
         workflow_type=WorkflowType(id=wftids[WorkflowTypeId.oapen_irus_uk]),
         extra={
@@ -136,8 +151,9 @@ def get_workflow_info(api: ObservatoryApi):
         },
         tags='["oaebu"]',
     )
-    workflow_info["ANU Press OAPEN IRUS-UK Telescope"] = Workflow(
-        name="ANU Press OAPEN IRUS-UK Telescope",
+    name="ANU Press OAPEN IRUS-UK Telescope"
+    workflow_info[name] = Workflow(
+        name=name,
         organisation=Organisation(id=orgids["ANU Press"]),
         workflow_type=WorkflowType(id=wftids[WorkflowTypeId.oapen_irus_uk]),
         extra={
@@ -146,8 +162,9 @@ def get_workflow_info(api: ObservatoryApi):
         },
         tags='["oaebu"]',
     )
-    workflow_info["UoMP OAPEN IRUS-UK Telescope"] = Workflow(
-        name="UoMP OAPEN IRUS-UK Telescope",
+    name="UoMP OAPEN IRUS-UK Telescope"
+    workflow_info[name] = Workflow(
+        name=name,
         organisation=Organisation(id=orgids["University of Michigan Press"]),
         workflow_type=WorkflowType(id=wftids[WorkflowTypeId.oapen_irus_uk]),
         extra={
@@ -156,8 +173,9 @@ def get_workflow_info(api: ObservatoryApi):
         },
         tags='["oaebu"]',
     )
-    workflow_info["OAPEN Press OAPEN IRUS-UK Telescope"] = Workflow(
-        name="OAPEN Press OAPEN IRUS-UK Telescope",
+    name="OAPEN Press OAPEN IRUS-UK Telescope"
+    workflow_info[name] = Workflow(
+        name=name,
         organisation=Organisation(id=orgids["OAPEN Press"]),
         workflow_type=WorkflowType(id=wftids[WorkflowTypeId.oapen_irus_uk]),
         extra={
@@ -166,8 +184,9 @@ def get_workflow_info(api: ObservatoryApi):
         },
         tags='["oaebu"]',
     )
-    workflow_info["Wits Press OAPEN IRUS-UK Telescope"] = Workflow(
-        name="Wits Press OAPEN IRUS-UK Telescope",
+    name="Wits Press OAPEN IRUS-UK Telescope"
+    workflow_info[name] = Workflow(
+        name=name,
         organisation=Organisation(id=orgids["Wits University Press"]),
         workflow_type=WorkflowType(id=wftids["oapen_irus_uk"]),
         extra={
@@ -176,43 +195,49 @@ def get_workflow_info(api: ObservatoryApi):
         },
         tags='["oaebu"]',
     )
-    workflow_info["UCL Press UCL Discovery Telescope"] = Workflow(
-        name="UCL Press UCL Discovery Telescope",
+    name="UCL Press UCL Discovery Telescope"
+    workflow_info[name] = Workflow(
+        name=name,
         organisation=Organisation(id=orgids["UCL Press"]),
         workflow_type=WorkflowType(id=wftids[WorkflowTypeId.ucl_discovery]),
         extra={},
         tags='["oaebu"]',
     )
-    workflow_info["ANU Press ONIX Workflow"] = Workflow(
-        name="ANU Press ONIX Workflow",
+    name="ANU Press ONIX Workflow"
+    workflow_info[name] = Workflow(
+        name=name,
         organisation=Organisation(id=orgids["ANU Press"]),
         workflow_type=WorkflowType(id=wftids[WorkflowTypeId.onix_workflow]),
         extra={},
         tags='["oaebu"]',
     )
-    workflow_info["UCL Press ONIX Workflow"] = Workflow(
-        name="UCL Press ONIX Workflow",
+    name="UCL Press ONIX Workflow"
+    workflow_info[name] = Workflow(
+        name=name,
         organisation=Organisation(id=orgids["UCL Press"]),
         workflow_type=WorkflowType(id=wftids[WorkflowTypeId.onix_workflow]),
         extra={},
         tags='["oaebu"]',
     )
-    workflow_info["Wits Press ONIX Workflow"] = Workflow(
-        name="Wits Press ONIX Workflow",
+    name="Wits Press ONIX Workflow"
+    workflow_info[name] = Workflow(
+        name=name,
         organisation=Organisation(id=orgids["Wits University Press"]),
         workflow_type=WorkflowType(id=wftids[WorkflowTypeId.onix_workflow]),
         extra={},
         tags='["oaebu"]',
     )
-    workflow_info["UoMP ONIX Workflow"] = Workflow(
-        name="UoMP ONIX Workflow",
+    name="UoMP ONIX Workflow"
+    workflow_info[name] = Workflow(
+        name=name,
         organisation=Organisation(id=orgids["University of Michigan Press"]),
         workflow_type=WorkflowType(id=wftids[WorkflowTypeId.onix_workflow]),
         extra={},
         tags='["oaebu"]',
     )
-    workflow_info["OAPEN Workflow"] = Workflow(
-        name="OAPEN Workflow",
+    name="OAPEN Workflow"
+    workflow_info[name] = Workflow(
+        name=name,
         organisation=Organisation(id=orgids["OAPEN Press"]),
         workflow_type=WorkflowType(id=wftids[WorkflowTypeId.onix_workflow]),
         extra={},
