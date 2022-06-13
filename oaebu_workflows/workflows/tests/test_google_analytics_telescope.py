@@ -265,16 +265,8 @@ class TestGoogleAnalyticsTelescope(ObservatoryTestCase):
                             "start_date": "2022-06-01",
                             "end_date": "2022-06-30",
                             "average_time": 49.6,
-                            "unique_views": {
-                                "country": [{"name": "country 1", "value": 1}],
-                                "referrer": [{"name": "referrer 1", "value": 1}],
-                                "social_network": [{"name": "social_network 1", "value": 1}],
-                            },
-                            "page_views": {
-                                "country": [{"name": "country 1", "value": 3}],
-                                "referrer": [{"name": "referrer 1", "value": 3}],
-                                "social_network": [{"name": "social_network 1", "value": 3}],
-                            },
+                            "unique_views": {"country": [], "referrer": [], "social_network": []},
+                            "page_views": {"country": [], "referrer": [], "social_network": []},
                             "sessions": {"country": [], "source": []},
                             "release_date": "2022-06-30",
                         },
@@ -447,16 +439,8 @@ class TestGoogleAnalyticsTelescope(ObservatoryTestCase):
                             "start_date": "2022-06-01",
                             "end_date": "2022-06-30",
                             "average_time": 49.6,
-                            "unique_views": {
-                                "country": [{"name": "country 1", "value": 1}],
-                                "referrer": [{"name": "referrer 1", "value": 1}],
-                                "social_network": [{"name": "social_network 1", "value": 1}],
-                            },
-                            "page_views": {
-                                "country": [{"name": "country 1", "value": 3}],
-                                "referrer": [{"name": "referrer 1", "value": 3}],
-                                "social_network": [{"name": "social_network 1", "value": 3}],
-                            },
+                            "unique_views": {"country": [], "referrer": [], "social_network": []},
+                            "page_views": {"country": [], "referrer": [], "social_network": []},
                             "sessions": {"country": [], "source": []},
                             "publication_id": "1234567891234",
                             "publication_type": "book",
@@ -646,7 +630,7 @@ def create_http_mock_sequence(organisation_name: str) -> list:
                             },
                             {
                                 "dimensions": ["/base/path/833557", dimension + " 1"],
-                                "metrics": [{"values": ["1", "3", "0"]}],
+                                "metrics": [{"values": ["0", "0", "0"]}],  # Added a zero case for code coverage
                             },
                             {
                                 "dimensions": ["/base/path/833557?fbclid=123", dimension + " 2"],
