@@ -209,7 +209,7 @@ def get_workflow_info(api: ObservatoryApi):
         organisation=Organisation(id=orgids["ANU Press"]),
         workflow_type=WorkflowType(id=wftids[WorkflowTypeId.onix_workflow]),
         extra={},
-        tags='["oaebu"]',
+        tags=None,
     )
     name="UCL Press ONIX Workflow"
     workflow_info[name] = Workflow(
@@ -217,7 +217,7 @@ def get_workflow_info(api: ObservatoryApi):
         organisation=Organisation(id=orgids["UCL Press"]),
         workflow_type=WorkflowType(id=wftids[WorkflowTypeId.onix_workflow]),
         extra={},
-        tags='["oaebu"]',
+        tags=None,
     )
     name="Wits Press ONIX Workflow"
     workflow_info[name] = Workflow(
@@ -225,7 +225,7 @@ def get_workflow_info(api: ObservatoryApi):
         organisation=Organisation(id=orgids["Wits University Press"]),
         workflow_type=WorkflowType(id=wftids[WorkflowTypeId.onix_workflow]),
         extra={},
-        tags='["oaebu"]',
+        tags=None,
     )
     name="UoMP ONIX Workflow"
     workflow_info[name] = Workflow(
@@ -233,7 +233,7 @@ def get_workflow_info(api: ObservatoryApi):
         organisation=Organisation(id=orgids["University of Michigan Press"]),
         workflow_type=WorkflowType(id=wftids[WorkflowTypeId.onix_workflow]),
         extra={},
-        tags='["oaebu"]',
+        tags=None,
     )
     name="OAPEN Workflow"
     workflow_info[name] = Workflow(
@@ -241,7 +241,7 @@ def get_workflow_info(api: ObservatoryApi):
         organisation=Organisation(id=orgids["OAPEN Press"]),
         workflow_type=WorkflowType(id=wftids[WorkflowTypeId.onix_workflow]),
         extra={},
-        tags='["oaebu"]',
+        tags=None,
     )
     return workflow_info
 
