@@ -17,9 +17,10 @@
 
 
 from collections import OrderedDict
+
+from oaebu_workflows.api_type_ids import WorkflowTypeId
 from observatory.api.client.model.workflow_type import WorkflowType
 from observatory.api.utils import get_api_client, seed_workflow_type
-from oaebu_workflows.api_type_ids import WorkflowTypeId
 
 
 def get_workflow_type_info():

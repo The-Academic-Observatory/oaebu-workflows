@@ -17,17 +17,18 @@
 
 
 from collections import OrderedDict
+
+from oaebu_workflows.api_type_ids import DatasetTypeId
+from observatory.api.client.api.observatory_api import ObservatoryApi
 from observatory.api.client.model.dataset import Dataset
 from observatory.api.utils import get_api_client, get_workflows, seed_dataset, get_dataset_type
-from observatory.api.client.api.observatory_api import ObservatoryApi
-from oaebu_workflows.api_type_ids import DatasetTypeId
 
 
 def get_dataset_info(api: ObservatoryApi):
     workflows = get_workflows(api=api)
 
     dataset_info = OrderedDict()
-    name="DOAB Dataset"
+    name = "DOAB Dataset"
     dataset_info[name] = Dataset(
         name=name,
         service="google",
@@ -35,7 +36,7 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["DOAB Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.doab),
     )
-    name="OAPEN Metadata Dataset"
+    name = "OAPEN Metadata Dataset"
     dataset_info[name] = Dataset(
         name=name,
         service="google",
@@ -43,7 +44,7 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["OAPEN Metadata Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.oapen_metadata),
     )
-    name="ANU Press Onix Dataset"
+    name = "ANU Press Onix Dataset"
     dataset_info[name] = Dataset(
         name=name,
         service="google",
@@ -51,7 +52,7 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["ANU Press ONIX Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.onix),
     )
-    name="UCL Press Onix Dataset"
+    name = "UCL Press Onix Dataset"
     dataset_info[name] = Dataset(
         name=name,
         service="google",
@@ -59,15 +60,15 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["UCL Press ONIX Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.onix),
     )
-    name="Wits Press Onix Dataset"
+    name = "Wits Press Onix Dataset"
     dataset_info[name] = Dataset(
         name=name,
         service="google",
         address="oaebu-witts-press.onix.onix",
-        workflow=workflows["Witts University Press ONIX Telescope"],
+        workflow=workflows["Wits Press ONIX Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.onix),
     )
-    name="UoMP Onix Dataset"
+    name = "UoMP Onix Dataset"
     dataset_info[name] = Dataset(
         name=name,
         service="google",
@@ -75,7 +76,7 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["UoMP ONIX Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.onix),
     )
-    name="ANU Press Google Analytics Dataset"
+    name = "ANU Press Google Analytics Dataset"
     dataset_info[name] = Dataset(
         name=name,
         service="google",
@@ -83,7 +84,7 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["ANU Press Google Analytics Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.google_analytics),
     )
-    name="ANU Press Google Books Sales Dataset"
+    name = "ANU Press Google Books Sales Dataset"
     dataset_info[name] = Dataset(
         name=name,
         service="google",
@@ -91,7 +92,7 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["ANU Press Google Books Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.google_books_sales),
     )
-    name="ANU Press Google Books Traffic Dataset"
+    name = "ANU Press Google Books Traffic Dataset"
     dataset_info[name] = Dataset(
         name=name,
         service="google",
@@ -99,7 +100,7 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["ANU Press Google Books Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.google_books_traffic),
     )
-    name="UCL Press Google Books Sales Dataset"
+    name = "UCL Press Google Books Sales Dataset"
     dataset_info[name] = Dataset(
         name=name,
         service="google",
@@ -107,7 +108,7 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["UCL Press Google Books Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.google_books_sales),
     )
-    name="UCL Press Google Books Traffic Dataset"
+    name = "UCL Press Google Books Traffic Dataset"
     dataset_info[name] = Dataset(
         name=name,
         service="google",
@@ -115,7 +116,7 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["UCL Press Google Books Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.google_books_traffic),
     )
-    name="UoMP Google Books Sales Dataset"
+    name = "UoMP Google Books Sales Dataset"
     dataset_info[name] = Dataset(
         name=name,
         service="google",
@@ -123,7 +124,7 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["UoMP Google Books Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.google_books_sales),
     )
-    name="UoMP Google Books Traffic Dataset"
+    name = "UoMP Google Books Traffic Dataset"
     dataset_info[name] = Dataset(
         name=name,
         service="google",
@@ -131,7 +132,7 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["UoMP Google Books Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.google_books_traffic),
     )
-    name="ANU Press JSTOR Country Dataset"
+    name = "ANU Press JSTOR Country Dataset"
     dataset_info[name] = Dataset(
         name=name,
         service="google",
@@ -139,7 +140,7 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["ANU Press JSTOR Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.jstor_country),
     )
-    name="ANU Press JSTOR Institution Dataset"
+    name = "ANU Press JSTOR Institution Dataset"
     dataset_info[name] = Dataset(
         name=name,
         service="google",
@@ -147,7 +148,7 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["ANU Press JSTOR Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.jstor_institution),
     )
-    name="UoMP JSTOR Country Dataset"
+    name = "UoMP JSTOR Country Dataset"
     dataset_info[name] = Dataset(
         name=name,
         service="google",
@@ -155,7 +156,7 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["UoMP JSTOR Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.jstor_country),
     )
-    name="UoMP JSTOR Institution Dataset"
+    name = "UoMP JSTOR Institution Dataset"
     dataset_info[name] = Dataset(
         name=name,
         service="google",
@@ -163,7 +164,7 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["UoMP JSTOR Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.jstor_institution),
     )
-    name="UCL Press JSTOR Country Dataset"
+    name = "UCL Press JSTOR Country Dataset"
     dataset_info[name] = Dataset(
         name=name,
         service="google",
@@ -171,7 +172,7 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["UCL Press JSTOR Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.jstor_country),
     )
-    name="UCL Press JSTOR Institution Dataset"
+    name = "UCL Press JSTOR Institution Dataset"
     dataset_info[name] = Dataset(
         name=name,
         service="google",
@@ -179,7 +180,7 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["UCL Press JSTOR Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.jstor_institution),
     )
-    name="Wits Press JSTOR Country Dataset"
+    name = "Wits Press JSTOR Country Dataset"
     dataset_info[name] = Dataset(
         name=name,
         service="google",
@@ -187,7 +188,7 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["Wits Press JSTOR Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.jstor_country),
     )
-    name="Wits Press JSTOR Institution Dataset"
+    name = "Wits Press JSTOR Institution Dataset"
     dataset_info[name] = Dataset(
         name=name,
         service="google",
@@ -195,7 +196,7 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["Wits Press JSTOR Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.jstor_institution),
     )
-    name="UCL Press OAPEN IRUS UK Dataset"
+    name = "UCL Press OAPEN IRUS UK Dataset"
     dataset_info[name] = Dataset(
         name=name,
         service="google",
@@ -203,7 +204,7 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["UCL Press OAPEN IRUS-UK Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.oapen_irus_uk),
     )
-    name="ANU Press OAPEN IRUS UK Dataset"
+    name = "ANU Press OAPEN IRUS UK Dataset"
     dataset_info[name] = Dataset(
         name=name,
         service="google",
@@ -211,7 +212,7 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["ANU Press OAPEN IRUS-UK Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.oapen_irus_uk),
     )
-    name="UoMP OAPEN IRUS UK Dataset"
+    name = "UoMP OAPEN IRUS UK Dataset"
     dataset_info[name] = Dataset(
         name=name,
         service="google",
@@ -219,7 +220,7 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["UoMP OAPEN IRUS-UK Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.oapen_irus_uk),
     )
-    name="OAPEN Press OAPEN IRUS UK Dataset"
+    name = "OAPEN Press OAPEN IRUS UK Dataset"
     dataset_info[name] = Dataset(
         name=name,
         service="google",
@@ -227,7 +228,7 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["OAPEN Press OAPEN IRUS-UK Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.oapen_irus_uk),
     )
-    name="Wits Press OAPEN IRUS UK Dataset"
+    name = "Wits Press OAPEN IRUS UK Dataset"
     dataset_info[name] = Dataset(
         name=name,
         service="google",
@@ -235,7 +236,7 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["Wits Press OAPEN IRUS-UK Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.oapen_irus_uk),
     )
-    name="UCL Press UCL Discovery Dataset"
+    name = "UCL Press UCL Discovery Dataset"
     dataset_info[name] = Dataset(
         name=name,
         service="google",
@@ -243,7 +244,7 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["UCL Press UCL Discovery Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.ucl_discovery),
     )
-    name="ANU Press ONIX Workflow Dataset"
+    name = "ANU Press ONIX Workflow Dataset"
     dataset_info[name] = Dataset(
         name=name,
         service="google",
@@ -251,7 +252,7 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["ANU Press ONIX Workflow"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.onix_workflow),
     )
-    name="UCL Press ONIX Workflow Dataset"
+    name = "UCL Press ONIX Workflow Dataset"
     dataset_info[name] = Dataset(
         name="UCL Press ONIX Workflow Dataset",
         service="google",
@@ -259,7 +260,7 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["UCL Press ONIX Workflow"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.onix_workflow),
     )
-    name="Wits Press ONIX Workflow Dataset"
+    name = "Wits Press ONIX Workflow Dataset"
     dataset_info[name] = Dataset(
         name=name,
         service="google",
@@ -267,7 +268,7 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["Wits Press ONIX Workflow"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.onix_workflow),
     )
-    name="UoMP ONIX Workflow Dataset"
+    name = "UoMP ONIX Workflow Dataset"
     dataset_info[name] = Dataset(
         name=name,
         service="google",
@@ -275,7 +276,7 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["UoMP ONIX Workflow"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.onix_workflow),
     )
-    name="OAPEN Workflow Dataset"
+    name = "OAPEN Workflow Dataset"
     dataset_info[name] = Dataset(
         name=name,
         service="google",
