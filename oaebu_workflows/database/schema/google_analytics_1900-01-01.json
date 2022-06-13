@@ -99,6 +99,74 @@
   },
   {
     "mode": "NULLABLE",
+    "name": "page_views",
+    "type": "RECORD",
+    "description": "The total number of pageviews for the property",
+    "fields": [
+      {
+        "mode": "REPEATED",
+        "name": "country",
+        "type": "RECORD",
+        "description": "Page views per users' country, derived from their IP addresses or Geographical IDs.",
+        "fields": [
+          {
+            "mode": "NULLABLE",
+            "name": "name",
+            "type": "STRING",
+            "description": "Country name."
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "value",
+            "type": "INTEGER",
+            "description": "Number of page views."
+          }
+        ]
+      },
+      {
+        "mode": "REPEATED",
+        "name": "referrer",
+        "type": "RECORD",
+        "description": "Page views per referrer, the full referring URL including the hostname and path.",
+        "fields": [
+          {
+            "mode": "NULLABLE",
+            "name": "name",
+            "type": "STRING",
+            "description": "Referrer name."
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "value",
+            "type": "INTEGER",
+            "description": "Number of page views."
+          }
+        ]
+      },
+      {
+        "mode": "REPEATED",
+        "name": "social_network",
+        "type": "RECORD",
+        "description": "Page views per social network. This is related to the referring social network for traffic sources; e.g., Google+, Blogger.",
+        "fields": [
+          {
+            "mode": "NULLABLE",
+            "name": "name",
+            "type": "STRING",
+            "description": "Social network name."
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "value",
+            "type": "INTEGER",
+            "description": "Number of page views."
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "mode": "NULLABLE",
     "name": "sessions",
     "type": "RECORD",
     "description": "Total number of sessions for several different dimensions.",
