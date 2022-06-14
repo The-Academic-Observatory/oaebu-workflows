@@ -29,7 +29,7 @@ SELECT
     count(ISBN13) as unique_books,
     month.month,
     STRUCT(
-        group_counts(ARRAY_CONCAT_AGG(month.google_analytics.unique_views_country)) as unique_views,
+        group_counts(ARRAY_CONCAT_AGG(month.google_analytics.views_total_country)) as page_views,
         group_counts(ARRAY_CONCAT_AGG(month.google_analytics.downloads_total_country)) as downloads,
         group_counts(ARRAY_CONCAT_AGG(month.google_analytics.downloads_pdf_book_country)) as downloads_pdf_book,
         group_counts(ARRAY_CONCAT_AGG(month.google_analytics.downloads_pdf_chapter_country)) as downloads_pdf_chapter,
