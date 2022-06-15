@@ -34,6 +34,7 @@ from observatory.platform.utils.test_utils import (
     Table,
     bq_load_tables,
     make_dummy_dag,
+    find_free_port,
 )
 from observatory.platform.utils.workflow_utils import (
     make_dag_id,
@@ -160,7 +161,7 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
 
         # API environment
         self.host = "localhost"
-        self.port = 5001
+        self.port = find_free_port()
         configuration = Configuration(host=f"http://{self.host}:{self.port}")
         api_client = ApiClient(configuration)
         self.api = ObservatoryApi(api_client=api_client)  # noqa: E501

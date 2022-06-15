@@ -36,6 +36,7 @@ from observatory.platform.utils.test_utils import (
     ObservatoryEnvironment,
     ObservatoryTestCase,
     module_file_path,
+    find_free_port,
 )
 from observatory.platform.utils.workflow_utils import (
     blob_name,
@@ -79,7 +80,7 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
 
         # API environment
         self.host = "localhost"
-        self.port = 5001
+        self.port = find_free_port()
         configuration = Configuration(host=f"http://{self.host}:{self.port}")
         api_client = ApiClient(configuration)
         self.api = ObservatoryApi(api_client=api_client)  # noqa: E501
