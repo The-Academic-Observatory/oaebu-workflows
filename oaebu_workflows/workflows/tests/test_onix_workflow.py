@@ -1944,7 +1944,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
         env = ObservatoryEnvironment(self.gcp_project_id, self.data_location, api_host=self.host, api_port=self.port)
 
         # Create datasets
-        partner_release_date = pendulum.datetime(2021, 1, 1)
+        partner_release_date = pendulum.datetime(2022, 6, 13)
         onix_dataset_id = env.add_dataset(prefix="onix")
         oaebu_data_qa_dataset_id = env.add_dataset(prefix="oaebu_data_qa")
         onix_workflow_dataset_id = env.add_dataset(prefix="onix_workflow")
