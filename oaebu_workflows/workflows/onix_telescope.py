@@ -44,6 +44,7 @@ from observatory.platform.workflows.snapshot_telescope import (
     SnapshotRelease,
     SnapshotTelescope,
 )
+from oaebu_workflows.dag_tag import Tag
 
 
 class OnixRelease(SnapshotRelease):
@@ -282,6 +283,7 @@ class OnixTelescope(SnapshotTelescope):
             airflow_vars=airflow_vars,
             airflow_conns=airflow_conns,
             workflow_id=workflow_id,
+            tags=[Tag.oaebu],
         )
 
         # self.organisation = organisation

@@ -45,6 +45,7 @@ from observatory.platform.utils.url_utils import get_user_agent
 from observatory.platform.utils.workflow_utils import SubFolder, workflow_path
 from observatory.platform.utils.workflow_utils import add_partition_date, convert, make_dag_id
 from observatory.platform.workflows.organisation_telescope import OrganisationRelease, OrganisationTelescope
+from oaebu_workflows.dag_tag import Tag
 
 
 class JstorRelease(OrganisationRelease):
@@ -214,6 +215,7 @@ class JstorTelescope(OrganisationTelescope):
             airflow_conns=airflow_conns,
             max_active_runs=max_active_runs,
             workflow_id=workflow_id,
+            tags=[Tag.oaebu],
         )
         self.publisher_id = publisher_id
 

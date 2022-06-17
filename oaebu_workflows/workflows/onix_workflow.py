@@ -56,6 +56,8 @@ from observatory.platform.utils.workflow_utils import (
 from observatory.platform.workflows.workflow import AbstractRelease, Workflow
 from observatory.platform.utils.api import make_observatory_api
 from oaebu_workflows.seed.dataset_type_info import get_dataset_type_info
+from oaebu_workflows.dag_tag import Tag
+
 
 class OnixWorkflowRelease(AbstractRelease):
     """
@@ -284,6 +286,7 @@ class OnixWorkflow(Workflow):
             schedule_interval=schedule_interval,
             catchup=catchup,
             workflow_id=workflow_id,
+            tags=[Tag.oaebu],
         )
 
         # Wait for data partner workflows to finish
@@ -725,8 +728,12 @@ class OnixWorkflow(Workflow):
             include_jstor=self.dataset_type_info["jstor_country"].type_id in data_partner_datasets,
             include_oapen=self.dataset_type_info["oapen_irus_uk"].type_id in data_partner_datasets,
             include_ucl=self.dataset_type_info["ucl_discovery"].type_id in data_partner_datasets,
-            google_analytics_dataset=data_partner_datasets.get(self.dataset_type_info["google_analytics"].type_id, None),
-            google_books_dataset=data_partner_datasets.get(self.dataset_type_info["google_books_traffic"].type_id, None),
+            google_analytics_dataset=data_partner_datasets.get(
+                self.dataset_type_info["google_analytics"].type_id, None
+            ),
+            google_books_dataset=data_partner_datasets.get(
+                self.dataset_type_info["google_books_traffic"].type_id, None
+            ),
             jstor_dataset=data_partner_datasets.get(self.dataset_type_info["jstor_country"].type_id, None),
             oapen_dataset=data_partner_datasets.get(self.dataset_type_info["oapen_irus_uk"].type_id, None),
             ucl_dataset=data_partner_datasets.get(self.dataset_type_info["ucl_discovery"].type_id, None),

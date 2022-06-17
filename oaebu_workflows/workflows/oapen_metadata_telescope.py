@@ -35,6 +35,7 @@ from observatory.platform.workflows.stream_telescope import (
     StreamRelease,
     StreamTelescope,
 )
+from oaebu_workflows.dag_tag import Tag
 
 
 class OapenMetadataRelease(StreamRelease):
@@ -192,6 +193,7 @@ class OapenMetadataTelescope(StreamTelescope):
             workflow_id=workflow_id,
             dataset_type_id=dataset_type_id,
             load_bigquery_table_kwargs={"ignore_unknown_values": True},
+            tags=[Tag.oaebu],
         )
 
         self.add_setup_task(self.check_dependencies)
