@@ -45,6 +45,7 @@ from observatory.platform.utils.test_utils import (
     ObservatoryTestCase,
     module_file_path,
     random_id,
+    find_free_port,
 )
 from observatory.platform.utils.workflow_utils import blob_name, table_ids_from_path
 from requests import Response
@@ -90,13 +91,13 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
             "publisher_uuid_v5": "df73bf94-b818-494c-a8dd-6775b0573bc2",
         }
         self.host = "localhost"
-        self.api_port = 5000
+        self.api_port = find_free_port()
         self.download_path = test_fixtures_folder("oapen_irus_uk", "download.jsonl.gz")
         self.transform_hash = "0b111b2f"
 
         # API environment
         self.host = "localhost"
-        self.port = 5001
+        self.port = find_free_port()
         configuration = Configuration(host=f"http://{self.host}:{self.port}")
         api_client = ApiClient(configuration)
         self.api = ObservatoryApi(api_client=api_client)  # noqa: E501

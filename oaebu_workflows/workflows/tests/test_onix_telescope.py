@@ -30,6 +30,7 @@ from observatory.platform.utils.test_utils import (
     ObservatoryTestCase,
     SftpServer,
     module_file_path,
+    find_free_port,
 )
 from observatory.platform.utils.workflow_utils import (
     SftpFolders,
@@ -64,8 +65,8 @@ class TestOnixTelescope(ObservatoryTestCase):
 
         super(TestOnixTelescope, self).__init__(*args, **kwargs)
         self.host = "localhost"
-        self.api_port = 5000
-        self.sftp_port = 3373
+        self.api_port = find_free_port()
+        self.sftp_port = find_free_port()
         self.project_id = os.getenv("TEST_GCP_PROJECT_ID")
         self.data_location = os.getenv("TEST_GCP_DATA_LOCATION")
         self.organisation_name = "Curtin Press"
@@ -76,7 +77,7 @@ class TestOnixTelescope(ObservatoryTestCase):
 
         # API environment
         self.host = "localhost"
-        self.port = 5001
+        self.port = find_free_port()
         configuration = Configuration(host=f"http://{self.host}:{self.port}")
         api_client = ApiClient(configuration)
         self.api = ObservatoryApi(api_client=api_client)  # noqa: E501

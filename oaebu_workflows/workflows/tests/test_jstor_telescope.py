@@ -31,7 +31,12 @@ from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.workflows.jstor_telescope import JstorRelease, JstorTelescope, get_label_id, get_release_date
 from observatory.api.client.model.organisation import Organisation
 from observatory.platform.utils.airflow_utils import AirflowConns
-from observatory.platform.utils.test_utils import ObservatoryEnvironment, ObservatoryTestCase, module_file_path
+from observatory.platform.utils.test_utils import (
+    ObservatoryEnvironment,
+    ObservatoryTestCase,
+    module_file_path,
+    find_free_port,
+)
 from observatory.platform.utils.workflow_utils import blob_name, table_ids_from_path
 from observatory.api.testing import ObservatoryApiEnvironment
 from observatory.api.client import ApiClient, Configuration
@@ -63,7 +68,7 @@ class TestJstorTelescope(ObservatoryTestCase):
         self.organisation_name = "ANU Press"
         self.extra = {"publisher_id": "anupress"}
         self.host = "localhost"
-        self.api_port = 5000
+        self.api_port = find_free_port()
 
         self.release_date = pendulum.parse("20210301").end_of("month")
         publisher_id = self.extra.get("publisher_id")
@@ -100,7 +105,7 @@ class TestJstorTelescope(ObservatoryTestCase):
 
         # API environment
         self.host = "localhost"
-        self.port = 5001
+        self.port = find_free_port()
         configuration = Configuration(host=f"http://{self.host}:{self.port}")
         api_client = ApiClient(configuration)
         self.api = ObservatoryApi(api_client=api_client)  # noqa: E501
