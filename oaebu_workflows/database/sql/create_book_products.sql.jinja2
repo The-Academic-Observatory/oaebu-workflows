@@ -771,11 +771,18 @@ metrics as (
     LEFT JOIN oapen_irus_uk_metrics as oapen_irus_uk ON ebook_months.ISBN13 = oapen_irus_uk.ISBN13 AND ebook_months.release_date = oapen_irus_uk.release_date
     LEFT JOIN ucl_discovery_metrics as ucl_discovery ON ebook_months.ISBN13 = ucl_discovery.ISBN13 AND ebook_months.release_date = ucl_discovery.release_date
     LEFT JOIN crossref_events as crossref_events ON ebook_months.ISBN13 = crossref_events.ISBN13 AND ebook_months.release_date = crossref_events.release_date
-    WHERE crossref_events.metrics IS NOT NULL OR google_books_sales.metrics IS NOT NULL OR google_books_traffic.metrics IS NOT NULL OR jstor_country.metrics IS NOT NULL OR jstor_institution.metrics is not null OR oapen_irus_uk.metrics IS NOT NULL
+    WHERE google_analytics.metrics IS NOT NULL 
+    OR google_books_sales.metrics IS NOT NULL 
+    OR google_books_traffic.metrics IS NOT NULL 
+    OR jstor_country.metrics IS NOT NULL 
+    OR jstor_institution.metrics IS NOT NULL
+    OR oapen_irus_uk.metrics IS NOT NULL 
+    OR ucl_discovery.metrics IS NOT NULL
+    OR crossref_events.metrics IS NOT NULL 
     GROUP BY ebook_months.ISBN13
 )
 
-# Main Querry
+# Main Query
 {#
 The purpose of this query is to bring together a range of individual sources as compose them into the final query output.
 
