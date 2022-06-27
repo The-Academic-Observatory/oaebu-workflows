@@ -576,23 +576,23 @@ class OnixWorkflow(Workflow):
         :param data_partners: List of oaebu partner data.
         """
 
-        for data in data_partners:
+        with self.parallel_tasks():
+            for data in data_partners:
+                fn = partial(
+                    self.create_oaebu_intermediate_table,
+                    orig_project_id=data.gcp_project_id,
+                    orig_dataset=data.gcp_dataset_id,
+                    orig_table=data.gcp_table_id,
+                    orig_isbn=data.isbn_field_name,
+                    sharded=data.sharded,
+                )
 
-            fn = partial(
-                self.create_oaebu_intermediate_table,
-                orig_project_id=data.gcp_project_id,
-                orig_dataset=data.gcp_dataset_id,
-                orig_table=data.gcp_table_id,
-                orig_isbn=data.isbn_field_name,
-                sharded=data.sharded,
-            )
+                # Populate the __name__ attribute of the partial object (it lacks one by default).
+                # Scheme: create_oaebu_intermediate_table.dataset.table
+                update_wrapper(fn, self.create_oaebu_intermediate_table)
+                fn.__name__ += f".{data.gcp_dataset_id}.{data.gcp_table_id}"
 
-            # Populate the __name__ attribute of the partial object (it lacks one by default).
-            # Scheme: create_oaebu_intermediate_table.dataset.table
-            update_wrapper(fn, self.create_oaebu_intermediate_table)
-            fn.__name__ += f".{data.gcp_dataset_id}.{data.gcp_table_id}"
-
-            self.add_task(fn)
+                self.add_task(fn)
 
     def create_oaebu_book_product_table(
         self,
@@ -943,18 +943,19 @@ class OnixWorkflow(Workflow):
         ]
 
         # Create each export table in BiqQuery
-        for export_table in export_tables:
-            fn = partial(
-                self.export_oaebu_table,
-                output_table=export_table["output_table"],
-                query_template=export_table["query_template"],
-            )
+        with self.parallel_tasks():
+            for export_table in export_tables:
+                fn = partial(
+                    self.export_oaebu_table,
+                    output_table=export_table["output_table"],
+                    query_template=export_table["query_template"],
+                )
 
-            # Populate the __name__ attribute of the partial object (it lacks one by default).
-            update_wrapper(fn, self.export_oaebu_table)
-            fn.__name__ += f".{export_table['output_table']}"
+                # Populate the __name__ attribute of the partial object (it lacks one by default).
+                update_wrapper(fn, self.export_oaebu_table)
+                fn.__name__ += f".{export_table['output_table']}"
 
-            self.add_task(fn)
+                self.add_task(fn)
 
         # Export QA Metrics
         data_partner_tables = {data.dataset_type_id: data.gcp_table_id for data in data_partners}
@@ -990,25 +991,26 @@ class OnixWorkflow(Workflow):
         :param data_partners: List of oaebu partner data.
         """
 
-        self.create_oaebu_data_qa_onix()
+        with self.parallel_tasks():
+            self.create_oaebu_data_qa_onix()
 
-        for data_partner in data_partners:
+            for data_partner in data_partners:
 
-            if (
-                data_partner.dataset_type_id == self.dataset_type_info["jstor_country"].type_id
-                or data_partner.dataset_type_id == self.dataset_type_info["jstor_institution"].type_id
-            ):
-                self.create_oaebu_data_qa_jstor_tasks(data_partner)
-            elif data_partner.dataset_type_id == self.dataset_type_info["oapen_irus_uk"].type_id:
-                self.create_oaebu_data_qa_oapen_irus_uk_tasks(data_partner)
-            elif data_partner.dataset_type_id == self.dataset_type_info["google_books_sales"].type_id:
-                self.create_oaebu_data_qa_google_books_sales_tasks(data_partner)
-            elif data_partner.dataset_type_id == self.dataset_type_info["google_books_traffic"].type_id:
-                self.create_oaebu_data_qa_google_books_traffic_tasks(data_partner)
-            elif data_partner.dataset_type_id == self.dataset_type_info["google_analytics"].type_id:
-                self.create_oaebu_data_qa_google_analytics_tasks(data_partner)
+                if (
+                    data_partner.dataset_type_id == self.dataset_type_info["jstor_country"].type_id
+                    or data_partner.dataset_type_id == self.dataset_type_info["jstor_institution"].type_id
+                ):
+                    self.create_oaebu_data_qa_jstor_tasks(data_partner)
+                elif data_partner.dataset_type_id == self.dataset_type_info["oapen_irus_uk"].type_id:
+                    self.create_oaebu_data_qa_oapen_irus_uk_tasks(data_partner)
+                elif data_partner.dataset_type_id == self.dataset_type_info["google_books_sales"].type_id:
+                    self.create_oaebu_data_qa_google_books_sales_tasks(data_partner)
+                elif data_partner.dataset_type_id == self.dataset_type_info["google_books_traffic"].type_id:
+                    self.create_oaebu_data_qa_google_books_traffic_tasks(data_partner)
+                elif data_partner.dataset_type_id == self.dataset_type_info["google_analytics"].type_id:
+                    self.create_oaebu_data_qa_google_analytics_tasks(data_partner)
 
-            self.create_oaebu_data_qa_intermediate_tasks(data_partner)
+                self.create_oaebu_data_qa_intermediate_tasks(data_partner)
 
     def create_oaebu_data_qa_onix(self, *args, **kwargs):
         """Create ONIX quality assurance metrics."""
