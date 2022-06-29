@@ -57,7 +57,7 @@ from observatory.platform.utils.test_utils import (
     bq_load_tables,
     make_dummy_dag,
     module_file_path,
-    find_free_port
+    find_free_port,
 )
 from observatory.platform.utils.test_utils import (
     random_id,
@@ -201,269 +201,281 @@ class TestOnixWorkflow(ObservatoryTestCase):
         dataset_type_info = get_dataset_type_info(self.api)
         seed_dataset_type(api=self.api, dataset_type_info=dataset_type_info)
 
-    @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
-    @patch("oaebu_workflows.workflows.onix_workflow.OnixWorkflow.make_release")
-    @patch("observatory.platform.utils.gc_utils.select_table_shard_dates")
-    def test_ctor_gen_dag_id(self, mock_sel_table_suffixes, mock_mr, mock_api):
-        mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
-        mock_api.return_value = self.api
-        
-        with self.env.create():
-            self.seed_db()
+        @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
+        @patch("oaebu_workflows.workflows.onix_workflow.OnixWorkflow.make_release")
+        @patch("observatory.platform.utils.gc_utils.select_table_shard_dates")
+        def test_ctor_gen_dag_id(self, mock_sel_table_suffixes, mock_mr, mock_api):
+            mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
+            mock_api.return_value = self.api
+
+            with self.env.create():
+                self.seed_db()
+                with CliRunner().isolated_filesystem():
+                    mock_mr.return_value = OnixWorkflowRelease(
+                        dag_id="onix_workflow_test",
+                        release_date=pendulum.datetime(2021, 1, 1),
+                        onix_release_date=pendulum.datetime(2021, 1, 1),
+                        gcp_project_id=self.telescope.organisation.project_id,
+                        gcp_bucket_name=self.bucket_name,
+                        onix_dataset_id="",
+                        onix_table_id="onix",
+                    )
+                    wf = OnixWorkflow(
+                        org_name=self.telescope.organisation.name,
+                        gcp_project_id=self.telescope.organisation.project_id,
+                        gcp_bucket_name=self.bucket_name,
+                    )
+
+                    release = wf.make_release(execution_date=pendulum.datetime(2021, 1, 1))
+                    self.assertEqual(wf.dag_id, "onix_workflow_test")
+                    self.assertEqual(
+                        release.workslookup_filename, "onix_workflow_test/20210101/onix_workid_isbn.jsonl.gz"
+                    )
+                    self.assertEqual(
+                        release.workslookup_errors_filename,
+                        "onix_workflow_test/20210101/onix_workid_isbn_errors.jsonl.gz",
+                    )
+                    self.assertEqual(
+                        release.worksfamilylookup_filename,
+                        "onix_workflow_test/20210101/onix_workfamilyid_isbn.jsonl.gz",
+                    )
+
+                    self.assertEqual(release.onix_table_id, "onix")
+                    self.assertEqual(release.release_date, pendulum.datetime(2021, 1, 1, 0, 0, 0, 0))
+                    self.assertEqual(release.project_id, "project_id")
+                    self.assertEqual(release.transform_bucket, "bucket_name")
+                    self.assertIsInstance(wf.operators[0][0], BaseSensorOperator)
+
+        @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
+        @patch("oaebu_workflows.workflows.onix_workflow.OnixWorkflow.make_release")
+        @patch("observatory.platform.utils.gc_utils.select_table_shard_dates")
+        def test_ctor_gen_assign_dag_id(self, mock_sel_table_suffixes, mock_mr, mock_api):
+            mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
+            mock_api.return_value = self.api
+
+            with self.env.create():
+                self.seed_db()
+                with CliRunner().isolated_filesystem():
+                    wf = OnixWorkflow(
+                        org_name=self.telescope.organisation.name,
+                        gcp_project_id=self.telescope.organisation.project_id,
+                        gcp_bucket_name=self.bucket_name,
+                        dag_id="dagid",
+                    )
+
+                    mock_mr.return_value = OnixWorkflowRelease(
+                        dag_id="dagid",
+                        release_date=pendulum.datetime(2021, 1, 1),
+                        onix_release_date=pendulum.datetime(2021, 1, 1),
+                        gcp_project_id=self.telescope.organisation.project_id,
+                        gcp_bucket_name=self.bucket_name,
+                        onix_dataset_id="",
+                        onix_table_id="onix",
+                    )
+
+                    release = wf.make_release(execution_date=pendulum.datetime(2021, 1, 1))
+
+                    self.assertEqual(release.dag_id, "dagid")
+                    self.assertEqual(release.workslookup_filename, "dagid/20210101/onix_workid_isbn.jsonl.gz")
+                    self.assertEqual(
+                        release.workslookup_errors_filename, "dagid/20210101/onix_workid_isbn_errors.jsonl.gz"
+                    )
+                    self.assertEqual(
+                        release.worksfamilylookup_filename, "dagid/20210101/onix_workfamilyid_isbn.jsonl.gz"
+                    )
+
+                    self.assertEqual(release.onix_table_id, "onix")
+                    self.assertEqual(release.release_date, pendulum.datetime(2021, 1, 1, 0, 0, 0, 0))
+                    self.assertEqual(release.project_id, "project_id")
+                    self.assertEqual(release.transform_bucket, "bucket_name")
+                    self.assertIsInstance(wf.operators[0][0], BaseSensorOperator)
+
+        @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
+        @patch("oaebu_workflows.workflows.onix_workflow.OnixWorkflow.make_release")
+        @patch("observatory.platform.utils.gc_utils.select_table_shard_dates")
+        def test_ctor(self, mock_sel_table_suffixes, mock_mr, mock_api):
+            mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
+            mock_api.return_value = self.api
+
+            with self.env.create():
+                self.seed_db()
+                with CliRunner().isolated_filesystem():
+                    wf = OnixWorkflow(
+                        org_name=self.telescope.organisation.name,
+                        gcp_project_id=self.telescope.organisation.project_id,
+                        gcp_bucket_name=self.bucket_name,
+                    )
+
+                    mock_mr.return_value = OnixWorkflowRelease(
+                        dag_id="onix_workflow_test",
+                        release_date=pendulum.datetime(2021, 1, 1),
+                        onix_release_date=pendulum.datetime(2021, 1, 1),
+                        gcp_project_id=self.telescope.organisation.project_id,
+                        gcp_bucket_name=self.bucket_name,
+                        onix_dataset_id="onix",
+                        onix_table_id="onix",
+                    )
+
+                    release = wf.make_release(execution_date=pendulum.datetime(2021, 1, 1))
+
+                    self.assertEqual(wf.dag_id, "onix_workflow_test")
+                    self.assertEqual(wf.org_name, "test")
+                    self.assertEqual(wf.gcp_bucket_name, "bucket_name")
+
+                    self.assertEqual(release.dag_id, "onix_workflow_test")
+                    self.assertEqual(release.release_date, pendulum.datetime(2021, 1, 1))
+                    self.assertEqual(release.transform_folder, "onix_workflow_test/20210101")
+                    self.assertEqual(release.worksid_table, "onix_workid_isbn")
+                    self.assertEqual(release.worksid_error_table, "onix_workid_isbn_errors")
+                    self.assertEqual(release.workfamilyid_table, "onix_workfamilyid_isbn")
+
+                    self.assertEqual(
+                        release.workslookup_filename, "onix_workflow_test/20210101/onix_workid_isbn.jsonl.gz"
+                    )
+                    self.assertEqual(
+                        release.workslookup_errors_filename,
+                        "onix_workflow_test/20210101/onix_workid_isbn_errors.jsonl.gz",
+                    )
+                    self.assertEqual(
+                        release.worksfamilylookup_filename,
+                        "onix_workflow_test/20210101/onix_workfamilyid_isbn.jsonl.gz",
+                    )
+
+                    self.assertEqual(release.workflow_dataset, "onix_workflow")
+                    self.assertEqual(release.project_id, "project_id")
+                    self.assertEqual(release.onix_dataset_id, "onix")
+                    self.assertEqual(release.dataset_location, "us")
+                    self.assertEqual(release.dataset_description, "ONIX workflow tables")
+
+                    self.assertEqual(release.onix_table_id, "onix")
+
+        @patch("oaebu_workflows.workflows.onix_workflow.OnixWorkflow.make_release")
+        @patch("observatory.platform.utils.gc_utils.select_table_shard_dates")
+        def test_ctor_dataset_overrides(self, mock_sel_table_suffixes, mock_mr):
+            mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
             with CliRunner().isolated_filesystem():
-                mock_mr.return_value = OnixWorkflowRelease(
-                    dag_id="onix_workflow_test",
-                    release_date=pendulum.datetime(2021, 1, 1),
-                    onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.project_id,
-                    gcp_bucket_name=self.bucket_name,
-                    onix_dataset_id="",
-                    onix_table_id="onix",
+                release = OnixWorkflowRelease(
+                    dag_id="dag",
+                    release_date=pendulum.datetime(2000, 1, 1),
+                    onix_release_date=pendulum.datetime(2000, 1, 1),
+                    gcp_project_id="project",
+                    gcp_bucket_name="bucket",
                 )
-                wf = OnixWorkflow(
-                    org_name=self.telescope.organisation.name,
-                    gcp_project_id=self.telescope.organisation.project_id,
-                    gcp_bucket_name=self.bucket_name,
-                )
-
-                release = wf.make_release(execution_date=pendulum.datetime(2021, 1, 1))
-                self.assertEqual(wf.dag_id, "onix_workflow_test")
-                self.assertEqual(release.workslookup_filename, "onix_workflow_test/20210101/onix_workid_isbn.jsonl.gz")
-                self.assertEqual(
-                    release.workslookup_errors_filename, "onix_workflow_test/20210101/onix_workid_isbn_errors.jsonl.gz"
-                )
-                self.assertEqual(
-                    release.worksfamilylookup_filename, "onix_workflow_test/20210101/onix_workfamilyid_isbn.jsonl.gz"
-                )
-
-                self.assertEqual(release.onix_table_id, "onix")
-                self.assertEqual(release.release_date, pendulum.datetime(2021, 1, 1, 0, 0, 0, 0))
-                self.assertEqual(release.project_id, "project_id")
-                self.assertEqual(release.transform_bucket, "bucket_name")
-                self.assertIsInstance(wf.operators[0][0], BaseSensorOperator)
-
-    @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
-    @patch("oaebu_workflows.workflows.onix_workflow.OnixWorkflow.make_release")
-    @patch("observatory.platform.utils.gc_utils.select_table_shard_dates")
-    def test_ctor_gen_assign_dag_id(self, mock_sel_table_suffixes, mock_mr, mock_api):
-        mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
-        mock_api.return_value = self.api
-        
-        with self.env.create():
-            self.seed_db()
-            with CliRunner().isolated_filesystem():
-                wf = OnixWorkflow(
-                    org_name=self.telescope.organisation.name,
-                    gcp_project_id=self.telescope.organisation.project_id,
-                    gcp_bucket_name=self.bucket_name,
-                    dag_id="dagid",
-                )
-
-                mock_mr.return_value = OnixWorkflowRelease(
-                    dag_id="dagid",
-                    release_date=pendulum.datetime(2021, 1, 1),
-                    onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.project_id,
-                    gcp_bucket_name=self.bucket_name,
-                    onix_dataset_id="",
-                    onix_table_id="onix",
-                )
-
-                release = wf.make_release(execution_date=pendulum.datetime(2021, 1, 1))
-
-                self.assertEqual(release.dag_id, "dagid")
-                self.assertEqual(release.workslookup_filename, "dagid/20210101/onix_workid_isbn.jsonl.gz")
-                self.assertEqual(release.workslookup_errors_filename, "dagid/20210101/onix_workid_isbn_errors.jsonl.gz")
-                self.assertEqual(release.worksfamilylookup_filename, "dagid/20210101/onix_workfamilyid_isbn.jsonl.gz")
-
-                self.assertEqual(release.onix_table_id, "onix")
-                self.assertEqual(release.release_date, pendulum.datetime(2021, 1, 1, 0, 0, 0, 0))
-                self.assertEqual(release.project_id, "project_id")
-                self.assertEqual(release.transform_bucket, "bucket_name")
-                self.assertIsInstance(wf.operators[0][0], BaseSensorOperator)
-
-    @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
-    @patch("oaebu_workflows.workflows.onix_workflow.OnixWorkflow.make_release")
-    @patch("observatory.platform.utils.gc_utils.select_table_shard_dates")
-    def test_ctor(self, mock_sel_table_suffixes, mock_mr, mock_api):
-        mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
-        mock_api.return_value = self.api
-        
-        with self.env.create():
-            self.seed_db()
-            with CliRunner().isolated_filesystem():
-                wf = OnixWorkflow(
-                    org_name=self.telescope.organisation.name,
-                    gcp_project_id=self.telescope.organisation.project_id,
-                    gcp_bucket_name=self.bucket_name,
-                )
-
-                mock_mr.return_value = OnixWorkflowRelease(
-                    dag_id="onix_workflow_test",
-                    release_date=pendulum.datetime(2021, 1, 1),
-                    onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.project_id,
-                    gcp_bucket_name=self.bucket_name,
-                    onix_dataset_id="onix",
-                    onix_table_id="onix",
-                )
-
-                release = wf.make_release(execution_date=pendulum.datetime(2021, 1, 1))
-
-                self.assertEqual(wf.dag_id, "onix_workflow_test")
-                self.assertEqual(wf.org_name, "test")
-                self.assertEqual(wf.gcp_bucket_name, "bucket_name")
-
-                self.assertEqual(release.dag_id, "onix_workflow_test")
-                self.assertEqual(release.release_date, pendulum.datetime(2021, 1, 1))
-                self.assertEqual(release.transform_folder, "onix_workflow_test/20210101")
-                self.assertEqual(release.worksid_table, "onix_workid_isbn")
-                self.assertEqual(release.worksid_error_table, "onix_workid_isbn_errors")
-                self.assertEqual(release.workfamilyid_table, "onix_workfamilyid_isbn")
-
-                self.assertEqual(release.workslookup_filename, "onix_workflow_test/20210101/onix_workid_isbn.jsonl.gz")
-                self.assertEqual(
-                    release.workslookup_errors_filename, "onix_workflow_test/20210101/onix_workid_isbn_errors.jsonl.gz"
-                )
-                self.assertEqual(
-                    release.worksfamilylookup_filename, "onix_workflow_test/20210101/onix_workfamilyid_isbn.jsonl.gz"
-                )
-
                 self.assertEqual(release.workflow_dataset, "onix_workflow")
-                self.assertEqual(release.project_id, "project_id")
-                self.assertEqual(release.onix_dataset_id, "onix")
-                self.assertEqual(release.dataset_location, "us")
-                self.assertEqual(release.dataset_description, "ONIX workflow tables")
+                self.assertEqual(release.oaebu_intermediate_dataset, "oaebu_intermediate")
+                self.assertEqual(release.oaebu_data_qa_dataset, "oaebu_data_qa")
 
-                self.assertEqual(release.onix_table_id, "onix")
-
-    @patch("oaebu_workflows.workflows.onix_workflow.OnixWorkflow.make_release")
-    @patch("observatory.platform.utils.gc_utils.select_table_shard_dates")
-    def test_ctor_dataset_overrides(self, mock_sel_table_suffixes, mock_mr):
-        mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
-        with CliRunner().isolated_filesystem():
-            release = OnixWorkflowRelease(
-                dag_id="dag",
-                release_date=pendulum.datetime(2000, 1, 1),
-                onix_release_date=pendulum.datetime(2000, 1, 1),
-                gcp_project_id="project",
-                gcp_bucket_name="bucket",
-            )
-            self.assertEqual(release.workflow_dataset, "onix_workflow")
-            self.assertEqual(release.oaebu_intermediate_dataset, "oaebu_intermediate")
-            self.assertEqual(release.oaebu_data_qa_dataset, "oaebu_data_qa")
-
-            # Override
-            release = OnixWorkflowRelease(
-                dag_id="dag",
-                release_date=pendulum.datetime(2000, 1, 1),
-                onix_release_date=pendulum.datetime(2000, 1, 1),
-                gcp_project_id="project",
-                gcp_bucket_name="bucket",
-                workflow_dataset="override",
-                oaebu_intermediate_dataset="override",
-                oaebu_data_qa_dataset="override",
-            )
-
-            self.assertEqual(release.workflow_dataset, "override")
-            self.assertEqual(release.oaebu_intermediate_dataset, "override")
-            self.assertEqual(release.oaebu_data_qa_dataset, "override")
-
-    @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
-    @patch("oaebu_workflows.workflows.onix_workflow.run_bigquery_query")
-    @patch("observatory.platform.utils.gc_utils.select_table_shard_dates")
-    def test_get_onix_records(self, mock_sel_table_suffixes, mock_bq_query, mock_api):
-        mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
-        mock_bq_query.return_value = TestOnixWorkflow.onix_data
-        mock_api.return_value = self.api
-        
-        with self.env.create():
-            self.seed_db()
-            with CliRunner().isolated_filesystem():
-                wf = OnixWorkflow(
-                    org_name=self.telescope.organisation.name,
-                    gcp_project_id=self.telescope.organisation.project_id,
-                    gcp_bucket_name=self.bucket_name,
-                )
-                records = wf.get_onix_records("project_id", "ds_id", "table_id")
-                self.assertEqual(len(records), 3)
-                self.assertEqual(records[0]["ISBN13"], "111")
-
-    @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
-    @patch("oaebu_workflows.workflows.onix_workflow.select_table_shard_dates")
-    def test_make_release(self, mock_sel_table_suffixes, mock_api):
-        mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
-        mock_api.return_value = self.api
-        
-        with self.env.create():
-            self.seed_db()
-            with CliRunner().isolated_filesystem():
-                wf = OnixWorkflow(
-                    org_name=self.telescope.organisation.name,
-                    gcp_project_id=self.telescope.organisation.project_id,
-                    gcp_bucket_name=self.bucket_name,
+                # Override
+                release = OnixWorkflowRelease(
+                    dag_id="dag",
+                    release_date=pendulum.datetime(2000, 1, 1),
+                    onix_release_date=pendulum.datetime(2000, 1, 1),
+                    gcp_project_id="project",
+                    gcp_bucket_name="bucket",
+                    workflow_dataset="override",
+                    oaebu_intermediate_dataset="override",
+                    oaebu_data_qa_dataset="override",
                 )
 
-                kwargs = {"next_execution_date": pendulum.datetime(2021, 2, 1)}
-                release = wf.make_release(**kwargs)
-                self.assertIsInstance(release, OnixWorkflowRelease)
-                self.assertEqual(release.dag_id, "onix_workflow_test")
-                self.assertEqual(release.release_date, pendulum.datetime(2021, 1, 31))
-                self.assertEqual(release.onix_release_date, pendulum.datetime(2021, 1, 1))
-                self.assertEqual(release.project_id, "project_id")
-                self.assertEqual(release.onix_dataset_id, "onix")
-                self.assertEqual(release.onix_table_id, "onix")
-                self.assertEqual(release.bucket_name, "bucket_name")
+                self.assertEqual(release.workflow_dataset, "override")
+                self.assertEqual(release.oaebu_intermediate_dataset, "override")
+                self.assertEqual(release.oaebu_data_qa_dataset, "override")
 
-    @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
-    @patch("oaebu_workflows.workflows.onix_workflow.select_table_shard_dates")
-    def test_make_release_no_releases(self, mock_sel_table_suffixes, mock_api):
-        mock_sel_table_suffixes.return_value = []
-        mock_api.return_value = self.api
-        
-        with self.env.create():
-            self.seed_db()
-            with CliRunner().isolated_filesystem():
-                wf = OnixWorkflow(
-                    org_name=self.telescope.organisation.name,
-                    gcp_project_id=self.telescope.organisation.project_id,
-                    gcp_bucket_name=self.bucket_name,
-                )
+        @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
+        @patch("oaebu_workflows.workflows.onix_workflow.run_bigquery_query")
+        @patch("observatory.platform.utils.gc_utils.select_table_shard_dates")
+        def test_get_onix_records(self, mock_sel_table_suffixes, mock_bq_query, mock_api):
+            mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
+            mock_bq_query.return_value = TestOnixWorkflow.onix_data
+            mock_api.return_value = self.api
 
-                with self.assertRaises(AirflowException):
+            with self.env.create():
+                self.seed_db()
+                with CliRunner().isolated_filesystem():
+                    wf = OnixWorkflow(
+                        org_name=self.telescope.organisation.name,
+                        gcp_project_id=self.telescope.organisation.project_id,
+                        gcp_bucket_name=self.bucket_name,
+                    )
+                    records = wf.get_onix_records("project_id", "ds_id", "table_id")
+                    self.assertEqual(len(records), 3)
+                    self.assertEqual(records[0]["ISBN13"], "111")
+
+        @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
+        @patch("oaebu_workflows.workflows.onix_workflow.select_table_shard_dates")
+        def test_make_release(self, mock_sel_table_suffixes, mock_api):
+            mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
+            mock_api.return_value = self.api
+
+            with self.env.create():
+                self.seed_db()
+                with CliRunner().isolated_filesystem():
+                    wf = OnixWorkflow(
+                        org_name=self.telescope.organisation.name,
+                        gcp_project_id=self.telescope.organisation.project_id,
+                        gcp_bucket_name=self.bucket_name,
+                    )
+
                     kwargs = {"next_execution_date": pendulum.datetime(2021, 2, 1)}
-                    wf.make_release(**kwargs)
+                    release = wf.make_release(**kwargs)
+                    self.assertIsInstance(release, OnixWorkflowRelease)
+                    self.assertEqual(release.dag_id, "onix_workflow_test")
+                    self.assertEqual(release.release_date, pendulum.datetime(2021, 1, 31))
+                    self.assertEqual(release.onix_release_date, pendulum.datetime(2021, 1, 1))
+                    self.assertEqual(release.project_id, "project_id")
+                    self.assertEqual(release.onix_dataset_id, "onix")
+                    self.assertEqual(release.onix_table_id, "onix")
+                    self.assertEqual(release.bucket_name, "bucket_name")
 
-    @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
-    @patch("oaebu_workflows.workflows.onix_workflow.OnixWorkflow.make_release")
-    @patch("observatory.platform.utils.gc_utils.select_table_shard_dates")
-    def test_cleanup(self, mock_sel_table_suffixes, mock_mr, mock_api):
-        mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
-        mock_api.return_value = self.api
-        
-        with self.env.create():
-            self.seed_db()
-            with CliRunner().isolated_filesystem():
-                wf = OnixWorkflow(
-                    org_name=self.telescope.organisation.name,
-                    gcp_project_id=self.telescope.organisation.project_id,
-                    gcp_bucket_name=self.bucket_name,
-                )
+        @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
+        @patch("oaebu_workflows.workflows.onix_workflow.select_table_shard_dates")
+        def test_make_release_no_releases(self, mock_sel_table_suffixes, mock_api):
+            mock_sel_table_suffixes.return_value = []
+            mock_api.return_value = self.api
 
-                mock_mr.return_value = OnixWorkflowRelease(
-                    dag_id="onix_workflow_test",
-                    release_date=pendulum.datetime(2021, 1, 1),
-                    onix_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.project_id,
-                    gcp_bucket_name=self.bucket_name,
-                    onix_dataset_id="onix",
-                    onix_table_id="onix",
-                )
+            with self.env.create():
+                self.seed_db()
+                with CliRunner().isolated_filesystem():
+                    wf = OnixWorkflow(
+                        org_name=self.telescope.organisation.name,
+                        gcp_project_id=self.telescope.organisation.project_id,
+                        gcp_bucket_name=self.bucket_name,
+                    )
 
-                release = wf.make_release(execution_date=pendulum.datetime(2021, 1, 1))
-                self.assertTrue(os.path.isdir(release.transform_folder))
-                wf.cleanup(release)
-                self.assertFalse(os.path.isdir(release.transform_folder))
+                    with self.assertRaises(AirflowException):
+                        kwargs = {"next_execution_date": pendulum.datetime(2021, 2, 1)}
+                        wf.make_release(**kwargs)
+
+        @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
+        @patch("oaebu_workflows.workflows.onix_workflow.OnixWorkflow.make_release")
+        @patch("observatory.platform.utils.gc_utils.select_table_shard_dates")
+        def test_cleanup(self, mock_sel_table_suffixes, mock_mr, mock_api):
+            mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
+            mock_api.return_value = self.api
+
+            with self.env.create():
+                self.seed_db()
+                with CliRunner().isolated_filesystem():
+                    wf = OnixWorkflow(
+                        org_name=self.telescope.organisation.name,
+                        gcp_project_id=self.telescope.organisation.project_id,
+                        gcp_bucket_name=self.bucket_name,
+                    )
+
+                    mock_mr.return_value = OnixWorkflowRelease(
+                        dag_id="onix_workflow_test",
+                        release_date=pendulum.datetime(2021, 1, 1),
+                        onix_release_date=pendulum.datetime(2021, 1, 1),
+                        gcp_project_id=self.telescope.organisation.project_id,
+                        gcp_bucket_name=self.bucket_name,
+                        onix_dataset_id="onix",
+                        onix_table_id="onix",
+                    )
+
+                    release = wf.make_release(execution_date=pendulum.datetime(2021, 1, 1))
+                    self.assertTrue(os.path.isdir(release.transform_folder))
+                    wf.cleanup(release)
+                    self.assertFalse(os.path.isdir(release.transform_folder))
 
     @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
     def test_dag_structure_ignore_google_analytics(self, mock_api):
@@ -533,73 +545,77 @@ class TestOnixWorkflow(ObservatoryTestCase):
                         "upload_aggregation_tables": ["bq_load_workid_lookup"],
                         "bq_load_workid_lookup": ["bq_load_workid_lookup_errors"],
                         "bq_load_workid_lookup_errors": ["bq_load_workfamilyid_lookup"],
-                        "bq_load_workfamilyid_lookup": ["create_oaebu_intermediate_table.dataset.jstor_country"],
-                        "create_oaebu_intermediate_table.dataset.jstor_country": [
-                            "create_oaebu_intermediate_table.dataset.oapen_irus_uk"
+                        "bq_load_workfamilyid_lookup": [
+                            "create_oaebu_intermediate_table.dataset.oapen_irus_uk",
+                            "create_oaebu_intermediate_table.dataset.google_books_sales",
+                            "create_oaebu_intermediate_table.dataset.google_books_traffic",
+                            "create_oaebu_intermediate_table.dataset.jstor_country",
                         ],
-                        "create_oaebu_intermediate_table.dataset.oapen_irus_uk": [
-                            "create_oaebu_intermediate_table.dataset.google_books_sales"
-                        ],
+                        "create_oaebu_intermediate_table.dataset.jstor_country": ["create_oaebu_book_product_table"],
+                        "create_oaebu_intermediate_table.dataset.oapen_irus_uk": ["create_oaebu_book_product_table"],
                         "create_oaebu_intermediate_table.dataset.google_books_sales": [
-                            "create_oaebu_intermediate_table.dataset.google_books_traffic"
+                            "create_oaebu_book_product_table"
                         ],
-                        "create_oaebu_intermediate_table.dataset.google_books_traffic": ["create_oaebu_book_product_table"],
-                        "create_oaebu_book_product_table": ["create_oaebu_data_qa_onix_isbn"],
-                        "create_oaebu_data_qa_onix_isbn": ["create_oaebu_data_qa_onix_aggregate"],
-                        "create_oaebu_data_qa_onix_aggregate": ["create_oaebu_data_qa_jstor_isbn.dataset.jstor_country"],
-                        "create_oaebu_data_qa_jstor_isbn.dataset.jstor_country": [
-                            "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.jstor_country"
+                        "create_oaebu_intermediate_table.dataset.google_books_traffic": [
+                            "create_oaebu_book_product_table"
                         ],
+                        "create_oaebu_book_product_table": [
+                            "export_oaebu_table.book_product_year_metrics",
+                            "export_oaebu_table.book_product_subject_bisac_metrics",
+                            "create_oaebu_data_qa_jstor_isbn.dataset.jstor_country",
+                            "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.google_books_sales",
+                            "export_oaebu_table.book_product_subject_year_metrics",
+                            "export_oaebu_table.book_product_author_metrics",
+                            "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.google_books_traffic",
+                            "export_oaebu_table.book_product_metrics_city",
+                            "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.jstor_country",
+                            "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.oapen_irus_uk",
+                            "create_oaebu_data_qa_google_books_traffic_isbn",
+                            "export_oaebu_table.book_product_metrics_country",
+                            "export_oaebu_table.book_product_publisher_metrics",
+                            "export_oaebu_table.book_product_subject_bic_metrics",
+                            "export_oaebu_table.institution_list",
+                            "create_oaebu_data_qa_oapen_irus_uk_isbn",
+                            "export_oaebu_table.book_product_list",
+                            "export_oaebu_table.book_product_subject_thema_metrics",
+                            "create_oaebu_data_qa_google_books_sales_isbn",
+                            "create_oaebu_data_qa_onix_aggregate",
+                            "export_oaebu_table.book_product_metrics_events",
+                            "export_oaebu_table.book_product_metrics",
+                            "create_oaebu_data_qa_onix_isbn",
+                            "export_oaebu_table.book_product_metrics_institution",
+                        ],
+                        "create_oaebu_data_qa_onix_isbn": ["export_oaebu_qa_metrics"],
+                        "create_oaebu_data_qa_onix_aggregate": ["export_oaebu_qa_metrics"],
+                        "create_oaebu_data_qa_jstor_isbn.dataset.jstor_country": ["export_oaebu_qa_metrics"],
                         "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.jstor_country": [
-                            "create_oaebu_data_qa_oapen_irus_uk_isbn"
+                            "export_oaebu_qa_metrics"
                         ],
-                        "create_oaebu_data_qa_oapen_irus_uk_isbn": [
-                            "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.oapen_irus_uk"
-                        ],
+                        "create_oaebu_data_qa_oapen_irus_uk_isbn": ["export_oaebu_qa_metrics"],
                         "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.oapen_irus_uk": [
-                            "create_oaebu_data_qa_google_books_sales_isbn"
+                            "export_oaebu_qa_metrics"
                         ],
-                        "create_oaebu_data_qa_google_books_sales_isbn": [
-                            "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.google_books_sales"
-                        ],
+                        "create_oaebu_data_qa_google_books_sales_isbn": ["export_oaebu_qa_metrics"],
                         "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.google_books_sales": [
-                            "create_oaebu_data_qa_google_books_traffic_isbn"
+                            "export_oaebu_qa_metrics"
                         ],
-                        "create_oaebu_data_qa_google_books_traffic_isbn": [
-                            "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.google_books_traffic"
-                        ],
+                        "create_oaebu_data_qa_google_books_traffic_isbn": ["export_oaebu_qa_metrics"],
                         "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.google_books_traffic": [
-                            "export_oaebu_table.book_product_list"
+                            "export_oaebu_qa_metrics"
                         ],
-                        "export_oaebu_table.book_product_list": ["export_oaebu_table.book_product_metrics"],
-                        "export_oaebu_table.book_product_metrics": ["export_oaebu_table.book_product_metrics_country"],
-                        "export_oaebu_table.book_product_metrics_country": [
-                            "export_oaebu_table.book_product_metrics_institution"
-                        ],
-                        "export_oaebu_table.book_product_metrics_institution": ["export_oaebu_table.institution_list"],
-                        "export_oaebu_table.institution_list": ["export_oaebu_table.book_product_metrics_city"],
-                        "export_oaebu_table.book_product_metrics_city": ["export_oaebu_table.book_product_metrics_events"],
-                        "export_oaebu_table.book_product_metrics_events": [
-                            "export_oaebu_table.book_product_publisher_metrics"
-                        ],
-                        "export_oaebu_table.book_product_publisher_metrics": [
-                            "export_oaebu_table.book_product_subject_bic_metrics"
-                        ],
-                        "export_oaebu_table.book_product_subject_bic_metrics": [
-                            "export_oaebu_table.book_product_subject_bisac_metrics"
-                        ],
-                        "export_oaebu_table.book_product_subject_bisac_metrics": [
-                            "export_oaebu_table.book_product_subject_thema_metrics"
-                        ],
-                        "export_oaebu_table.book_product_subject_thema_metrics": [
-                            "export_oaebu_table.book_product_year_metrics"
-                        ],
-                        "export_oaebu_table.book_product_year_metrics": [
-                            "export_oaebu_table.book_product_subject_year_metrics"
-                        ],
-                        "export_oaebu_table.book_product_subject_year_metrics": [
-                            "export_oaebu_table.book_product_author_metrics"
-                        ],
+                        "export_oaebu_table.book_product_list": ["export_oaebu_qa_metrics"],
+                        "export_oaebu_table.book_product_metrics": ["export_oaebu_qa_metrics"],
+                        "export_oaebu_table.book_product_metrics_country": ["export_oaebu_qa_metrics"],
+                        "export_oaebu_table.book_product_metrics_institution": ["export_oaebu_qa_metrics"],
+                        "export_oaebu_table.institution_list": ["export_oaebu_qa_metrics"],
+                        "export_oaebu_table.book_product_metrics_city": ["export_oaebu_qa_metrics"],
+                        "export_oaebu_table.book_product_metrics_events": ["export_oaebu_qa_metrics"],
+                        "export_oaebu_table.book_product_publisher_metrics": ["export_oaebu_qa_metrics"],
+                        "export_oaebu_table.book_product_subject_bic_metrics": ["export_oaebu_qa_metrics"],
+                        "export_oaebu_table.book_product_subject_bisac_metrics": ["export_oaebu_qa_metrics"],
+                        "export_oaebu_table.book_product_subject_thema_metrics": ["export_oaebu_qa_metrics"],
+                        "export_oaebu_table.book_product_year_metrics": ["export_oaebu_qa_metrics"],
+                        "export_oaebu_table.book_product_subject_year_metrics": ["export_oaebu_qa_metrics"],
                         "export_oaebu_table.book_product_author_metrics": ["export_oaebu_qa_metrics"],
                         "export_oaebu_qa_metrics": ["cleanup"],
                         "cleanup": ["add_new_dataset_releases"],
@@ -688,82 +704,85 @@ class TestOnixWorkflow(ObservatoryTestCase):
                         "upload_aggregation_tables": ["bq_load_workid_lookup"],
                         "bq_load_workid_lookup": ["bq_load_workid_lookup_errors"],
                         "bq_load_workid_lookup_errors": ["bq_load_workfamilyid_lookup"],
-                        "bq_load_workfamilyid_lookup": ["create_oaebu_intermediate_table.dataset.jstor_country"],
-                        "create_oaebu_intermediate_table.dataset.jstor_country": [
-                            "create_oaebu_intermediate_table.dataset.oapen_irus_uk"
+                        "bq_load_workfamilyid_lookup": [
+                            "create_oaebu_intermediate_table.dataset.google_books_sales",
+                            "create_oaebu_intermediate_table.dataset.oapen_irus_uk",
+                            "create_oaebu_intermediate_table.dataset.google_analytics",
+                            "create_oaebu_intermediate_table.dataset.google_books_traffic",
+                            "create_oaebu_intermediate_table.dataset.jstor_country",
                         ],
-                        "create_oaebu_intermediate_table.dataset.oapen_irus_uk": [
-                            "create_oaebu_intermediate_table.dataset.google_books_sales"
-                        ],
+                        "create_oaebu_intermediate_table.dataset.jstor_country": ["create_oaebu_book_product_table"],
+                        "create_oaebu_intermediate_table.dataset.oapen_irus_uk": ["create_oaebu_book_product_table"],
                         "create_oaebu_intermediate_table.dataset.google_books_sales": [
-                            "create_oaebu_intermediate_table.dataset.google_books_traffic"
+                            "create_oaebu_book_product_table"
                         ],
                         "create_oaebu_intermediate_table.dataset.google_books_traffic": [
-                            "create_oaebu_intermediate_table.dataset.google_analytics"
+                            "create_oaebu_book_product_table"
                         ],
                         "create_oaebu_intermediate_table.dataset.google_analytics": ["create_oaebu_book_product_table"],
-                        "create_oaebu_book_product_table": ["create_oaebu_data_qa_onix_isbn"],
-                        "create_oaebu_data_qa_onix_isbn": ["create_oaebu_data_qa_onix_aggregate"],
-                        "create_oaebu_data_qa_onix_aggregate": ["create_oaebu_data_qa_jstor_isbn.dataset.jstor_country"],
-                        "create_oaebu_data_qa_jstor_isbn.dataset.jstor_country": [
-                            "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.jstor_country"
+                        "create_oaebu_book_product_table": [
+                            "export_oaebu_table.book_product_publisher_metrics",
+                            "create_oaebu_data_qa_onix_isbn",
+                            "create_oaebu_data_qa_jstor_isbn.dataset.jstor_country",
+                            "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.jstor_country",
+                            "export_oaebu_table.book_product_metrics_country",
+                            "create_oaebu_data_qa_google_books_sales_isbn",
+                            "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.google_analytics",
+                            "export_oaebu_table.book_product_subject_year_metrics",
+                            "export_oaebu_table.book_product_subject_thema_metrics",
+                            "create_oaebu_data_qa_google_books_traffic_isbn",
+                            "export_oaebu_table.book_product_subject_bic_metrics",
+                            "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.google_books_sales",
+                            "export_oaebu_table.book_product_list",
+                            "export_oaebu_table.book_product_metrics_city",
+                            "export_oaebu_table.book_product_author_metrics",
+                            "export_oaebu_table.book_product_metrics_institution",
+                            "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.oapen_irus_uk",
+                            "create_oaebu_data_qa_google_analytics_isbn",
+                            "export_oaebu_table.book_product_year_metrics",
+                            "export_oaebu_table.book_product_subject_bisac_metrics",
+                            "create_oaebu_data_qa_onix_aggregate",
+                            "export_oaebu_table.book_product_metrics_events",
+                            "export_oaebu_table.institution_list",
+                            "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.google_books_traffic",
+                            "create_oaebu_data_qa_oapen_irus_uk_isbn",
+                            "export_oaebu_table.book_product_metrics",
                         ],
+                        "create_oaebu_data_qa_onix_isbn": ["export_oaebu_qa_metrics"],
+                        "create_oaebu_data_qa_onix_aggregate": ["export_oaebu_qa_metrics"],
+                        "create_oaebu_data_qa_jstor_isbn.dataset.jstor_country": ["export_oaebu_qa_metrics"],
                         "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.jstor_country": [
-                            "create_oaebu_data_qa_oapen_irus_uk_isbn"
+                            "export_oaebu_qa_metrics"
                         ],
-                        "create_oaebu_data_qa_oapen_irus_uk_isbn": [
-                            "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.oapen_irus_uk"
-                        ],
+                        "create_oaebu_data_qa_oapen_irus_uk_isbn": ["export_oaebu_qa_metrics"],
                         "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.oapen_irus_uk": [
-                            "create_oaebu_data_qa_google_books_sales_isbn"
+                            "export_oaebu_qa_metrics"
                         ],
-                        "create_oaebu_data_qa_google_books_sales_isbn": [
-                            "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.google_books_sales"
-                        ],
+                        "create_oaebu_data_qa_google_books_sales_isbn": ["export_oaebu_qa_metrics"],
                         "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.google_books_sales": [
-                            "create_oaebu_data_qa_google_books_traffic_isbn"
+                            "export_oaebu_qa_metrics"
                         ],
-                        "create_oaebu_data_qa_google_books_traffic_isbn": [
-                            "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.google_books_traffic"
-                        ],
+                        "create_oaebu_data_qa_google_books_traffic_isbn": ["export_oaebu_qa_metrics"],
                         "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.google_books_traffic": [
-                            "create_oaebu_data_qa_google_analytics_isbn"
+                            "export_oaebu_qa_metrics"
                         ],
-                        "create_oaebu_data_qa_google_analytics_isbn": [
-                            "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.google_analytics"
-                        ],
+                        "create_oaebu_data_qa_google_analytics_isbn": ["export_oaebu_qa_metrics"],
                         "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.google_analytics": [
-                            "export_oaebu_table.book_product_list"
+                            "export_oaebu_qa_metrics"
                         ],
-                        "export_oaebu_table.book_product_list": ["export_oaebu_table.book_product_metrics"],
-                        "export_oaebu_table.book_product_metrics": ["export_oaebu_table.book_product_metrics_country"],
-                        "export_oaebu_table.book_product_metrics_country": [
-                            "export_oaebu_table.book_product_metrics_institution"
-                        ],
-                        "export_oaebu_table.book_product_metrics_institution": ["export_oaebu_table.institution_list"],
-                        "export_oaebu_table.institution_list": ["export_oaebu_table.book_product_metrics_city"],
-                        "export_oaebu_table.book_product_metrics_city": ["export_oaebu_table.book_product_metrics_events"],
-                        "export_oaebu_table.book_product_metrics_events": [
-                            "export_oaebu_table.book_product_publisher_metrics"
-                        ],
-                        "export_oaebu_table.book_product_publisher_metrics": [
-                            "export_oaebu_table.book_product_subject_bic_metrics"
-                        ],
-                        "export_oaebu_table.book_product_subject_bic_metrics": [
-                            "export_oaebu_table.book_product_subject_bisac_metrics"
-                        ],
-                        "export_oaebu_table.book_product_subject_bisac_metrics": [
-                            "export_oaebu_table.book_product_subject_thema_metrics"
-                        ],
-                        "export_oaebu_table.book_product_subject_thema_metrics": [
-                            "export_oaebu_table.book_product_year_metrics"
-                        ],
-                        "export_oaebu_table.book_product_year_metrics": [
-                            "export_oaebu_table.book_product_subject_year_metrics"
-                        ],
-                        "export_oaebu_table.book_product_subject_year_metrics": [
-                            "export_oaebu_table.book_product_author_metrics"
-                        ],
+                        "export_oaebu_table.book_product_list": ["export_oaebu_qa_metrics"],
+                        "export_oaebu_table.book_product_metrics": ["export_oaebu_qa_metrics"],
+                        "export_oaebu_table.book_product_metrics_country": ["export_oaebu_qa_metrics"],
+                        "export_oaebu_table.book_product_metrics_institution": ["export_oaebu_qa_metrics"],
+                        "export_oaebu_table.institution_list": ["export_oaebu_qa_metrics"],
+                        "export_oaebu_table.book_product_metrics_city": ["export_oaebu_qa_metrics"],
+                        "export_oaebu_table.book_product_metrics_events": ["export_oaebu_qa_metrics"],
+                        "export_oaebu_table.book_product_publisher_metrics": ["export_oaebu_qa_metrics"],
+                        "export_oaebu_table.book_product_subject_bic_metrics": ["export_oaebu_qa_metrics"],
+                        "export_oaebu_table.book_product_subject_bisac_metrics": ["export_oaebu_qa_metrics"],
+                        "export_oaebu_table.book_product_subject_thema_metrics": ["export_oaebu_qa_metrics"],
+                        "export_oaebu_table.book_product_year_metrics": ["export_oaebu_qa_metrics"],
+                        "export_oaebu_table.book_product_subject_year_metrics": ["export_oaebu_qa_metrics"],
                         "export_oaebu_table.book_product_author_metrics": ["export_oaebu_qa_metrics"],
                         "export_oaebu_qa_metrics": ["cleanup"],
                         "cleanup": ["add_new_dataset_releases"],
@@ -997,7 +1016,13 @@ class TestOnixWorkflow(ObservatoryTestCase):
     @patch("oaebu_workflows.workflows.onix_workflow.select_table_shard_dates")
     @patch("observatory.platform.utils.workflow_utils.select_table_shard_dates")
     def test_create_oaebu_intermediate_table_tasks(
-        self, mock_select_table_shard_dates, mock_sel_table_suffixes, mock_create_bq_ds, mock_create_bq_table, mock_mr, mock_api
+        self,
+        mock_select_table_shard_dates,
+        mock_sel_table_suffixes,
+        mock_create_bq_ds,
+        mock_create_bq_table,
+        mock_mr,
+        mock_api,
     ):
         mock_api.return_value = self.api
 
@@ -1051,13 +1076,11 @@ class TestOnixWorkflow(ObservatoryTestCase):
 
                 # Spin up tasks
                 oaebu_task1_op = wf.operators[6]
-                self.assertEqual(oaebu_task1_op.task_id, "create_oaebu_intermediate_table.test_dataset.test_table")
-
-                oaebu_task2_op = wf.operators[7]
-                self.assertEqual(oaebu_task2_op.task_id, "create_oaebu_intermediate_table.test_dataset.test_table2")
+                self.assertEqual(oaebu_task1_op[0].task_id, "create_oaebu_intermediate_table.test_dataset.test_table")
+                self.assertEqual(oaebu_task1_op[1].task_id, "create_oaebu_intermediate_table.test_dataset.test_table2")
 
                 # Run tasks
-                oaebu_task1_op.execute_callable()
+                oaebu_task1_op[0].execute_callable()
                 _, call_args = mock_create_bq_ds.call_args
                 self.assertEqual(call_args["project_id"], "project_id")
                 self.assertEqual(call_args["dataset_id"], "oaebu_intermediate")
@@ -1073,7 +1096,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 expected_hash = "1dabe0b435be583fdbae6ad4421f579b"
                 self.assertEqual(sql_hash, expected_hash)
 
-                oaebu_task2_op.execute_callable()
+                oaebu_task1_op[1].execute_callable()
                 _, call_args = mock_create_bq_ds.call_args
                 self.assertEqual(call_args["project_id"], "project_id")
                 self.assertEqual(call_args["dataset_id"], "oaebu_intermediate")
@@ -1443,7 +1466,9 @@ class TestOnixWorkflow(ObservatoryTestCase):
     @patch("observatory.platform.utils.workflow_utils.select_table_shard_dates")
     @patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_table_from_query")
     @patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_dataset")
-    def test_create_oaebu_data_qa_oapen_irus_uk_isbn(self, mock_bq_ds, mock_bq_table_query, mock_sel_table_suffixes, mock_api):
+    def test_create_oaebu_data_qa_oapen_irus_uk_isbn(
+        self, mock_bq_ds, mock_bq_table_query, mock_sel_table_suffixes, mock_api
+    ):
         mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
         mock_api.return_value = self.api
 
@@ -1520,7 +1545,9 @@ class TestOnixWorkflow(ObservatoryTestCase):
     @patch("observatory.platform.utils.workflow_utils.select_table_shard_dates")
     @patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_table_from_query")
     @patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_dataset")
-    def test_create_oaebu_data_qa_google_analytics_isbn(self, mock_bq_ds, mock_bq_table_query, mock_sel_table_suffixes, mock_api):
+    def test_create_oaebu_data_qa_google_analytics_isbn(
+        self, mock_bq_ds, mock_bq_table_query, mock_sel_table_suffixes, mock_api
+    ):
         mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
         mock_api.return_value = self.api
 
