@@ -43,6 +43,11 @@ ANU Press is using custom dimensions in their google analytics data. To ensure t
 The organisation name is used directly inside the telescope and if it matches 'ANU Press' additional dimensions will
  be added and a different BigQuery schema is used.  
 
+## A note on the API metrics
+We use the python client for the The Google Analytics API in order to retrieve the data on several metrics (such as page views) per country. It appears as though the API does not return a result for every country. We would have expected any data without a country field to be labelled with a country name of **not set**, however this does not appear to be the case.  
+At this time, we have no other way of retrieving country-level data on the desired metrics, so we must acknowledge that the numbers returned by the API are slightly different to those found on the Google Analytics web page.  
+A [ticket](https://issuetracker.google.com/issues/237421688) has been created with google in the hope of resolving this issue.
+
 ## Telescope object 'extra'
 This telescope is created using the Observatory API. There are two 'extra' fields that are required for the
  corresponding Telescope object.  
