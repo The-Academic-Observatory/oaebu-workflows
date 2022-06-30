@@ -55,6 +55,7 @@ from observatory.platform.workflows.organisation_telescope import (
     OrganisationRelease,
     OrganisationTelescope,
 )
+from oaebu_workflows.dag_tag import Tag
 
 
 class OapenIrusUkRelease(OrganisationRelease):
@@ -305,6 +306,7 @@ class OapenIrusUkTelescope(OrganisationTelescope):
             max_active_runs=max_active_runs,
             workflow_id=workflow_id,
             table_descriptions=table_descriptions,
+            tags=[Tag.oaebu],
         )
         self.max_cloud_function_instances = max_cloud_function_instances
         self.publisher_name_v4 = publisher_name_v4

@@ -35,6 +35,7 @@ from observatory.platform.utils.gc_utils import (
 from observatory.platform.utils.jinja2_utils import render_template
 from observatory.platform.utils.workflow_utils import make_dag_id, make_release_date
 from observatory.platform.workflows.workflow import Workflow
+from oaebu_workflows.dag_tag import Tag
 
 
 class OapenWorkflowRelease:
@@ -168,6 +169,7 @@ class OapenWorkflow(Workflow):
             catchup=catchup,
             airflow_vars=airflow_vars,
             workflow_id=workflow_id,
+            tags=[Tag.oaebu],
         )
 
         with self.parallel_tasks():

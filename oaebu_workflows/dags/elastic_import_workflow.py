@@ -33,6 +33,7 @@ from observatory.platform.workflows.elastic_import_workflow import (
     ElasticImportConfig,
     ElasticImportWorkflow,
 )
+from oaebu_workflows.dag_tag import Tag
 
 DATASET_ID = "data_export"
 DATA_LOCATION = "us"
@@ -213,5 +214,6 @@ for config in configs:
         kibana_spaces=config.kibana_spaces,
         kibana_time_fields=config.kibana_time_fields,
         index_keep_info=config.index_keep_info,
+        tags=[Tag.oaebu],
     ).make_dag()
     globals()[dag.dag_id] = dag

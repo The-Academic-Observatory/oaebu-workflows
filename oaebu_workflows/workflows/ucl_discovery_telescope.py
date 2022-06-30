@@ -32,6 +32,7 @@ from observatory.platform.utils.file_utils import list_to_jsonl_gz
 from observatory.platform.utils.url_utils import retry_session
 from observatory.platform.utils.workflow_utils import add_partition_date, make_dag_id
 from observatory.platform.workflows.organisation_telescope import OrganisationRelease, OrganisationTelescope
+from oaebu_workflows.dag_tag import Tag
 
 
 class UclDiscoveryRelease(OrganisationRelease):
@@ -254,6 +255,7 @@ class UclDiscoveryTelescope(OrganisationTelescope):
             airflow_vars=airflow_vars,
             max_active_runs=max_active_runs,
             workflow_id=workflow_id,
+            tags=[Tag.oaebu],
         )
         self.add_setup_task(self.check_dependencies)
         self.add_task_chain(

@@ -34,6 +34,7 @@ from observatory.platform.utils.airflow_utils import AirflowConns, AirflowVars
 from observatory.platform.utils.file_utils import list_to_jsonl_gz
 from observatory.platform.utils.workflow_utils import add_partition_date, make_dag_id
 from observatory.platform.workflows.organisation_telescope import OrganisationRelease, OrganisationTelescope
+from oaebu_workflows.dag_tag import Tag
 
 
 class GoogleAnalyticsRelease(OrganisationRelease):
@@ -156,6 +157,7 @@ class GoogleAnalyticsTelescope(OrganisationTelescope):
             airflow_conns=airflow_conns,
             schema_prefix=schema_prefix,
             workflow_id=workflow_id,
+            tags=[Tag.oaebu],
         )
 
         self.view_id = view_id

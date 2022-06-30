@@ -38,6 +38,7 @@ from observatory.platform.utils.workflow_utils import (
     make_sftp_connection,
 )
 from observatory.platform.workflows.organisation_telescope import OrganisationRelease, OrganisationTelescope
+from oaebu_workflows.dag_tag import Tag
 
 
 class GoogleBooksRelease(OrganisationRelease):
@@ -210,6 +211,7 @@ class GoogleBooksTelescope(OrganisationTelescope):
             airflow_vars=airflow_vars,
             airflow_conns=airflow_conns,
             workflow_id=workflow_id,
+            tags=[Tag.oaebu],
         )
         self.sftp_folders = SftpFolders(dag_id, organisation.name)
         self.sftp_regex = r"^Google(SalesTransaction|BooksTraffic)Report_\d{4}_\d{2}.csv$"
