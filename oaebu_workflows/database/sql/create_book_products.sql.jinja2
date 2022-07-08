@@ -289,7 +289,7 @@ empty_google_analytics as (
         CAST(null as STRING) as publication_format,
         STRUCT(
             [STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value)] as country
-        ) as unique_views
+        ) as page_views
 ),
 
 {#
@@ -417,52 +417,52 @@ google_analytics_grouped_metrics AS(
   IF
     (publication_format = 'PDF'
       AND publication_whole_or_part = 'whole',
-      group_items_google_analytics(ARRAY_CONCAT_AGG(unique_views.country)),
+      group_items_google_analytics(ARRAY_CONCAT_AGG(page_views.country)),
       ARRAY_AGG(STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value))) AS pdf_book_country,
   IF
     (publication_format = 'PDF'
       AND publication_whole_or_part = 'part',
-      group_items_google_analytics(ARRAY_CONCAT_AGG(unique_views.country)),
+      group_items_google_analytics(ARRAY_CONCAT_AGG(page_views.country)),
       ARRAY_AGG(STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value))) AS pdf_chapter_country,
   IF
     (publication_format = 'HTML'
       AND publication_whole_or_part = 'whole',
-      group_items_google_analytics(ARRAY_CONCAT_AGG(unique_views.country)),
+      group_items_google_analytics(ARRAY_CONCAT_AGG(page_views.country)),
       ARRAY_AGG(STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value))) AS html_book_country,
   IF
     (publication_format = 'HTML'
       AND publication_whole_or_part = 'part',
-      group_items_google_analytics(ARRAY_CONCAT_AGG(unique_views.country)),
+      group_items_google_analytics(ARRAY_CONCAT_AGG(page_views.country)),
       ARRAY_AGG(STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value))) AS html_chapter_country,
   IF
     (publication_format = 'EPUB'
       AND publication_whole_or_part = 'whole',
-      group_items_google_analytics(ARRAY_CONCAT_AGG(unique_views.country)),
+      group_items_google_analytics(ARRAY_CONCAT_AGG(page_views.country)),
       ARRAY_AGG(STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value))) AS epub_book_country,
   IF
     (publication_format = 'EPUB'
       AND publication_whole_or_part = 'part',
-      group_items_google_analytics(ARRAY_CONCAT_AGG(unique_views.country)),
+      group_items_google_analytics(ARRAY_CONCAT_AGG(page_views.country)),
       ARRAY_AGG(STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value))) AS epub_chapter_country,
   IF
     (publication_format = 'MOBI'
       AND publication_whole_or_part = 'whole',
-      group_items_google_analytics(ARRAY_CONCAT_AGG(unique_views.country)),
+      group_items_google_analytics(ARRAY_CONCAT_AGG(page_views.country)),
       ARRAY_AGG(STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value))) AS mobi_book_country,
   IF
     (publication_format = 'MOBI'
       AND publication_whole_or_part = 'part',
-      group_items_google_analytics(ARRAY_CONCAT_AGG(unique_views.country)),
+      group_items_google_analytics(ARRAY_CONCAT_AGG(page_views.country)),
       ARRAY_AGG(STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value))) AS mobi_chapter_country,
   IF
     (publication_format IN ('PDF','HTML', 'EPUB', 'MOBI')
       AND publication_whole_or_part IN ('whole', 'part'),
-      group_items_google_analytics(ARRAY_CONCAT_AGG(unique_views.country)),
+      group_items_google_analytics(ARRAY_CONCAT_AGG(page_views.country)),
       ARRAY_AGG(STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value))) AS downloads_total_country,
   IF
     (publication_whole_or_part = '(citation)',
-      group_items_google_analytics(ARRAY_CONCAT_AGG(unique_views.country)),
-      ARRAY_AGG(STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value))) AS unique_views_country,
+      group_items_google_analytics(ARRAY_CONCAT_AGG(page_views.country)),
+      ARRAY_AGG(STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value))) AS views_total_country,
   FROM
     `{{ google_analytics_table_id }}`
   WHERE
@@ -477,7 +477,7 @@ google_analytics_metrics AS (
   SELECT
     publication_id AS ISBN13,
     release_date,
-    STRUCT( ARRAY_CONCAT_AGG(unique_views_country) AS unique_views_country,
+    STRUCT( ARRAY_CONCAT_AGG(views_total_country) AS views_total_country,
       group_items_google_analytics(ARRAY_CONCAT_AGG(downloads_total_country)) AS downloads_total_country,
       ARRAY_CONCAT_AGG(pdf_book_country) AS downloads_pdf_book_country,
       ARRAY_CONCAT_AGG(pdf_chapter_country) AS downloads_pdf_chapter_country,
@@ -771,11 +771,18 @@ metrics as (
     LEFT JOIN oapen_irus_uk_metrics as oapen_irus_uk ON ebook_months.ISBN13 = oapen_irus_uk.ISBN13 AND ebook_months.release_date = oapen_irus_uk.release_date
     LEFT JOIN ucl_discovery_metrics as ucl_discovery ON ebook_months.ISBN13 = ucl_discovery.ISBN13 AND ebook_months.release_date = ucl_discovery.release_date
     LEFT JOIN crossref_events as crossref_events ON ebook_months.ISBN13 = crossref_events.ISBN13 AND ebook_months.release_date = crossref_events.release_date
-    WHERE crossref_events.metrics IS NOT NULL OR google_books_sales.metrics IS NOT NULL OR google_books_traffic.metrics IS NOT NULL OR jstor_country.metrics IS NOT NULL OR jstor_institution.metrics is not null OR oapen_irus_uk.metrics IS NOT NULL
+    WHERE google_analytics.metrics IS NOT NULL 
+    OR google_books_sales.metrics IS NOT NULL 
+    OR google_books_traffic.metrics IS NOT NULL 
+    OR jstor_country.metrics IS NOT NULL 
+    OR jstor_institution.metrics IS NOT NULL
+    OR oapen_irus_uk.metrics IS NOT NULL 
+    OR ucl_discovery.metrics IS NOT NULL
+    OR crossref_events.metrics IS NOT NULL 
     GROUP BY ebook_months.ISBN13
 )
 
-# Main Querry
+# Main Query
 {#
 The purpose of this query is to bring together a range of individual sources as compose them into the final query output.
 

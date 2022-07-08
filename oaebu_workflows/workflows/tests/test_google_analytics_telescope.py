@@ -180,7 +180,7 @@ class TestGoogleAnalyticsTelescope(ObservatoryTestCase):
         dataset_id = env.add_dataset()
 
         # Setup Telescope
-        execution_date = pendulum.datetime(year=2020, month=4, day=1)
+        execution_date = pendulum.datetime(year=2022, month=6, day=1)
         organisation = Organisation(
             name=self.organisation_name,
             project_id=self.project_id,
@@ -234,9 +234,8 @@ class TestGoogleAnalyticsTelescope(ObservatoryTestCase):
                         {
                             "url": "/base/path/151420",
                             "title": "Anything public program drive north.",
-                            "start_date": "2020-04-01",
-                            "end_date": "2020-04-30",
-                            "release_date": "2020-04-30",
+                            "start_date": "2022-06-01",
+                            "end_date": "2022-06-30",
                             "average_time": 59.5,
                             "unique_views": {
                                 "country": [{"name": "country 1", "value": 3}, {"name": "country 2", "value": 3}],
@@ -246,41 +245,49 @@ class TestGoogleAnalyticsTelescope(ObservatoryTestCase):
                                     {"name": "social_network 2", "value": 3},
                                 ],
                             },
+                            "page_views": {
+                                "country": [{"name": "country 1", "value": 4}, {"name": "country 2", "value": 4}],
+                                "referrer": [{"name": "referrer 1", "value": 4}, {"name": "referrer 2", "value": 4}],
+                                "social_network": [
+                                    {"name": "social_network 1", "value": 4},
+                                    {"name": "social_network 2", "value": 4},
+                                ],
+                            },
                             "sessions": {
                                 "country": [{"name": "country 1", "value": 1}, {"name": "country 2", "value": 1}],
                                 "source": [{"name": "source 1", "value": 1}, {"name": "source 2", "value": 1}],
                             },
+                            "release_date": "2022-06-30",
                         },
                         {
                             "url": "/base/path/833557",
                             "title": "Standard current never no.",
-                            "start_date": "2020-04-01",
-                            "end_date": "2020-04-30",
-                            "release_date": "2020-04-30",
-                            "average_time": 44.2,
-                            "unique_views": {
-                                "country": [{"name": "country 2", "value": 2}, {"name": "country 1", "value": 1}],
-                                "referrer": [{"name": "referrer 1", "value": 1}, {"name": "referrer 2", "value": 2}],
-                                "social_network": [
-                                    {"name": "social_network 2", "value": 2},
-                                    {"name": "social_network 1", "value": 1},
-                                ],
-                            },
+                            "start_date": "2022-06-01",
+                            "end_date": "2022-06-30",
+                            "average_time": 49.6,
+                            "unique_views": {"country": [], "referrer": [], "social_network": []},
+                            "page_views": {"country": [], "referrer": [], "social_network": []},
                             "sessions": {"country": [], "source": []},
+                            "release_date": "2022-06-30",
                         },
                         {
                             "url": "/base/path/833557?fbclid=123",
                             "title": "Standard current never no.",
-                            "start_date": "2020-04-01",
-                            "end_date": "2020-04-30",
+                            "start_date": "2022-06-01",
+                            "end_date": "2022-06-30",
                             "average_time": 38.8,
                             "unique_views": {
                                 "country": [{"name": "country 2", "value": 2}],
                                 "referrer": [{"name": "referrer 2", "value": 2}],
                                 "social_network": [{"name": "social_network 2", "value": 2}],
                             },
+                            "page_views": {
+                                "country": [{"name": "country 2", "value": 4}],
+                                "referrer": [{"name": "referrer 2", "value": 4}],
+                                "social_network": [{"name": "social_network 2", "value": 4}],
+                            },
                             "sessions": {"country": [], "source": []},
-                            "release_date": "2020-04-30",
+                            "release_date": "2022-06-30",
                         },
                     ]
                     self.assertEqual(3, len(actual_list))
@@ -341,7 +348,7 @@ class TestGoogleAnalyticsTelescope(ObservatoryTestCase):
         dataset_id = env.add_dataset()
 
         # Setup Telescope
-        execution_date = pendulum.datetime(year=2020, month=4, day=1)
+        execution_date = pendulum.datetime(year=2022, month=6, day=1)
         organisation = Organisation(
             name=self.organisation_name,
             project_id=self.project_id,
@@ -395,8 +402,8 @@ class TestGoogleAnalyticsTelescope(ObservatoryTestCase):
                         {
                             "url": "/base/path/151420",
                             "title": "Anything public program drive north.",
-                            "start_date": "2020-04-01",
-                            "end_date": "2020-04-30",
+                            "start_date": "2022-06-01",
+                            "end_date": "2022-06-30",
                             "average_time": 59.5,
                             "unique_views": {
                                 "country": [{"name": "country 1", "value": 3}, {"name": "country 2", "value": 3}],
@@ -404,6 +411,14 @@ class TestGoogleAnalyticsTelescope(ObservatoryTestCase):
                                 "social_network": [
                                     {"name": "social_network 1", "value": 3},
                                     {"name": "social_network 2", "value": 3},
+                                ],
+                            },
+                            "page_views": {
+                                "country": [{"name": "country 1", "value": 4}, {"name": "country 2", "value": 4}],
+                                "referrer": [{"name": "referrer 1", "value": 4}, {"name": "referrer 2", "value": 4}],
+                                "social_network": [
+                                    {"name": "social_network 1", "value": 4},
+                                    {"name": "social_network 2", "value": 4},
                                 ],
                             },
                             "sessions": {
@@ -416,22 +431,16 @@ class TestGoogleAnalyticsTelescope(ObservatoryTestCase):
                             "publication_group": "group",
                             "publication_whole_or_part": "whole",
                             "publication_format": "PDF",
-                            "release_date": "2020-04-30",
+                            "release_date": "2022-06-30",
                         },
                         {
                             "url": "/base/path/833557",
                             "title": "Standard current never no.",
-                            "start_date": "2020-04-01",
-                            "end_date": "2020-04-30",
-                            "average_time": 44.2,
-                            "unique_views": {
-                                "country": [{"name": "country 2", "value": 2}, {"name": "country 1", "value": 1}],
-                                "referrer": [{"name": "referrer 1", "value": 1}, {"name": "referrer 2", "value": 2}],
-                                "social_network": [
-                                    {"name": "social_network 2", "value": 2},
-                                    {"name": "social_network 1", "value": 1},
-                                ],
-                            },
+                            "start_date": "2022-06-01",
+                            "end_date": "2022-06-30",
+                            "average_time": 49.6,
+                            "unique_views": {"country": [], "referrer": [], "social_network": []},
+                            "page_views": {"country": [], "referrer": [], "social_network": []},
                             "sessions": {"country": [], "source": []},
                             "publication_id": "1234567891234",
                             "publication_type": "book",
@@ -439,19 +448,24 @@ class TestGoogleAnalyticsTelescope(ObservatoryTestCase):
                             "publication_group": "(none)",
                             "publication_whole_or_part": "part",
                             "publication_format": "HTML",
-                            "release_date": "2020-04-30",
+                            "release_date": "2022-06-30",
                         },
                         {
                             "url": "/base/path/833557?fbclid=123",
                             "title": "Standard current never no.",
-                            "start_date": "2020-04-01",
-                            "end_date": "2020-04-30",
+                            "start_date": "2022-06-01",
+                            "end_date": "2022-06-30",
                             "average_time": 38.8,
                             "unique_views": {
                                 "country": [{"name": "country 2", "value": 2}],
                                 "referrer": [{"name": "referrer 2", "value": 2}],
                                 "social_network": [{"name": "social_network 2", "value": 2}],
                             },
+                            "page_views": {
+                                "country": [{"name": "country 2", "value": 4}],
+                                "referrer": [{"name": "referrer 2", "value": 4}],
+                                "social_network": [{"name": "social_network 2", "value": 4}],
+                            },
                             "sessions": {"country": [], "source": []},
                             "publication_id": "1234567891234",
                             "publication_type": "book",
@@ -459,7 +473,7 @@ class TestGoogleAnalyticsTelescope(ObservatoryTestCase):
                             "publication_group": "(none)",
                             "publication_whole_or_part": "part",
                             "publication_format": "HTML",
-                            "release_date": "2020-04-30",
+                            "release_date": "2022-06-30",
                         },
                     ]
                     self.assertEqual(3, len(actual_list))
@@ -599,6 +613,7 @@ def create_http_mock_sequence(organisation_name: str) -> list:
                         "metricHeader": {
                             "metricHeaderEntries": [
                                 {"name": "ga:uniquePageviews", "type": "INTEGER"},
+                                {"name": "ga:Pageviews", "type": "INTEGER"},
                                 {"name": "ga:sessions", "type": "INTEGER"},
                             ]
                         },
@@ -607,25 +622,25 @@ def create_http_mock_sequence(organisation_name: str) -> list:
                         "rows": [
                             {
                                 "dimensions": ["/base/path/151420", dimension + " 1"],
-                                "metrics": [{"values": ["3", "1"]}],
+                                "metrics": [{"values": ["3", "4", "1"]}],
                             },
                             {
                                 "dimensions": ["/base/path/151420", dimension + " 2"],
-                                "metrics": [{"values": ["3", "1"]}],
+                                "metrics": [{"values": ["3", "4", "1"]}],
                             },
                             {
                                 "dimensions": ["/base/path/833557", dimension + " 1"],
-                                "metrics": [{"values": ["1", "0"]}],
+                                "metrics": [{"values": ["0", "0", "0"]}],  # Added a zero case for code coverage
                             },
                             {
                                 "dimensions": ["/base/path/833557?fbclid=123", dimension + " 2"],
-                                "metrics": [{"values": ["2", "0"]}],
+                                "metrics": [{"values": ["2", "4", "0"]}],
                             },
                         ],
-                        "totals": [{"values": ["6", "1"]}],
+                        "totals": [{"values": ["6", "9", "1"]}],
                         "rowCount": 3,
-                        "minimums": [{"values": ["1", "0"]}],
-                        "maximums": [{"values": ["3", "1"]}],
+                        "minimums": [{"values": ["1", "3", "0"]}],
+                        "maximums": [{"values": ["3", "4", "1"]}],
                         "isDataGolden": True,
                     },
                 }

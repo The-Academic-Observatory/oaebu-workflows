@@ -22,7 +22,7 @@ SELECT
     month,
     count(ISBN13) as unique_books,
     STRUCT(
-      SUM(google_analytics.unique_views) as unique_views,
+      SUM(google_analytics.page_views) as page_views,
       SUM(google_analytics.downloads) as downloads,
       SUM(google_analytics.downloads_pdf_book) as downloads_pdf_book,
       SUM(google_analytics.downloads_pdf_chapter) as downloads_pdf_chapter,
@@ -54,7 +54,7 @@ FROM (
         ISBN13,
         month.month,
         STRUCT(
-            (SELECT SUM(value) FROM UNNEST(month.google_analytics.unique_views_country)) as unique_views,
+            (SELECT SUM(value) FROM UNNEST(month.google_analytics.views_total_country)) as page_views,
             (SELECT SUM(value) FROM UNNEST(month.google_analytics.downloads_total_country)) as downloads,
             (SELECT SUM(value) FROM UNNEST(month.google_analytics.downloads_pdf_book_country)) as downloads_pdf_book,
             (SELECT SUM(value) FROM UNNEST(month.google_analytics.downloads_pdf_chapter_country)) as downloads_pdf_chapter,

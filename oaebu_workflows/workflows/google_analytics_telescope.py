@@ -239,8 +239,10 @@ def list_all_books(
     start_date: pendulum.DateTime,
     end_date: pendulum.DateTime,
     organisation_name: str,
+    metrics: list
 ) -> Tuple[List[dict], list]:
     """List all available books by getting all pagepaths of a view id in a given period.
+    Note: Google API will not return a result for any entry in which all supplied metrics are zero. However, it will return 'some' results if you supply no metrics, contrary to the documentation.
 
     :param service: The Google Analytics Reporting service object.
     :param view_id: The view id.
@@ -248,6 +250,7 @@ def list_all_books(
     :param start_date: Start date of analytics period
     :param end_date: End date of analytics period
     :param organisation_name: The organisation name.
+    :param: metrics: The metrics to return return with the book results
     :return: A list with dictionaries, one for each book entry (the dict contains the pagepath, title and average time
     on page) and a list of all pagepaths.
     """
@@ -263,7 +266,7 @@ def list_all_books(
                         "endDate": end_date.strftime("%Y-%m-%d"),
                     }
                 ],
-                "metrics": [{"expression": "ga:avgTimeOnPage"}],
+                "metrics": metrics,
                 "dimensions": [{"name": "ga:pagepath"}, {"name": "ga:pageTitle"}],
                 "dimensionFilterClauses": [
                     {
@@ -318,7 +321,7 @@ def create_book_result_dicts(
     for entry in book_entries:
         pagepath = entry["dimensions"][0]
         pagetitle = entry["dimensions"][1]
-        average_time = float(entry["metrics"][0]["values"][0])
+        average_time = float(entry["metrics"][0]["values"][-1])
         book_result = {
             "url": pagepath,
             "title": pagetitle,
@@ -326,6 +329,7 @@ def create_book_result_dicts(
             "end_date": end_date.strftime("%Y-%m-%d"),
             "average_time": average_time,
             "unique_views": {"country": {}, "referrer": {}, "social_network": {}},
+            "page_views": {"country": {}, "referrer": {}, "social_network": {}},
             "sessions": {"country": {}, "source": {}},
         }
         # add custom dimension data for ANU Press
@@ -400,14 +404,17 @@ def get_dimension_data(
     return all_dimension_data
 
 
-def add_to_book_result_dict(book_results: dict, dimension: dict, pagepath: str, unique_views: dict, sessions: dict):
-    """Add the 'unique_views' and 'sessions' results to the book results dict if these metrics are of interest for the
+def add_to_book_result_dict(
+    book_results: dict, dimension: dict, pagepath: str, unique_views: dict, page_views: dict, sessions: dict
+):
+    """Add the 'unique_views', 'page_views' and 'sessions' results to the book results dict if these metrics are of interest for the
     current dimension.
 
     :param book_results: A dictionary with all book results.
     :param dimension: Current dimension for which 'unique_views' and 'sessions' data is given.
     :param pagepath: Pagepath of the book.
     :param unique_views: Number of unique views for the pagepath&dimension
+    :param page_views: Number of page views for the pagepath&dimension
     :param sessions: Number of sessions for the pagepath&dimension
     :return: None
     """
@@ -422,6 +429,7 @@ def add_to_book_result_dict(book_results: dict, dimension: dict, pagepath: str, 
     column_name = mapping[dimension["name"]]
     if column_name in ["country", "referrer", "social_network"]:
         book_results[pagepath]["unique_views"][column_name] = unique_views
+        book_results[pagepath]["page_views"][column_name] = page_views
     if column_name in ["country", "source"]:
         book_results[pagepath]["sessions"][column_name] = sessions
 
@@ -445,16 +453,16 @@ def get_reports(
     :return: List with google analytics data for each book
     """
 
+    metric_names = ["uniquePageviews", "Pageviews", "sessions", "avgTimeOnPage"]
+    metrics = [{"expression": f"ga:{metric}"} for metric in metric_names]
+
     # list all books
-    book_entries, pagepaths = list_all_books(service, view_id, pagepath_regex, start_date, end_date, organisation_name)
+    book_entries, pagepaths = list_all_books(service, view_id, pagepath_regex, start_date, end_date, organisation_name, metrics)
     # if no books in period return empty list and raise airflow skip exception
     if not book_entries:
         return []
     # create dict with dict for each book to store results
-    book_results = create_book_result_dicts(book_entries, start_date, end_date, organisation_name)
-
-    metric_names = ["uniquePageviews", "sessions"]
-    metrics = [{"expression": f"ga:{metric}"} for metric in metric_names]
+    book_results = create_book_result_dicts(book_entries, start_date, end_date, organisation_name)    
 
     dimension_names = ["country", "fullReferrer", "socialNetwork", "source"]
     dimensions = [{"name": f"ga:{dimension}"} for dimension in dimension_names]
@@ -465,6 +473,7 @@ def get_reports(
 
         prev_pagepath = None
         unique_views = {}
+        page_views = {}
         sessions = {}
         # entry is combination of book pagepath & dimension
         for entry in dimension_data:
@@ -472,22 +481,27 @@ def get_reports(
             dimension_value = entry["dimensions"][1]  # e.g. 'Australia' for 'country' dimension
 
             if prev_pagepath and pagepath != prev_pagepath:
-                add_to_book_result_dict(book_results, dimension, prev_pagepath, unique_views, sessions)
+                add_to_book_result_dict(book_results, dimension, prev_pagepath, unique_views, page_views, sessions)
 
                 unique_views = {}
+                page_views = {}
                 sessions = {}
 
             # add values if they are not 0
-            views_metric = int(entry["metrics"][0]["values"][0])
-            sessions_metric = int(entry["metrics"][0]["values"][1])
-            if views_metric > 0:
-                unique_views[dimension_value] = views_metric
+            # ["values"][n] maps to the nth value of metric_names
+            unique_views_metric = int(entry["metrics"][0]["values"][0])
+            page_views_metric = int(entry["metrics"][0]["values"][1])
+            sessions_metric = int(entry["metrics"][0]["values"][2])
+            if unique_views_metric > 0:
+                unique_views[dimension_value] = unique_views_metric
+            if page_views_metric > 0:
+                page_views[dimension_value] = page_views_metric
             if sessions_metric > 0:
                 sessions[dimension_value] = sessions_metric
 
             prev_pagepath = pagepath
         else:
-            add_to_book_result_dict(book_results, dimension, prev_pagepath, unique_views, sessions)
+            add_to_book_result_dict(book_results, dimension, prev_pagepath, unique_views, page_views, sessions)
 
     # transform nested dict to list of dicts
     for book, result in book_results.items():
