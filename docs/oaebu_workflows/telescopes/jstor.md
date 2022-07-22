@@ -116,7 +116,7 @@ def main():
     # The publisher name is the exact text displayed when you click 'Select a publisher'
     publisher_names = ["UCL Press (uclpress)", "ANU Press (anuepress)"]
     email_address = 'address@gmail.com'
-    start_date = pendulum.datetime(2018, 2, 1)
+    start_date = pendulum.datetime(2016, 10, 1)
     end_date = pendulum.now()
     """ Customise values """
 
@@ -294,7 +294,7 @@ Search for the Gmail API and enable this.
 Currently, the telescope works only with a Gmail account that is an internal user (a G-suite account).  
 It is possible to create credentials for an external user with a project status of 'Testing' in the OAuth screen, 
 however refresh tokens created in such a project expire after 7 days and the telescope does not handle expired
- refresh tokens.  
+ refresh tokens.
 See the [documentation](https://developers.google.com/identity/protocols/oauth2#expiration) for more info on OAuth
  refresh token expiration.  
 
@@ -313,7 +313,7 @@ See the [documentation](https://developers.google.com/identity/protocols/oauth2#
 
 Note that there is currently a limit of 50 refresh tokens per client ID. 
 If the limit is reached, creating a new refresh token automatically invalidates the oldest refresh token without
- warning.  
+ warning. Additionally, tokens are invalidated whenever an account's password is reset.  
 ```python
 import urllib.parse
 from google_auth_oauthlib.flow import InstalledAppFlow
