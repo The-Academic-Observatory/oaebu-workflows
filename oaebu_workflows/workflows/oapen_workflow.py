@@ -91,6 +91,8 @@ class OapenWorkflow(Workflow):
         oaebu_elastic_dataset: str = "data_export",
         country_project_id: str = "academic-observatory",
         country_dataset_id: str = "settings",
+        subject_project_id: str = "oaebu-public-data",
+        subject_dataset_id: str = "oaebu_reference",
         dataset_location: str = "us",
         dataset_description: str = "Oapen workflow tables",
         dag_id: Optional[str] = None,
@@ -102,16 +104,26 @@ class OapenWorkflow(Workflow):
     ):
         """Initialises the workflow object.
         :param ao_gcp_project_id: GCP project ID for the Academic Observatory.
+        :param oapen_gcp_project_id: GCP project ID for oapen data.
         :param oapen_metadata_dataset_id: GCP dataset ID for the oapen data.
         :param oapen_metadata_table_id: GCP table ID for the oapen data.
+        :param public_book_metadata_dataset_id: GCP dataset ID for metadata.
+        :param public_book_metadata_table_id: GCP table ID for book metadata.
         :param public_book_dataset_id: GCP dataset ID for the public book data.
         :param public_book_table_id: GCP table ID for the public book data.
         :param irus_uk_dag_id_prefix: OAEBU IRUS_UK dag id prefix.
         :param irus_uk_dataset_id: OAEBU IRUS_UK dataset id.
         :param irus_uk_table_id: OAEBU IRUS_UK table id.
         :param oaebu_dataset: OAEBU dataset.
+        :param oaebu_onix_dataset: GCP oapen onix dataset name.
         :param oaebu_intermediate_dataset: OAEBU intermediate dataset.
         :param oaebu_elastic_dataset: OAEBU elastic dataset.
+        :param country_project_id: GCP project ID containing the country lookup table.
+        :param country_dataset_id: GCP dataset ID for the country lookup table.
+        :param subject_project_id: GCP project ID containing the book subject lookup table (bic).
+        :param subject_dataset_id: GCP dataset ID for the book subject lookup table (bic).
+        :param dataset_location: GCP region.
+        :param dataset_description: Description of dataset.
         :param dag_id: DAG ID.
         :param start_date: Start date of the DAG.
         :param schedule_interval: Scheduled interval for running the DAG.
@@ -160,6 +172,9 @@ class OapenWorkflow(Workflow):
 
         self.country_project_id = country_project_id
         self.country_dataset_id = country_dataset_id
+
+        self.subject_project_id = subject_project_id
+        self.subject_dataset_id = subject_dataset_id
 
         # Initialise Telesecope base class
         super().__init__(
@@ -384,6 +399,8 @@ class OapenWorkflow(Workflow):
             release=release_date,
             country_project_id=self.country_project_id,
             country_dataset_id=self.country_dataset_id,
+            subject_project_id=self.subject_project_id,
+            subject_dataset_id=self.subject_dataset_id,
         )
 
         status = create_bigquery_table_from_query(
@@ -415,16 +432,6 @@ class OapenWorkflow(Workflow):
                 "file_type": "json",
             },
             {
-                "output_table": "book_product_metrics_institution",
-                "query_template": "export_book_metrics_institution.sql.jinja2",
-                "file_type": "json",
-            },
-            {
-                "output_table": "institution_list",
-                "query_template": "export_institution_list.sql.jinja2",
-                "file_type": "json",
-            },
-            {
                 "output_table": "book_product_metrics_city",
                 "query_template": "export_book_metrics_city.sql.jinja2",
                 "file_type": "json",
@@ -442,16 +449,6 @@ class OapenWorkflow(Workflow):
             {
                 "output_table": "book_product_subject_bic_metrics",
                 "query_template": "export_book_subject_bic_metrics.sql.jinja2",
-                "file_type": "json",
-            },
-            {
-                "output_table": "book_product_subject_bisac_metrics",
-                "query_template": "export_book_subject_bisac_metrics.sql.jinja2",
-                "file_type": "json",
-            },
-            {
-                "output_table": "book_product_subject_thema_metrics",
-                "query_template": "export_book_subject_thema_metrics.sql.jinja2",
                 "file_type": "json",
             },
             {
