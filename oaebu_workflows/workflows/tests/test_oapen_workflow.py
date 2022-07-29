@@ -15,6 +15,7 @@
 # Author: Richard Hosking
 
 
+from cmath import exp
 import os
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
@@ -98,11 +99,7 @@ class TestOapenWorkflow(ObservatoryTestCase):
                     "create_oaebu_book_product_table": ["export_oaebu_table.book_product_list"],
                     "export_oaebu_table.book_product_list": ["export_oaebu_table.book_product_metrics"],
                     "export_oaebu_table.book_product_metrics": ["export_oaebu_table.book_product_metrics_country"],
-                    "export_oaebu_table.book_product_metrics_country": [
-                        "export_oaebu_table.book_product_metrics_institution"
-                    ],
-                    "export_oaebu_table.book_product_metrics_institution": ["export_oaebu_table.institution_list"],
-                    "export_oaebu_table.institution_list": ["export_oaebu_table.book_product_metrics_city"],
+                    "export_oaebu_table.book_product_metrics_country": ["export_oaebu_table.book_product_metrics_city"],
                     "export_oaebu_table.book_product_metrics_city": ["export_oaebu_table.book_product_metrics_events"],
                     "export_oaebu_table.book_product_metrics_events": [
                         "export_oaebu_table.book_product_publisher_metrics"
@@ -111,12 +108,6 @@ class TestOapenWorkflow(ObservatoryTestCase):
                         "export_oaebu_table.book_product_subject_bic_metrics"
                     ],
                     "export_oaebu_table.book_product_subject_bic_metrics": [
-                        "export_oaebu_table.book_product_subject_bisac_metrics"
-                    ],
-                    "export_oaebu_table.book_product_subject_bisac_metrics": [
-                        "export_oaebu_table.book_product_subject_thema_metrics"
-                    ],
-                    "export_oaebu_table.book_product_subject_thema_metrics": [
                         "export_oaebu_table.book_product_year_metrics"
                     ],
                     "export_oaebu_table.book_product_year_metrics": [
@@ -218,6 +209,7 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
         book = load_jsonl(test_fixtures_folder("oapen_workflow", "book.jsonl"))
         metadata = load_jsonl(test_fixtures_folder("oapen_workflow", "oapen_metadata.jsonl"))
         oapen_irus_uk = load_jsonl(test_fixtures_folder("oapen_workflow", "oapen_irus_uk.jsonl"))
+        bic_lookup = load_jsonl(test_fixtures_folder("oapen_workflow", "bic_lookup.jsonl"))
         fixtures_schema_path = test_fixtures_folder("oapen_workflow", "schema")
         tables = [
             Table(
@@ -250,6 +242,14 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
                 fixtures_dataset_id,
                 oapen_irus_uk,
                 "oapen_irus_uk",
+                fixtures_schema_path,
+            ),
+            Table(
+                "bic_lookup",
+                False,
+                fixtures_dataset_id,
+                bic_lookup,
+                "bic_lookup",
                 fixtures_schema_path,
             ),
         ]
@@ -300,6 +300,8 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
                 start_date=start_date,
                 country_project_id=self.gcp_project_id,
                 country_dataset_id=oaebu_settings_dataset_id,
+                subject_project_id=self.gcp_project_id, 
+                subject_dataset_id=oaebu_fixtures_dataset_id,
                 workflow_id=1,
             )
 
@@ -374,14 +376,10 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
                     "book_product_list",
                     "book_product_metrics",
                     "book_product_metrics_country",
-                    "book_product_metrics_institution",
-                    "institution_list",
                     "book_product_metrics_city",
                     "book_product_metrics_events",
                     "book_product_publisher_metrics",
                     "book_product_subject_bic_metrics",
-                    "book_product_subject_bisac_metrics",
-                    "book_product_subject_thema_metrics",
                     "book_product_year_metrics",
                     "book_product_subject_year_metrics",
                     "book_product_author_metrics",
@@ -428,3 +426,16 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
                 self.assertEqual(ti.state, State.SUCCESS)
                 dataset_releases = get_dataset_releases(dataset_id=1)
                 self.assertEqual(len(dataset_releases), 1)
+
+            # Check that the data_export tables tables exist
+            for table in export_tables:
+                table_id = f"{self.gcp_project_id}.{oaebu_elastic_dataset_id}.{self.gcp_project_id.replace('-', '_')}_{table}{release_suffix}"
+                self.assert_table_integrity(table_id)
+
+            # Check that the onix and book_product tables tables exist and are as expected
+            onix_table_id = f"{self.gcp_project_id}.{oaebu_onix_dataset_id}.onix{release_suffix}"
+            book_product_table_id = f"{self.gcp_project_id}.{oaebu_output_dataset_id}.book_product{release_suffix}"
+            self.assert_table_integrity(onix_table_id)
+            self.assert_table_integrity(book_product_table_id)
+            self.assert_table_content(onix_table_id, load_jsonl(test_fixtures_folder("oapen_workflow", "expected_onix.jsonl")))
+            self.assert_table_content(book_product_table_id, load_jsonl(test_fixtures_folder("oapen_workflow", "expected_book_product.jsonl")))
