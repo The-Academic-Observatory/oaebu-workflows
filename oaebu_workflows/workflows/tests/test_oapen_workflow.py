@@ -201,7 +201,7 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
         conn = Connection(conn_id=AirflowConns.OBSERVATORY_API, uri=f"http://:password@{self.host}:{self.port}")
         env.add_connection(conn)
 
-    def setup_fake_data(self, settings_dataset_id: str, fixtures_dataset_id:str, release_date: pendulum.DateTime):
+    def setup_fake_data(self, settings_dataset_id: str, fixtures_dataset_id: str, release_date: pendulum.DateTime):
         # Settings dataset
         country = load_jsonl(test_fixtures_folder("onix_workflow", "country.jsonl"))
         settings_schema_path = test_fixtures_folder("onix_workflow", "schema")
@@ -222,7 +222,7 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
             ),
             Table(
                 "book",
-                True, # book table must be sharded
+                True,  # book table must be sharded
                 fixtures_dataset_id,
                 book,
                 "book",
@@ -300,7 +300,7 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
                 start_date=start_date,
                 country_project_id=self.gcp_project_id,
                 country_dataset_id=oaebu_settings_dataset_id,
-                subject_project_id=self.gcp_project_id, 
+                subject_project_id=self.gcp_project_id,
                 subject_dataset_id=oaebu_fixtures_dataset_id,
                 workflow_id=1,
             )
@@ -437,5 +437,9 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
             book_product_table_id = f"{self.gcp_project_id}.{oaebu_output_dataset_id}.book_product{release_suffix}"
             self.assert_table_integrity(onix_table_id)
             self.assert_table_integrity(book_product_table_id)
-            self.assert_table_content(onix_table_id, load_jsonl(test_fixtures_folder("oapen_workflow", "expected_onix.jsonl")))
-            self.assert_table_content(book_product_table_id, load_jsonl(test_fixtures_folder("oapen_workflow", "expected_book_product.jsonl")))
+            self.assert_table_content(
+                onix_table_id, load_jsonl(test_fixtures_folder("oapen_workflow", "expected_onix.jsonl"))
+            )
+            self.assert_table_content(
+                book_product_table_id, load_jsonl(test_fixtures_folder("oapen_workflow", "expected_book_product.jsonl"))
+            )
