@@ -363,47 +363,48 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
                     )
                 )
 
+                # Create tables and test conditions
+                release_suffix = release_date.strftime("%Y%m%d")
+
                 # Format OAPEN Metadata like ONIX to enable the next steps
                 ti = env.run_task(workflow.create_onix_formatted_metadata_output_tasks.__name__)
                 self.assertEqual(expected_state, ti.state)
+                onix_table_id = f"{self.gcp_project_id}.{oaebu_onix_dataset_id}.onix{release_suffix}"
+                self.assert_table_integrity(onix_table_id, expected_rows=2)
+                self.assert_table_content(
+                    onix_table_id, load_jsonl(test_fixtures_folder("oapen_workflow", "expected_onix.jsonl"))
+                )
 
-                # Create oaebu output tables
+                # Create book product table
                 ti = env.run_task(workflow.create_oaebu_book_product_table.__name__)
                 self.assertEqual(expected_state, ti.state)
+                book_product_table_id = f"{self.gcp_project_id}.{oaebu_output_dataset_id}.book_product{release_suffix}"
+                self.assert_table_integrity(book_product_table_id, expected_rows=2)
+                self.assert_table_content(
+                    book_product_table_id,
+                    load_jsonl(test_fixtures_folder("oapen_workflow", "expected_book_product.jsonl")),
+                )
 
-                # Export oaebu elastic tables
+                # Export oaebu elastic table names and expected row count
                 export_tables = [
-                    "book_product_list",
-                    "book_product_metrics",
-                    "book_product_metrics_country",
-                    "book_product_metrics_city",
-                    "book_product_metrics_events",
-                    "book_product_publisher_metrics",
-                    "book_product_subject_bic_metrics",
-                    "book_product_year_metrics",
-                    "book_product_subject_year_metrics",
-                    "book_product_author_metrics",
+                    ("book_product_list", 2),
+                    ("book_product_metrics", 3),
+                    ("book_product_metrics_country", 2),
+                    ("book_product_metrics_city", 2),
+                    ("book_product_metrics_events", 1),
+                    ("book_product_publisher_metrics", 1),
+                    ("book_product_subject_bic_metrics", 1),
+                    ("book_product_year_metrics", 1),
+                    ("book_product_subject_year_metrics", 1),
+                    ("book_product_author_metrics", 2),
                 ]
 
-                for table in export_tables:
+                for table, exp_rows in export_tables:
                     ti = env.run_task(f"{workflow.export_oaebu_table.__name__}.{table}")
                     self.assertEqual(expected_state, ti.state, msg=f"table: {table}")
-
-                # Test conditions
-                release_suffix = release_date.strftime("%Y%m%d")
-
-                # Check records in book_product and book_product_list match
-                sql = (
-                    f"SELECT COUNT(*) from {self.gcp_project_id}.{oaebu_output_dataset_id}.book_product{release_suffix}"
-                )
-                records = run_bigquery_query(sql)
-                count_book_product = len(records)
-
-                sql = f"SELECT COUNT(*) from {self.gcp_project_id}.{oaebu_elastic_dataset_id}.{self.gcp_project_id.replace('-', '_')}_book_product_list{release_suffix}"
-                records = run_bigquery_query(sql)
-                count_book_product_list = len(records)
-
-                self.assertEqual(count_book_product, count_book_product_list)
+                    # Check that the data_export tables tables exist and have the correct number of rows
+                    table_id = f"{self.gcp_project_id}.{oaebu_elastic_dataset_id}.{self.gcp_project_id.replace('-', '_')}_{table}{release_suffix}"
+                    self.assert_table_integrity(table_id, expected_rows=exp_rows)
 
                 # Ensure there are no duplicates
                 sql = f"""  SELECT
@@ -426,20 +427,3 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
                 self.assertEqual(ti.state, State.SUCCESS)
                 dataset_releases = get_dataset_releases(dataset_id=1)
                 self.assertEqual(len(dataset_releases), 1)
-
-            # Check that the data_export tables tables exist
-            for table in export_tables:
-                table_id = f"{self.gcp_project_id}.{oaebu_elastic_dataset_id}.{self.gcp_project_id.replace('-', '_')}_{table}{release_suffix}"
-                self.assert_table_integrity(table_id)
-
-            # Check that the onix and book_product tables tables exist and are as expected
-            onix_table_id = f"{self.gcp_project_id}.{oaebu_onix_dataset_id}.onix{release_suffix}"
-            book_product_table_id = f"{self.gcp_project_id}.{oaebu_output_dataset_id}.book_product{release_suffix}"
-            self.assert_table_integrity(onix_table_id)
-            self.assert_table_integrity(book_product_table_id)
-            self.assert_table_content(
-                onix_table_id, load_jsonl(test_fixtures_folder("oapen_workflow", "expected_onix.jsonl"))
-            )
-            self.assert_table_content(
-                book_product_table_id, load_jsonl(test_fixtures_folder("oapen_workflow", "expected_book_product.jsonl"))
-            )
