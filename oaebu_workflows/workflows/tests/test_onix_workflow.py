@@ -1819,32 +1819,48 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 dag_id = make_dag_id("onix_workflow", org_name)
                 self.assert_dag_load(dag_id, dag_file)
 
-    def setup_fake_onix_data_table(self, dataset_id: str, settings_dataset_id: str, release_date: pendulum.DateTime):
-        """Create a new onix data table with its own dataset id and table id, and populate it with some fake data."""
+    def setup_fake_data_tables(
+        self, dataset_id: str, settings_dataset_id: str, fixtures_dataset_id: str, release_date: pendulum.DateTime
+    ):
+        """Create a new onix and subject lookup data tables with their own dataset and table ids. Populate them with some fake data."""
 
         # Upload fixture to bucket
-        files = [test_fixtures_folder("onix_workflow", "onix.jsonl")]
+
+        files = [
+            test_fixtures_folder("onix_workflow", "onix.jsonl"),
+            test_fixtures_folder("onix_workflow", "bic_lookup.jsonl"),
+            test_fixtures_folder("onix_workflow", "bisac_lookup.jsonl"),
+            test_fixtures_folder("onix_workflow", "thema_lookup.jsonl"),
+        ]
         blobs = [os.path.join(self.test_onix_folder, os.path.basename(file)) for file in files]
         upload_files_to_cloud_storage(bucket_name=self.gcp_bucket_name, blob_names=blobs, file_paths=files)
+        schema_path = test_fixtures_folder("onix_workflow", "schema")
 
         # Load into bigquery
-        table_id, _ = table_ids_from_path("onix.jsonl")
-        bq_load_shard_v2(
-            self.schema_path,
-            project_id=self.gcp_project_id,
-            transform_bucket=self.gcp_bucket_name,
-            transform_blob=blobs[0],
-            dataset_id=dataset_id,
-            dataset_location=self.data_location,
-            table_id=table_id,
-            release_date=release_date,
-            source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
-            dataset_description="Test Onix data for the workflow",
-            **{},
-        )
+        table_ids = [
+            table_ids_from_path("onix.jsonl")[0],
+            table_ids_from_path("bic_lookup.jsonl")[0],
+            table_ids_from_path("bisac_lookup.jsonl")[0],
+            table_ids_from_path("thema_lookup.jsonl")[0],
+        ]
+        for blob, id in zip(blobs, table_ids):
+            bq_load_shard_v2(
+                schema_path,
+                project_id=self.gcp_project_id,
+                transform_bucket=self.gcp_bucket_name,
+                transform_blob=blob,
+                dataset_id=dataset_id,
+                dataset_location=self.data_location,
+                table_id=id,
+                release_date=release_date,
+                source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
+                **{},
+            )
 
         country = load_jsonl(test_fixtures_folder("onix_workflow", "country.jsonl"))
-        schema_path = test_fixtures_folder("onix_workflow", "schema")
+        bic_lookup = load_jsonl(test_fixtures_folder("onix_workflow", "bic_lookup.jsonl"))
+        bisac_lookup = load_jsonl(test_fixtures_folder("onix_workflow", "bisac_lookup.jsonl"))
+        thema_lookup = load_jsonl(test_fixtures_folder("onix_workflow", "thema_lookup.jsonl"))
         tables = [
             Table(
                 "country",
@@ -1852,6 +1868,30 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 settings_dataset_id,
                 country,
                 "country",
+                schema_path,
+            ),
+            Table(
+                "bic_lookup",
+                False,
+                fixtures_dataset_id,
+                bic_lookup,
+                "bic_lookup",
+                schema_path,
+            ),
+            Table(
+                "bisac_lookup",
+                False,
+                fixtures_dataset_id,
+                bisac_lookup,
+                "bisac_lookup",
+                schema_path,
+            ),
+            Table(
+                "thema_lookup",
+                False,
+                fixtures_dataset_id,
+                thema_lookup,
+                "thema_lookup",
                 schema_path,
             ),
         ]
@@ -1952,6 +1992,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
         oaebu_output_dataset_id = env.add_dataset(prefix="oaebu_output")
         oaebu_elastic_dataset_id = env.add_dataset(prefix="oaebu_elastic")
         oaebu_settings_dataset_id = env.add_dataset(prefix="settings")
+        oaebu_fixtures_dataset_id = env.add_dataset(prefix="fixtures")
 
         # Create the Observatory environment and run tests
         with env.create(task_logging=True):
@@ -1965,8 +2006,10 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
             if not include_google_analytics:
                 data_partners = data_partners[:-1]
 
-            # Create fake data table. There's no guarantee the data was deleted so clean it again just in case.
-            self.setup_fake_onix_data_table(onix_dataset_id, oaebu_settings_dataset_id, partner_release_date)
+            # Create fake data tables. There's no guarantee the data was deleted so clean it again just in case.
+            self.setup_fake_data_tables(
+                onix_dataset_id, oaebu_settings_dataset_id, oaebu_fixtures_dataset_id, partner_release_date
+            )
 
             # Pull info from Observatory API
             gcp_bucket_name = env.transform_bucket
@@ -1986,6 +2029,8 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 country_dataset_id=oaebu_settings_dataset_id,
                 onix_dataset_id=onix_dataset_id,
                 onix_table_id=self.onix_table_id,
+                subject_project_id=gcp_project_id,
+                subject_dataset_id=oaebu_fixtures_dataset_id,
                 data_partners=data_partners,
                 start_date=start_date,
                 workflow_id=2,
