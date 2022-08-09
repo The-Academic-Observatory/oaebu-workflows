@@ -15,6 +15,7 @@
 # Author: Richard Hosking
 
 
+from cmath import exp
 import os
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
@@ -72,16 +73,16 @@ class TestOapenWorkflow(ObservatoryTestCase):
     @patch("oaebu_workflows.workflows.oapen_workflow.OapenWorkflow.make_release")
     @patch("observatory.platform.utils.gc_utils.select_table_shard_dates")
     def test_cleanup(self, mock_sel_table_suffixes, mock_mr):
-        mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
+        mock_sel_table_suffixes.return_value = [pendulum.datetime(2022, 1, 1)]
         with CliRunner().isolated_filesystem():
             wf = OapenWorkflow()
 
             mock_mr.return_value = OapenWorkflowRelease(
-                release_date=pendulum.datetime(2021, 1, 1),
+                release_date=pendulum.datetime(2022, 1, 1),
                 gcp_project_id=self.gcp_project_id,
             )
 
-            release = wf.make_release(execution_date=pendulum.datetime(2021, 1, 1))
+            release = wf.make_release(execution_date=pendulum.datetime(2022, 1, 1))
             wf.cleanup(release)
 
     def test_dag_structure(self):
@@ -98,11 +99,7 @@ class TestOapenWorkflow(ObservatoryTestCase):
                     "create_oaebu_book_product_table": ["export_oaebu_table.book_product_list"],
                     "export_oaebu_table.book_product_list": ["export_oaebu_table.book_product_metrics"],
                     "export_oaebu_table.book_product_metrics": ["export_oaebu_table.book_product_metrics_country"],
-                    "export_oaebu_table.book_product_metrics_country": [
-                        "export_oaebu_table.book_product_metrics_institution"
-                    ],
-                    "export_oaebu_table.book_product_metrics_institution": ["export_oaebu_table.institution_list"],
-                    "export_oaebu_table.institution_list": ["export_oaebu_table.book_product_metrics_city"],
+                    "export_oaebu_table.book_product_metrics_country": ["export_oaebu_table.book_product_metrics_city"],
                     "export_oaebu_table.book_product_metrics_city": ["export_oaebu_table.book_product_metrics_events"],
                     "export_oaebu_table.book_product_metrics_events": [
                         "export_oaebu_table.book_product_publisher_metrics"
@@ -111,12 +108,6 @@ class TestOapenWorkflow(ObservatoryTestCase):
                         "export_oaebu_table.book_product_subject_bic_metrics"
                     ],
                     "export_oaebu_table.book_product_subject_bic_metrics": [
-                        "export_oaebu_table.book_product_subject_bisac_metrics"
-                    ],
-                    "export_oaebu_table.book_product_subject_bisac_metrics": [
-                        "export_oaebu_table.book_product_subject_thema_metrics"
-                    ],
-                    "export_oaebu_table.book_product_subject_thema_metrics": [
                         "export_oaebu_table.book_product_year_metrics"
                     ],
                     "export_oaebu_table.book_product_year_metrics": [
@@ -144,20 +135,12 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
 
         self.data_location = os.getenv("TEST_GCP_DATA_LOCATION")
 
-        self.ao_gcp_project_id = "academic-observatory"
-        self.oapen_metadata_dataset_id = "oapen"
-        self.oapen_metadata_table_id = "metadata"
-        self.public_book_metadata_dataset_id = "observatory"
-        self.public_book_metadata_table_id = "book"
-
         self.org_name = OapenWorkflow.ORG_NAME
         self.gcp_project_id = os.getenv("TEST_GCP_PROJECT_ID")
 
         self.gcp_dataset_id = "oaebu"
         self.irus_uk_dag_id_prefix = "oapen_irus_uk"
         self.irus_uk_table_id = "oapen_irus_uk"
-
-        self.irus_uk_dataset_id = "fixtures"
 
         # API environment
         self.host = "localhost"
@@ -218,9 +201,16 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
         conn = Connection(conn_id=AirflowConns.OBSERVATORY_API, uri=f"http://:password@{self.host}:{self.port}")
         env.add_connection(conn)
 
-    def setup_fake_data(self, settings_dataset_id: str, release_date: pendulum.DateTime):
+    def setup_fake_data(self, settings_dataset_id: str, fixtures_dataset_id: str, release_date: pendulum.DateTime):
+        # Settings dataset
         country = load_jsonl(test_fixtures_folder("onix_workflow", "country.jsonl"))
-        schema_path = test_fixtures_folder("onix_workflow", "schema")
+        settings_schema_path = test_fixtures_folder("onix_workflow", "schema")
+        # Fixtures dataset
+        book = load_jsonl(test_fixtures_folder("oapen_workflow", "book.jsonl"))
+        metadata = load_jsonl(test_fixtures_folder("oapen_workflow", "oapen_metadata.jsonl"))
+        oapen_irus_uk = load_jsonl(test_fixtures_folder("oapen_workflow", "oapen_irus_uk.jsonl"))
+        bic_lookup = load_jsonl(test_fixtures_folder("oapen_workflow", "bic_lookup.jsonl"))
+        fixtures_schema_path = test_fixtures_folder("oapen_workflow", "schema")
         tables = [
             Table(
                 "country",
@@ -228,7 +218,39 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
                 settings_dataset_id,
                 country,
                 "country",
-                schema_path,
+                settings_schema_path,
+            ),
+            Table(
+                "book",
+                True,  # book table must be sharded
+                fixtures_dataset_id,
+                book,
+                "book",
+                fixtures_schema_path,
+            ),
+            Table(
+                "oapen_metadata",
+                False,
+                fixtures_dataset_id,
+                metadata,
+                "oapen_metadata",
+                fixtures_schema_path,
+            ),
+            Table(
+                "oapen_irus_uk",
+                False,
+                fixtures_dataset_id,
+                oapen_irus_uk,
+                "oapen_irus_uk",
+                fixtures_schema_path,
+            ),
+            Table(
+                "bic_lookup",
+                False,
+                fixtures_dataset_id,
+                bic_lookup,
+                "bic_lookup",
+                fixtures_schema_path,
             ),
         ]
 
@@ -253,6 +275,7 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
         oaebu_onix_dataset_id = env.add_dataset(prefix="oaebu_onix_dataset")
         oaebu_elastic_dataset_id = env.add_dataset(prefix="data_export")
         oaebu_settings_dataset_id = env.add_dataset(prefix="settings")
+        oaebu_fixtures_dataset_id = env.add_dataset(prefix="fixtures")
 
         # Create the Observatory environment and run tests
         with env.create(task_logging=True):
@@ -261,16 +284,24 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
             self.setup_api()
 
             # Setup workflow
-            start_date = pendulum.datetime(year=2021, month=5, day=9)
+            start_date = pendulum.datetime(year=2022, month=1, day=1)
             workflow = OapenWorkflow(
                 oaebu_onix_dataset=oaebu_onix_dataset_id,
                 oaebu_dataset=oaebu_output_dataset_id,
                 oaebu_intermediate_dataset=oaebu_intermediate_dataset_id,
                 oaebu_elastic_dataset=oaebu_elastic_dataset_id,
-                irus_uk_dataset_id=self.irus_uk_dataset_id,
+                irus_uk_dataset_id=oaebu_fixtures_dataset_id,
+                ao_gcp_project_id=self.gcp_project_id,
+                oapen_gcp_project_id=self.gcp_project_id,
+                oapen_metadata_dataset_id=oaebu_fixtures_dataset_id,
+                oapen_metadata_table_id="oapen_metadata",
+                public_book_metadata_dataset_id=oaebu_fixtures_dataset_id,
+                public_book_metadata_table_id="book",
                 start_date=start_date,
                 country_project_id=self.gcp_project_id,
                 country_dataset_id=oaebu_settings_dataset_id,
+                subject_project_id=self.gcp_project_id,
+                subject_dataset_id=oaebu_fixtures_dataset_id,
                 workflow_id=1,
             )
 
@@ -293,11 +324,11 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
 
             # Run Dummy Dags
             expected_state = "success"
-            execution_date = pendulum.datetime(year=2021, month=5, day=16)
-            release_date = pendulum.datetime(year=2021, month=5, day=22)
+            execution_date = pendulum.datetime(year=2022, month=1, day=8)
+            release_date = pendulum.datetime(year=2022, month=1, day=14)
 
             # Setup fake data
-            self.setup_fake_data(oaebu_settings_dataset_id, release_date)
+            self.setup_fake_data(oaebu_settings_dataset_id, oaebu_fixtures_dataset_id, release_date)
 
             dag = make_dummy_dag(make_dag_id(self.irus_uk_dag_id_prefix, org_name), execution_date)
             with env.create_dag_run(dag, execution_date):
@@ -332,51 +363,48 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
                     )
                 )
 
+                # Create tables and test conditions
+                release_suffix = release_date.strftime("%Y%m%d")
+
                 # Format OAPEN Metadata like ONIX to enable the next steps
                 ti = env.run_task(workflow.create_onix_formatted_metadata_output_tasks.__name__)
                 self.assertEqual(expected_state, ti.state)
+                onix_table_id = f"{self.gcp_project_id}.{oaebu_onix_dataset_id}.onix{release_suffix}"
+                self.assert_table_integrity(onix_table_id, expected_rows=2)
+                self.assert_table_content(
+                    onix_table_id, load_jsonl(test_fixtures_folder("oapen_workflow", "expected_onix.jsonl"))
+                )
 
-                # Create oaebu output tables
+                # Create book product table
                 ti = env.run_task(workflow.create_oaebu_book_product_table.__name__)
                 self.assertEqual(expected_state, ti.state)
+                book_product_table_id = f"{self.gcp_project_id}.{oaebu_output_dataset_id}.book_product{release_suffix}"
+                self.assert_table_integrity(book_product_table_id, expected_rows=2)
+                self.assert_table_content(
+                    book_product_table_id,
+                    load_jsonl(test_fixtures_folder("oapen_workflow", "expected_book_product.jsonl")),
+                )
 
-                # Export oaebu elastic tables
+                # Export oaebu elastic table names and expected row count
                 export_tables = [
-                    "book_product_list",
-                    "book_product_metrics",
-                    "book_product_metrics_country",
-                    "book_product_metrics_institution",
-                    "institution_list",
-                    "book_product_metrics_city",
-                    "book_product_metrics_events",
-                    "book_product_publisher_metrics",
-                    "book_product_subject_bic_metrics",
-                    "book_product_subject_bisac_metrics",
-                    "book_product_subject_thema_metrics",
-                    "book_product_year_metrics",
-                    "book_product_subject_year_metrics",
-                    "book_product_author_metrics",
+                    ("book_product_list", 2),
+                    ("book_product_metrics", 3),
+                    ("book_product_metrics_country", 2),
+                    ("book_product_metrics_city", 2),
+                    ("book_product_metrics_events", 1),
+                    ("book_product_publisher_metrics", 1),
+                    ("book_product_subject_bic_metrics", 1),
+                    ("book_product_year_metrics", 1),
+                    ("book_product_subject_year_metrics", 1),
+                    ("book_product_author_metrics", 2),
                 ]
 
-                for table in export_tables:
+                for table, exp_rows in export_tables:
                     ti = env.run_task(f"{workflow.export_oaebu_table.__name__}.{table}")
                     self.assertEqual(expected_state, ti.state, msg=f"table: {table}")
-
-                # Test conditions
-                release_suffix = release_date.strftime("%Y%m%d")
-
-                # Check records in book_product and book_product_list match
-                sql = (
-                    f"SELECT COUNT(*) from {self.gcp_project_id}.{oaebu_output_dataset_id}.book_product{release_suffix}"
-                )
-                records = run_bigquery_query(sql)
-                count_book_product = len(records)
-
-                sql = f"SELECT COUNT(*) from {self.gcp_project_id}.{oaebu_elastic_dataset_id}.{self.gcp_project_id.replace('-', '_')}_book_product_list{release_suffix}"
-                records = run_bigquery_query(sql)
-                count_book_product_list = len(records)
-
-                self.assertEqual(count_book_product, count_book_product_list)
+                    # Check that the data_export tables tables exist and have the correct number of rows
+                    table_id = f"{self.gcp_project_id}.{oaebu_elastic_dataset_id}.{self.gcp_project_id.replace('-', '_')}_{table}{release_suffix}"
+                    self.assert_table_integrity(table_id, expected_rows=exp_rows)
 
                 # Ensure there are no duplicates
                 sql = f"""  SELECT

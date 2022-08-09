@@ -75,4 +75,4 @@ FROM(
     WHERE month.oapen_irus_uk IS NOT NULL OR month.google_books_traffic IS NOT NULL OR month.google_books_sales IS NOT NULL
     GROUP BY subject, month
     ORDER BY subject ASC, month DESC) as metrics
-LEFT JOIN `oaebu-public-data.oaebu_reference.bic_lookup` as bic on bic.code = subject
+LEFT JOIN `{{ subject_project_id }}.{{ subject_dataset_id}}.bic_lookup` as bic on bic.code = subject

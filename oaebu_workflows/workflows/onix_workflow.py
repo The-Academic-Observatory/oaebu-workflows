@@ -232,6 +232,8 @@ class OnixWorkflow(Workflow):
         country_dataset_id: str = "settings",
         onix_dataset_id: str = "onix",
         onix_table_id: str = "onix",
+        subject_project_id: str = "oaebu-public-data",
+        subject_dataset_id: str = "oaebu_reference",
         schema_folder: str = default_schema_folder(),
         dag_id: Optional[str] = None,
         start_date: Optional[pendulum.DateTime] = pendulum.datetime(2021, 3, 28),
@@ -267,6 +269,8 @@ class OnixWorkflow(Workflow):
         self.gcp_bucket_name = gcp_bucket_name
         self.onix_dataset_id = onix_dataset_id
         self.onix_table_id = onix_table_id
+        self.subject_project_id = subject_project_id
+        self.subject_dataset_id = subject_dataset_id
         self.schema_folder = schema_folder
 
         api = make_observatory_api()
@@ -773,6 +777,8 @@ class OnixWorkflow(Workflow):
             release=release_date,
             country_project_id=self.country_project_id,
             country_dataset_id=self.country_dataset_id,
+            subject_project_id=self.subject_project_id,
+            subject_dataset_id=self.subject_dataset_id,
         )
 
         status = create_bigquery_table_from_query(
