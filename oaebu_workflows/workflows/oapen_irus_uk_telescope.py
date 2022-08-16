@@ -233,7 +233,7 @@ class OapenIrusUkTelescope(OrganisationTelescope):
         publisher_name_v4: str,
         publisher_uuid_v5: str,
         dag_id: Optional[str] = None,
-        start_date: pendulum.DateTime = pendulum.datetime(2018, 1, 1),
+        start_date: pendulum.DateTime = pendulum.datetime(2015, 6, 1),
         schedule_interval: str = "0 0 14 * *",
         dataset_id: str = "oapen",
         schema_folder: str = default_schema_folder(),
