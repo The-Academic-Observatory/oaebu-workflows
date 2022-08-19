@@ -19,7 +19,7 @@ from cmath import exp
 import os
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
-
+import vcr
 import pendulum
 from click.testing import CliRunner
 
@@ -95,7 +95,13 @@ class TestOapenWorkflow(ObservatoryTestCase):
                     "oapen_irus_uk_oapen_press_sensor": ["check_dependencies"],
                     "oapen_metadata_sensor": ["check_dependencies"],
                     "check_dependencies": ["create_onix_formatted_metadata_output_tasks"],
-                    "create_onix_formatted_metadata_output_tasks": ["create_oaebu_book_product_table"],
+                    "create_onix_formatted_metadata_output_tasks": [
+                        "create_oaebu_crossref_metadata_table",
+                        "create_oaebu_crossref_events_table",
+                    ],
+                    "create_oaebu_crossref_metadata_table": ["create_oaebu_book_table"],
+                    "create_oaebu_crossref_events_table": ["create_oaebu_book_table"],
+                    "create_oaebu_book_table": ["create_oaebu_book_product_table"],
                     "create_oaebu_book_product_table": ["export_oaebu_table.book_product_list"],
                     "export_oaebu_table.book_product_list": ["export_oaebu_table.book_product_metrics"],
                     "export_oaebu_table.book_product_metrics": ["export_oaebu_table.book_product_metrics_country"],
@@ -141,6 +147,10 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
         self.gcp_dataset_id = "oaebu"
         self.irus_uk_dag_id_prefix = "oapen_irus_uk"
         self.irus_uk_table_id = "oapen_irus_uk"
+
+        # vcrpy cassettes for http request mocking
+        self.metadata_cassette = test_fixtures_folder("oapen_workflow", "crossref_metadata_request.yaml")
+        self.events_cassette = test_fixtures_folder("oapen_workflow", "crossref_events_request.yaml")
 
         # API environment
         self.host = "localhost"
@@ -206,7 +216,6 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
         country = load_jsonl(test_fixtures_folder("onix_workflow", "country.jsonl"))
         settings_schema_path = test_fixtures_folder("onix_workflow", "schema")
         # Fixtures dataset
-        book = load_jsonl(test_fixtures_folder("oapen_workflow", "book.jsonl"))
         metadata = load_jsonl(test_fixtures_folder("oapen_workflow", "oapen_metadata.jsonl"))
         oapen_irus_uk = load_jsonl(test_fixtures_folder("oapen_workflow", "oapen_irus_uk.jsonl"))
         bic_lookup = load_jsonl(test_fixtures_folder("oapen_workflow", "bic_lookup.jsonl"))
@@ -219,14 +228,6 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
                 country,
                 "country",
                 settings_schema_path,
-            ),
-            Table(
-                "book",
-                True,  # book table must be sharded
-                fixtures_dataset_id,
-                book,
-                "book",
-                fixtures_schema_path,
             ),
             Table(
                 "oapen_metadata",
@@ -265,6 +266,15 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
     def test_run_workflow_tests(self):
         """Functional test of the OAPEN workflow"""
 
+        def vcr_ignore_condition(request):
+            """This function is used by vcrpy to allow requests to sources not in the cassette file.
+            At time of writing, the only mocked requests are the ones to crossref events and metadata."""
+            allowed_domains = ["https://api.crossref.org", "https://api.eventdata.crossref.org"]
+            allow_request = any([request.url.startswith(i) for i in allowed_domains])
+            if not allow_request:
+                return None
+            return request
+
         # Setup Observatory environment
         env = ObservatoryEnvironment(self.gcp_project_id, self.data_location, api_port=self.port, api_host=self.host)
         org_name = self.org_name
@@ -276,6 +286,7 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
         oaebu_elastic_dataset_id = env.add_dataset(prefix="data_export")
         oaebu_settings_dataset_id = env.add_dataset(prefix="settings")
         oaebu_fixtures_dataset_id = env.add_dataset(prefix="fixtures")
+        oaebu_crossref_dataset_id = env.add_dataset(prefix="crossref")
 
         # Create the Observatory environment and run tests
         with env.create(task_logging=True):
@@ -285,8 +296,10 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
 
             # Setup workflow
             start_date = pendulum.datetime(year=2022, month=1, day=1)
+            crossref_start_date = pendulum.datetime(year=2018, month=5, day=14)
             workflow = OapenWorkflow(
                 oaebu_onix_dataset=oaebu_onix_dataset_id,
+                oaebu_onix_table_id="onix",
                 oaebu_dataset=oaebu_output_dataset_id,
                 oaebu_intermediate_dataset=oaebu_intermediate_dataset_id,
                 oaebu_elastic_dataset=oaebu_elastic_dataset_id,
@@ -295,14 +308,14 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
                 oapen_gcp_project_id=self.gcp_project_id,
                 oapen_metadata_dataset_id=oaebu_fixtures_dataset_id,
                 oapen_metadata_table_id="oapen_metadata",
-                public_book_metadata_dataset_id=oaebu_fixtures_dataset_id,
-                public_book_metadata_table_id="book",
                 start_date=start_date,
+                crossref_start_date=crossref_start_date,
                 country_project_id=self.gcp_project_id,
                 country_dataset_id=oaebu_settings_dataset_id,
                 subject_project_id=self.gcp_project_id,
                 subject_dataset_id=oaebu_fixtures_dataset_id,
                 workflow_id=1,
+                max_threads=1,  # Having more than 1 thread for testing will give inconsistent returns due to VCR
             )
 
             # Override sensor grace period and dag check
@@ -360,6 +373,8 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
                     return_value=OapenWorkflowRelease(
                         release_date=release_date,
                         gcp_project_id=self.gcp_project_id,
+                        gcp_bucket_name=env.transform_bucket,
+                        crossref_dataset_id=oaebu_crossref_dataset_id,
                     )
                 )
 
@@ -370,28 +385,54 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
                 ti = env.run_task(workflow.create_onix_formatted_metadata_output_tasks.__name__)
                 self.assertEqual(expected_state, ti.state)
                 onix_table_id = f"{self.gcp_project_id}.{oaebu_onix_dataset_id}.onix{release_suffix}"
-                self.assert_table_integrity(onix_table_id, expected_rows=2)
                 self.assert_table_content(
                     onix_table_id, load_jsonl(test_fixtures_folder("oapen_workflow", "expected_onix.jsonl"))
+                )
+
+                # Load crossref metadata table into bigquery
+                metadata_vcr = vcr.VCR(record_mode="none", before_record_request=vcr_ignore_condition)
+                with metadata_vcr.use_cassette(self.metadata_cassette):
+                    ti = env.run_task(workflow.create_oaebu_crossref_metadata_table.__name__)
+                # Assertions
+                self.assertEqual(expected_state, ti.state)
+                self.assert_table_content(
+                    f"{self.gcp_project_id}.{oaebu_crossref_dataset_id}.crossref_metadata{release_suffix}",
+                    load_jsonl(test_fixtures_folder("oapen_workflow", "expected_crossref_metadata.jsonl")),
+                )
+
+                # Load crossref event table into bigquery
+                events_vcr = vcr.VCR(record_mode="none", before_record_request=vcr_ignore_condition)
+                with events_vcr.use_cassette(self.events_cassette):
+                    ti = env.run_task(workflow.create_oaebu_crossref_events_table.__name__)
+                self.assertEqual(expected_state, ti.state)
+                self.assert_table_content(
+                    f"{self.gcp_project_id}.{oaebu_crossref_dataset_id}.crossref_events{release_suffix}",
+                    load_jsonl(test_fixtures_folder("oapen_workflow", "expected_crossref_events.jsonl")),
+                )
+
+                # Create book table in bigquery
+                ti = env.run_task(workflow.create_oaebu_book_table.__name__)
+                self.assertEqual(expected_state, ti.state)
+                self.assert_table_content(
+                    f"{self.gcp_project_id}.{oaebu_output_dataset_id}.book{release_suffix}",
+                    load_jsonl(test_fixtures_folder("oapen_workflow", "expected_book.jsonl")),
                 )
 
                 # Create book product table
                 ti = env.run_task(workflow.create_oaebu_book_product_table.__name__)
                 self.assertEqual(expected_state, ti.state)
-                book_product_table_id = f"{self.gcp_project_id}.{oaebu_output_dataset_id}.book_product{release_suffix}"
-                self.assert_table_integrity(book_product_table_id, expected_rows=2)
                 self.assert_table_content(
-                    book_product_table_id,
+                    f"{self.gcp_project_id}.{oaebu_output_dataset_id}.book_product{release_suffix}",
                     load_jsonl(test_fixtures_folder("oapen_workflow", "expected_book_product.jsonl")),
                 )
 
                 # Export oaebu elastic table names and expected row count
                 export_tables = [
-                    ("book_product_list", 2),
-                    ("book_product_metrics", 3),
+                    ("book_product_list", 3),
+                    ("book_product_metrics", 2),
                     ("book_product_metrics_country", 2),
                     ("book_product_metrics_city", 2),
-                    ("book_product_metrics_events", 1),
+                    ("book_product_metrics_events", 0),
                     ("book_product_publisher_metrics", 1),
                     ("book_product_subject_bic_metrics", 1),
                     ("book_product_year_metrics", 1),

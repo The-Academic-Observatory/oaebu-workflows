@@ -52,6 +52,14 @@ The Work Family ID will be an arbitrary Work ID (ISBN) representative from a wor
    :width: 100%
    :header-rows: 1
 ```
+## Create Crossref metadata table
+Crossref data is required to proceed. The ISBNs for each work is obtained from the publisher's Onix table. For each of these ISBNs, the Crossref [metadata REST API](https://api.crossref.org/) is queried.  
+
+## Create Crossref events table
+Similarly to the metadata, Crossref event data is retrieved through Crossref's dedicated [event REST API](https://www.eventdata.crossref.org/guide/service/query-api/). The API accepts queries based on DOI only, which we retrienve by matching the appropriate ISBN13 from the metadata.  
+
+## Create book table
+The book table is a collection of works and their relevant details for the relative publisher. The table accommodates a title's Crossref metadata, events and separate chapters.
 
 ## Create intermediate tables
 For each data partner's tables containing ISBN, create new "matched" tables which extend the original data with new "work_id" and "work_family_id" columns.
