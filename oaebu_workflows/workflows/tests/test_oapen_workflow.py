@@ -36,6 +36,7 @@ from observatory.platform.utils.test_utils import (
     bq_load_tables,
     make_dummy_dag,
     find_free_port,
+    make_prefix,
 )
 from observatory.platform.utils.workflow_utils import (
     make_dag_id,
@@ -141,6 +142,9 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
         self.gcp_dataset_id = "oaebu"
         self.irus_uk_dag_id_prefix = "oapen_irus_uk"
         self.irus_uk_table_id = "oapen_irus_uk"
+
+        # Create prefix depending on test name and organisation
+        self.prefix = make_prefix(self.__class__.__name__, self.org_name)
 
         # API environment
         self.host = "localhost"
@@ -266,8 +270,12 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
         """Functional test of the OAPEN workflow"""
 
         # Setup Observatory environment
-        env = ObservatoryEnvironment(self.gcp_project_id, self.data_location, api_port=self.port, api_host=self.host)
+        env = ObservatoryEnvironment(self.gcp_project_id, self.data_location, prefix=self.prefix, api_port=self.port, api_host=self.host)
         org_name = self.org_name
+
+        # Remove buckets and datasets 7 days or older.
+        env.delete_old_test_buckets(age_to_delete=7)
+        env.delete_old_test_datasets(age_to_delete=7)
 
         # Create datasets
         oaebu_intermediate_dataset_id = env.add_dataset(prefix="oaebu_intermediate")

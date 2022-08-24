@@ -38,6 +38,7 @@ from observatory.platform.utils.test_utils import (
     ObservatoryTestCase,
     module_file_path,
     find_free_port,
+    make_prefix,
 )
 from observatory.platform.utils.workflow_utils import (
     blob_name,
@@ -86,6 +87,9 @@ class TestDoabTelescope(ObservatoryTestCase):
         self.api = ObservatoryApi(api_client=api_client)  # noqa: E501
         self.env = ObservatoryApiEnvironment(host=self.host, port=self.port)
         self.org_name = "UCL Press"
+
+        # Create prefix depending on test name and organisation
+        self.prefix = make_prefix(self.__class__.__name__, self.org_name)
 
     def setup_api(self):
         dt = pendulum.now("UTC")
@@ -165,7 +169,7 @@ class TestDoabTelescope(ObservatoryTestCase):
         :return: None
         """
 
-        env = ObservatoryEnvironment(self.project_id, self.data_location, api_host=self.host, api_port=self.port)
+        env = ObservatoryEnvironment(self.project_id, self.data_location, prefix=self.prefix, api_host=self.host, api_port=self.port)
 
         with env.create():
             self.setup_connections(env)
@@ -178,7 +182,12 @@ class TestDoabTelescope(ObservatoryTestCase):
         :return: None.
         """
         # Setup Observatory environment
-        env = ObservatoryEnvironment(self.project_id, self.data_location, api_host=self.host, api_port=self.port)
+        env = ObservatoryEnvironment(self.project_id, self.data_location, prefix=self.prefix, api_host=self.host, api_port=self.port)
+
+        # Remove buckets and datasets 7 days or older.
+        env.delete_old_test_buckets(age_to_delete=7)
+        env.delete_old_test_datasets(age_to_delete=7)
+
         dataset_id = env.add_dataset()
 
         # Setup Telescope

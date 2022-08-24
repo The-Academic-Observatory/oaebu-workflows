@@ -23,7 +23,7 @@ from oaebu_workflows.config import elastic_mappings_folder
 from oaebu_workflows.dags.elastic_import_workflow import load_elastic_mappings_oaebu
 from observatory.platform.utils.config_utils import module_file_path
 from observatory.platform.utils.jinja2_utils import render_template
-from observatory.platform.utils.test_utils import ObservatoryEnvironment, ObservatoryTestCase
+from observatory.platform.utils.test_utils import ObservatoryEnvironment, ObservatoryTestCase, make_prefix
 from observatory.platform.utils.workflow_utils import make_dag_id
 
 
@@ -34,6 +34,9 @@ class TestElasticImportWorkflow(ObservatoryTestCase):
         super().__init__(*args, **kwargs)
         self.project_id = os.getenv("TEST_GCP_PROJECT_ID")
         self.data_location = os.getenv("TEST_GCP_DATA_LOCATION")
+
+        # Create prefix depending on test name and organisation
+        self.prefix = make_prefix(self.__class__.__name__, "")
 
     def test_load_elastic_mappings_oaebu(self):
         """Test load_elastic_mappings_oaebu"""
@@ -157,7 +160,7 @@ class TestElasticImportWorkflow(ObservatoryTestCase):
         :return: None
         """
 
-        env = ObservatoryEnvironment(self.project_id, self.data_location, enable_api=False)
+        env = ObservatoryEnvironment(self.project_id, self.data_location, prefix=self.prefix, enable_api=False)
         with env.create():
             expected_dag_ids = [
                 make_dag_id("elastic_import", suffix)

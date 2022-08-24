@@ -36,6 +36,7 @@ from observatory.platform.utils.test_utils import (
     ObservatoryTestCase,
     module_file_path,
     find_free_port,
+    make_prefix,
 )
 from observatory.platform.utils.workflow_utils import blob_name, table_ids_from_path
 from observatory.api.testing import ObservatoryApiEnvironment
@@ -69,6 +70,9 @@ class TestJstorTelescope(ObservatoryTestCase):
         self.extra = {"publisher_id": "anupress"}
         self.host = "localhost"
         self.api_port = find_free_port()
+
+        # Create prefix depending on test name and organisation
+        self.prefix = make_prefix(self.__class__.__name__, self.organisation_name)
 
         self.release_date = pendulum.parse("20210301").end_of("month")
         publisher_id = self.extra.get("publisher_id")
@@ -191,7 +195,7 @@ class TestJstorTelescope(ObservatoryTestCase):
         :return: None
         """
 
-        env = ObservatoryEnvironment(self.project_id, self.data_location, api_host=self.host, api_port=self.port)
+        env = ObservatoryEnvironment(self.project_id, self.data_location, prefix=self.prefix, api_host=self.host, api_port=self.port)
         with env.create():
             self.setup_connections(env)
             self.setup_api()
@@ -216,7 +220,12 @@ class TestJstorTelescope(ObservatoryTestCase):
         mock_build.return_value = build("gmail", "v1", http=http)
 
         # Setup Observatory environment
-        env = ObservatoryEnvironment(self.project_id, self.data_location, api_host=self.host, api_port=self.port)
+        env = ObservatoryEnvironment(self.project_id, self.data_location, prefix=self.prefix, api_host=self.host, api_port=self.port)
+
+        # Remove buckets and datasets 7 days or older.
+        env.delete_old_test_buckets(age_to_delete=7)
+        env.delete_old_test_datasets(age_to_delete=7)
+
         dataset_id = env.add_dataset()
 
         # Setup Telescope

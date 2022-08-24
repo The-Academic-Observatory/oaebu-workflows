@@ -31,6 +31,7 @@ from observatory.platform.utils.test_utils import (
     SftpServer,
     module_file_path,
     find_free_port,
+    make_prefix,
 )
 from observatory.platform.utils.workflow_utils import (
     SftpFolders,
@@ -83,6 +84,9 @@ class TestOnixTelescope(ObservatoryTestCase):
         self.api = ObservatoryApi(api_client=api_client)  # noqa: E501
         self.env = ObservatoryApiEnvironment(host=self.host, port=self.port)
         self.org_name = "Curtin Press"
+
+        # Create prefix depending on test name and organisation
+        self.prefix = make_prefix(self.__class__.__name__, self.org_name)
 
     def setup_api(self):
         dt = pendulum.now("UTC")
@@ -173,7 +177,7 @@ class TestOnixTelescope(ObservatoryTestCase):
         :return: None
         """
 
-        env = ObservatoryEnvironment(self.project_id, self.data_location, api_host=self.host, api_port=self.port)
+        env = ObservatoryEnvironment(self.project_id, self.data_location, prefix=self.prefix, api_host=self.host, api_port=self.port)
         with env.create():
             self.setup_connections(env)
             self.setup_api()
@@ -187,8 +191,13 @@ class TestOnixTelescope(ObservatoryTestCase):
         """
 
         # Setup Observatory environment
-        env = ObservatoryEnvironment(self.project_id, self.data_location, api_host=self.host, api_port=self.port)
+        env = ObservatoryEnvironment(self.project_id, self.data_location, prefix=self.prefix, api_host=self.host, api_port=self.port)
         sftp_server = SftpServer(host=self.host, port=self.sftp_port)
+
+        # Remove buckets and datasets 7 days or older.
+        env.delete_old_test_buckets(age_to_delete=7)
+        env.delete_old_test_datasets(age_to_delete=7)
+
         dataset_id = env.add_dataset()
 
         # Create the Observatory environment and run tests

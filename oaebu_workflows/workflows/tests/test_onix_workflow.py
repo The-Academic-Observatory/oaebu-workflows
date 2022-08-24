@@ -58,6 +58,7 @@ from observatory.platform.utils.test_utils import (
     make_dummy_dag,
     module_file_path,
     find_free_port,
+    make_prefix,
 )
 from observatory.platform.utils.test_utils import (
     random_id,
@@ -812,7 +813,10 @@ class TestOnixWorkflow(ObservatoryTestCase):
         mock_bq_query.return_value = TestOnixWorkflow.onix_data
         mock_api.return_value = self.api
 
-        env = ObservatoryEnvironment(self.project_id, self.data_location, api_host=self.host, api_port=self.port)
+        # Create prefix depending on test name and organisation
+        self.prefix = make_prefix(self.__class__.__name__, self.telescope.organisation.name)
+
+        env = ObservatoryEnvironment(self.project_id, self.data_location, prefix=self.prefix, api_host=self.host, api_port=self.port)
         with env.create():
             self.seed_db()
             with CliRunner().isolated_filesystem():
@@ -1807,15 +1811,21 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
         dag_file = os.path.join(module_file_path("oaebu_workflows.dags"), "onix_workflow.py")
         org_names = ["ANU Press", "UCL Press", "University of Michigan Press"]
 
-        env = ObservatoryEnvironment(self.gcp_project_id, self.data_location, api_host=self.host, api_port=self.port)
-        with env.create():
-            # Add Observatory API connection
-            self.setup_connections(env)
-            self.setup_api(orgs=org_names)
-            self.seed_db()
+        # For each organisation name, create an environment and unique prefix
+        for org_name in org_names:
+            
+            # Create prefix depending on test name and organisation
+            self.prefix = make_prefix(self.__class__.__name__, org_name)
 
-            # Check that all DAGs load
-            for org_name in org_names:
+            env = ObservatoryEnvironment(self.gcp_project_id, self.data_location, prefix=self.prefix, api_host=self.host, api_port=self.port)
+            with env.create():
+
+                # Add Observatory API connection
+                self.setup_connections(env)
+                self.setup_api(orgs=org_names)
+                self.seed_db()
+
+                # Check that all DAGs load
                 dag_id = make_dag_id("onix_workflow", org_name)
                 self.assert_dag_load(dag_id, dag_file)
 
@@ -1980,8 +1990,15 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
     def run_telescope_tests(self, *, org_name: str, include_google_analytics: bool = False):
         """Functional test of the ONIX workflow"""
 
+        # Create prefix depending on test name and organisation
+        self.prefix = make_prefix(self.__class__.__name__, org_name)
+
         # Setup Observatory environment
-        env = ObservatoryEnvironment(self.gcp_project_id, self.data_location, api_host=self.host, api_port=self.port)
+        env = ObservatoryEnvironment(self.gcp_project_id, self.data_location, prefix=self.prefix, api_host=self.host, api_port=self.port)
+
+        # Remove buckets and datasets 7 days or older.
+        env.delete_old_test_buckets(age_to_delete=7)
+        env.delete_old_test_datasets(age_to_delete=7)
 
         # Create datasets
         partner_release_date = pendulum.datetime(2022, 6, 13)
