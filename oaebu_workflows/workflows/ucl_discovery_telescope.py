@@ -164,6 +164,7 @@ class UclDiscoveryRelease(OrganisationRelease):
                         "language": row["language"],
                         "doi": row["doi"],
                         "isbn": row["isbn_13"],
+                        "isbn10": row["isbn"],
                         "language_elements": row["language_elements"],
                         "series": row["series"],
                         "pagerange": row["pagerange"],
