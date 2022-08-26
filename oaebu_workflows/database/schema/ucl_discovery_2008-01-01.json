@@ -96,6 +96,12 @@
     "type": "STRING"
   },
   {
+    "description": "ISBN10",
+    "mode": "NULLABLE",
+    "name": "isbn10",
+    "type": "STRING"
+  },
+  {
     "description": "Language elements",
     "mode": "NULLABLE",
     "name": "language_elements",

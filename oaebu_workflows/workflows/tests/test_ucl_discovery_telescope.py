@@ -74,7 +74,7 @@ class TestUclDiscoveryTelescope(ObservatoryTestCase):
         self.metadata_cassette = test_fixtures_folder("ucl_discovery", "metadata.yaml")
         self.country_cassette = test_fixtures_folder("ucl_discovery", "country.yaml")
         self.download_hash = "8ae68aa5a455a1835fd906665746ee8c"
-        self.transform_hash = "5a552603"
+        self.transform_hash = "ef8ba725"
 
         # API environment
         self.host = "localhost"
