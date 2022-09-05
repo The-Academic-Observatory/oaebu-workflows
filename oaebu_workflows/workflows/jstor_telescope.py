@@ -216,6 +216,7 @@ class JstorTelescope(OrganisationTelescope):
             max_active_runs=max_active_runs,
             workflow_id=workflow_id,
             tags=[Tag.oaebu],
+            load_bigquery_table_kwargs={"ignore_unknown_values": True},
         )
         self.publisher_id = publisher_id
 
