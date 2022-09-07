@@ -284,6 +284,14 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["Wits Press OAPEN IRUS-UK Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.oapen_irus_uk),
     )
+    name = "UoMP Fulcrum Dataset"
+    dataset_info[name] = Dataset(
+        name=name,
+        service="google",
+        address="oaebu-umich-press.oapen.fulcrum",
+        workflow=workflows["UoMP Fulcrum Telescope"],
+        dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.fulcrum),
+    )
     name = "OBP OAPEN IRUS UK Dataset"
     dataset_info[name] = Dataset(
         name=name,

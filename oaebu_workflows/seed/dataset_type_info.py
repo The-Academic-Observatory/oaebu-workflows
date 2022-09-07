@@ -85,6 +85,12 @@ def get_dataset_type_info(api: ObservatoryApi):
         name="ONIX Workflow",
         table_type=TableType(id=ttids[TableTypeId.partitioned]),
     )
+    dataset_type_info[DatasetTypeId.fulcrum] = DatasetType(
+        type_id=DatasetTypeId.fulcrum,
+        name="Fuclrum Telescope",
+        extra={"isbn_field_name": "ISBN", "title_field_name": "book_title"},
+        table_type=TableType(id=ttids[TableTypeId.partitioned]),
+    )
     return dataset_type_info
 
 

@@ -251,6 +251,14 @@ def get_workflow_info(api: ObservatoryApi):
         },
         tags='["oaebu"]',
     )
+    name = "UoMP Fulcrum Telescope"
+    workflow_info[name] = Workflow(
+        name=name,
+        organisation=Organisation(id=orgids["University of Michigan Press"]),
+        workflow_type=WorkflowType(id=wftids[WorkflowTypeId.fulcrum]),
+        extra={},
+        tags='["oaebu"]',
+    )
     name = "UCL Press UCL Discovery Telescope"
     workflow_info[name] = Workflow(
         name=name,
