@@ -70,32 +70,32 @@ class TestJstorTelescope(ObservatoryTestCase):
         self.host = "localhost"
         self.api_port = find_free_port()
 
-        self.release_date = pendulum.parse("20210301").end_of("month")
+        self.release_date = pendulum.parse("20220701").end_of("month")
         publisher_id = self.extra.get("publisher_id")
         self.country_report = {
-            "path": test_fixtures_folder("jstor", "country_20210401.tsv"),
+            "path": test_fixtures_folder("jstor", "country_20220801.tsv"),
             "url": "https://www.jstor.org/admin/reports/download/249192019",
             "headers": {
                 "Content-Disposition": f"attachment; filename=PUB_{publisher_id}_PUBBCU_"
                 f'{self.release_date.strftime("%Y%m%d")}.tsv'
             },
-            "download_hash": "1bad528f89b2d8df0846c47a58d7fb2e",
-            "transform_hash": "9b197a54",
+            "download_hash": "9330cc71f8228838ac84abb33cedb3b8",
+            "transform_hash": "5a72fe64",
             "table_rows": 10,
         }
         self.institution_report = {
-            "path": test_fixtures_folder("jstor", "institution_20210401.tsv"),
+            "path": test_fixtures_folder("jstor", "institution_20220801.tsv"),
             "url": "https://www.jstor.org/admin/reports/download/129518301",
             "headers": {
                 "Content-Disposition": f"attachment; filename=PUB_{publisher_id}_PUBBIU_"
                 f'{self.release_date.strftime("%Y%m%d")}.tsv'
             },
-            "download_hash": "793ee70d9102d8dca3cace65cb00ecc3",
-            "transform_hash": "4a664f4d",
+            "download_hash": "1c78c316766a3f7306d6c19440250484",
+            "transform_hash": "f339ea81",
             "table_rows": 3,
         }
         self.wrong_publisher_report = {
-            "path": test_fixtures_folder("jstor", "institution_20210401.tsv"),  # has to be valid path, but is not used
+            "path": test_fixtures_folder("jstor", "institution_20220801.tsv"),  # has to be valid path, but is not used
             "url": "https://www.jstor.org/admin/reports/download/12345",
             "headers": {
                 "Content-Disposition": f"attachment; filename=PUB_publisher_PUBBIU_"

@@ -92,20 +92,29 @@ class JstorRelease(OrganisationRelease):
         :return: None.
         """
         for file in self.download_files:
+            release_date = get_release_date(file)
+            release_column = release_date.strftime("%b-%Y")  # e.g. Jan-2020
+            usage_month = release_date.strftime("%Y-%m")
             results = []
             # Check if report has header in old or new format based on the first line
             with open(file, "r") as tsv_file:
                 first_line = tsv_file.readline()
-            with open(file, "r") as tsv_file:
-                # Skip the header section of the file for the new format
-                if first_line.startswith("Report_Name"):
-                    line = None
-                    while line != "\n":
-                        line = next(tsv_file)
-                csv_reader = csv.DictReader(tsv_file, delimiter="\t")
-                for row in csv_reader:
-                    transformed_row = OrderedDict((convert(k), v) for k, v in row.items())
-                    results.append(transformed_row)
+                with open(file, "r") as tsv_file:
+                    # Skip the header section of the file for the new format
+                    if first_line.startswith("Report_Name"):
+                        line = None
+                        while line != "\n":
+                            line = next(tsv_file)
+                    csv_reader = csv.DictReader(tsv_file, delimiter="\t")
+                    for row in csv_reader:
+                        transformed_row = OrderedDict((convert(k), v) for k, v in row.items())
+                        # As of 2022-07, Some column names have changed and conflict with our schema
+                        transformed_row.pop(release_column, None)
+                        if "Usage_Month" not in transformed_row:
+                            transformed_row["Usage_Month"] = usage_month
+                        if "Total_Item_Requests" not in transformed_row:
+                            transformed_row["Total_Item_Requests"] = transformed_row.pop("Reporting_Period_Total")
+                        results.append(transformed_row)
 
             results = add_partition_date(results, self.release_date, bigquery.TimePartitioningType.MONTH)
             report_type = "country" if "country" in file else "institution"
