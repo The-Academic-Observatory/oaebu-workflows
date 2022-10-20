@@ -169,7 +169,7 @@ class JstorTelescope(OrganisationTelescope):
         publisher_id: str,
         dag_id: Optional[str] = None,
         start_date: pendulum.DateTime = pendulum.datetime(2016, 10, 1),
-        schedule_interval: str = "@monthly",
+        schedule_interval: str = "0 0 4 * *",  # 4th day of every month
         dataset_id: str = "jstor",
         schema_folder: str = default_schema_folder(),
         source_format: str = SourceFormat.NEWLINE_DELIMITED_JSON,
