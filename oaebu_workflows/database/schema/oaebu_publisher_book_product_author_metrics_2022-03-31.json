@@ -27,9 +27,9 @@
     "fields": [
       {
         "mode": "NULLABLE",
-        "name": "unique_views",
+        "name": "views_total_country",
         "type": "INTEGER",
-        "description": "Number of unique views"
+        "description": "Number of page views aggregated over all countries"
       },
       {
         "mode": "NULLABLE",
@@ -69,10 +69,16 @@
       }, 
       {
         "mode": "NULLABLE",
+        "name": "downloads_mobi_book",
+        "type": "INTEGER",
+        "description": "Number of MOBI book downloads"
+      }, 
+      {
+        "mode": "NULLABLE",
         "name": "downloads_mobi_chapter",
         "type": "INTEGER",
         "description": "Number of MOBI chapter downloads"
-      } 
+      }
     ],
     "mode": "NULLABLE",
     "name": "google_analytics",

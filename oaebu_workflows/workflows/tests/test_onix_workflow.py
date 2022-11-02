@@ -63,12 +63,12 @@ from oaebu_workflows.seed.dataset_type_info import get_dataset_type_info
 from observatory.api.testing import ObservatoryApiEnvironment
 from observatory.platform.utils.airflow_utils import AirflowConns
 from observatory.platform.utils.file_utils import load_jsonl
+from observatory.platform.utils.config_utils import find_schema
 from observatory.platform.utils.gc_utils import (
     run_bigquery_query,
     upload_files_to_cloud_storage,
     upload_file_to_cloud_storage,
 )
-from observatory.platform.utils.url_utils import get_user_agent
 from observatory.platform.utils.release_utils import get_dataset_releases
 from observatory.platform.utils.test_utils import (
     ObservatoryEnvironment,
@@ -79,19 +79,16 @@ from observatory.platform.utils.test_utils import (
     module_file_path,
     find_free_port,
 )
-from observatory.platform.utils.test_utils import (
-    random_id,
-)
+from observatory.platform.utils.test_utils import random_id
 from observatory.platform.utils.workflow_utils import (
     bq_load_partition,
-    bq_load_shard_v2,
+    bq_load_shard,
     make_dag_id,
     table_ids_from_path,
 )
 from observatory.api.utils import seed_table_type, seed_dataset_type
 from oaebu_workflows.seed.table_type_info import get_table_type_info
 from oaebu_workflows.seed.dataset_type_info import get_dataset_type_info
-from sqlalchemy import table
 
 
 class TestOnixWorkflowRelease(unittest.TestCase):
@@ -364,7 +361,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     self.assertEqual(release.workflow_dataset, "onix_workflow")
                     self.assertEqual(release.project_id, "project_id")
                     self.assertEqual(release.onix_dataset_id, "onix")
-                    self.assertEqual(release.dataset_location, "us")
+                    self.assertEqual(release.data_location, "us")
                     self.assertEqual(release.dataset_description, "ONIX workflow tables")
 
                     self.assertEqual(release.onix_table_id, "onix")
@@ -820,7 +817,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
     @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
     @patch("oaebu_workflows.workflows.onix_workflow.OnixWorkflow.make_release")
     @patch("oaebu_workflows.workflows.onix_workflow.run_bigquery_query")
-    @patch("oaebu_workflows.workflows.onix_workflow.bq_load_shard_v2")
+    @patch("oaebu_workflows.workflows.onix_workflow.bq_load_shard")
     @patch("oaebu_workflows.workflows.onix_workflow.upload_files_to_cloud_storage")
     @patch("oaebu_workflows.workflows.onix_workflow.list_to_jsonl_gz")
     @patch("observatory.platform.utils.gc_utils.select_table_shard_dates")
@@ -908,11 +905,12 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 wf.bq_load_workid_lookup(release)
                 self.assertEqual(mock_bq_load_lookup.call_count, 1)
                 _, call_args = mock_bq_load_lookup.call_args
+                self.assertTrue(call_args["schema_file_path"].endswith("onix_workid_isbn.json"))
                 self.assertEqual(call_args["project_id"], "project_id")
                 self.assertEqual(call_args["transform_bucket"], "bucket_name")
                 self.assertEqual(call_args["transform_blob"], "onix_workflow_test/20210101/onix_workid_isbn.jsonl.gz")
                 self.assertEqual(call_args["dataset_id"], "onix_workflow")
-                self.assertEqual(call_args["dataset_location"], "us")
+                self.assertEqual(call_args["data_location"], "us")
                 self.assertEqual(call_args["table_id"], "onix_workid_isbn")
                 self.assertEqual(call_args["release_date"], pendulum.datetime(2021, 1, 1))
                 self.assertEqual(call_args["source_format"], "NEWLINE_DELIMITED_JSON")
@@ -922,24 +920,23 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 wf.bq_load_workid_lookup_errors(release)
                 self.assertEqual(mock_bq_load_lookup.call_count, 2)
                 _, call_args = mock_bq_load_lookup.call_args
+                self.assertTrue(call_args["schema_file_path"].endswith("onix_workid_isbn_errors.json"))
                 self.assertEqual(call_args["project_id"], "project_id")
                 self.assertEqual(call_args["transform_bucket"], "bucket_name")
                 self.assertEqual(
                     call_args["transform_blob"], "onix_workflow_test/20210101/onix_workid_isbn_errors.jsonl.gz"
                 )
                 self.assertEqual(call_args["dataset_id"], "onix_workflow")
-                self.assertEqual(call_args["dataset_location"], "us")
+                self.assertEqual(call_args["data_location"], "us")
                 self.assertEqual(call_args["table_id"], "onix_workid_isbn_errors")
                 self.assertEqual(call_args["release_date"], pendulum.datetime(2021, 1, 1))
                 self.assertEqual(call_args["source_format"], "NEWLINE_DELIMITED_JSON")
-                self.assertEqual(call_args["prefix"], "")
-                self.assertEqual(call_args["schema_version"], "")
                 self.assertEqual(call_args["dataset_description"], "ONIX workflow tables")
 
     @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
     @patch("oaebu_workflows.workflows.onix_workflow.OnixWorkflow.make_release")
     @patch("oaebu_workflows.workflows.onix_workflow.run_bigquery_query")
-    @patch("oaebu_workflows.workflows.onix_workflow.bq_load_shard_v2")
+    @patch("oaebu_workflows.workflows.onix_workflow.bq_load_shard")
     @patch("oaebu_workflows.workflows.onix_workflow.upload_files_to_cloud_storage")
     @patch("oaebu_workflows.workflows.onix_workflow.list_to_jsonl_gz")
     @patch("observatory.platform.utils.gc_utils.select_table_shard_dates")
@@ -2014,7 +2011,6 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
         bucket_name = env.transform_bucket
         fake_onix_dataset_id = env.add_dataset(prefix="onix")
         with env.create():
-            schema_path = test_fixtures_folder("onix_workflow", "schema")
             onix_table_file = test_fixtures_folder("onix_workflow", "onix_query_test.jsonl")
             blob = os.path.join(self.test_onix_folder, os.path.basename(onix_table_file))
             upload_file_to_cloud_storage(bucket_name=bucket_name, blob_name=blob, file_path=onix_table_file)
@@ -2026,8 +2022,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                     False,
                     fake_onix_dataset_id,
                     fake_onix,
-                    "onix",
-                    schema_path,
+                    find_schema(self.schema_path, "onix"),
                 ),
             ]
             release_date = pendulum.datetime(2022, 6, 13)
@@ -2066,7 +2061,6 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
         ]
         blobs = [os.path.join(self.test_onix_folder, os.path.basename(file)) for file in files]
         upload_files_to_cloud_storage(bucket_name=self.gcp_bucket_name, blob_names=blobs, file_paths=files)
-        schema_path = test_fixtures_folder("onix_workflow", "schema")
 
         # Load into bigquery
         table_ids = [
@@ -2075,20 +2069,28 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
             table_ids_from_path("bisac_lookup.jsonl")[0],
             table_ids_from_path("thema_lookup.jsonl")[0],
         ]
-        for blob, id in zip(blobs, table_ids):
-            bq_load_shard_v2(
-                schema_path,
+        onix_test_schema_folder = test_fixtures_folder("onix_workflow", "schema")
+        schema_file_paths = [
+            find_schema(self.schema_path, "onix"),
+            find_schema(onix_test_schema_folder, "bic_lookup"),
+            find_schema(onix_test_schema_folder, "bisac_lookup"),
+            find_schema(onix_test_schema_folder, "thema_lookup"),
+        ]
+        for blob, id, schema_file_path in zip(blobs, table_ids, schema_file_paths):
+            bq_load_shard(
+                schema_file_path=schema_file_path,
                 project_id=self.gcp_project_id,
                 transform_bucket=self.gcp_bucket_name,
                 transform_blob=blob,
                 dataset_id=dataset_id,
-                dataset_location=self.data_location,
+                data_location=self.data_location,
                 table_id=id,
                 release_date=release_date,
                 source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
                 **{},
             )
 
+        # Create the table objects
         country = load_jsonl(test_fixtures_folder("onix_workflow", "country.jsonl"))
         bic_lookup = load_jsonl(test_fixtures_folder("onix_workflow", "bic_lookup.jsonl"))
         bisac_lookup = load_jsonl(test_fixtures_folder("onix_workflow", "bisac_lookup.jsonl"))
@@ -2099,35 +2101,32 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 False,
                 settings_dataset_id,
                 country,
-                "country",
-                schema_path,
+                find_schema(onix_test_schema_folder, "country", release_date=release_date),
             ),
             Table(
                 "bic_lookup",
                 False,
                 fixtures_dataset_id,
                 bic_lookup,
-                "bic_lookup",
-                schema_path,
+                find_schema(onix_test_schema_folder, "bic_lookup"),
             ),
             Table(
                 "bisac_lookup",
                 False,
                 fixtures_dataset_id,
                 bisac_lookup,
-                "bisac_lookup",
-                schema_path,
+                find_schema(onix_test_schema_folder, "bisac_lookup"),
             ),
             Table(
                 "thema_lookup",
                 False,
                 fixtures_dataset_id,
                 thema_lookup,
-                "thema_lookup",
-                schema_path,
+                find_schema(onix_test_schema_folder, "thema_lookup"),
             ),
         ]
 
+        # Load tables into bigquery
         bq_load_tables(
             tables=tables,
             bucket_name=self.gcp_bucket_name,
@@ -2160,18 +2159,18 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
             # set schema prefix to 'anu_press' for ANU press, custom dimensions are added in this schema.
             schema_prefix = "anu_press_" if table_id == "google_analytics" else ""
 
+            schema_file_path = find_schema(self.schema_path, table_id, prefix=schema_prefix)
             bq_load_partition(
-                self.schema_path,
+                schema_file_path=schema_file_path,
                 project_id=self.gcp_project_id,
                 transform_bucket=self.gcp_bucket_name,
                 transform_blob=blob,
                 dataset_id=self.fake_partner_dataset,
-                dataset_location=self.data_location,
+                data_location=self.data_location,
                 table_id=table_id,
                 release_date=release_date,
                 source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
                 partition_type=bigquery.table.TimePartitioningType.MONTH,
-                prefix=schema_prefix,
                 dataset_description="Test Onix data for the workflow",
                 partition_field="release_date",
                 **{},

@@ -71,7 +71,7 @@ class TestOnixTelescope(ObservatoryTestCase):
         self.data_location = os.getenv("TEST_GCP_DATA_LOCATION")
         self.organisation_name = "Curtin Press"
         self.organisation_folder = "curtin_press"
-        self.dataset_location = "us"
+        self.data_location = "us"
         self.date_regex = "\\d{8}"
         self.date_format = "%Y%m%d"
 
@@ -146,7 +146,7 @@ class TestOnixTelescope(ObservatoryTestCase):
             project_id="my-project",
             download_bucket="download_bucket",
             transform_bucket="transform_bucket",
-            dataset_location=self.dataset_location,
+            data_location=self.data_location,
             date_regex=self.date_regex,
             date_format=self.date_format,
         ).make_dag()
@@ -204,7 +204,7 @@ class TestOnixTelescope(ObservatoryTestCase):
                     project_id=self.project_id,
                     download_bucket=env.download_bucket,
                     transform_bucket=env.transform_bucket,
-                    dataset_location=self.dataset_location,
+                    data_location=self.data_location,
                     date_regex=self.date_regex,
                     date_format=self.date_format,
                     dataset_id=dataset_id,

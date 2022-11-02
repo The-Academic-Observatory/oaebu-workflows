@@ -30,7 +30,6 @@ from oaebu_workflows.workflows.google_books_telescope import (
     GoogleBooksRelease,
     GoogleBooksTelescope,
 )
-from oaebu_workflows.identifiers import WorkflowTypes
 from observatory.api.client.model.organisation import Organisation
 from observatory.platform.utils.airflow_utils import AirflowConns
 from observatory.platform.utils.test_utils import (

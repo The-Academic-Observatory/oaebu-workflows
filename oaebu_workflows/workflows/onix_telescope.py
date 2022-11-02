@@ -28,13 +28,13 @@ from google.cloud.bigquery import SourceFormat
 
 from oaebu_workflows.config import schema_folder as default_schema_folder
 from observatory.platform.utils.airflow_utils import AirflowConns, AirflowVars
-from observatory.platform.utils.config_utils import observatory_home
+from observatory.platform.utils.config_utils import observatory_home, find_schema
 from observatory.platform.utils.http_download import download_file
 from observatory.platform.utils.proc_utils import wait_for_process
 from observatory.platform.utils.workflow_utils import (
     SftpFolders,
     blob_name,
-    bq_load_shard_v2,
+    bq_load_shard,
     make_dag_id,
     make_org_id,
     make_sftp_connection,
@@ -210,7 +210,7 @@ class OnixTelescope(SnapshotTelescope):
         project_id: str,
         download_bucket: str,
         transform_bucket: str,
-        dataset_location: str,
+        data_location: str,
         date_regex: str,
         date_format: str,
         dag_id: Optional[str] = None,
@@ -230,7 +230,7 @@ class OnixTelescope(SnapshotTelescope):
         :param project_id: the Google Cloud project id.
         :param download_bucket: the Google Cloud download bucket.
         :param transform_bucket: the Google Cloud transform bucket.
-        :param dataset_location: the location for the BigQuery dataset.
+        :param data_location: the location for the BigQuery dataset.
         :param date_regex: a regular expression for extracting a date string from an ONIX file name.
         :param date_format: the Python strptime date format string for transforming the string extracted with
         `date_regex` into a date object.
@@ -267,7 +267,7 @@ class OnixTelescope(SnapshotTelescope):
         self.project_id = project_id
         self.download_bucket = download_bucket
         self.transform_bucket = transform_bucket
-        self.dataset_location = dataset_location
+        self.data_location = data_location
         self.date_regex = date_regex
         self.date_format = date_format
 
@@ -398,19 +398,17 @@ class OnixTelescope(SnapshotTelescope):
             for transform_path in release.transform_files:
                 transform_blob = blob_name(transform_path)
                 table_id, _ = table_ids_from_path(transform_path)
-
-                bq_load_shard_v2(
-                    self.schema_folder,
-                    self.project_id,
-                    self.transform_bucket,
-                    transform_blob,
-                    self.dataset_id,
-                    self.dataset_location,
-                    table_id,
-                    release.release_date,
-                    self.source_format,
-                    prefix=self.schema_prefix,
-                    schema_version=self.schema_version,
+                schema_file_path = find_schema(path=self.schema_folder, table_name=table_id)
+                bq_load_shard(
+                    schema_file_path=schema_file_path,
+                    project_id=self.project_id,
+                    transform_bucket=self.transform_bucket,
+                    transform_blob=transform_blob,
+                    dataset_id=self.dataset_id,
+                    data_location=self.data_location,
+                    table_id=table_id,
+                    release_date=release.release_date,
+                    source_format=self.source_format,
                     dataset_description=self.dataset_description,
                     **self.load_bigquery_table_kwargs,
                 )

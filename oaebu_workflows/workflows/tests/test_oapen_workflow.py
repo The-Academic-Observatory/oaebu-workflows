@@ -15,7 +15,6 @@
 # Author: Richard Hosking
 
 
-from cmath import exp
 import os
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
@@ -23,12 +22,11 @@ import vcr
 import pendulum
 from click.testing import CliRunner
 
-from oaebu_workflows.config import test_fixtures_folder
+from oaebu_workflows.config import test_fixtures_folder, schema_folder
 from oaebu_workflows.workflows.oapen_workflow import OapenWorkflow, OapenWorkflowRelease
 from observatory.platform.utils.file_utils import load_jsonl
-from observatory.platform.utils.gc_utils import (
-    run_bigquery_query,
-)
+from observatory.platform.utils.gc_utils import run_bigquery_query
+from observatory.platform.utils.config_utils import find_schema
 from observatory.platform.utils.test_utils import (
     ObservatoryEnvironment,
     ObservatoryTestCase,
@@ -37,9 +35,7 @@ from observatory.platform.utils.test_utils import (
     make_dummy_dag,
     find_free_port,
 )
-from observatory.platform.utils.workflow_utils import (
-    make_dag_id,
-)
+from observatory.platform.utils.workflow_utils import make_dag_id
 from observatory.api.testing import ObservatoryApiEnvironment
 from observatory.api.client import ApiClient, Configuration
 from observatory.api.client.api.observatory_api import ObservatoryApi  # noqa: E501
@@ -226,32 +222,24 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
                 False,
                 settings_dataset_id,
                 country,
-                "country",
-                settings_schema_path,
+                find_schema(settings_schema_path, "country", release_date=release_date),
             ),
             Table(
                 "oapen_metadata",
                 False,
                 fixtures_dataset_id,
                 metadata,
-                "oapen_metadata",
-                fixtures_schema_path,
+                find_schema(schema_folder(), "oapen_metadata", release_date=release_date),
             ),
             Table(
                 "oapen_irus_uk",
                 False,
                 fixtures_dataset_id,
                 oapen_irus_uk,
-                "oapen_irus_uk",
-                fixtures_schema_path,
+                find_schema(schema_folder(), "oapen_irus_uk"),
             ),
             Table(
-                "bic_lookup",
-                False,
-                fixtures_dataset_id,
-                bic_lookup,
-                "bic_lookup",
-                fixtures_schema_path,
+                "bic_lookup", False, fixtures_dataset_id, bic_lookup, find_schema(fixtures_schema_path, "bic_lookup")
             ),
         ]
 

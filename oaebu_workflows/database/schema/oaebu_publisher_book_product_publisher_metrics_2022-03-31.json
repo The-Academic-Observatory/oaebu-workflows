@@ -1,59 +1,15 @@
 [
   {
     "mode": "NULLABLE",
-    "name": "product_id",
-    "type": "STRING",
-    "description": "Book Product ID"
-  },
-  {
-    "mode": "NULLABLE",
-    "name": "work_id",
-    "type": "STRING",
-    "description": "Book Work ID"
-  },
-  {
-    "mode": "NULLABLE",
-    "name": "work_family_id",
-    "type": "STRING",
-    "description": "Book Work Family ID"
-  },
-  {
-    "mode": "NULLABLE",
-    "name": "title",
-    "type": "STRING",
-    "description": "The title of the book"
-  },
-  {
-    "fields": [
-      {
-        "mode": "NULLABLE",
-        "name": "PersonName",
-        "type": "STRING",
-        "description": "The Author's Name"
-      },
-      {
-        "mode": "NULLABLE",
-        "name": "ORCID",
-        "type": "STRING",
-        "description": "The Authors ORCID ID"
-      }
-    ],
-    "mode": "REPEATED",
-    "name": "authors",
-    "type": "RECORD",
-    "description": "A list of Book Authors"
-  },
-  {
-    "mode": "NULLABLE",
-    "name": "published_year",
-    "type": "INTEGER",
-    "description": "The Books published year"
-  },
-  {
-    "mode": "NULLABLE",
     "name": "month",
     "type": "DATE",
-    "description": "The month in which the metrics took place"
+    "description": "Month for which these metrics apply"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "unique_books",
+    "type": "INTEGER",
+    "description": "The number of unique books"
   },
   {
     "fields": [
@@ -167,7 +123,7 @@
         "mode": "NULLABLE",
         "name": "Pages_Viewed",
         "type": "INTEGER",
-        "description": "The total number of unique preview content pages that a user viewed in a given session (counted as a 24-hour period)"
+        "description": "The clickthrough rate for purchase links. The values are percentages"
       }
     ],
     "mode": "NULLABLE",
@@ -182,26 +138,6 @@
         "name": "qty",
         "type": "INTEGER",
         "description": "Quantity of sales"
-      },
-      {
-        "fields": [
-          {
-            "mode": "NULLABLE",
-            "name": "Country_of_Sale",
-            "type": "STRING",
-            "description": "Country in which sale occured"
-          },
-          {
-            "mode": "NULLABLE",
-            "name": "qty",
-            "type": "INTEGER",
-            "description": "Quantity of sales"
-          }
-        ],
-        "mode": "REPEATED",
-        "name": "countries",
-        "type": "RECORD",
-        "description": "A list of Countries"
       }
     ],
     "mode": "NULLABLE",
@@ -225,12 +161,6 @@
   },
   {
     "fields": [
-      {
-        "mode": "NULLABLE",
-        "name": "version",
-        "type": "STRING",
-        "description": "Version of the OAPEN IRUS UK API, corresponds to the COUNTER report version"
-      },
       {
         "mode": "NULLABLE",
         "name": "title_requests",
@@ -266,19 +196,5 @@
     "name": "oapen_irus_uk",
     "type": "RECORD",
     "description": "Metrics from IRUS-UK"
-  },
-  {
-    "fields": [
-      {
-        "mode": "NULLABLE",
-        "name": "total_downloads",
-        "type": "INTEGER",
-        "description": ""
-      }
-    ],
-    "mode": "NULLABLE",
-    "name": "ucl_discovery",
-    "type": "RECORD",
-    "description": "Metrics from UCL Discovery"
   }
 ]
