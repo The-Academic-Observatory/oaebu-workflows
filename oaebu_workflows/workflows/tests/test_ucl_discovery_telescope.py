@@ -25,7 +25,6 @@ from airflow.models.connection import Connection
 from click.testing import CliRunner
 from croniter import croniter
 from observatory.api.client.model.organisation import Organisation
-from observatory.api.server import orm
 from oaebu_workflows.workflows.ucl_discovery_telescope import (
     UclDiscoveryRelease,
     UclDiscoveryTelescope,
@@ -201,16 +200,6 @@ class TestUclDiscoveryTelescope(ObservatoryTestCase):
             self.setup_connections(env)
             self.setup_api()
             with env.create_dag_run(dag, execution_date):
-                # Add OAEBU service account connection connection
-                conn = Connection(
-                    conn_id=AirflowConns.OAEBU_SERVICE_ACCOUNT,
-                    uri=f"google-cloud-platform://?type=service_account&private_key_id=private_key_id"
-                    f"&private_key=private_key"
-                    f"&client_email=client_email"
-                    f"&client_id=client_id",
-                )
-                env.add_connection(conn)
-
                 # Test that all dependencies are specified: no error should be thrown
                 env.run_task(telescope.check_dependencies.__name__)
 
