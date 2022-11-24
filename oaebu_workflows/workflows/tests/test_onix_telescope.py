@@ -16,14 +16,14 @@
 
 import os
 import shutil
+from tempfile import TemporaryDirectory
 
 import pendulum
 from airflow.models.connection import Connection
 from airflow.utils.state import State
 from oaebu_workflows.config import test_fixtures_folder
-from oaebu_workflows.workflows.onix_telescope import OnixTelescope
+from oaebu_workflows.workflows.onix_telescope import OnixTelescope, parse_onix
 from observatory.platform.utils.airflow_utils import AirflowConns
-from observatory.platform.utils.file_utils import get_file_hash
 from observatory.platform.utils.gc_utils import bigquery_sharded_table_id
 from observatory.platform.utils.test_utils import (
     ObservatoryEnvironment,
@@ -73,7 +73,6 @@ class TestOnixTelescope(ObservatoryTestCase):
         self.organisation_folder = "curtin_press"
         self.data_location = "us"
         self.date_regex = "\\d{8}"
-        self.date_format = "%Y%m%d"
 
         # API environment
         self.host = "localhost"
@@ -83,6 +82,9 @@ class TestOnixTelescope(ObservatoryTestCase):
         self.api = ObservatoryApi(api_client=api_client)  # noqa: E501
         self.env = ObservatoryApiEnvironment(host=self.host, port=self.port)
         self.org_name = "Curtin Press"
+
+        # Test file
+        self.onix_test_path = test_fixtures_folder("onix", "20210330_CURTINPRESS_ONIX.xml")
 
     def setup_api(self):
         dt = pendulum.now("UTC")
@@ -148,7 +150,6 @@ class TestOnixTelescope(ObservatoryTestCase):
             transform_bucket="transform_bucket",
             data_location=self.data_location,
             date_regex=self.date_regex,
-            date_format=self.date_format,
         ).make_dag()
         self.assert_dag_structure(
             {
@@ -174,7 +175,6 @@ class TestOnixTelescope(ObservatoryTestCase):
             transform_bucket="transform_bucket",
             data_location=self.data_location,
             date_regex=self.date_regex,
-            date_format=self.date_format,
             sensor_dag_ids=["test_dag"],
         ).make_dag()
         self.assert_dag_structure(
@@ -234,7 +234,6 @@ class TestOnixTelescope(ObservatoryTestCase):
                     transform_bucket=env.transform_bucket,
                     data_location=self.data_location,
                     date_regex=self.date_regex,
-                    date_format=self.date_format,
                     dataset_id=dataset_id,
                     workflow_id=1,
                 )
@@ -258,13 +257,12 @@ class TestOnixTelescope(ObservatoryTestCase):
                     self.assertEqual(ti.state, State.SUCCESS)
 
                     # Add ONIX file to SFTP server
-                    onix_file_name = "20210330_CURTINPRESS_ONIX.xml"
-                    onix_test_file = test_fixtures_folder("onix", onix_file_name)
+                    onix_file_name = os.path.basename(self.onix_test_path)
                     # Create SftpFolders instance with local sftp_root path as root
                     local_sftp_folders = SftpFolders(telescope.dag_id, self.organisation_name, sftp_root)
                     os.makedirs(local_sftp_folders.upload, exist_ok=True)
                     onix_file_dst = os.path.join(local_sftp_folders.upload, onix_file_name)
-                    shutil.copy(onix_test_file, onix_file_dst)
+                    shutil.copy(self.onix_test_path, onix_file_dst)
 
                     # Get release info from SFTP server and check that the correct release info is returned via Xcom
                     ti = env.run_task(telescope.list_release_info.__name__)
@@ -295,8 +293,7 @@ class TestOnixTelescope(ObservatoryTestCase):
                     self.assertEqual(ti.state, State.SUCCESS)
 
                     download_file_path = os.path.join(download_folder, onix_file_name)
-                    expected_file_hash = get_file_hash(file_path=onix_test_file, algorithm="md5")
-                    self.assert_file_integrity(download_file_path, expected_file_hash, "md5")
+                    self.assert_file_integrity(download_file_path, "28f85c488ab01b0cff769d9da6b4be24", "md5")
 
                     # Test upload downloaded
                     ti = env.run_task(telescope.upload_downloaded.__name__)
@@ -309,7 +306,7 @@ class TestOnixTelescope(ObservatoryTestCase):
                     self.assertEqual(ti.state, State.SUCCESS)
 
                     transform_file_path = os.path.join(transform_folder, "onix.jsonl")
-                    expected_file_hash = "82faa8c7940a9766376a1f3862d35828"
+                    expected_file_hash = "84d46e2942df615f18d270e18e0ebb26"
                     self.assert_file_integrity(transform_file_path, expected_file_hash, "md5")
 
                     # Test upload to cloud storage
@@ -348,3 +345,16 @@ class TestOnixTelescope(ObservatoryTestCase):
                     self.assertEqual(ti.state, State.SUCCESS)
                     dataset_releases = get_dataset_releases(dataset_id=1)
                     self.assertEqual(len(dataset_releases), 1)
+
+    def test_onix_parser(self):
+        """Tests the parse_onix function"""
+        with TemporaryDirectory() as tempdir:
+            input_dir = os.path.join(tempdir, "input")
+            output_dir = os.path.join(tempdir, "output")
+            os.mkdir(input_dir)
+            os.mkdir(output_dir)
+            shutil.copy(self.onix_test_path, input_dir)
+            parse_onix(input_dir, output_dir)
+            output_file = os.path.join(output_dir, "full.jsonl")
+            self.assertTrue(os.path.exists(output_file))
+            self.assert_file_integrity(output_file, "84d46e2942df615f18d270e18e0ebb26", "md5")

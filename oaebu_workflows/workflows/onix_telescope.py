@@ -49,13 +49,13 @@ from observatory.platform.workflows.snapshot_telescope import (
 )
 from oaebu_workflows.dag_tag import Tag
 
+ONIX_PARSER_NAME = "coki-onix-parser.jar"
+ONIX_PARSER_URL = "https://github.com/The-Academic-Observatory/onix-parser/releases/download/v1.3.0/coki-onix-parser-1.2-SNAPSHOT-shaded.jar"
+
 
 class OnixRelease(SnapshotRelease):
     DOWNLOAD_FILES_REGEX = r"^.*\.(onx|xml)$"
     TRANSFORM_FILES_REGEX = "onix.jsonl"
-    ONIX_PARSER_NAME = "coki-onix-parser.jar"
-    ONIX_PARSER_URL = "https://github.com/The-Academic-Observatory/onix-parser/releases/download/v1.2/coki-onix-parser-1.2-SNAPSHOT-shaded.jar"
-    ONIX_PARSER_MD5 = "bf223124df9e93cdb1cbb5d7dc71080c"
 
     def __init__(
         self,
@@ -134,30 +134,8 @@ class OnixRelease(SnapshotRelease):
         :return: None.
         """
 
-        # Download ONIX Parser
-        bin_path = observatory_home("bin")
-        filename = os.path.join(bin_path, self.ONIX_PARSER_NAME)
-        download_file(
-            url=self.ONIX_PARSER_URL,
-            filename=filename,
-            hash=self.ONIX_PARSER_MD5,
-        )
-
         # Transform release
-        cmd = (
-            f"java -jar {self.ONIX_PARSER_NAME} {self.download_folder} {self.transform_folder} "
-            f"{make_org_id(self.organisation_name)}"
-        )
-        p = subprocess.Popen(
-            cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, executable="/bin/bash", cwd=bin_path
-        )
-        stdout, stderr = wait_for_process(p)
-
-        if stdout:
-            logging.info(stdout)
-
-        if p.returncode != 0:
-            raise AirflowException(f"bash command failed `{cmd}`: {stderr}")
+        parse_onix(self.download_folder, self.transform_folder)
 
         # Rename file to onix.jsonl
         shutil.move(
@@ -177,13 +155,11 @@ def list_release_info(
     *,
     sftp_upload_folder: str,
     date_regex: str,
-    date_format: str,
 ) -> List[Dict]:
     """List the ONIX release info, a release date and a file name for each release.
 
     :param sftp_upload_folder: the SFTP upload folder.
     :param date_regex: the regex for extracting the date from the filename.
-    :param date_format: the strptime date format string for converting the date into a pendulum datetime object.
     :return: the release information.
     """
 
@@ -215,7 +191,6 @@ class OnixTelescope(SnapshotTelescope):
         transform_bucket: str,
         data_location: str,
         date_regex: str,
-        date_format: str,
         dag_id: Optional[str] = None,
         start_date: pendulum.DateTime = pendulum.datetime(2021, 3, 28),
         schedule_interval: str = "@weekly",
@@ -236,7 +211,6 @@ class OnixTelescope(SnapshotTelescope):
         :param transform_bucket: the Google Cloud transform bucket.
         :param data_location: the location for the BigQuery dataset.
         :param date_regex: a regular expression for extracting a date string from an ONIX file name.
-        :param date_format: the Python strptime date format string for transforming the string extracted with
         `date_regex` into a date object.
         :param dag_id: the id of the DAG, by default this is automatically generated based on the DAG_ID_PREFIX
         and the organisation name.
@@ -278,7 +252,6 @@ class OnixTelescope(SnapshotTelescope):
         self.transform_bucket = transform_bucket
         self.data_location = data_location
         self.date_regex = date_regex
-        self.date_format = date_format
 
         super().__init__(
             dag_id,
@@ -332,9 +305,7 @@ class OnixTelescope(SnapshotTelescope):
 
         # List release dates
         sftp_upload_folder = SftpFolders(self.dag_id, self.organisation_name).upload
-        release_info = list_release_info(
-            sftp_upload_folder=sftp_upload_folder, date_regex=self.date_regex, date_format=self.date_format
-        )
+        release_info = list_release_info(sftp_upload_folder=sftp_upload_folder, date_regex=self.date_regex)
 
         # Publish XCom
         continue_dag = len(release_info)
@@ -444,3 +415,32 @@ class OnixTelescope(SnapshotTelescope):
 
         for release in releases:
             release.move_files_to_finished()
+
+
+def parse_onix(input_dir: str, output_dir: str):
+    """Runs the onix parser on an onix file/files
+
+    :param input_dir: The directory containing the onix input
+    :param output_dir: The directory to output the parsed onix file
+    :raises AirflowException: Raised if the subprocess fails for any reason
+    """
+
+    # Download ONIX Parser
+    bin_path = observatory_home("bin")
+    filename = os.path.join(bin_path, ONIX_PARSER_NAME)
+    download_file(
+        url=ONIX_PARSER_URL,
+        filename=filename,
+    )
+
+    cmd = f"java -jar {ONIX_PARSER_NAME} {input_dir} {output_dir}"
+    p = subprocess.Popen(
+        cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, executable="/bin/bash", cwd=bin_path
+    )
+    stdout, stderr = wait_for_process(p)
+
+    if stdout:
+        logging.info(stdout)
+
+    if p.returncode != 0:
+        raise AirflowException(f"bash command failed `{cmd}`: {stderr}")
