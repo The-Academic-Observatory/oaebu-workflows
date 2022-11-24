@@ -642,9 +642,7 @@ class OnixWorkflow(Workflow):
             blob_name,
             release.crossref_metadata_filename,
         )
-        schema_file_path = find_schema(
-            path=self.schema_folder, table_name=release.crossref_metadata_table_id, release_date=release.release_date
-        )
+        schema_file_path = find_schema(path=self.schema_folder, table_name=release.crossref_metadata_table_id)
         # load the table into bigquery
         bq_load_shard(
             schema_file_path=schema_file_path,
@@ -690,9 +688,8 @@ class OnixWorkflow(Workflow):
             blob_name,
             release.crossref_events_filename,
         )
-        schema_file_path = find_schema(
-            path=self.schema_folder, table_name=release.crossref_events_table_id, release_date=release.release_date
-        )
+        schema_file_path = find_schema(path=self.schema_folder, table_name=release.crossref_events_table_id)
+
         # load the table into bigquery
         bq_load_shard(
             schema_file_path=schema_file_path,
@@ -723,9 +720,7 @@ class OnixWorkflow(Workflow):
         crossref_metadata_table_id = bigquery_sharded_table_id(release.crossref_metadata_table_id, release.release_date)
         table_joining_template_file = "create_book.sql.jinja2"
         template_path = os.path.join(sql_folder(), table_joining_template_file)
-        schema_file_path = find_schema(
-            path=self.schema_folder, table_name=release.book_table_id, release_date=release.release_date
-        )
+        schema_file_path = find_schema(path=self.schema_folder, table_name=release.book_table_id)
 
         sql = render_template(
             template_path,
@@ -882,9 +877,7 @@ class OnixWorkflow(Workflow):
         table_joining_template_file = "create_book_products.sql.jinja2"
         template_path = os.path.join(sql_folder(), table_joining_template_file)
 
-        schema_file_path = find_schema(
-            path=self.schema_folder, table_name=release.book_product_table_id, release_date=release.release_date
-        )
+        schema_file_path = find_schema(path=self.schema_folder, table_name=release.book_product_table_id)
 
         if include_google_analytics:
             google_analytics_table_id = f"{project_id}.{oaebu_intermediate_dataset}.{google_analytics_dataset}_google_analytics_matched{release_date.strftime('%Y%m%d')}"
@@ -1009,7 +1002,6 @@ class OnixWorkflow(Workflow):
         schema_file_path = find_schema(
             path=self.schema_folder,
             table_name=output_table,
-            release_date=release.release_date,
             prefix="oaebu_publisher_",
         )
 
@@ -1294,6 +1286,7 @@ class OnixWorkflow(Workflow):
         output_table = "onix_aggregate_metrics"
         release_date = release.release_date
         output_table_id = bigquery_sharded_table_id(output_table, release_date)
+        schema_file_path = find_schema(self.schema_folder, output_table)
 
         sql = render_template(
             template_path,
@@ -1309,13 +1302,13 @@ class OnixWorkflow(Workflow):
             location=release.data_location,
         )
 
-        # Fix
         status = create_bigquery_table_from_query(
             sql=sql,
             project_id=release.project_id,
             dataset_id=release.oaebu_data_qa_dataset,
             table_id=output_table_id,
             location=release.data_location,
+            schema_file_path=schema_file_path,
         )
 
         if not status:
@@ -1338,6 +1331,7 @@ class OnixWorkflow(Workflow):
         output_table = "onix_invalid_isbn"
         output_table_id = bigquery_sharded_table_id(output_table, release_date)
         data_location = release.data_location
+        schema_file_path = find_schema(self.schema_folder, output_table)
 
         self.oaebu_data_qa_validate_isbn(
             project_id=project_id,
@@ -1347,6 +1341,7 @@ class OnixWorkflow(Workflow):
             output_table_id=output_table_id,
             data_location=data_location,
             isbn="ISBN13",
+            schema_file_path=schema_file_path,
         )
 
     def oaebu_data_qa_validate_isbn(
@@ -1359,6 +1354,7 @@ class OnixWorkflow(Workflow):
         output_table_id: str,
         data_location: str,
         isbn: str,
+        schema_file_path: str = None,
     ):
         """Create a BQ table of invalid ISBNs for the ONIX feed that can be fed back to publishers.
         No attempt is made to normalise the string so we catch as many string issues as we can.
@@ -1370,6 +1366,7 @@ class OnixWorkflow(Workflow):
         :param output_table_id: Table ID for the output data.
         :apram data_location: Location of GCP servers.
         :param isbn: Name of the isbn field in source table.
+        :param schema_file_path: The path of the schema file to use for the BigQuery upload
         """
 
         isbn_utils_sql = self.get_isbn_utils_sql_string()
@@ -1399,6 +1396,7 @@ class OnixWorkflow(Workflow):
             dataset_id=output_dataset_id,
             table_id=output_table_id,
             location=data_location,
+            schema_file_path=schema_file_path,
         )
 
         if not status:

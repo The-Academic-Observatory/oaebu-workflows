@@ -387,9 +387,7 @@ class OapenWorkflow(Workflow):
             blob_name,
             release.crossref_metadata_filename,
         )
-        schema_file_path = find_schema(
-            path=self.schema_folder, table_name=release.crossref_metadata_table_id, release_date=release.release_date
-        )
+        schema_file_path = find_schema(path=self.schema_folder, table_name=release.crossref_metadata_table_id)
         # load the table into bigquery
         bq_load_shard(
             schema_file_path=schema_file_path,
@@ -435,9 +433,7 @@ class OapenWorkflow(Workflow):
             blob_name,
             release.crossref_events_filename,
         )
-        schema_file_path = find_schema(
-            path=self.schema_folder, table_name=release.crossref_events_table_id, release_date=release.release_date
-        )
+        schema_file_path = find_schema(path=self.schema_folder, table_name=release.crossref_events_table_id)
         # load the table into bigquery
         bq_load_shard(
             schema_file_path=schema_file_path,

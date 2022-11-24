@@ -229,7 +229,7 @@ class TestOapenWorkflowFunctional(ObservatoryTestCase):
                 False,
                 fixtures_dataset_id,
                 metadata,
-                find_schema(schema_folder(), "oapen_metadata", release_date=release_date),
+                find_schema(schema_folder(), "oapen_metadata"),
             ),
             Table(
                 "oapen_irus_uk",
