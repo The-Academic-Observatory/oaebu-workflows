@@ -20,6 +20,7 @@ import re
 import shutil
 import subprocess
 from typing import Dict, List, Optional
+from datetime import timedelta
 
 import pendulum
 from airflow.exceptions import AirflowException
@@ -27,6 +28,8 @@ from airflow.models.taskinstance import TaskInstance
 from google.cloud.bigquery import SourceFormat
 
 from oaebu_workflows.config import schema_folder as default_schema_folder
+from oaebu_workflows.workflows.oapen_metadata_workflow import OapenMetadataWorkflow
+from observatory.platform.utils.dag_run_sensor import DagRunSensor
 from observatory.platform.utils.airflow_utils import AirflowConns, AirflowVars
 from observatory.platform.utils.config_utils import observatory_home, find_schema
 from observatory.platform.utils.http_download import download_file
@@ -288,6 +291,16 @@ class OnixTelescope(SnapshotTelescope):
         )
 
         # self.organisation = organisation
+        if self.organisation_name == "OAPEN Press":
+            sensor = DagRunSensor(
+                task_id="oapen_metadata_sensor",
+                external_dag_id=OapenMetadataWorkflow.DAG_ID,
+                mode="reschedule",
+                duration=timedelta(days=7),  # Look back up to 7 days from execution date
+                poke_interval=int(timedelta(hours=1).total_seconds()),  # Check at this interval if dag run is ready
+                timeout=int(timedelta(days=2).total_seconds()),  # Sensor will fail after 2 days of waiting
+            )
+            self.add_operator(sensor)
         self.add_setup_task(self.check_dependencies)
         self.add_setup_task(self.list_release_info)
         self.add_task(self.move_files_to_in_progress)
