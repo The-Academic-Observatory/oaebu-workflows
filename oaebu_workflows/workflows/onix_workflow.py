@@ -51,8 +51,9 @@ from observatory.platform.utils.gc_utils import (
     upload_file_to_cloud_storage,
 )
 from observatory.platform.utils.jinja2_utils import render_template
+from observatory.platform.utils.config_utils import find_schema
 from observatory.platform.utils.workflow_utils import (
-    bq_load_shard_v2,
+    bq_load_shard,
     make_dag_id,
     make_release_date,
     make_table_name,
@@ -147,7 +148,7 @@ class OnixWorkflowRelease(AbstractRelease):
         worksid_table: str = "onix_workid_isbn",
         worksid_error_table: str = "onix_workid_isbn_errors",
         workfamilyid_table: str = "onix_workfamilyid_isbn",
-        dataset_location: str = "us",
+        data_location: str = "us",
         dataset_description: str = "ONIX workflow tables",
         oaebu_intermediate_match_suffix: str = "_matched",
     ):
@@ -186,7 +187,7 @@ class OnixWorkflowRelease(AbstractRelease):
         # GCP parameters
         self.project_id = gcp_project_id
         self.onix_dataset_id = onix_dataset_id
-        self.dataset_location = dataset_location
+        self.data_location = data_location
         self.dataset_description = dataset_description
 
         # ONIX release info
@@ -541,13 +542,14 @@ class OnixWorkflow(Workflow):
 
         blob = os.path.join(release.transform_folder, os.path.basename(release.workslookup_filename))
         table_id, _ = table_ids_from_path(release.workslookup_filename)
-        bq_load_shard_v2(
-            schema_folder=self.schema_folder,
+        schema_file_path = find_schema(path=self.schema_folder, table_name=table_id)
+        bq_load_shard(
+            schema_file_path=schema_file_path,
             project_id=release.project_id,
             transform_bucket=release.transform_bucket,
             transform_blob=blob,
             dataset_id=release.workflow_dataset,
-            dataset_location=release.dataset_location,
+            data_location=release.data_location,
             table_id=table_id,
             release_date=release.release_date,
             source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
@@ -564,18 +566,17 @@ class OnixWorkflow(Workflow):
 
         blob = os.path.join(release.transform_folder, os.path.basename(release.workslookup_errors_filename))
         table_id, _ = table_ids_from_path(release.workslookup_errors_filename)
-        bq_load_shard_v2(
-            schema_folder=self.schema_folder,
+        schema_file_path = find_schema(path=self.schema_folder, table_name=table_id)
+        bq_load_shard(
+            schema_file_path=schema_file_path,
             project_id=release.project_id,
             transform_bucket=release.transform_bucket,
             transform_blob=blob,
             dataset_id=release.workflow_dataset,
-            dataset_location=release.dataset_location,
+            data_location=release.data_location,
             table_id=table_id,
             release_date=release.release_date,
             source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
-            prefix="",
-            schema_version="",
             dataset_description=release.dataset_description,
             **{},
         )
@@ -589,18 +590,17 @@ class OnixWorkflow(Workflow):
 
         blob = os.path.join(release.transform_folder, os.path.basename(release.worksfamilylookup_filename))
         table_id, _ = table_ids_from_path(release.worksfamilylookup_filename)
-        bq_load_shard_v2(
-            schema_folder=self.schema_folder,
+        schema_file_path = find_schema(path=self.schema_folder, table_name=table_id)
+        bq_load_shard(
+            schema_file_path=schema_file_path,
             project_id=release.project_id,
             transform_bucket=release.transform_bucket,
             transform_blob=blob,
             dataset_id=release.workflow_dataset,
-            dataset_location=release.dataset_location,
+            data_location=release.data_location,
             table_id=table_id,
             release_date=release.release_date,
             source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
-            prefix="",
-            schema_version="",
             dataset_description=release.dataset_description,
             **{},
         )
@@ -642,14 +642,15 @@ class OnixWorkflow(Workflow):
             blob_name,
             release.crossref_metadata_filename,
         )
+        schema_file_path = find_schema(path=self.schema_folder, table_name=release.crossref_metadata_table_id)
         # load the table into bigquery
-        bq_load_shard_v2(
-            schema_folder=self.schema_folder,
+        bq_load_shard(
+            schema_file_path=schema_file_path,
             project_id=release.project_id,
             transform_bucket=release.transform_bucket,
             transform_blob=blob_name,
             dataset_id=self.crossref_dataset_id,
-            dataset_location=release.dataset_location,
+            data_location=release.data_location,
             table_id=release.crossref_metadata_table_id,
             release_date=release.release_date,
             source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
@@ -687,14 +688,16 @@ class OnixWorkflow(Workflow):
             blob_name,
             release.crossref_events_filename,
         )
+        schema_file_path = find_schema(path=self.schema_folder, table_name=release.crossref_events_table_id)
+
         # load the table into bigquery
-        bq_load_shard_v2(
-            schema_folder=self.schema_folder,
+        bq_load_shard(
+            schema_file_path=schema_file_path,
             project_id=release.project_id,
             transform_bucket=release.transform_bucket,
             transform_blob=blob_name,
             dataset_id=self.crossref_dataset_id,
-            dataset_location=release.dataset_location,
+            data_location=release.data_location,
             table_id=release.crossref_events_table_id,
             release_date=release.release_date,
             source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
@@ -717,6 +720,7 @@ class OnixWorkflow(Workflow):
         crossref_metadata_table_id = bigquery_sharded_table_id(release.crossref_metadata_table_id, release.release_date)
         table_joining_template_file = "create_book.sql.jinja2"
         template_path = os.path.join(sql_folder(), table_joining_template_file)
+        schema_file_path = find_schema(path=self.schema_folder, table_name=release.book_table_id)
 
         sql = render_template(
             template_path,
@@ -727,7 +731,7 @@ class OnixWorkflow(Workflow):
         )
 
         create_bigquery_dataset(
-            project_id=release.project_id, dataset_id=release.oaebu_dataset, location=release.dataset_location
+            project_id=release.project_id, dataset_id=release.oaebu_dataset, location=release.data_location
         )
 
         status = create_bigquery_table_from_query(
@@ -735,7 +739,8 @@ class OnixWorkflow(Workflow):
             project_id=release.project_id,
             dataset_id=release.oaebu_dataset,
             table_id=output_table,
-            location=release.dataset_location,
+            location=release.data_location,
+            schema_file_path=schema_file_path,
         )
 
         if not status:
@@ -774,7 +779,7 @@ class OnixWorkflow(Workflow):
         output_table = f"{orig_dataset}_{orig_table}{release.oaebu_intermediate_match_suffix}"
         output_dataset = release.oaebu_intermediate_dataset
 
-        data_location = release.dataset_location
+        data_location = release.data_location
         release_date = release.release_date
         table_joining_template_file = "assign_workid_workfamilyid.sql.jinja2"
         template_path = os.path.join(sql_folder(), table_joining_template_file)
@@ -799,7 +804,7 @@ class OnixWorkflow(Workflow):
             project_id=release.project_id,
             dataset_id=output_dataset,
             table_id=table_id,
-            location=release.dataset_location,
+            location=release.data_location,
         )
 
         if not status:
@@ -863,7 +868,7 @@ class OnixWorkflow(Workflow):
         project_id = release.project_id
         oaebu_intermediate_dataset = release.oaebu_intermediate_dataset
 
-        data_location = release.dataset_location
+        data_location = release.data_location
         release_date = release.release_date
 
         book_table_id = bigquery_sharded_table_id(release.book_table_id, release_date)
@@ -871,6 +876,8 @@ class OnixWorkflow(Workflow):
 
         table_joining_template_file = "create_book_products.sql.jinja2"
         template_path = os.path.join(sql_folder(), table_joining_template_file)
+
+        schema_file_path = find_schema(path=self.schema_folder, table_name=release.book_product_table_id)
 
         if include_google_analytics:
             google_analytics_table_id = f"{project_id}.{oaebu_intermediate_dataset}.{google_analytics_dataset}_google_analytics_matched{release_date.strftime('%Y%m%d')}"
@@ -931,7 +938,8 @@ class OnixWorkflow(Workflow):
             project_id=release.project_id,
             dataset_id=output_dataset,
             table_id=table_id,
-            location=release.dataset_location,
+            location=release.data_location,
+            schema_file_path=schema_file_path,
         )
 
         if not status:
@@ -984,13 +992,18 @@ class OnixWorkflow(Workflow):
         """
 
         output_dataset = release.oaebu_elastic_dataset
-        data_location = release.dataset_location
+        data_location = release.data_location
         release_date = release.release_date
 
         create_bigquery_dataset(project_id=release.project_id, dataset_id=output_dataset, location=data_location)
 
         table_id = bigquery_sharded_table_id(f"{release.project_id.replace('-', '_')}_{output_table}", release_date)
         template_path = os.path.join(sql_folder(), query_template)
+        schema_file_path = find_schema(
+            path=self.schema_folder,
+            table_name=output_table,
+            prefix="oaebu_publisher_",
+        )
 
         sql = render_template(
             template_path,
@@ -1008,7 +1021,8 @@ class OnixWorkflow(Workflow):
             project_id=release.project_id,
             dataset_id=output_dataset,
             table_id=table_id,
-            location=release.dataset_location,
+            location=release.data_location,
+            schema_file_path=schema_file_path,
         )
 
         if not status:
@@ -1057,7 +1071,7 @@ class OnixWorkflow(Workflow):
         """
 
         output_dataset = release.oaebu_elastic_dataset
-        data_location = release.dataset_location
+        data_location = release.data_location
         release_date = release.release_date
 
         create_bigquery_dataset(project_id=release.project_id, dataset_id=output_dataset, location=data_location)
@@ -1095,7 +1109,7 @@ class OnixWorkflow(Workflow):
             project_id=release.project_id,
             dataset_id=output_dataset,
             table_id=table_id,
-            location=release.dataset_location,
+            location=release.data_location,
         )
 
         if not status:
@@ -1184,6 +1198,7 @@ class OnixWorkflow(Workflow):
                     self.export_oaebu_table,
                     output_table=export_table["output_table"],
                     query_template=export_table["query_template"],
+                    schema_file_path=default_schema_folder(),
                 )
 
                 # Populate the __name__ attribute of the partial object (it lacks one by default).
@@ -1271,6 +1286,7 @@ class OnixWorkflow(Workflow):
         output_table = "onix_aggregate_metrics"
         release_date = release.release_date
         output_table_id = bigquery_sharded_table_id(output_table, release_date)
+        schema_file_path = find_schema(self.schema_folder, output_table)
 
         sql = render_template(
             template_path,
@@ -1283,16 +1299,16 @@ class OnixWorkflow(Workflow):
         create_bigquery_dataset(
             project_id=release.project_id,
             dataset_id=release.oaebu_data_qa_dataset,
-            location=release.dataset_location,
+            location=release.data_location,
         )
 
-        # Fix
         status = create_bigquery_table_from_query(
             sql=sql,
             project_id=release.project_id,
             dataset_id=release.oaebu_data_qa_dataset,
             table_id=output_table_id,
-            location=release.dataset_location,
+            location=release.data_location,
+            schema_file_path=schema_file_path,
         )
 
         if not status:
@@ -1314,7 +1330,8 @@ class OnixWorkflow(Workflow):
         output_dataset_id = release.oaebu_data_qa_dataset
         output_table = "onix_invalid_isbn"
         output_table_id = bigquery_sharded_table_id(output_table, release_date)
-        dataset_location = release.dataset_location
+        data_location = release.data_location
+        schema_file_path = find_schema(self.schema_folder, output_table)
 
         self.oaebu_data_qa_validate_isbn(
             project_id=project_id,
@@ -1322,8 +1339,9 @@ class OnixWorkflow(Workflow):
             orig_table_id=orig_table_id,
             output_dataset_id=output_dataset_id,
             output_table_id=output_table_id,
-            dataset_location=dataset_location,
+            data_location=data_location,
             isbn="ISBN13",
+            schema_file_path=schema_file_path,
         )
 
     def oaebu_data_qa_validate_isbn(
@@ -1334,8 +1352,9 @@ class OnixWorkflow(Workflow):
         orig_table_id: str,
         output_dataset_id: str,
         output_table_id: str,
-        dataset_location: str,
+        data_location: str,
         isbn: str,
+        schema_file_path: str = None,
     ):
         """Create a BQ table of invalid ISBNs for the ONIX feed that can be fed back to publishers.
         No attempt is made to normalise the string so we catch as many string issues as we can.
@@ -1345,8 +1364,9 @@ class OnixWorkflow(Workflow):
         :param orig_table_id: Table ID of the source data (excluding date).
         :param output_dataset_id: Dataset ID for the output data.
         :param output_table_id: Table ID for the output data.
-        :apram dataset_location: Location of GCP servers.
+        :apram data_location: Location of GCP servers.
         :param isbn: Name of the isbn field in source table.
+        :param schema_file_path: The path of the schema file to use for the BigQuery upload
         """
 
         isbn_utils_sql = self.get_isbn_utils_sql_string()
@@ -1367,7 +1387,7 @@ class OnixWorkflow(Workflow):
         create_bigquery_dataset(
             project_id=project_id,
             dataset_id=output_dataset_id,
-            location=dataset_location,
+            location=data_location,
         )
 
         status = create_bigquery_table_from_query(
@@ -1375,7 +1395,8 @@ class OnixWorkflow(Workflow):
             project_id=project_id,
             dataset_id=output_dataset_id,
             table_id=output_table_id,
-            location=dataset_location,
+            location=data_location,
+            schema_file_path=schema_file_path,
         )
 
         if not status:
@@ -1436,14 +1457,14 @@ class OnixWorkflow(Workflow):
         # Validate the ISBN field
         output_table = "jstor_invalid_isbn"
         output_table_id = bigquery_sharded_table_id(output_table, release_date)
-        dataset_location = release.dataset_location
+        data_location = release.data_location
         self.oaebu_data_qa_validate_isbn(
             project_id=project_id,
             orig_dataset_id=orig_dataset_id,
             orig_table_id=orig_table_id,
             output_dataset_id=output_dataset_id,
             output_table_id=output_table_id,
-            dataset_location=dataset_location,
+            data_location=data_location,
             isbn="ISBN",
         )
 
@@ -1456,7 +1477,7 @@ class OnixWorkflow(Workflow):
             orig_table_id=orig_table_id,
             output_dataset_id=output_dataset_id,
             output_table_id=output_table_id,
-            dataset_location=dataset_location,
+            data_location=data_location,
             isbn="eISBN",
         )
 
@@ -1511,14 +1532,14 @@ class OnixWorkflow(Workflow):
         # Validate the ISBN field
         output_table = "google_analytics_invalid_isbn"
         output_table_id = bigquery_sharded_table_id(output_table, release_date)
-        dataset_location = release.dataset_location
+        data_location = release.data_location
         self.oaebu_data_qa_validate_isbn(
             project_id=project_id,
             orig_dataset_id=orig_dataset_id,
             orig_table_id=orig_table_id,
             output_dataset_id=output_dataset_id,
             output_table_id=output_table_id,
-            dataset_location=dataset_location,
+            data_location=data_location,
             isbn="publication_id",
         )
 
@@ -1574,14 +1595,14 @@ class OnixWorkflow(Workflow):
         # Validate the ISBN field
         output_table = "oapen_irus_uk_invalid_isbn"
         output_table_id = bigquery_sharded_table_id(output_table, release_date)
-        dataset_location = release.dataset_location
+        data_location = release.data_location
         self.oaebu_data_qa_validate_isbn(
             project_id=project_id,
             orig_dataset_id=orig_dataset_id,
             orig_table_id=orig_table_id,
             output_dataset_id=output_dataset_id,
             output_table_id=output_table_id,
-            dataset_location=dataset_location,
+            data_location=data_location,
             isbn="ISBN",
         )
 
@@ -1637,14 +1658,14 @@ class OnixWorkflow(Workflow):
         # Validate the ISBN field
         output_table = "google_books_sales_invalid_isbn"
         output_table_id = bigquery_sharded_table_id(output_table, release_date)
-        dataset_location = release.dataset_location
+        data_location = release.data_location
         self.oaebu_data_qa_validate_isbn(
             project_id=project_id,
             orig_dataset_id=orig_dataset_id,
             orig_table_id=orig_table_id,
             output_dataset_id=output_dataset_id,
             output_table_id=output_table_id,
-            dataset_location=dataset_location,
+            data_location=data_location,
             isbn="Primary_ISBN",
         )
 
@@ -1700,14 +1721,14 @@ class OnixWorkflow(Workflow):
         # Validate the ISBN field
         output_table = "google_books_traffic_invalid_isbn"
         output_table_id = bigquery_sharded_table_id(output_table, release_date)
-        dataset_location = release.dataset_location
+        data_location = release.data_location
         self.oaebu_data_qa_validate_isbn(
             project_id=project_id,
             orig_dataset_id=orig_dataset_id,
             orig_table_id=orig_table_id,
             output_dataset_id=output_dataset_id,
             output_table_id=output_table_id,
-            dataset_location=dataset_location,
+            data_location=data_location,
             isbn="Primary_ISBN",
         )
 
@@ -1779,7 +1800,7 @@ class OnixWorkflow(Workflow):
         create_bigquery_dataset(
             project_id=release.project_id,
             dataset_id=release.oaebu_data_qa_dataset,
-            location=release.dataset_location,
+            location=release.data_location,
         )
 
         status = create_bigquery_table_from_query(
@@ -1787,7 +1808,7 @@ class OnixWorkflow(Workflow):
             project_id=release.project_id,
             dataset_id=release.oaebu_data_qa_dataset,
             table_id=output_table_id,
-            location=release.dataset_location,
+            location=release.data_location,
         )
 
         if not status:

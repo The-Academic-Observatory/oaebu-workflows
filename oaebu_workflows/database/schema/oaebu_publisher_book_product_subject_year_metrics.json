@@ -3,13 +3,13 @@
     "mode": "NULLABLE",
     "name": "subject",
     "type": "STRING",
-    "description": "BIC Subject"
+    "description": "BIC subject (top level BIC subjects only)"
   },
   {
     "mode": "NULLABLE",
-    "name": "subject_code",
-    "type": "STRING",
-    "description": "BIC Subject Code"
+    "name": "published_year",
+    "type": "INTEGER",
+    "description": "The published year of the book"
   },
   {
     "mode": "NULLABLE",
@@ -27,9 +27,9 @@
     "fields": [
       {
         "mode": "NULLABLE",
-        "name": "unique_views",
+        "name": "page_views",
         "type": "INTEGER",
-        "description": "The number of unique views"
+        "description": "Number of page views"
       },
       {
         "mode": "NULLABLE",
@@ -69,10 +69,16 @@
       }, 
       {
         "mode": "NULLABLE",
+        "name": "downloads_mobi_book",
+        "type": "INTEGER",
+        "description": "Number of MOBI book downloads"
+      }, 
+      {
+        "mode": "NULLABLE",
         "name": "downloads_mobi_chapter",
         "type": "INTEGER",
         "description": "Number of MOBI chapter downloads"
-      } 
+      }
     ],
     "mode": "NULLABLE",
     "name": "google_analytics",
@@ -201,6 +207,6 @@
     "mode": "NULLABLE",
     "name": "oapen_irus_uk",
     "type": "RECORD",
-    "description": "Metrics from IRUS-UK"
+    "description": "Metrics from OAPEN IRUS-UK"
   }
 ]

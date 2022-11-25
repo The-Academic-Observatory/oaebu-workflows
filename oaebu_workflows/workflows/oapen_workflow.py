@@ -44,7 +44,8 @@ from observatory.platform.utils.gc_utils import (
     upload_file_to_cloud_storage,
 )
 from observatory.platform.utils.jinja2_utils import render_template
-from observatory.platform.utils.workflow_utils import make_dag_id, make_release_date, bq_load_shard_v2
+from observatory.platform.utils.workflow_utils import make_dag_id, make_release_date, bq_load_shard
+from observatory.platform.utils.config_utils import find_schema
 from observatory.platform.utils.file_utils import list_to_jsonl_gz
 from observatory.platform.workflows.workflow import Workflow
 from oaebu_workflows.dag_tag import Tag
@@ -130,7 +131,7 @@ class OapenWorkflow(Workflow):
         country_dataset_id: str = "settings",
         subject_project_id: str = "oaebu-public-data",
         subject_dataset_id: str = "oaebu_reference",
-        dataset_location: str = "us",
+        data_location: str = "us",
         dataset_description: str = "Oapen workflow tables",
         schema_folder: str = schema_folder(),
         dag_id: Optional[str] = None,
@@ -163,7 +164,7 @@ class OapenWorkflow(Workflow):
         :param country_dataset_id: GCP dataset ID for the country lookup table.
         :param subject_project_id: GCP project ID containing the book subject lookup table (bic).
         :param subject_dataset_id: GCP dataset ID for the book subject lookup table (bic).
-        :param dataset_location: GCP region.
+        :param data_location: GCP region.
         :param dataset_description: Description of dataset.
         :param schema_folder: the SQL schema path.
         :param dag_id: DAG ID.
@@ -190,7 +191,7 @@ class OapenWorkflow(Workflow):
         self.org_name = self.ORG_NAME
 
         # GCP parameters for oaebu_oapen project
-        self.dataset_location = dataset_location
+        self.data_location = data_location
         self.dataset_description = dataset_description
 
         self.oaebu_dataset = oaebu_dataset
@@ -327,7 +328,7 @@ class OapenWorkflow(Workflow):
         """
 
         output_dataset = self.oaebu_onix_dataset
-        data_location = self.dataset_location
+        data_location = self.data_location
         project_id = release.gcp_project_id
         release_date = release.release_date
 
@@ -386,14 +387,15 @@ class OapenWorkflow(Workflow):
             blob_name,
             release.crossref_metadata_filename,
         )
+        schema_file_path = find_schema(path=self.schema_folder, table_name=release.crossref_metadata_table_id)
         # load the table into bigquery
-        bq_load_shard_v2(
-            schema_folder=self.schema_folder,
+        bq_load_shard(
+            schema_file_path=schema_file_path,
             project_id=release.gcp_project_id,
             transform_bucket=release.bucket_name,
             transform_blob=blob_name,
             dataset_id=release.crossref_dataset_id,
-            dataset_location=self.dataset_location,
+            data_location=self.data_location,
             table_id=release.crossref_metadata_table_id,
             release_date=release.release_date,
             source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
@@ -431,14 +433,15 @@ class OapenWorkflow(Workflow):
             blob_name,
             release.crossref_events_filename,
         )
+        schema_file_path = find_schema(path=self.schema_folder, table_name=release.crossref_events_table_id)
         # load the table into bigquery
-        bq_load_shard_v2(
-            schema_folder=self.schema_folder,
+        bq_load_shard(
+            schema_file_path=schema_file_path,
             project_id=release.gcp_project_id,
             transform_bucket=release.bucket_name,
             transform_blob=blob_name,
             dataset_id=release.crossref_dataset_id,
-            dataset_location=self.dataset_location,
+            data_location=self.data_location,
             table_id=release.crossref_events_table_id,
             release_date=release.release_date,
             source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
@@ -471,7 +474,7 @@ class OapenWorkflow(Workflow):
         )
 
         create_bigquery_dataset(
-            project_id=release.gcp_project_id, dataset_id=self.oaebu_dataset, location=self.dataset_location
+            project_id=release.gcp_project_id, dataset_id=self.oaebu_dataset, location=self.data_location
         )
 
         status = create_bigquery_table_from_query(
@@ -479,7 +482,7 @@ class OapenWorkflow(Workflow):
             project_id=release.gcp_project_id,
             dataset_id=self.oaebu_dataset,
             table_id=output_table,
-            location=self.dataset_location,
+            location=self.data_location,
         )
 
         if not status:
@@ -500,7 +503,7 @@ class OapenWorkflow(Workflow):
         output_dataset = self.oaebu_dataset
         project_id = release.gcp_project_id
 
-        data_location = self.dataset_location
+        data_location = self.data_location
         release_date = release.release_date
 
         book_table_id = bigquery_sharded_table_id(self.book_table_id, release_date)
@@ -568,7 +571,7 @@ class OapenWorkflow(Workflow):
 
         project_id = release.gcp_project_id
         output_dataset = self.oaebu_elastic_dataset
-        data_location = self.dataset_location
+        data_location = self.data_location
         release_date = release.release_date
 
         create_bigquery_dataset(project_id=project_id, dataset_id=output_dataset, location=data_location)

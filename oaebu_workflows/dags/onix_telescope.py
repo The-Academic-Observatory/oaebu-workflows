@@ -33,7 +33,7 @@ for workflow in workflows:
     project_id = organisation.project_id
     download_bucket = organisation.download_bucket
     transform_bucket = organisation.transform_bucket
-    dataset_location = "us"
+    data_location = "us"
     date_regex = workflow.extra.get("date_regex")
     date_format = workflow.extra.get("date_format")
 
@@ -42,7 +42,7 @@ for workflow in workflows:
         project_id=project_id,
         download_bucket=download_bucket,
         transform_bucket=transform_bucket,
-        dataset_location=dataset_location,
+        data_location=data_location,
         date_regex=date_regex,
         date_format=date_format,
         workflow_id=workflow.id,

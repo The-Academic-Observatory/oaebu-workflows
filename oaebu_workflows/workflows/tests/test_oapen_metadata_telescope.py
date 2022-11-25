@@ -350,7 +350,15 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
         """Cover case when airflow_vars is given."""
 
         telescope = OapenMetadataTelescope(workflow_id=1, airflow_vars=[AirflowVars.DOWNLOAD_BUCKET])
-        self.assertEqual(set(telescope.airflow_vars), {AirflowVars.DOWNLOAD_BUCKET, AirflowVars.TRANSFORM_BUCKET})
+        self.assertEqual(
+            set(telescope.airflow_vars),
+            {
+                AirflowVars.DOWNLOAD_BUCKET,
+                AirflowVars.TRANSFORM_BUCKET,
+                AirflowVars.DATA_LOCATION,
+                AirflowVars.PROJECT_ID,
+            },
+        )
 
     @patch("observatory.platform.utils.workflow_utils.Variable.get")
     def test_download(self, mock_variable_get):

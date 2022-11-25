@@ -1,29 +1,83 @@
 [
   {
     "mode": "NULLABLE",
-    "name": "published_year",
-    "type": "INTEGER",
-    "description": "Published Year"
+    "name": "PersonName",
+    "type": "STRING",
+    "description": "Author's Name"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "orcid",
+    "type": "STRING",
+    "description": "Author's ORCID ID"
   },
   {
     "mode": "NULLABLE",
     "name": "unique_books",
     "type": "INTEGER",
-    "description": "The number of unique books published that year in the dataset"
+    "description": "Number of unique Books matched to the author"
   },
   {
     "mode": "NULLABLE",
     "name": "month",
     "type": "DATE",
-    "description": "The month for which the metrics apply to"
+    "description": "Month in which metrics took place"
   },
   {
     "fields": [
       {
         "mode": "NULLABLE",
-        "name": "unique_views",
+        "name": "views_total_country",
         "type": "INTEGER",
-        "description": "Unique Views"
+        "description": "Number of page views aggregated over all countries"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "downloads",
+        "type": "INTEGER",
+        "description": "Number of total downloads"
+      },  
+      {
+        "mode": "NULLABLE",
+        "name": "downloads_pdf_book",
+        "type": "INTEGER",
+        "description": "Number of PDF book downloads"
+      }, 
+      {
+        "mode": "NULLABLE",
+        "name": "downloads_pdf_chapter",
+        "type": "INTEGER",
+        "description": "Number of PDF chapter downloads"
+      }, 
+      {
+        "mode": "NULLABLE",
+        "name": "downloads_html_chapter",
+        "type": "INTEGER",
+        "description": "Number of HTML chapter downloads"
+      }, 
+      {
+        "mode": "NULLABLE",
+        "name": "downloads_epub_book",
+        "type": "INTEGER",
+        "description": "Number of ePUB book downloads"
+      }, 
+      {
+        "mode": "NULLABLE",
+        "name": "downloads_epub_chapter",
+        "type": "INTEGER",
+        "description": "Number of ePUB chapter downloads"
+      }, 
+      {
+        "mode": "NULLABLE",
+        "name": "downloads_mobi_book",
+        "type": "INTEGER",
+        "description": "Number of MOBI book downloads"
+      }, 
+      {
+        "mode": "NULLABLE",
+        "name": "downloads_mobi_chapter",
+        "type": "INTEGER",
+        "description": "Number of MOBI chapter downloads"
       }
     ],
     "mode": "NULLABLE",
@@ -43,7 +97,7 @@
     "mode": "NULLABLE",
     "name": "crossref_events",
     "type": "RECORD",
-    "description": "Metrics from Crossref Events"
+    "description": "Metrics from Crossref events"
   },
   {
     "fields": [
@@ -95,7 +149,7 @@
         "mode": "NULLABLE",
         "name": "qty",
         "type": "INTEGER",
-        "description": "The number of units in the transaction. Negative for refunds"
+        "description": "Number of sales"
       }
     ],
     "mode": "NULLABLE",
@@ -109,7 +163,7 @@
         "mode": "NULLABLE",
         "name": "Total_Item_Requests",
         "type": "INTEGER",
-        "description": "Total number of request made"
+        "description": "The total number of item requests"
       }
     ],
     "mode": "NULLABLE",

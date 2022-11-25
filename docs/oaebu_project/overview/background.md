@@ -14,7 +14,7 @@ Link to public dashboards embedded in the University of Michigan Press website:
 * <https://ebc.press.umich.edu/impact/#oa-book-usage> 
 
 Direct link to the University of Michigan Press public dashboards: 
-* <https://tinyurl.com/umpress-public>
+* <https://uomp-public.book-analytics.org>
 
 ## Pilot Project Dashboard Partners
 The pilot project dashboard partners that took part in the pilot project were: the University of Michigan Press, Wits University Press, UCL Press, ANU Press, SpringerNature and OAPEN. 

@@ -1,35 +1,29 @@
 [
   {
     "mode": "NULLABLE",
-    "name": "subject",
-    "type": "STRING",
-    "description": "Thema Subject"
-  },
-  {
-    "mode": "NULLABLE",
-    "name": "subject_code",
-    "type": "STRING",
-    "description": "Thema Subject Code"
+    "name": "published_year",
+    "type": "INTEGER",
+    "description": "Published Year"
   },
   {
     "mode": "NULLABLE",
     "name": "unique_books",
     "type": "INTEGER",
-    "description": "The number of unique books"
+    "description": "The number of unique books published that year in the dataset"
   },
   {
     "mode": "NULLABLE",
     "name": "month",
     "type": "DATE",
-    "description": "The month in which the metrics occurred"
+    "description": "The month for which the metrics apply to"
   },
   {
     "fields": [
       {
         "mode": "NULLABLE",
-        "name": "unique_views",
+        "name": "page_views",
         "type": "INTEGER",
-        "description": "The number of unique views"
+        "description": "Number of page views"
       },
       {
         "mode": "NULLABLE",
@@ -69,10 +63,16 @@
       }, 
       {
         "mode": "NULLABLE",
+        "name": "downloads_mobi_book",
+        "type": "INTEGER",
+        "description": "Number of MOBI book downloads"
+      }, 
+      {
+        "mode": "NULLABLE",
         "name": "downloads_mobi_chapter",
         "type": "INTEGER",
         "description": "Number of MOBI chapter downloads"
-      } 
+      }
     ],
     "mode": "NULLABLE",
     "name": "google_analytics",
@@ -91,7 +91,7 @@
     "mode": "NULLABLE",
     "name": "crossref_events",
     "type": "RECORD",
-    "description": "Metrics from Crossref events"
+    "description": "Metrics from Crossref Events"
   },
   {
     "fields": [

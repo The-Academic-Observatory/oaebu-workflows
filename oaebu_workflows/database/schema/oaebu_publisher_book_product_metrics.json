@@ -1,35 +1,115 @@
 [
   {
     "mode": "NULLABLE",
-    "name": "subject",
+    "name": "product_id",
     "type": "STRING",
-    "description": "BISAC Subject"
+    "description": "Book Product ID"
   },
   {
     "mode": "NULLABLE",
-    "name": "subject_code",
+    "name": "work_id",
     "type": "STRING",
-    "description": "BISAC Subject Code"
+    "description": "Book Work ID"
   },
   {
     "mode": "NULLABLE",
-    "name": "unique_books",
-    "type": "INTEGER",
-    "description": "The number of unique books"
+    "name": "work_family_id",
+    "type": "STRING",
+    "description": "Book Work Family ID"
   },
   {
     "mode": "NULLABLE",
-    "name": "month",
-    "type": "DATE",
-    "description": "The month in which the metrics occurred"
+    "name": "title",
+    "type": "STRING",
+    "description": "The title of the book"
   },
   {
     "fields": [
       {
         "mode": "NULLABLE",
-        "name": "unique_views",
+        "name": "PersonName",
+        "type": "STRING",
+        "description": "The Author's Name"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "ORCID",
+        "type": "STRING",
+        "description": "The Authors ORCID ID"
+      }
+    ],
+    "mode": "REPEATED",
+    "name": "authors",
+    "type": "RECORD",
+    "description": "A list of Book Authors"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "published_year",
+    "type": "INTEGER",
+    "description": "The Books published year"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "month",
+    "type": "DATE",
+    "description": "The month in which the metrics took place"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "page_views",
         "type": "INTEGER",
-        "description": "The number of unique views"
+        "description": "Number of page views"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "downloads",
+        "type": "INTEGER",
+        "description": "Number of total downloads"
+      },  
+      {
+        "mode": "NULLABLE",
+        "name": "downloads_pdf_book",
+        "type": "INTEGER",
+        "description": "Number of PDF book downloads"
+      }, 
+      {
+        "mode": "NULLABLE",
+        "name": "downloads_pdf_chapter",
+        "type": "INTEGER",
+        "description": "Number of PDF chapter downloads"
+      }, 
+      {
+        "mode": "NULLABLE",
+        "name": "downloads_html_chapter",
+        "type": "INTEGER",
+        "description": "Number of HTML chapter downloads"
+      }, 
+      {
+        "mode": "NULLABLE",
+        "name": "downloads_epub_book",
+        "type": "INTEGER",
+        "description": "Number of ePUB book downloads"
+      }, 
+      {
+        "mode": "NULLABLE",
+        "name": "downloads_epub_chapter",
+        "type": "INTEGER",
+        "description": "Number of ePUB chapter downloads"
+      }, 
+      {
+        "mode": "NULLABLE",
+        "name": "downloads_mobi_book",
+        "type": "INTEGER",
+        "description": "Number of MOBI book downloads"
+      }, 
+      {
+        "mode": "NULLABLE",
+        "name": "downloads_mobi_chapter",
+        "type": "INTEGER",
+        "description": "Number of MOBI chapter downloads"
       }
     ],
     "mode": "NULLABLE",
@@ -49,7 +129,7 @@
     "mode": "NULLABLE",
     "name": "crossref_events",
     "type": "RECORD",
-    "description": "Metrics from Crossref events"
+    "description": "Metrics from Crossref Events"
   },
   {
     "fields": [
@@ -101,7 +181,27 @@
         "mode": "NULLABLE",
         "name": "qty",
         "type": "INTEGER",
-        "description": "The number of units in the transaction. Negative for refunds"
+        "description": "Quantity of sales"
+      },
+      {
+        "fields": [
+          {
+            "mode": "NULLABLE",
+            "name": "Country_of_Sale",
+            "type": "STRING",
+            "description": "Country in which sale occured"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "qty",
+            "type": "INTEGER",
+            "description": "Quantity of sales"
+          }
+        ],
+        "mode": "REPEATED",
+        "name": "countries",
+        "type": "RECORD",
+        "description": "A list of Countries"
       }
     ],
     "mode": "NULLABLE",
@@ -115,7 +215,7 @@
         "mode": "NULLABLE",
         "name": "Total_Item_Requests",
         "type": "INTEGER",
-        "description": "Total number of request made"
+        "description": "Total number of item requests"
       }
     ],
     "mode": "NULLABLE",
@@ -125,6 +225,12 @@
   },
   {
     "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "version",
+        "type": "STRING",
+        "description": "Version of the OAPEN IRUS UK API, corresponds to the COUNTER report version"
+      },
       {
         "mode": "NULLABLE",
         "name": "title_requests",
@@ -160,5 +266,19 @@
     "name": "oapen_irus_uk",
     "type": "RECORD",
     "description": "Metrics from IRUS-UK"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "total_downloads",
+        "type": "INTEGER",
+        "description": ""
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "ucl_discovery",
+    "type": "RECORD",
+    "description": "Metrics from UCL Discovery"
   }
 ]
