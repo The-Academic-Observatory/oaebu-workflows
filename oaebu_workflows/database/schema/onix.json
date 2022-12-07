@@ -74,6 +74,12 @@
                 "name": "TitleText",
                 "type": "STRING",
                 "description": "The text of a title element, excluding any subtitle. Optional and non-repeating, may only be used where\n<TitlePrefix>, <NoPrefix/> and <TitleWithoutPrefix> are not used."
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "Subtitle",
+                "type": "STRING",
+                "description": "The text of a subtitle, if any. ‘Subtitle‘ means any added words which appear with the title element given in an occurrence of the <TitleElement> composite, and which amplify and explain the title element, but which are not considered to be part of the title element itself. Optional and non-repeating."
               }
             ],
             "mode": "REPEATED",
