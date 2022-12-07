@@ -284,6 +284,7 @@ class OnixTelescope(SnapshotTelescope):
             airflow_conns=airflow_conns,
             workflow_id=workflow_id,
             tags=[Tag.oaebu],
+            load_bigquery_table_kwargs={"ignore_unknown_values": True},
         )
 
         # self.organisation = organisation
