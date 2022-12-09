@@ -1833,7 +1833,7 @@ def isbns_from_onix(project_id: str, onix_dataset_id: str, onix_table_id: str) -
     isbn_rows = run_bigquery_query(sql)
     isbns = [row["ISBN13"] for row in isbn_rows]
     isbns = list(filter(None, isbns))  # Remove null values
-    return isbns[:200]
+    return isbns
 
 
 def dois_from_onix(project_id: str, onix_dataset_id: str, onix_table_id: str) -> List[str]:

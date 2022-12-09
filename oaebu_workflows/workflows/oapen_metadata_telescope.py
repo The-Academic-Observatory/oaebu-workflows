@@ -70,11 +70,11 @@ class OapenMetadataRelease(StreamRelease):
         )
 
 
-class OapenMetadataWorkflow(StreamTelescope):
-    """Oapen Metadata Workflow"""
+class OapenMetadataTelescope(StreamTelescope):
+    """Oapen Metadata Telescope"""
 
     METADATA_URL = "https://library.oapen.org/download-export?format=onix"
-    DAG_ID = "oapen_metadata_workflow"
+    DAG_ID = "oapen_metadata_telescope"
     SFTP_UPLOAD_DIR = "/telescopes/onix/oapen_press/upload"
 
     def __init__(
@@ -90,7 +90,7 @@ class OapenMetadataWorkflow(StreamTelescope):
         dataset_type_id: str = DatasetTypeId.oapen_metadata,
         sftp_upload_dir: str = SFTP_UPLOAD_DIR,
     ):
-        """Construct a OapenMetadataWorkflow instance.
+        """Construct a OapenMetadataTelescope instance.
 
         :param workflow_id: api workflow id.
         :param dag_id: the id of the DAG.
@@ -151,7 +151,7 @@ class OapenMetadataWorkflow(StreamTelescope):
 
         :param release: an OapenMetadataRelease instance.
         """
-        logging.info(f"Downloading metadata XML from url: {OapenMetadataWorkflow.METADATA_URL}")
+        logging.info(f"Downloading metadata XML from url: {OapenMetadataTelescope.METADATA_URL}")
         download_oapen_metadata(release.download_path)
 
     def transform(self, release: OapenMetadataRelease, **kwargs):
@@ -197,7 +197,7 @@ class OapenMetadataWorkflow(StreamTelescope):
     retry=retry_if_exception_type((ElementTree.ParseError, ConnectionError)),
     reraise=True,
 )
-def download_oapen_metadata(download_path: str, metadata_url: str = OapenMetadataWorkflow.METADATA_URL) -> None:
+def download_oapen_metadata(download_path: str, metadata_url: str = OapenMetadataTelescope.METADATA_URL) -> None:
     """Downloads the OAPEN metadata XML file
     OAPEN's downloader can give an incomplete file if the metadata is partially generated.
     In this scenario, we should wait until the metadata generator has finished.

@@ -3,4 +3,3 @@ faker>=8.12.1,<9
 Markdown==3.3.4 # prevent error: INSTALLED_EXTENSIONS = metadata.entry_points(group='markdown.extensions') TypeError: entry_points() got an unexpected keyword argument 'group'
 responses==0.20.*
 onixcheck==0.9.7
-vcrpy==4.2.1

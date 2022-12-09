@@ -1,13 +1,3 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<thing1>
-    <thing11>
-        <thing111>111</thing111>
-        <thing112>112</thing112>
-        <thing113>113</thing113>
-        <thing114>
-            <thing1111>1111</thing1111>
-        </thing114>
-    </thing11>
-    <thing12>12</thing12>
-    <thing13>13</thing13>
-</thing1>
+version https://git-lfs.github.com/spec/v1
+oid sha256:6ace352bbd83ee4fc56a9f9f72955e68c7b5e497ce184ea10b81bb4358e167e6
+size 316

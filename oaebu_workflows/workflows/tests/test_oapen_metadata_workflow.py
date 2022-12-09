@@ -26,9 +26,9 @@ from airflow.exceptions import AirflowException
 
 from oaebu_workflows.api_type_ids import DatasetTypeId
 from oaebu_workflows.config import test_fixtures_folder
-from oaebu_workflows.workflows.oapen_metadata_workflow import (
+from oaebu_workflows.workflows.oapen_metadata_telescope import (
     OapenMetadataRelease,
-    OapenMetadataWorkflow,
+    OapenMetadataTelescope,
     download_oapen_metadata,
     oapen_metadata_parse,
     remove_invalid_products,
@@ -59,8 +59,8 @@ from observatory.platform.utils.airflow_utils import AirflowConns
 from airflow.models import Connection
 
 
-class TestOapenMetadataWorkflow(ObservatoryTestCase):
-    """Tests for the Oapen Metadata Workflow DAG"""
+class TestOapenMetadataTelescope(ObservatoryTestCase):
+    """Tests for the Oapen Metadata Telescope DAG"""
 
     def __init__(self, *args, **kwargs):
         """Constructor which sets up variables used by tests.
@@ -108,8 +108,8 @@ class TestOapenMetadataWorkflow(ObservatoryTestCase):
         self.processing_test_fields = test_fixtures_folder("oapen_metadata", "processing_test_valid_fields.json")
 
     def setup_api(self):
-        name = "Oapen Metadata Workflow"
-        workflow_type = WorkflowType(name=name, type_id=OapenMetadataWorkflow.DAG_ID)
+        name = "Oapen Metadata Telescope"
+        workflow_type = WorkflowType(name=name, type_id=OapenMetadataTelescope.DAG_ID)
         self.api.put_workflow_type(workflow_type)
 
         organisation = Organisation(
@@ -161,7 +161,7 @@ class TestOapenMetadataWorkflow(ObservatoryTestCase):
 
     def test_dag_structure(self):
         """Test that the Oapen Metadata DAG has the correct structure"""
-        dag = OapenMetadataWorkflow(workflow_id=1).make_dag()
+        dag = OapenMetadataTelescope(workflow_id=1).make_dag()
         self.assert_dag_structure(
             {
                 "check_dependencies": ["download"],
@@ -182,8 +182,8 @@ class TestOapenMetadataWorkflow(ObservatoryTestCase):
         with env.create():
             self.setup_connections(env)
             self.setup_api()
-            dag_file = os.path.join(module_file_path("oaebu_workflows.dags"), "oapen_metadata_workflow.py")
-            self.assert_dag_load("oapen_metadata_workflow", dag_file)
+            dag_file = os.path.join(module_file_path("oaebu_workflows.dags"), "oapen_metadata_telescope.py")
+            self.assert_dag_load("oapen_metadata_telescope", dag_file)
 
     def test_workflow(self):
         """Test workflow task execution."""
@@ -191,7 +191,7 @@ class TestOapenMetadataWorkflow(ObservatoryTestCase):
         upload_dir_name = "upload"
         env = ObservatoryEnvironment(self.project_id, self.data_location, api_host=self.host, api_port=self.api_port)
         self.dataset_id = env.add_dataset()
-        wf = OapenMetadataWorkflow(dataset_id=self.dataset_id, workflow_id=1, sftp_upload_dir=upload_dir_name)
+        wf = OapenMetadataTelescope(dataset_id=self.dataset_id, workflow_id=1, sftp_upload_dir=upload_dir_name)
         dag = wf.make_dag()
 
         with env.create():
@@ -276,7 +276,7 @@ class TestOapenMetadataWorkflow(ObservatoryTestCase):
     def test_airflow_vars(self):
         """Cover case when airflow_vars is given."""
 
-        wf = OapenMetadataWorkflow(workflow_id=1, airflow_vars=[AirflowVars.DOWNLOAD_BUCKET])
+        wf = OapenMetadataTelescope(workflow_id=1, airflow_vars=[AirflowVars.DOWNLOAD_BUCKET])
         self.assertEqual(
             set(wf.airflow_vars),
             {
@@ -320,9 +320,9 @@ class TestOapenMetadataWorkflow(ObservatoryTestCase):
 
     def test_oapen_metadata_parse(self):
         """Tests the function used to parse the relevant fields into an onix file"""
-        with open(OapenMetadataWorkflow(workflow_id=1).onix_product_fields_file) as f:
+        with open(OapenMetadataTelescope(workflow_id=1).onix_product_fields_file) as f:
             onix_product_fields = json.load(f)
-        with open(OapenMetadataWorkflow(workflow_id=1).onix_header_fields_file) as f:
+        with open(OapenMetadataTelescope(workflow_id=1).onix_header_fields_file) as f:
             onix_header_fields = json.load(f)
         parsed_file = NamedTemporaryFile(delete=False)
 

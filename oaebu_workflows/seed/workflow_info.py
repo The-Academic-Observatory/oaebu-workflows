@@ -38,7 +38,7 @@ def get_workflow_info(api: ObservatoryApi):
         extra={},
         tags=None,
     )
-    name = "OAPEN Metadata Workflow"
+    name = "OAPEN Metadata Telescope"
     workflow_info[name] = Workflow(
         name=name,
         organisation=Organisation(id=orgids["OAPEN Press"]),
@@ -51,7 +51,7 @@ def get_workflow_info(api: ObservatoryApi):
         name=name,
         organisation=Organisation(id=orgids["OAPEN Press"]),
         workflow_type=WorkflowType(id=wftids[WorkflowTypeId.onix]),
-        extra={"date_format": "%Y%m%d", "date_regex": "\\d{8}"},
+        extra={"date_format": "%Y%m%d", "date_regex": "\\d{8}", "sensor_dag_ids": ["oapen_metadata_telescope"]},
         tags=None,
     )
     name = "ANU Press ONIX Telescope"
@@ -82,14 +82,6 @@ def get_workflow_info(api: ObservatoryApi):
     workflow_info[name] = Workflow(
         name=name,
         organisation=Organisation(id=orgids["University of Michigan Press"]),
-        workflow_type=WorkflowType(id=wftids[WorkflowTypeId.onix]),
-        extra={"date_format": "%Y%m%d", "date_regex": "\\d{8}"},
-        tags=None,
-    )
-    name = "OAPEN ONIX Telescope"
-    workflow_info[name] = Workflow(
-        name=name,
-        organisation=Organisation(id=orgids["OAPEN Press"]),
         workflow_type=WorkflowType(id=wftids[WorkflowTypeId.onix]),
         extra={"date_format": "%Y%m%d", "date_regex": "\\d{8}"},
         tags=None,
@@ -258,7 +250,6 @@ def get_workflow_info(api: ObservatoryApi):
         name=name,
         organisation=Organisation(id=orgids["OAPEN Press"]),
         workflow_type=WorkflowType(id=wftids[WorkflowTypeId.onix_workflow]),
-        extra={},
         tags=None,
     )
     return workflow_info

@@ -166,6 +166,34 @@ class TestOnixTelescope(ObservatoryTestCase):
             },
             dag,
         )
+        # Test with sensor
+        dag = OnixTelescope(
+            organisation_name=self.organisation_name,
+            project_id="my-project",
+            download_bucket="download_bucket",
+            transform_bucket="transform_bucket",
+            data_location=self.data_location,
+            date_regex=self.date_regex,
+            date_format=self.date_format,
+            sensor_dag_ids=["test_dag"],
+        ).make_dag()
+        self.assert_dag_structure(
+            {
+                "test_dag_sensor": ["check_dependencies"],
+                "check_dependencies": ["list_release_info"],
+                "list_release_info": ["move_files_to_in_progress"],
+                "move_files_to_in_progress": ["download"],
+                "download": ["upload_downloaded"],
+                "upload_downloaded": ["transform"],
+                "transform": ["upload_transformed"],
+                "upload_transformed": ["bq_load"],
+                "bq_load": ["move_files_to_finished"],
+                "move_files_to_finished": ["cleanup"],
+                "cleanup": ["add_new_dataset_releases"],
+                "add_new_dataset_releases": [],
+            },
+            dag,
+        )
 
     def test_dag_load(self):
         """Test that the Geonames DAG can be loaded from a DAG bag.

@@ -41,7 +41,7 @@ def get_dataset_info(api: ObservatoryApi):
         name=name,
         service="google",
         address="keegan-dev.oapen.metadata",
-        workflow=workflows["OAPEN Metadata Workflow"],
+        workflow=workflows["OAPEN Metadata Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.oapen_metadata),
     )
     name = "OAPEN Press Onix Dataset"
