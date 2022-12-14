@@ -22,7 +22,7 @@ class WorkflowTypes:
     google_books = "google_books"
     jstor = "jstor"
     oapen_irus_uk = "oapen_irus_uk"
-    oapen_metadata = "oapen_metadata_telescope"
+    oapen_metadata = "oapen_metadata"
     onix = "onix"
     onix_workflow = "onix_workflow"
     ucl_discovery = "ucl_discovery"

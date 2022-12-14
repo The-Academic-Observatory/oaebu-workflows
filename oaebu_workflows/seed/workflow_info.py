@@ -250,6 +250,7 @@ def get_workflow_info(api: ObservatoryApi):
         name=name,
         organisation=Organisation(id=orgids["OAPEN Press"]),
         workflow_type=WorkflowType(id=wftids[WorkflowTypeId.onix_workflow]),
+        extra={},
         tags=None,
     )
     return workflow_info

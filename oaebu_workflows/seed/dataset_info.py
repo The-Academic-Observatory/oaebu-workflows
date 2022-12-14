@@ -32,7 +32,7 @@ def get_dataset_info(api: ObservatoryApi):
     dataset_info[name] = Dataset(
         name=name,
         service="google",
-        address="keegan-dev.doab.doab",
+        address="academic-observatory.doab.doab",
         workflow=workflows["DOAB Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.doab),
     )
@@ -40,7 +40,7 @@ def get_dataset_info(api: ObservatoryApi):
     dataset_info[name] = Dataset(
         name=name,
         service="google",
-        address="keegan-dev.oapen.metadata",
+        address="academic-observatory.oapen.metadata",
         workflow=workflows["OAPEN Metadata Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.oapen_metadata),
     )
@@ -56,7 +56,7 @@ def get_dataset_info(api: ObservatoryApi):
     dataset_info[name] = Dataset(
         name=name,
         service="google",
-        address="keegan-dev.onix.onix",
+        address="oaebu-anu-press.onix.onix",
         workflow=workflows["ANU Press ONIX Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.onix),
     )
@@ -64,7 +64,7 @@ def get_dataset_info(api: ObservatoryApi):
     dataset_info[name] = Dataset(
         name=name,
         service="google",
-        address="keegan-dev.onix.onix",
+        address="oaebu-ucl-press.onix.onix",
         workflow=workflows["UCL Press ONIX Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.onix),
     )
@@ -72,7 +72,7 @@ def get_dataset_info(api: ObservatoryApi):
     dataset_info[name] = Dataset(
         name=name,
         service="google",
-        address="keegan-dev.onix.onix",
+        address="oaebu-witts-press.onix.onix",
         workflow=workflows["Wits Press ONIX Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.onix),
     )
@@ -80,7 +80,7 @@ def get_dataset_info(api: ObservatoryApi):
     dataset_info[name] = Dataset(
         name=name,
         service="google",
-        address="keegan-dev.onix.onix",
+        address="oaebu-umich-press.onix.onix",
         workflow=workflows["UoMP ONIX Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.onix),
     )
@@ -88,7 +88,7 @@ def get_dataset_info(api: ObservatoryApi):
     dataset_info[name] = Dataset(
         name=name,
         service="google",
-        address="keegan-dev.google.google_analytics",
+        address="oaebu-anu-press.google.google_analytics",
         workflow=workflows["ANU Press Google Analytics Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.google_analytics),
     )
@@ -96,7 +96,7 @@ def get_dataset_info(api: ObservatoryApi):
     dataset_info[name] = Dataset(
         name=name,
         service="google",
-        address="keegan-dev.google.google_books_sales",
+        address="oaebu-anu-press.google.google_books_sales",
         workflow=workflows["ANU Press Google Books Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.google_books_sales),
     )
@@ -104,7 +104,7 @@ def get_dataset_info(api: ObservatoryApi):
     dataset_info[name] = Dataset(
         name=name,
         service="google",
-        address="keegan-dev.google.google_books_traffic",
+        address="oaebu-anu-press.google.google_books_traffic",
         workflow=workflows["ANU Press Google Books Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.google_books_traffic),
     )
@@ -112,7 +112,7 @@ def get_dataset_info(api: ObservatoryApi):
     dataset_info[name] = Dataset(
         name=name,
         service="google",
-        address="keegan-dev.google.google_books_sales",
+        address="oaebu-ucl-press.google.google_books_sales",
         workflow=workflows["UCL Press Google Books Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.google_books_sales),
     )
@@ -120,7 +120,7 @@ def get_dataset_info(api: ObservatoryApi):
     dataset_info[name] = Dataset(
         name=name,
         service="google",
-        address="keegan-dev.google.google_books_traffic",
+        address="oaebu-ucl-press.google.google_books_traffic",
         workflow=workflows["UCL Press Google Books Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.google_books_traffic),
     )
@@ -128,7 +128,7 @@ def get_dataset_info(api: ObservatoryApi):
     dataset_info[name] = Dataset(
         name=name,
         service="google",
-        address="keegan-dev.google.google_books_sales",
+        address="oaebu-umich-press.google.google_books_sales",
         workflow=workflows["UoMP Google Books Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.google_books_sales),
     )
@@ -136,7 +136,7 @@ def get_dataset_info(api: ObservatoryApi):
     dataset_info[name] = Dataset(
         name=name,
         service="google",
-        address="keegan-dev.google.google_books_traffic",
+        address="oaebu-umich-press.google.google_books_traffic",
         workflow=workflows["UoMP Google Books Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.google_books_traffic),
     )
@@ -144,7 +144,7 @@ def get_dataset_info(api: ObservatoryApi):
     dataset_info[name] = Dataset(
         name=name,
         service="google",
-        address="keegan-dev.jstor.jstor_country",
+        address="oaebu-anu-press.jstor.jstor_country",
         workflow=workflows["ANU Press JSTOR Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.jstor_country),
     )
@@ -152,7 +152,7 @@ def get_dataset_info(api: ObservatoryApi):
     dataset_info[name] = Dataset(
         name=name,
         service="google",
-        address="keegan-dev.jstor.jstor_institution",
+        address="oaebu-anu-press.jstor.jstor_institution",
         workflow=workflows["ANU Press JSTOR Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.jstor_institution),
     )
@@ -160,7 +160,7 @@ def get_dataset_info(api: ObservatoryApi):
     dataset_info[name] = Dataset(
         name=name,
         service="google",
-        address="keegan-dev.jstor.jstor_country",
+        address="oaebu-umich-press.jstor.jstor_country",
         workflow=workflows["UoMP JSTOR Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.jstor_country),
     )
@@ -168,7 +168,7 @@ def get_dataset_info(api: ObservatoryApi):
     dataset_info[name] = Dataset(
         name=name,
         service="google",
-        address="keegan-dev.jstor.jstor_institution",
+        address="oaebu-umich-press.jstor.jstor_institution",
         workflow=workflows["UoMP JSTOR Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.jstor_institution),
     )
@@ -176,7 +176,7 @@ def get_dataset_info(api: ObservatoryApi):
     dataset_info[name] = Dataset(
         name=name,
         service="google",
-        address="keegan-dev.jstor.jstor_country",
+        address="oaebu-ucl-press.jstor.jstor_country",
         workflow=workflows["UCL Press JSTOR Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.jstor_country),
     )
@@ -184,7 +184,7 @@ def get_dataset_info(api: ObservatoryApi):
     dataset_info[name] = Dataset(
         name=name,
         service="google",
-        address="keegan-dev.jstor.jstor_institution",
+        address="oaebu-ucl-press.jstor.jstor_institution",
         workflow=workflows["UCL Press JSTOR Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.jstor_institution),
     )
@@ -192,7 +192,7 @@ def get_dataset_info(api: ObservatoryApi):
     dataset_info[name] = Dataset(
         name=name,
         service="google",
-        address="keegan-dev.jstor.jstor_country",
+        address="oaebu-witts-press.jstor.jstor_country",
         workflow=workflows["Wits Press JSTOR Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.jstor_country),
     )
@@ -200,7 +200,7 @@ def get_dataset_info(api: ObservatoryApi):
     dataset_info[name] = Dataset(
         name=name,
         service="google",
-        address="keegan-dev.jstor.jstor_institution",
+        address="oaebu-witts-press.jstor.jstor_institution",
         workflow=workflows["Wits Press JSTOR Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.jstor_institution),
     )
@@ -208,7 +208,7 @@ def get_dataset_info(api: ObservatoryApi):
     dataset_info[name] = Dataset(
         name=name,
         service="google",
-        address="keegan-dev.oapen.oapen_irus_uk",
+        address="oaebu-ucl-press.oapen.oapen_irus_uk",
         workflow=workflows["UCL Press OAPEN IRUS-UK Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.oapen_irus_uk),
     )
@@ -216,7 +216,7 @@ def get_dataset_info(api: ObservatoryApi):
     dataset_info[name] = Dataset(
         name=name,
         service="google",
-        address="keegan-dev.oapen.oapen_irus_uk",
+        address="oaebu-anu-press.oapen.oapen_irus_uk",
         workflow=workflows["ANU Press OAPEN IRUS-UK Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.oapen_irus_uk),
     )
@@ -224,7 +224,7 @@ def get_dataset_info(api: ObservatoryApi):
     dataset_info[name] = Dataset(
         name=name,
         service="google",
-        address="keegan-dev.oapen.oapen_irus_uk",
+        address="oaebu-umich-press.oapen.oapen_irus_uk",
         workflow=workflows["UoMP OAPEN IRUS-UK Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.oapen_irus_uk),
     )
@@ -232,7 +232,7 @@ def get_dataset_info(api: ObservatoryApi):
     dataset_info[name] = Dataset(
         name=name,
         service="google",
-        address="keegan-dev.oapen.oapen_irus_uk",
+        address="oaebu-oapen.oapen.oapen_irus_uk",
         workflow=workflows["OAPEN Press OAPEN IRUS-UK Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.oapen_irus_uk),
     )
@@ -240,7 +240,7 @@ def get_dataset_info(api: ObservatoryApi):
     dataset_info[name] = Dataset(
         name=name,
         service="google",
-        address="keegan-dev.oapen.oapen_irus_uk",
+        address="oaebu-witts-press.oapen.oapen_irus_uk",
         workflow=workflows["Wits Press OAPEN IRUS-UK Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.oapen_irus_uk),
     )
@@ -248,7 +248,7 @@ def get_dataset_info(api: ObservatoryApi):
     dataset_info[name] = Dataset(
         name=name,
         service="google",
-        address="keegan-dev.ucl.ucl_discovery",
+        address="oaebu-ucl-press.ucl.ucl_discovery",
         workflow=workflows["UCL Press UCL Discovery Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.ucl_discovery),
     )
@@ -264,7 +264,7 @@ def get_dataset_info(api: ObservatoryApi):
     dataset_info[name] = Dataset(
         name=name,
         service="google",
-        address="keegan-dev.oaebu.book_product",
+        address="oaebu-anu-press.oaebu.book_product",
         workflow=workflows["ANU Press ONIX Workflow"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.onix_workflow),
     )
@@ -272,7 +272,7 @@ def get_dataset_info(api: ObservatoryApi):
     dataset_info[name] = Dataset(
         name=name,
         service="google",
-        address="keegan-dev.oaebu.book_product",
+        address="oaebu-ucl-press.oaebu.book_product",
         workflow=workflows["UCL Press ONIX Workflow"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.onix_workflow),
     )
@@ -280,7 +280,7 @@ def get_dataset_info(api: ObservatoryApi):
     dataset_info[name] = Dataset(
         name=name,
         service="google",
-        address="keegan-dev.oaebu.book_product",
+        address="oaebu-witts-press.oaebu.book_product",
         workflow=workflows["Wits Press ONIX Workflow"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.onix_workflow),
     )
@@ -288,7 +288,7 @@ def get_dataset_info(api: ObservatoryApi):
     dataset_info[name] = Dataset(
         name=name,
         service="google",
-        address="keegan-dev.oaebu.book_product",
+        address="oaebu-umich-press.oaebu.book_product",
         workflow=workflows["UoMP ONIX Workflow"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.onix_workflow),
     )

@@ -122,6 +122,7 @@ class OapenMetadataTelescope(StreamTelescope):
             dataset_id,
             merge_partition_field="",
             schema_folder=schema_folder,
+            airflow_conns=airflow_conns,
             airflow_vars=airflow_vars,
             workflow_id=workflow_id,
             dataset_type_id=dataset_type_id,
@@ -319,7 +320,7 @@ def remove_invalid_products(input_xml: str, output_xml: str, invalid_products_fi
         logging.info(f"Invalid products written to {invalid_products_file}")
 
 
-def find_onix_product(all_lines: list, line_number: int) -> Tuple[int]:
+def find_onix_product(all_lines: list, line_number: int) -> Tuple[int, int]:
     """Finds the range of lines encompassing a <Product> tag, given a line_number that is contained in the product
 
     :param all_lines: All lines in the onix file
@@ -344,7 +345,7 @@ def find_onix_product(all_lines: list, line_number: int) -> Tuple[int]:
     if (line_number - negative_offset) < 0:
         raise AirflowException(f"Product out of bounds for given line number {line_number}")
 
-    return (line_number - negative_offset, line_number + positive_offset)
+    return line_number - negative_offset, line_number + positive_offset
 
 
 def process_xml_element(xml_elem: ElementTree.Element, viable_fields: dict, xml_parent: ElementTree.Element) -> None:
