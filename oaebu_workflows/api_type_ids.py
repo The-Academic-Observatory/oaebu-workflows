@@ -29,6 +29,7 @@ class DatasetTypeId:
 
     # oaebu workflows
     doab = "doab"
+    oapen_metadata = "oapen_metadata"
     onix = "onix"
     google_analytics = "google_analytics"
     google_books_sales = "google_books_sales"
@@ -40,7 +41,6 @@ class DatasetTypeId:
 
     # Workflow dataset types, i.e., dataset types for datasets created by various non Telescope workflows.
     onix_workflow = "onix_workflow"
-    oapen_metadata = "oapen_metadata_telescope"
 
 
 class WorkflowTypeId:
@@ -48,6 +48,7 @@ class WorkflowTypeId:
 
     # oaebu workflows
     doab = "doab"
+    oapen_metadata = "oapen_metadata"
     onix = "onix"
     google_analytics = "google_analytics"
     google_books = "google_books"
@@ -57,4 +58,3 @@ class WorkflowTypeId:
 
     # Workflow dataset types, i.e., dataset types for datasets created by various non Telescope workflows.
     onix_workflow = "onix_workflow"
-    oapen_metadata = "oapen_metadata_telescope"
