@@ -74,7 +74,7 @@ class OapenMetadataTelescope(StreamTelescope):
     """Oapen Metadata Telescope"""
 
     METADATA_URL = "https://library.oapen.org/download-export?format=onix"
-    DAG_ID = "oapen_metadata_telescope"
+    DAG_ID = "oapen_metadata"
     SFTP_UPLOAD_DIR = "/telescopes/onix/oapen_press/upload"
 
     def __init__(

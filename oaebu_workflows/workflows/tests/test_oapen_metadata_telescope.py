@@ -183,7 +183,7 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
             self.setup_connections(env)
             self.setup_api()
             dag_file = os.path.join(module_file_path("oaebu_workflows.dags"), "oapen_metadata_telescope.py")
-            self.assert_dag_load("oapen_metadata_telescope", dag_file)
+            self.assert_dag_load("oapen_metadata", dag_file)
 
     def test_workflow(self):
         """Test workflow task execution."""
