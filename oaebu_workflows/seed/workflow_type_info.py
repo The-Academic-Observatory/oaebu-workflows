@@ -49,10 +49,6 @@ def get_workflow_type_info():
         type_id=WorkflowTypeId.oapen_metadata,
         name="OAPEN Metadata Telescope",
     )
-    workflow_type_info[WorkflowTypeId.oapen_workflow] = WorkflowType(
-        type_id=WorkflowTypeId.oapen_workflow,
-        name="OAPEN Workflow",
-    )
     workflow_type_info[WorkflowTypeId.onix] = WorkflowType(
         type_id=WorkflowTypeId.onix,
         name="ONIX Telescope",

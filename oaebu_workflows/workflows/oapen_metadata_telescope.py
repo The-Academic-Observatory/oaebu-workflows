@@ -12,30 +12,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Author: Aniek Roelofs
+# Author: Aniek Roelofs, Keegan Smith
 
 from __future__ import annotations
 
-import csv
 import logging
 import os
+import tempfile
+import json
+import numpy as np
 from typing import List, Tuple
+from xml.etree import ElementTree
+from xml.dom import minidom
+import requests
 
 import pendulum
-from pendulum.exceptions import ParserError
 from airflow.exceptions import AirflowException
+from onixcheck import validate as validate_onix
+from tenacity import retry, stop_after_attempt, wait_chain, wait_fixed, retry_if_exception_type
 
 from oaebu_workflows.api_type_ids import DatasetTypeId
 from oaebu_workflows.config import schema_folder as default_schema_folder
-from observatory.platform.utils.airflow_utils import AirflowVars
-from observatory.platform.utils.file_utils import list_to_jsonl_gz
-from observatory.platform.utils.url_utils import get_user_agent, retry_session
-from observatory.platform.utils.workflow_utils import convert, upload_files_from_list
-from observatory.platform.workflows.stream_telescope import (
-    StreamRelease,
-    StreamTelescope,
-)
+from observatory.platform.utils.airflow_utils import AirflowConns, AirflowVars
+from observatory.platform.utils.url_utils import get_user_agent
+from observatory.platform.utils.workflow_utils import make_sftp_connection
+from observatory.platform.workflows.stream_telescope import StreamTelescope, StreamRelease
 from oaebu_workflows.dag_tag import Tag
+
+# Download job will wait 120 seconds between first 2 attempts, then 30 minutes for the following 3
+DOWNLOAD_RETRY_CHAIN = wait_chain(*[wait_fixed(120) for _ in range(2)] + [wait_fixed(1800) for _ in range(3)])
 
 
 class OapenMetadataRelease(StreamRelease):
@@ -44,108 +49,33 @@ class OapenMetadataRelease(StreamRelease):
         :param dag_id: the id of the DAG.
         :param start_date: the start_date of the release.
         :param end_date: the end_date of the release.
-        :param first_release: whether this is the first release that is processed for this DAG
         """
         super().__init__(dag_id, start_date, end_date, first_release)
 
     @property
-    def csv_path(self) -> str:
-        """Path to store the original oapen metadata csv file"""
-        return os.path.join(self.download_folder, "oapen_metadata.csv")
+    def download_path(self) -> str:
+        """Path to store the original oapen metadata XML file"""
+        return os.path.join(self.download_folder, f"oapen_metadata_{self.end_date.format('YYYYMMDD')}.xml")
 
     @property
     def transform_path(self) -> str:
-        """Path to store the transformed oapen metadata file"""
-        return os.path.join(self.transform_folder, "metadata.jsonl.gz")
+        """Path to store the transformed oapen ONIX file"""
+        return os.path.join(self.transform_folder, f"oapen_onix_{self.end_date.format('YYYYMMDD')}.xml")
 
-    def download(self) -> bool:
-        """Download Oapen metadata CSV.
-
-        :return: True if download is successful
-        """
-        logging.info(f"Downloading csv from url: {OapenMetadataTelescope.CSV_URL}")
-        headers = {"User-Agent": f"{get_user_agent(package_name='oaebu_workflows')}"}
-        response = retry_session().get(OapenMetadataTelescope.CSV_URL, headers=headers)
-        if response.status_code == 200:
-            with open(self.csv_path, "w") as f:
-                f.write(response.content.decode("utf-8"))
-            logging.info(f"Downloaded csv successful to {self.csv_path}")
-        else:
-            raise AirflowException(f"Download csv unsuccessful, {response.text}")
-
-        with open(self.csv_path, "r") as f:
-            csv_dict = [row for row in csv.DictReader(f)]
-            if len(csv_dict) == 0:
-                raise AirflowException(f"CSV file is empty")
-
-        return True
-
-    def transform(self):
-        """Transform the oapen metadata csv file by storing in a jsonl format and restructuring lists/dicts.
-        Values of field names with '.' are formatted into nested dictionaries.
-        Values of field names in list_fields are split on - , ; and ||.
-        Values of the field 'dc.subject.classification' are parsed to create a custom field 'classification_code'.
-        See our readthedocs for an example row before and after transformation
-        :return: None
-        """
-        with open(self.csv_path, "r") as f:
-            csv_entries = [{k: v for k, v in row.items()} for row in csv.DictReader(f, skipinitialspace=True)]
-
-        nested_fields = get_nested_fieldnames(csv_entries)
-        # values of these fields should be transformed to a list
-        list_fields = {
-            "oapen.grant.number",
-            "oapen.grant.acronym",
-            "oapen.relation.hasChapter_dc.title",
-            "dc.subject.classification",
-            "oapen.grant.program",
-            "oapen.redirect",
-            "oapen.imprint",
-            "dc.subject.other",
-            "oapen.notes",
-            "dc.title",
-            "collection",
-            "dc.relation.ispartofseries",
-            "BITSTREAM Download URL",
-            "BITSTREAM ISBN",
-            "oapen.collection",
-            "dc.contributor.author",
-            "oapen.remark.public",
-            "oapen.relation.isPublisherOf",
-            "dc.contributor.other",
-            "dc.contributor.editor",
-            "dc.relation.isreplacedbydouble",
-            "dc.date.issued",
-            "dc.description.abstract",
-            "BITSTREAM Webshop URL",
-            "dc.type",
-            "dc.identifier.isbn",
-            "dc.description.provenance",
-            "oapen.grant.project",
-            "oapen.relation.isbn",
-            "dc.identifier",
-            "oapen.identifier.ocn",
-            "dc.date.accessioned",
-            "BITSTREAM License",
-            "oapen.relation.isFundedBy_grantor.name",
-            "dc.relation.isnodouble",
-            "dc.language",
-            "grantor.number",
-            "dc.date.available",
-        }
-        entries = transform_dict(csv_entries, convert, nested_fields, list_fields)
-
-        # Transform release into JSON Lines format saving in memory buffer
-        # Save in memory buffer to gzipped file
-        list_to_jsonl_gz(self.transform_path, entries)
+    @property
+    def invalid_products_path(self) -> str:
+        """Path to store the transformed oapen ONIX file"""
+        return os.path.join(
+            self.transform_folder, f"oapen_onix_invalid_products_{self.end_date.format('YYYYMMDD')}.xml"
+        )
 
 
 class OapenMetadataTelescope(StreamTelescope):
-    """Oapen Metadata telescope"""
+    """Oapen Metadata Telescope"""
 
-    CSV_URL = "https://library.oapen.org/download-export?format=csv"
-
+    METADATA_URL = "https://library.oapen.org/download-export?format=onix"
     DAG_ID = "oapen_metadata"
+    SFTP_UPLOAD_DIR = "/telescopes/onix/oapen_press/upload"
 
     def __init__(
         self,
@@ -154,23 +84,23 @@ class OapenMetadataTelescope(StreamTelescope):
         start_date: pendulum.DateTime = pendulum.datetime(2018, 5, 14),
         schedule_interval: str = "@weekly",
         dataset_id: str = "oapen",
-        merge_partition_field: str = "id",
         schema_folder: str = default_schema_folder(),
-        schema_prefix: str = "oapen_",
         airflow_vars: List = None,
+        airflow_conns: List = None,
         dataset_type_id: str = DatasetTypeId.oapen_metadata,
+        sftp_upload_dir: str = SFTP_UPLOAD_DIR,
     ):
         """Construct a OapenMetadataTelescope instance.
 
+        :param workflow_id: api workflow id.
         :param dag_id: the id of the DAG.
         :param start_date: the start date of the DAG.
         :param schedule_interval: the schedule interval of the DAG.
         :param dataset_id: the dataset id.
-        :param merge_partition_field: the BigQuery field used to match partitions for a merge
         :param schema_folder: the SQL schema path.
         :param schema_prefix: the prefix used to find the schema path
         :param airflow_vars: list of airflow variable keys, for each variable it is checked if it exists in airflow
-        :param workflow_id: api workflow id.
+        :param sftp_upload_dir: The directory on the SFTP server to upload the parsed file to
         """
 
         if airflow_vars is None:
@@ -181,26 +111,35 @@ class OapenMetadataTelescope(StreamTelescope):
                 AirflowVars.DOWNLOAD_BUCKET,
                 AirflowVars.TRANSFORM_BUCKET,
             ]
+
+        if airflow_conns is None:
+            airflow_conns = [AirflowConns.SFTP_SERVICE]
+
         super().__init__(
             dag_id,
             start_date,
             schedule_interval,
             dataset_id,
-            merge_partition_field,
-            schema_folder,
-            schema_prefix=schema_prefix,
+            merge_partition_field="",
+            schema_folder=schema_folder,
+            airflow_conns=airflow_conns,
             airflow_vars=airflow_vars,
             workflow_id=workflow_id,
             dataset_type_id=dataset_type_id,
-            load_bigquery_table_kwargs={"ignore_unknown_values": True},
             tags=[Tag.oaebu],
         )
 
+        self.sftp_upload_dir = sftp_upload_dir
+        self.onix_product_fields_file = os.path.join(self.schema_folder, "OAPEN_ONIX_product_fields.json")
+        self.onix_header_fields_file = os.path.join(self.schema_folder, "OAPEN_ONIX_header_fields.json")
+
         self.add_setup_task(self.check_dependencies)
-        self.add_task_chain(
-            [self.download, self.upload_downloaded, self.transform, self.upload_transformed, self.bq_load_partition]
-        )
-        self.add_task_chain([self.bq_delete_old, self.bq_append_new, self.cleanup, self.add_new_dataset_releases])
+        self.add_task(self.download)
+        self.add_task(self.upload_downloaded)
+        self.add_task(self.transform)
+        self.add_task(self.upload_transformed)
+        self.add_task(self.upload_to_sftp_server)
+        self.add_task(self.cleanup)
 
     def make_release(self, **kwargs) -> OapenMetadataRelease:
         # Make Release instance
@@ -210,149 +149,247 @@ class OapenMetadataTelescope(StreamTelescope):
 
     def download(self, release: OapenMetadataRelease, **kwargs):
         """Task to download the OapenMetadataRelease release.
-        :param release: an OapenMetadataRelease instance.
-        :return: None.
-        """
-        # Download release
-        release.download()
 
-    def upload_downloaded(self, release: OapenMetadataRelease, **kwargs):
-        """Task to upload the downloadeded OapenMetadataRelease release.
         :param release: an OapenMetadataRelease instance.
-        :return: None.
         """
-        # Upload each downloaded release
-        upload_files_from_list(release.download_files, release.download_bucket)
+        logging.info(f"Downloading metadata XML from url: {OapenMetadataTelescope.METADATA_URL}")
+        download_oapen_metadata(release.download_path)
 
     def transform(self, release: OapenMetadataRelease, **kwargs):
-        """Task to transform the OapenMetadataRelease release.
+        """Transform the oapen metadata XML file into a valid ONIX file
+
         :param release: an OapenMetadataRelease instance.
-        :return: None.
         """
-        # Transform each release
-        release.transform()
+        with open(self.onix_product_fields_file) as f:
+            onix_product_fields = json.load(f)
+        with open(self.onix_header_fields_file) as f:
+            onix_header_fields = json.load(f)
+        with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+            oapen_metadata_parse(
+                release.download_path,
+                tmp_file.name,
+                onix_product_fields=onix_product_fields,
+                onix_header_fields=onix_header_fields,
+            )
+            remove_invalid_products(
+                tmp_file.name, release.transform_path, invalid_products_file=release.invalid_products_path
+            )
+        # Assert that the new onix file is valid
+        errors = validate_onix(release.transform_path)
+        if errors:
+            raise AirflowException("Errors found in processed OAPEN ONIX file. Cannot proceed without valid ONIX.")
+
+    def upload_to_sftp_server(self, release: OapenMetadataRelease, **kwargs):
+        """Uploads the transformed ONIX file to the SFTP server
+
+        :param release: an OapenMetadataRelease instance.
+        """
+        upload_path = os.path.join(self.sftp_upload_dir, os.path.basename(release.transform_path))
+        logging.info(f"Uploading file '{release.transform_path}' to SFTP server path '{upload_path}'")
+        with make_sftp_connection() as sftp_con:
+            if not sftp_con.exists(self.sftp_upload_dir):
+                raise AirflowException(f"SFTP server directory: {self.sftp_upload_dir} does not exist")
+            sftp_con.put(release.transform_path, upload_path)
 
 
-def get_nested_fieldnames(csv_entries: List[dict]) -> set:
-    """Fieldnames with '.' should be converted to nested dictionaries. This function will return a set of
-    fieldnames for nested dictionaries from the highest to second lowest levels.
-    E.g these fieldnames: dc.date.available, dc.date.issued, dc.description
-    Will give this set: dc, dc.date, dc.description
+@retry(
+    stop=stop_after_attempt(5),
+    wait=DOWNLOAD_RETRY_CHAIN,
+    retry=retry_if_exception_type((ElementTree.ParseError, ConnectionError)),
+    reraise=True,
+)
+def download_oapen_metadata(download_path: str, metadata_url: str = OapenMetadataTelescope.METADATA_URL) -> None:
+    """Downloads the OAPEN metadata XML file
+    OAPEN's downloader can give an incomplete file if the metadata is partially generated.
+    In this scenario, we should wait until the metadata generator has finished.
+    Otherwise, an attempt to parse the data will result in an XML ParseError.
+    OAPEN metadata generation can take over an hour,
 
-    :param csv_entries: Dictionary with csv entries
-    :return: Set of field names which should be converted to nested fields
+    :param download_path: filepath to store te downloaded file
+    :param metadata_url: the url to query for the metadata
+    :raises ConnectionError: raised if the response from the metadata server does not have code 200
     """
-    keys = csv_entries[0].keys()
-    nested_fields = set()
-    for key in keys:
-        # split string in two, starting from the right
-        split_key = key.rsplit(".", 1)
-        # add key to set if there is at least one '.' in key name
-        if len(split_key) > 1:
-            nested_fields.add(split_key[0])
-    return nested_fields
+    headers = {"User-Agent": f"{get_user_agent(package_name='oaebu_workflows')}"}
+    response = requests.get(metadata_url, headers=headers)
+    if response.status_code != 200:
+        raise ConnectionError(
+            f"Expected status code 200 from url {metadata_url}, instead got response: {response.text}"
+        )
+    with open(download_path, "w") as f:
+        f.write(response.content.decode("utf-8"))
+    logging.info(f"Successfully downloadeded XML to {download_path}")
+
+    # Attempt to parse the XML, will raise an ElementTree.ParseError exception if it's invalid
+    ElementTree.parse(download_path)
+    logging.info("XML file is valid")
 
 
-def transform_value_to_list(k: str, v: str) -> Tuple[list, list]:
-    """Takes a key and value from the dictionary of csv entries. The value is always in a string format. Based on the
-    key name (k) the delimiter in the the value (v) is replaced with '||'. All values are then split on '||' so they
-    are transformed into a list. The values of 'dc.subject.classification' are parsed and stored in a variable,
-    so they can later be added to a custom key of the csv entries dictionary.
+def oapen_metadata_parse(input_xml: str, output_xml: str, onix_product_fields: dict, onix_header_fields: dict) -> None:
+    """For parsing OAPEN's metadata feed, keeping only the fields we require
 
-    :param k: Dictionary key
-    :param v: Dictionary value (string)
-    :return: Dictionary value (list) and classification code info.
+    :param input_xml: The file path of the input metadata xml file.
+    :param output_onix: The file path to use when writing the output onix xml
+    :param onix_product_fields: The allowed fields and their structure. Empty list indicates data inclusion.
+
+    onix_product_fields example:
+    {"RecordReference": [],
+    "Edition": {
+        "EditionNumber": []}}
+    Will search for the 'RecordReference' tag and fill its data. Then will search for the 'Edition" tag and look
+    inside it for 'EditionNumber', if it finds this tag, it will fill its data
+
+    :param input_xml: The metadata xml downloaded from OAPEN for parsing (filepath)
+    :param output_xml: The filepath to output
+    :param onix_product_fields: The product fields to retain as described in the above example
+    :param onix_header_fields: The header fields to retain
     """
-    # Get classification code for custom added column
-    classification_code = []
-    if k == "BITSTREAM ISBN":
-        v = v.replace("-", "")
-    if k == "dc.subject.other":
-        v = v.replace(";", "||")
-        v = v.replace(",", "||")
-    v = list(dict.fromkeys([x.strip() for x in v.split("||")]))
-    if k == "dc.date.issued":
-        try:
-            # Use rjust to create 4 digit year number < 1000 on linux, e.g. 215 -> 0215
-            v = [pendulum.parse(date).to_date_string().rjust(10, "0") for date in v]
-        except ParserError:
-            v = []
-    if k == "dc.subject.classification":
-        for c in v:
-            if c.startswith("bic Book Industry Communication::"):
-                code = c.split("::")[-1].split(" ")[0]
-                classification_code.append(code)
-            else:
-                classification_code.append(c)
-        classification_code = list(dict.fromkeys(classification_code))
-    return v, classification_code
+
+    # Load the ONIX XML file
+    tree = ElementTree.parse(input_xml)
+
+    # Create the header
+    root = ElementTree.Element("ONIXMessage", {"xmlns": "http://ns.editeur.org/onix/3.0/reference", "release": "3.0"})
+    root_element = tree.getroot()[0]
+    header_child = ElementTree.Element("Header")
+    process_xml_element(root_element, onix_header_fields, header_child)
+    root.append(header_child)
+
+    # Iterate through every element in the root, keeping those defined in the onix_product_fields
+    for onix_elem in tree.getroot():
+        if onix_elem.tag.endswith("Product"):
+            child = ElementTree.Element("Product")
+            process_xml_element(onix_elem, onix_product_fields, child)
+            root.append(child)
+
+    # Format and write trimmed metadta XML to a temporary file and look for remaining errors
+    with open(output_xml, "wb") as f:
+        # TODO: for python>=3.9, format using ElementTree.indent(tree, "   ")
+        # then change write command to: tree.write(f, xml_declaration=True)
+        f.write(minidom.parseString(ElementTree.tostring(root)).toprettyxml(indent="    ", encoding="UTF-8"))
 
 
-def transform_key_to_nested_dict(k: str, v, nested_fields: set, list_fields: set, classification_code: list, new: dict):
-    """Takes a dictionary key and value. The key is split on '.', a nested dictionary is created and the value will be
-    added to the most nested level. The dictionary is updated in place so it is not returned.
-    For example first k = 'dc.date.issued', the dictionary = {'dc': {'date': {'issued': v1}}
-    Second k = 'dc.date.accessed', the dictionary = {'dc': {'date': {'issued': v1, 'accessed': v2}}
+def remove_invalid_products(input_xml: str, output_xml: str, invalid_products_file: str = None) -> None:
+    """Attempts to validate the input xml as an ONIX file. Will remove any products that contain errors.
 
-    :param k: Dictionary key
-    :param v: Dictionary value
-    :param nested_fields: Set of field names for which the values should be a nested dictionary
-    :param list_fields: Set of field names for which the values should be a list
-    :param classification_code: List of classification code abbreviations
-    :param new: New, updated dictionary
-    :return: None.
+    :param input_xml: The filepath of the xml file to validate
+    :param output_xml: The output filepath
+    :param invalid_prouducts_file: The filepath to write the invalid products to. Ignored if unsupplied.
     """
-    # Get all (nested) fields of a specific key
-    fields = k.split(".")
-    tmp = new
-    # Create one dictionary for each field
-    for key in fields:
-        key = convert(key)
-        try:
-            tmp[key]
-        except KeyError:
-            # Add the value to the most nested level
-            if key == fields[-1]:
-                tmp[key] = transform_dict(v, convert, nested_fields, list_fields)
-                if key == "classification":
-                    # Add classification code column
-                    tmp["classification_code"] = transform_dict(
-                        classification_code, convert, nested_fields, list_fields
-                    )
-            # Create empty dictionary for key
-            else:
-                tmp[key] = {}
-        tmp = tmp[key]
+    errors = validate_onix(input_xml)
+    error_lines = [int(e.location.split(":")[-2]) for e in errors]  # Get the line numbers of the errors
+    if error_lines:
+        logging.info(
+            f"OAPEN metadata feed has been trimmed and {len(error_lines)} errors remain. These products will be removed"
+        )
+
+    # Ingest the file into a list and find onix products with errors
+    with open(input_xml, "r") as f:
+        onix_file_lines = f.readlines()
+    invalid_product_line_ranges = []
+    for line_number in sorted(error_lines):
+        invalid_product_line_ranges.append(find_onix_product(onix_file_lines, line_number))
+    # Remove any duplicates in the product list
+    invalid_product_line_ranges = list(set(tuple(i) for i in invalid_product_line_ranges))
+
+    # Remove products with errors in them
+    num_lines = len(onix_file_lines)
+    logging.info(f"Removing {len(invalid_product_line_ranges)} invalid products from metadata feed")
+    valid_line_numbers = list(np.linspace(1, num_lines, num_lines, dtype=int, endpoint=True))
+    invalid_line_numbers = []
+    for line_remove_start, line_remove_end in sorted(invalid_product_line_ranges, reverse=True):
+        invalid_line_numbers.extend(valid_line_numbers[line_remove_start : line_remove_end + 1])
+        del valid_line_numbers[line_remove_start : line_remove_end + 1]
+
+    # Create the clean XML ONIX file
+    clean_xml = [onix_file_lines[i - 1] for i in valid_line_numbers]
+    with open(output_xml, "w") as f:
+        for l in clean_xml:
+            f.write(l)
+        logging.info(f"XML written to {output_xml}")
+
+    # Create the invalid product file
+    if invalid_products_file:
+        invalid_products = [onix_file_lines[i - 1] for i in invalid_line_numbers]
+        with open(invalid_products_file, "w") as f:
+            # Write the XML root
+            f.write(onix_file_lines[0])
+            f.write(onix_file_lines[1])
+            for l in invalid_products:
+                f.write(l)
+            f.write(onix_file_lines[-1])  # Close the XML root
+        logging.info(f"Invalid products written to {invalid_products_file}")
 
 
-def transform_dict(obj, convert, nested_fields, list_fields):
-    """Recursively goes through the dictionary obj, replaces keys with the convert function.
-    :param obj: object, can be of any type
-    :param convert: convert function
-    :param nested_fields: fields
-    :param list_fields:
-    :return: Updated dictionary
+def find_onix_product(all_lines: list, line_number: int) -> Tuple[int, int]:
+    """Finds the range of lines encompassing a <Product> tag, given a line_number that is contained in the product
+
+    :param all_lines: All lines in the onix file
+    :param line_number: The line number associated with the product
+    :raises AirflowException: Raised if the return would encompass a negative index, indicating the input line was not in a product
+    :return: A two-tuple of the start and end line numbers of the product
     """
-    if isinstance(obj, (str, int, float)):
-        return obj
-    if isinstance(obj, dict):
-        new = obj.__class__()
-        for k, v in list(obj.items()):
-            classification_code = []
-            if v == "":
-                continue
-            if k in list_fields:
-                v, classification_code = transform_value_to_list(k, v)
-            # change key name for top level of nested dictionary
-            if k in nested_fields:
-                k = k + ".value"
-            # parse key/value of lower levels of nested dictionary
-            if k.rsplit(".", 1)[0] in nested_fields:
-                transform_key_to_nested_dict(k, v, nested_fields, list_fields, classification_code, new)
-            else:
-                new[convert(k)] = transform_dict(v, convert, nested_fields, list_fields)
-    elif isinstance(obj, (list, set, tuple)):
-        new = obj.__class__(transform_dict(v, convert, nested_fields, list_fields) for v in obj)
-    else:
-        return obj
-    return new
+    # Go up until we find <Product>
+    negative_offset = 0
+    line = all_lines[line_number - 1]  # -1 accounts for python zero indexing vs line number indexing
+    while not "<Product>" in line:
+        negative_offset += 1
+        line = all_lines[line_number - negative_offset]
+
+    # Go up until we find </Product>
+    positive_offset = -1
+    line = all_lines[line_number - 1]
+    while not "</Product>" in line:
+        positive_offset += 1
+        line = all_lines[line_number + positive_offset]
+
+    if (line_number - negative_offset) < 0:
+        raise AirflowException(f"Product out of bounds for given line number {line_number}")
+
+    return line_number - negative_offset, line_number + positive_offset
+
+
+def process_xml_element(xml_elem: ElementTree.Element, viable_fields: dict, xml_parent: ElementTree.Element) -> None:
+    """A recursive function that processes an XML by iterating through the tree and only keeping the elements if they
+    are described as expected in the viable fields.
+    For example, say we have an xml with this structure:
+    <thing>
+        <subthing>1
+            <subsubthing>1</subsubthing>
+        </subthing>
+        <unimportantsubthing>5</unimportantsubthing>
+    </thing>
+
+    and the viable fields looks like this:
+    {"thing":{
+        "subthing":{
+            "subsubthing":[]
+            }
+        }
+    }
+    Our resulting xml would look like this:
+    <thing>
+        <subthing>1
+            <subsubthing>1</subsubthing>
+        </subthing>
+    </thing>
+
+    Example use case:
+    tree = ElementTree.parse(my_xml_file) # Load my xml file
+    root = ElementTree.Element(tree.getroot().tag) # Create a new xml tree
+    process_xml_element(tree.getroot(), viable_fields, root) # process a new tree
+    with open('file.xml', 'w') as f: # write my tree to a file
+        f.write(ElementTree.tostring(root)))
+
+    :param xml_elem: The xml element to process
+    :param viable_fields: A dictionary describing the fileds to retain
+    :param xml_parent: The parent xml element to write to
+    """
+    if not viable_fields:  # Fields is an empty list
+        xml_parent.text = xml_elem.text
+        return
+
+    for e in xml_elem:
+        for field_key in viable_fields.keys():
+            if e.tag.endswith(field_key):
+                child = ElementTree.SubElement(xml_parent, field_key)
+                process_xml_element(e, viable_fields[field_key], child)

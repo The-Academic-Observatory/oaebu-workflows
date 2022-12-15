@@ -27,4 +27,3 @@ class WorkflowTypes:
     onix_workflow = "onix_workflow"
     ucl_discovery = "ucl_discovery"
     doab = "doab"
-    oapen_workflow = "oapen_workflow"

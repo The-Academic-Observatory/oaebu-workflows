@@ -36,6 +36,7 @@ for workflow in workflows:
     data_location = "us"
     date_regex = workflow.extra.get("date_regex")
     date_format = workflow.extra.get("date_format")
+    sensor_dag_ids = workflow.extra.get("sensor_dag_ids")
 
     workflow = OnixTelescope(
         organisation_name=organisation_name,
@@ -46,5 +47,6 @@ for workflow in workflows:
         date_regex=date_regex,
         date_format=date_format,
         workflow_id=workflow.id,
+        sensor_dag_ids=sensor_dag_ids,
     )
     globals()[workflow.dag_id] = workflow.make_dag()

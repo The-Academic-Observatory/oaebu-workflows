@@ -41,7 +41,6 @@ class DatasetTypeId:
 
     # Workflow dataset types, i.e., dataset types for datasets created by various non Telescope workflows.
     onix_workflow = "onix_workflow"
-    oapen_workflow = "oapen_workflow"
 
 
 class WorkflowTypeId:
@@ -59,4 +58,3 @@ class WorkflowTypeId:
 
     # Workflow dataset types, i.e., dataset types for datasets created by various non Telescope workflows.
     onix_workflow = "onix_workflow"
-    oapen_workflow = "oapen_workflow"

@@ -44,6 +44,14 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["OAPEN Metadata Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.oapen_metadata),
     )
+    name = "OAPEN Press Onix Dataset"
+    dataset_info[name] = Dataset(
+        name=name,
+        service="google",
+        address="keegan-dev.onix.onix",
+        workflow=workflows["OAPEN Press ONIX Telescope"],
+        dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.onix),
+    )
     name = "ANU Press Onix Dataset"
     dataset_info[name] = Dataset(
         name=name,
@@ -244,6 +252,14 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["UCL Press UCL Discovery Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.ucl_discovery),
     )
+    name = "OAPEN Press ONIX Workflow Dataset"
+    dataset_info[name] = Dataset(
+        name=name,
+        service="google",
+        address="keegan-dev.oaebu.book_product",
+        workflow=workflows["OAPEN Press ONIX Workflow"],
+        dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.onix_workflow),
+    )
     name = "ANU Press ONIX Workflow Dataset"
     dataset_info[name] = Dataset(
         name=name,
@@ -254,7 +270,7 @@ def get_dataset_info(api: ObservatoryApi):
     )
     name = "UCL Press ONIX Workflow Dataset"
     dataset_info[name] = Dataset(
-        name="UCL Press ONIX Workflow Dataset",
+        name=name,
         service="google",
         address="oaebu-ucl-press.oaebu.book_product",
         workflow=workflows["UCL Press ONIX Workflow"],
@@ -275,14 +291,6 @@ def get_dataset_info(api: ObservatoryApi):
         address="oaebu-umich-press.oaebu.book_product",
         workflow=workflows["UoMP ONIX Workflow"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.onix_workflow),
-    )
-    name = "OAPEN Workflow Dataset"
-    dataset_info[name] = Dataset(
-        name=name,
-        service="google",
-        address="oaebu-oapen.oaebu.book_product",
-        workflow=workflows["OAPEN Workflow"],
-        dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.oapen_workflow),
     )
     return dataset_info
 

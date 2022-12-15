@@ -23,42 +23,42 @@ from observatory.api.utils import get_api_client, seed_organisation
 
 def get_organisation_info():
     organisation_info = OrderedDict()
-    name="ANU Press"
+    name = "ANU Press"
     organisation_info[name] = Organisation(
         name=name,
         project_id="oaebu-anu-press",
         download_bucket="oaebu-anu-press-download",
         transform_bucket="oaebu-anu-press-transform",
     )
-    name="UCL Press"
+    name = "UCL Press"
     organisation_info[name] = Organisation(
         name=name,
         project_id="oaebu-ucl-press",
         download_bucket="oaebu-ucl-press-download",
         transform_bucket="oaebu-ucl-press-transform",
     )
-    name="University of Michigan Press"
+    name = "University of Michigan Press"
     organisation_info[name] = Organisation(
         name=name,
         project_id="oaebu-umich-press",
         download_bucket="oaebu-umich-press-download",
         transform_bucket="oaebu-umich-press-transform",
     )
-    name="Wits University Press"
+    name = "Wits University Press"
     organisation_info[name] = Organisation(
         name=name,
         project_id="oaebu-witts-press",
         download_bucket="oaebu-witts-press-download",
         transform_bucket="oaebu-witts-press-transform",
     )
-    name="OAPEN Press"
+    name = "OAPEN Press"
     organisation_info[name] = Organisation(
         name=name,
         project_id="oaebu-oapen",
         download_bucket="oaebu-oapen-download",
         transform_bucket="oaebu-oapen-transform",
     )
-    name="Curtin University"
+    name = "Curtin University"
     organisation_info[name] = Organisation(
         name=name,
         project_id=None,

@@ -12,36 +12,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Author: Aniek Roelofs, Tuan Chien
+# Author: Aniek Roelofs, Tuan Chien, Keegan Smith
 
 import os
-from unittest.mock import patch
+from unittest.mock import MagicMock
+from tempfile import NamedTemporaryFile
+from xml.etree import ElementTree
+import json
 
-import httpretty
 import pendulum
+import vcr
 from airflow.exceptions import AirflowException
-from click.testing import CliRunner
-from google.cloud import bigquery
 
 from oaebu_workflows.api_type_ids import DatasetTypeId
 from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.workflows.oapen_metadata_telescope import (
     OapenMetadataRelease,
     OapenMetadataTelescope,
-    convert,
-    transform_dict,
+    download_oapen_metadata,
+    oapen_metadata_parse,
+    remove_invalid_products,
+    find_onix_product,
+    process_xml_element,
 )
 from observatory.platform.utils.airflow_utils import AirflowVars
 from observatory.platform.utils.test_utils import (
     ObservatoryEnvironment,
     ObservatoryTestCase,
+    SftpServer,
     module_file_path,
     find_free_port,
 )
 from observatory.platform.utils.workflow_utils import (
     blob_name,
-    create_date_table_id,
-    table_ids_from_path,
 )
 from observatory.api.testing import ObservatoryApiEnvironment
 from observatory.api.client import ApiClient, Configuration
@@ -52,15 +55,12 @@ from observatory.api.client.model.workflow_type import WorkflowType
 from observatory.api.client.model.dataset import Dataset
 from observatory.api.client.model.dataset_type import DatasetType
 from observatory.api.client.model.table_type import TableType
-from observatory.platform.utils.release_utils import get_dataset_releases
 from observatory.platform.utils.airflow_utils import AirflowConns
 from airflow.models import Connection
-from airflow.utils.state import State
-import responses
 
 
 class TestOapenMetadataTelescope(ObservatoryTestCase):
-    """Tests for the Oapen Metadata telescope DAG"""
+    """Tests for the Oapen Metadata Telescope DAG"""
 
     def __init__(self, *args, **kwargs):
         """Constructor which sets up variables used by tests.
@@ -72,30 +72,42 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
         self.project_id = os.getenv("TEST_GCP_PROJECT_ID")
         self.data_location = os.getenv("TEST_GCP_DATA_LOCATION")
 
-        self.first_download_path = test_fixtures_folder("oapen_metadata", "oapen_metadata1.csv")
-        self.first_execution_date = pendulum.datetime(year=2021, month=2, day=1)
-
-        self.second_download_path = test_fixtures_folder("oapen_metadata", "oapen_metadata2.csv")
-        self.second_execution_date = pendulum.datetime(year=2021, month=2, day=8)
+        # Telescope run settings
+        self.execution_date = pendulum.datetime(year=2021, month=2, day=1)
 
         # API environment
         self.host = "localhost"
-        self.port = find_free_port()
-        configuration = Configuration(host=f"http://{self.host}:{self.port}")
+        self.api_port = find_free_port()
+        configuration = Configuration(host=f"http://{self.host}:{self.api_port}")
         api_client = ApiClient(configuration)
         self.api = ObservatoryApi(api_client=api_client)  # noqa: E501
-        self.env = ObservatoryApiEnvironment(host=self.host, port=self.port)
+        self.env = ObservatoryApiEnvironment(host=self.host, port=self.api_port)
         self.org_name = "Curtin Press"
 
-    def setup_environment(self) -> ObservatoryEnvironment:
-        """Setup observatory environment"""
-        env = ObservatoryEnvironment(self.project_id, self.data_location, api_host=self.host, api_port=self.port)
-        self.dataset_id = env.add_dataset()
-        return env
+        # SFTP server connection
+        self.sftp_port = find_free_port()
+        self.sftp_server = SftpServer(host=self.host, port=self.sftp_port)
+
+        # VCR Cassettes
+        self.valid_download_cassette = test_fixtures_folder("oapen_metadata", "oapen_metadata_cassette_valid.yaml")
+        self.invalid_download_cassette = test_fixtures_folder("oapen_metadata", "oapen_metadata_cassette_invalid.yaml")
+        self.bad_response_cassette = test_fixtures_folder("oapen_metadata", "oapen_metadata_cassette_bad_response.yaml")
+        self.empty_download_cassette = test_fixtures_folder("oapen_metadata", "oapen_metadata_cassette_empty.yaml")
+
+        # XML files for testing
+        self.valid_download_xml = test_fixtures_folder("oapen_metadata", "oapen_metadata_download_valid.xml")
+        self.invalid_download_xml = test_fixtures_folder("oapen_metadata", "oapen_metadata_download_invalid.xml")
+        self.empty_xml = test_fixtures_folder("oapen_metadata", "oapen_metadata_download_empty.xml")
+        self.valid_parsed_xml = test_fixtures_folder("oapen_metadata", "oapen_metadata_parsed_valid.xml")
+        self.invalid_parsed_xml = test_fixtures_folder("oapen_metadata", "oapen_metadata_parsed_invalid.xml")
+        self.valid_processed_xml = test_fixtures_folder("oapen_metadata", "oapen_metadata_processed_valid.xml")
+        self.processing_test_before = test_fixtures_folder("oapen_metadata", "processing_test_before.xml")
+        self.processing_test_after = test_fixtures_folder("oapen_metadata", "processing_test_after.xml")
+        self.invalid_products_xml = test_fixtures_folder("oapen_metadata", "oapen_metadata_invalid_products.xml")
+        # Valid fields json for the xml processing test
+        self.processing_test_fields = test_fixtures_folder("oapen_metadata", "processing_test_valid_fields.json")
 
     def setup_api(self):
-        dt = pendulum.now("UTC")
-
         name = "Oapen Metadata Telescope"
         workflow_type = WorkflowType(name=name, type_id=OapenMetadataTelescope.DAG_ID)
         self.api.put_workflow_type(workflow_type)
@@ -108,13 +120,13 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
         )
         self.api.put_organisation(organisation)
 
-        telescope = Workflow(
+        wf = Workflow(
             name=name,
             workflow_type=WorkflowType(id=1),
             organisation=Organisation(id=1),
             extra={},
         )
-        self.api.put_workflow(telescope)
+        self.api.put_workflow(wf)
 
         table_type = TableType(
             type_id="partitioned",
@@ -139,16 +151,16 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
         )
         self.api.put_dataset(dataset)
 
-    def setup_connections(self, env):
+    def setup_connections(self, env: ObservatoryEnvironment):
         # Add Observatory API connection
-        conn = Connection(conn_id=AirflowConns.OBSERVATORY_API, uri=f"http://:password@{self.host}:{self.port}")
+        conn = Connection(conn_id=AirflowConns.OBSERVATORY_API, uri=f"http://:password@{self.host}:{self.api_port}")
+        env.add_connection(conn)
+        # Add SFTP server connection
+        conn = Connection(conn_id=AirflowConns.SFTP_SERVICE, uri=f"http://:password@{self.host}:{self.sftp_port}")
         env.add_connection(conn)
 
     def test_dag_structure(self):
-        """Test that the Oapen Metadata DAG has the correct structure.
-
-        :return: None
-        """
+        """Test that the Oapen Metadata DAG has the correct structure"""
         dag = OapenMetadataTelescope(workflow_id=1).make_dag()
         self.assert_dag_structure(
             {
@@ -156,22 +168,16 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
                 "download": ["upload_downloaded"],
                 "upload_downloaded": ["transform"],
                 "transform": ["upload_transformed"],
-                "upload_transformed": ["bq_load_partition"],
-                "bq_load_partition": ["bq_delete_old"],
-                "bq_delete_old": ["bq_append_new"],
-                "bq_append_new": ["cleanup"],
-                "cleanup": ["add_new_dataset_releases"],
-                "add_new_dataset_releases": [],
+                "upload_transformed": ["upload_to_sftp_server"],
+                "upload_to_sftp_server": ["cleanup"],
+                "cleanup": [],
             },
             dag,
         )
 
     def test_dag_load(self):
-        """Test that the OapenMetadata DAG can be loaded from a DAG bag.
-
-        :return: None
-        """
-        env = ObservatoryEnvironment(self.project_id, self.data_location, api_host=self.host, api_port=self.port)
+        """Test that the OapenMetadata DAG can be loaded from a DAG bag"""
+        env = ObservatoryEnvironment(self.project_id, self.data_location, api_host=self.host, api_port=self.api_port)
 
         with env.create():
             self.setup_connections(env)
@@ -179,179 +185,100 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
             dag_file = os.path.join(module_file_path("oaebu_workflows.dags"), "oapen_metadata_telescope.py")
             self.assert_dag_load("oapen_metadata", dag_file)
 
-    def test_telescope(self):
-        """Test telescope task execution."""
+    def test_workflow(self):
+        """Test workflow task execution."""
 
-        env = self.setup_environment()
-        telescope = OapenMetadataTelescope(dataset_id=self.dataset_id, workflow_id=1)
-        dag = telescope.make_dag()
+        upload_dir_name = "upload"
+        env = ObservatoryEnvironment(self.project_id, self.data_location, api_host=self.host, api_port=self.api_port)
+        self.dataset_id = env.add_dataset()
+        wf = OapenMetadataTelescope(dataset_id=self.dataset_id, workflow_id=1, sftp_upload_dir=upload_dir_name)
+        dag = wf.make_dag()
 
-        with env.create(task_logging=True):
+        with env.create():
             self.setup_connections(env)
             self.setup_api()
-            # first run
-            with env.create_dag_run(dag, self.first_execution_date) as first_dagrun:
-                # Test that all dependencies are specified: no error should be thrown
-                env.run_task(telescope.check_dependencies.__name__)
 
-                start_date, end_date, first_release = telescope.get_release_info(
-                    dag=dag,
-                    data_interval_end=pendulum.datetime(2021, 1, 31),
-                )
+            with self.sftp_server.create() as sftp_root:
+                sftp_dir_local_path = os.path.join(sftp_root, upload_dir_name)
+                os.makedirs(sftp_dir_local_path)
 
-                # Use release info for other tasks
-                release = OapenMetadataRelease(telescope.dag_id, start_date, end_date, first_release)
+                # first run
+                with env.create_dag_run(dag, self.execution_date):
+                    # Test that all dependencies are specified: no error should be thrown
+                    env.run_task(wf.check_dependencies.__name__)
 
-                # Test download task
-                with responses.RequestsMock() as rsps:
-                    with open(self.first_download_path, "rb") as f:
-                        body = f.read()
-                    rsps.add(responses.GET, OapenMetadataTelescope.CSV_URL, body=body, status=200)
-                    env.run_task(telescope.download.__name__)
+                    start_date, end_date, first_release = wf.get_release_info(
+                        dag=dag,
+                        data_interval_end=pendulum.datetime(2021, 1, 31),
+                    )
 
-                self.assertEqual(1, len(release.download_files))
-                download_path = release.download_files[0]
-                expected_file_hash = "735584bffe046b9e073b6a63518a4044"
-                self.assert_file_integrity(download_path, expected_file_hash, "md5")
+                    # Use release info for other tasks
+                    release = OapenMetadataRelease(wf.dag_id, start_date, end_date, first_release)
 
-                # Test that file uploaded
-                env.run_task(telescope.upload_downloaded.__name__)
-                self.assert_blob_integrity(env.download_bucket, blob_name(download_path), download_path)
+                    # Download task
+                    with vcr.VCR().use_cassette(self.valid_download_cassette, record_mode="None"):
+                        env.run_task(wf.download.__name__)
 
-                # Test that file transformed
-                env.run_task(telescope.transform.__name__)
+                    # Upload download task
+                    env.run_task(wf.upload_downloaded.__name__)
 
-                self.assertEqual(1, len(release.transform_files))
-                transform_path = release.transform_files[0]
-                expected_file_hash = "fbf31c05"
-                self.assert_file_integrity(transform_path, expected_file_hash, "gzip_crc")
+                    # Transform task
+                    env.run_task(wf.transform.__name__)
 
-                # Test that transformed file uploaded
-                env.run_task(telescope.upload_transformed.__name__)
-                self.assert_blob_integrity(env.transform_bucket, blob_name(transform_path), transform_path)
+                    # Upload transform task
+                    env.run_task(wf.upload_transformed.__name__)
 
-                # Test that load partition task is skipped for the first release
-                ti = env.run_task(telescope.bq_load_partition.__name__)
-                self.assertEqual(ti.state, State.SUCCESS)
+                    # Upload to sftp server task
+                    env.run_task(wf.upload_to_sftp_server.__name__)
 
-                # Test delete old task is skipped for the first release
-                with patch("observatory.platform.utils.gc_utils.bq_query_bytes_daily_limit_check"):
-                    ti = env.run_task(telescope.bq_delete_old.__name__)
-                self.assertEqual(ti.state, State.SUCCESS)
+                    # Test that these functions have worked as intended
 
-                # Test append new creates table
-                env.run_task(telescope.bq_append_new.__name__)
-                main_table_id, partition_table_id = table_ids_from_path(transform_path)
-                table_id = f"{self.project_id}.{telescope.dataset_id}.{main_table_id}"
-                expected_rows = 4
-                self.assert_table_integrity(table_id, expected_rows)
+                    # Test download task
+                    self.assertEqual(1, len(os.listdir(os.path.dirname(release.download_path))))
+                    self.assert_file_integrity(release.download_path, "6df963cd448fe3ec8acb76bf49b34928", "md5")
 
-                # Test that all telescope data deleted
-                download_folder, extract_folder, transform_folder = (
-                    release.download_folder,
-                    release.extract_folder,
-                    release.transform_folder,
-                )
-                env.run_task(telescope.cleanup.__name__)
-                self.assert_cleanup(download_folder, extract_folder, transform_folder)
+                    # Test that download file uploaded to BQ
+                    self.assert_blob_integrity(
+                        env.download_bucket, blob_name(release.download_path), release.download_path
+                    )
 
-                # add_dataset_release_task
-                dataset_releases = get_dataset_releases(dataset_id=1)
-                self.assertEqual(len(dataset_releases), 0)
-                ti = env.run_task("add_new_dataset_releases")
-                self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = get_dataset_releases(dataset_id=1)
-                self.assertEqual(len(dataset_releases), 1)
+                    # Test transform task
+                    self.assertEqual(2, len(os.listdir(os.path.dirname(release.transform_path))))
+                    self.assert_file_integrity(
+                        release.transform_path, "181b9eefb66a00acb9066456e73dee82", "md5"
+                    )  # The transformed XML file
+                    self.assert_file_integrity(
+                        release.invalid_products_path, "297173aa0a09aa1dc538eadfc48285c5", "md5"
+                    )  # Invalid products file
 
-            # second run
-            with env.create_dag_run(dag, self.second_execution_date) as second_dagrun:
-                # Test that all dependencies are specified: no error should be thrown
-                env.run_task(telescope.check_dependencies.__name__)
+                    # Test that transformed files uploaded to BQ
+                    self.assert_blob_integrity(
+                        env.transform_bucket, blob_name(release.transform_path), release.transform_path
+                    )
+                    self.assert_blob_integrity(
+                        env.transform_bucket, blob_name(release.invalid_products_path), release.invalid_products_path
+                    )
 
-                start_date, end_date, first_release = telescope.get_release_info(
-                    dag=dag,
-                    data_interval_end=pendulum.datetime(2021, 2, 7),
-                )
+                    # Test that the transformed XML file was uploaded to SFTP server
+                    self.assertEqual(1, len(os.listdir(sftp_dir_local_path)))
+                    sftp_filepath = os.path.join(sftp_dir_local_path, os.path.basename(release.transform_path))
+                    self.assert_file_integrity(sftp_filepath, "181b9eefb66a00acb9066456e73dee82", "md5")
 
-                self.assertEqual(release.end_date, start_date)
-                self.assertEqual(pendulum.datetime(2021, 2, 7), end_date)
-                self.assertFalse(first_release)
-
-                # use release info for other tasks
-                release = OapenMetadataRelease(telescope.dag_id, start_date, end_date, first_release)
-
-                # Test download task
-                with responses.RequestsMock() as rsps:
-                    with open(self.second_download_path, "rb") as f:
-                        body = f.read()
-                    rsps.add(responses.GET, OapenMetadataTelescope.CSV_URL, body=body, status=200)
-                    env.run_task(telescope.download.__name__)
-
-                self.assertEqual(1, len(release.download_files))
-                download_path = release.download_files[0]
-                expected_file_hash = "331b0dbe0b0e8c0e166015d15a2954d0"
-                self.assert_file_integrity(download_path, expected_file_hash, "md5")
-
-                # Test that file uploaded
-                env.run_task(telescope.upload_downloaded.__name__)
-                self.assert_blob_integrity(env.download_bucket, blob_name(download_path), download_path)
-
-                # Test that file transformed
-                env.run_task(telescope.transform.__name__)
-
-                self.assertEqual(1, len(release.transform_files))
-                transform_path = release.transform_files[0]
-                expected_file_hash = "ab5c3e9d"
-                self.assert_file_integrity(transform_path, expected_file_hash, "gzip_crc")
-
-                # Test that transformed file uploaded
-                env.run_task(telescope.upload_transformed.__name__)
-                self.assert_blob_integrity(env.transform_bucket, blob_name(transform_path), transform_path)
-
-                # Test that load partition task creates partition
-                env.run_task(telescope.bq_load_partition.__name__)
-                main_table_id, partition_table_id = table_ids_from_path(transform_path)
-                table_id = create_date_table_id(partition_table_id, release.end_date, bigquery.TimePartitioningType.DAY)
-                table_id = f"{self.project_id}.{telescope.dataset_id}.{table_id}"
-                expected_rows = 4
-                self.assert_table_integrity(table_id, expected_rows)
-
-                # Test task deleted rows from main table
-                with patch("observatory.platform.utils.gc_utils.bq_query_bytes_daily_limit_check"):
-                    env.run_task(telescope.bq_delete_old.__name__)
-                table_id = f"{self.project_id}.{telescope.dataset_id}.{main_table_id}"
-                expected_rows = 3
-                self.assert_table_integrity(table_id, expected_rows)
-
-                # Test append new adds rows to table
-                env.run_task(telescope.bq_append_new.__name__)
-                table_id = f"{self.project_id}.{telescope.dataset_id}.{main_table_id}"
-                expected_rows = 7
-                self.assert_table_integrity(table_id, expected_rows)
-
-                # Test that all telescope data deleted
-                download_folder, extract_folder, transform_folder = (
-                    release.download_folder,
-                    release.extract_folder,
-                    release.transform_folder,
-                )
-                env.run_task(telescope.cleanup.__name__)
-                self.assert_cleanup(download_folder, extract_folder, transform_folder)
-
-                # add_dataset_release_task
-                dataset_releases = get_dataset_releases(dataset_id=1)
-                self.assertEqual(len(dataset_releases), 1)
-                ti = env.run_task("add_new_dataset_releases")
-                self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = get_dataset_releases(dataset_id=1)
-                self.assertEqual(len(dataset_releases), 2)
+                    # Test that all data deleted
+                    download_folder, extract_folder, transform_folder = (
+                        release.download_folder,
+                        release.extract_folder,
+                        release.transform_folder,
+                    )
+                    env.run_task(wf.cleanup.__name__)
+                    self.assert_cleanup(download_folder, extract_folder, transform_folder)
 
     def test_airflow_vars(self):
         """Cover case when airflow_vars is given."""
 
-        telescope = OapenMetadataTelescope(workflow_id=1, airflow_vars=[AirflowVars.DOWNLOAD_BUCKET])
+        wf = OapenMetadataTelescope(workflow_id=1, airflow_vars=[AirflowVars.DOWNLOAD_BUCKET])
         self.assertEqual(
-            set(telescope.airflow_vars),
+            set(wf.airflow_vars),
             {
                 AirflowVars.DOWNLOAD_BUCKET,
                 AirflowVars.TRANSFORM_BUCKET,
@@ -360,45 +287,145 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
             },
         )
 
-    @patch("observatory.platform.utils.workflow_utils.Variable.get")
-    def test_download(self, mock_variable_get):
-        """Download release and check exception is raised when response is not 200 or csv is empty.
+    def test_download_oapen_metadata(self):
+        """Tests the function used to download the oapen metadata xml file"""
+        download_file = NamedTemporaryFile(delete=False)
 
-        :param mock_variable_get: Mock result of airflow's Variable.get() function
-        :return:
-        """
-        start_date = pendulum.datetime(2020, 1, 1)
-        end_date = pendulum.datetime(2020, 1, 31)
-        release = OapenMetadataRelease("oapen_metadata", start_date, end_date, False)
+        # Remove the wait time before retries for testing
+        download_oapen_metadata.retry.sleep = MagicMock()
 
-        with CliRunner().isolated_filesystem():
-            mock_variable_get.return_value = "data"
+        # For a valid XML
+        with vcr.VCR().use_cassette(self.valid_download_cassette, record_mode="none", allow_playback_repeats=True):
+            download_oapen_metadata(download_file.name)
+        with open(download_file.name, "r") as f:
+            downloaded_xml = f.readlines()
+        with open(self.valid_download_xml, "r") as f:
+            assertion_xml = f.readlines()
+        assert len(downloaded_xml) == len(
+            assertion_xml
+        ), f"Downloaded 'valid' XML has {len(downloaded_xml)} lines. Expected {len(assertion_xml)}"
+        assert downloaded_xml == assertion_xml, "Downloaded 'valid' XML is not equal to the expected XML"
 
-            # Test exception is raised for invalid status code
-            with httpretty.enabled():
-                httpretty.register_uri(httpretty.GET, OapenMetadataTelescope.CSV_URL, status=400)
+        # For invalid XML
+        with vcr.VCR().use_cassette(self.invalid_download_cassette, record_mode="none", allow_playback_repeats=True):
+            self.assertRaises(ElementTree.ParseError, download_oapen_metadata, download_file.name)
 
-                with self.assertRaises(AirflowException):
-                    release.download()
+        # For empty XML
+        with vcr.VCR().use_cassette(self.empty_download_cassette, record_mode="none", allow_playback_repeats=True):
+            self.assertRaises(ElementTree.ParseError, download_oapen_metadata, download_file.name)
 
-            # Test exception is raised for empty csv file
-            with httpretty.enabled():
-                empty_csv = "Column1,Column2"
-                httpretty.register_uri(httpretty.GET, OapenMetadataTelescope.CSV_URL, body=empty_csv)
+        # For non-200 response code
+        with vcr.VCR().use_cassette(self.bad_response_cassette, record_mode="none", allow_playback_repeats=True):
+            self.assertRaises(ConnectionError, download_oapen_metadata, download_file.name)
 
-                with self.assertRaises(AirflowException):
-                    release.download()
+    def test_oapen_metadata_parse(self):
+        """Tests the function used to parse the relevant fields into an onix file"""
+        with open(OapenMetadataTelescope(workflow_id=1).onix_product_fields_file) as f:
+            onix_product_fields = json.load(f)
+        with open(OapenMetadataTelescope(workflow_id=1).onix_header_fields_file) as f:
+            onix_header_fields = json.load(f)
+        parsed_file = NamedTemporaryFile(delete=False)
 
-    def test_transform_dict(self):
-        """Check transform_dict handling of invalid case."""
-        nested_fields = ["dc.subject.classification"]
-        list_fields = ["dc.subject.classification"]
-        test_dict = {"field1": [{"1": "value1"}, "2"], "dc.subject.classification": "value1||value2", "field2": None}
-        transformed_dict = {
-            "field1": [{"1": "value1"}, "2"],
-            "dc": {"subject": {"classification": {"value": ["value1", "value2"]}}},
-            "field2": None,
-        }
+        # For a valid XML
+        oapen_metadata_parse(
+            self.valid_download_xml,
+            parsed_file.name,
+            onix_product_fields=onix_product_fields,
+            onix_header_fields=onix_header_fields,
+        )
+        with open(parsed_file.name, "r") as f:
+            parsed_xml = f.readlines()
+        with open(self.valid_parsed_xml, "r") as f:
+            assertion_xml = f.readlines()
+        assert len(parsed_xml) == len(
+            assertion_xml
+        ), f"Downloaded 'valid' XML has {len(parsed_xml)} lines. Expected {len(assertion_xml)}"
+        assert parsed_xml == assertion_xml, "Parsed 'valid' XML is not equal to the expected XML"
 
-        result = transform_dict(test_dict, convert, nested_fields, list_fields)
-        self.assertDictEqual(result, transformed_dict)
+        # For invalid XML
+        self.assertRaises(
+            ElementTree.ParseError,
+            oapen_metadata_parse,
+            self.invalid_download_xml,
+            parsed_file.name,
+            onix_product_fields=onix_product_fields,
+            onix_header_fields=onix_header_fields,
+        )
+
+        # For empty XML
+        self.assertRaises(
+            ElementTree.ParseError,
+            oapen_metadata_parse,
+            self.empty_xml,
+            parsed_file.name,
+            onix_product_fields=onix_product_fields,
+            onix_header_fields=onix_header_fields,
+        )
+
+    def test_remove_invalid_products(self):
+        """Tests the function used to remove invalid products from an xml file"""
+        processed_file = NamedTemporaryFile(delete=False)
+        invalid_products_file = NamedTemporaryFile(delete=False)
+
+        # For a valid XML
+        remove_invalid_products(
+            self.valid_parsed_xml, processed_file.name, invalid_products_file=invalid_products_file.name
+        )
+        with open(processed_file.name) as f:
+            processed_xml = f.readlines()
+        with open(self.valid_processed_xml) as f:
+            assertion_xml = f.readlines()
+        assert len(processed_xml) == len(
+            assertion_xml
+        ), f"Downloaded 'valid' XML has {len(processed_xml)} lines. Expected {len(assertion_xml)}"
+        assert processed_xml == assertion_xml, "Processed 'valid' XML is not equal to the expected XML"
+        # Check the invalid products xml
+        with open(invalid_products_file.name) as f:
+            invalid_products_xml = f.readlines()
+        with open(self.invalid_products_xml) as f:
+            assertion_xml = f.readlines()
+        assert len(invalid_products_xml) == len(
+            assertion_xml
+        ), f"Downloaded 'valid' XML has {len(invalid_products_xml)} lines. Expected {len(assertion_xml)}"
+        assert (
+            invalid_products_xml == assertion_xml
+        ), "Generated 'invalid products' XML is not equal to the expected XML"
+
+        # For an invalid XML
+        self.assertRaises(AttributeError, remove_invalid_products, self.invalid_parsed_xml, processed_file.name)
+
+        # For an empty XML
+        self.assertRaises(AttributeError, remove_invalid_products, self.invalid_parsed_xml, processed_file.name)
+
+    def test_find_onix_product(self):
+        """Tests the function that determines the line range of a product that encompasses a given line"""
+        with open(self.valid_parsed_xml) as f:
+            all_lines = f.readlines()
+
+        # Make assertions [(line_number, (expected_output_range))]
+        assertions = [(150, (9, 165)), (170, (166, 224)), (225, (166, 224)), (226, (226, 289))]
+        for line, product_range in assertions:
+            output_range = find_onix_product(all_lines, line)
+            assert (
+                output_range == product_range
+            ), f"Product range not as expected for inpiut line {line}. Expected {product_range}, got {output_range}"
+
+        self.assertRaises(AirflowException, find_onix_product, all_lines, 1)
+        self.assertRaises(IndexError, find_onix_product, all_lines, int(1e10))
+
+    def test_process_xml_element(self):
+        """Tests the function that removes undesired fields from an xml recusrively"""
+        with open(self.processing_test_fields) as f:
+            viable_fields = json.load(f)
+
+        # Process the input xml
+        tree = ElementTree.parse(self.processing_test_before)
+        test_xml = ElementTree.Element(tree.getroot().tag)
+        process_xml_element(tree.getroot(), viable_fields, test_xml)
+
+        # Canonicalize the expected and test xmls and compare them
+        expected_xml = ElementTree.canonicalize(from_file=self.processing_test_after, strip_text=True)
+        test_xml = ElementTree.canonicalize(ElementTree.tostring(test_xml), strip_text=True)
+        assert (
+            expected_xml == test_xml
+        ), f"Processed XML is not equal to expected XML. Expected {expected_xml}, got {test_xml}"

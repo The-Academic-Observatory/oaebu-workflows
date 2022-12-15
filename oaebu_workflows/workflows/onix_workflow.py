@@ -22,10 +22,9 @@ from functools import partial, update_wrapper
 from pathlib import Path
 from typing import List, Optional
 import json
+from urllib3.exceptions import MaxRetryError
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from tenacity import retry, stop_after_attempt, wait_exponential, wait_fixed
-import requests
 import pendulum
 from airflow.exceptions import AirflowException
 from google.cloud.bigquery import SourceFormat
@@ -40,7 +39,7 @@ from oaebu_workflows.workflows.onix_work_aggregation import (
 )
 from observatory.platform.utils.dag_run_sensor import DagRunSensor
 from observatory.platform.utils.file_utils import list_to_jsonl_gz
-from observatory.platform.utils.url_utils import get_user_agent
+from observatory.platform.utils.url_utils import get_user_agent, retry_session
 from observatory.platform.utils.gc_utils import (
     bigquery_sharded_table_id,
     create_bigquery_dataset,
@@ -1817,27 +1816,6 @@ class OnixWorkflow(Workflow):
             )
 
 
-@retry(
-    stop=stop_after_attempt(3),
-    wait=wait_fixed(20) + wait_exponential(multiplier=10, exp_base=3, max=60 * 10),
-)
-def get_response(url: str, headers: dict):
-    """Get response from the url with given headers and retry for certain status codes.
-
-    :param url: The url
-    :param headers: The headers dict
-    :return: The response
-    """
-    response = requests.get(url, headers=headers)
-    if response.status_code in [500, 400, 429, 504]:
-        print(
-            f'Downloading events from url: {url}, attempt: {get_response.retry.statistics["attempt_number"]}, '
-            f'idle for: {get_response.retry.statistics["idle_for"]}'
-        )
-        raise ConnectionError("Retrying url")
-    return response
-
-
 def isbns_from_onix(project_id: str, onix_dataset_id: str, onix_table_id: str) -> List[str]:
     """
     Queries an Onix table to obtain its unique ISBNs
@@ -1942,27 +1920,15 @@ def download_crossref_page_metadata(url: str, headers: dict, i: int = 0):
     :headers: Headers to attach to the request
     :i: The process number
     """
-    max_attempts = 5
-    attempt = 1
-    while attempt < max_attempts:
-        try:
-            print(f"{i+1}: Retrieving ISBN data from: {url} - attempt {attempt}/{max_attempts}")
-            with get_response(url, headers) as response:
-                # Check if authorisation with the api token was successful or not, raise error if not successful
-                if response.status_code != 200:
-                    raise ConnectionError(
-                        f"{i+1}: Error downloading file from {url}, status_code={response.status_code}"
-                    )
-                response_json = json.loads(response.content.decode("utf-8"))
-                isbn_metadata = response_json["message"]["items"]
-                next_cursor = response_json["message"]["next-cursor"]
-                break
-        except KeyError as e:
-            if attempt <= max_attempts:
-                attempt += 1
-                continue
-            else:
-                raise KeyError(e)
+    print(f"{i+1}: Retrieving ISBN data from: {url}")
+    try:
+        response = retry_session(num_retries=5, backoff_factor=0.8).get(url, headers=headers)
+    except MaxRetryError:
+        raise ConnectionError(f"{i+1}: Error downloading file from {url}, status_code={response.status_code}")
+    # Check if authorisation with the api token was successful or not, raise error if not successful
+    response_json = json.loads(response.content.decode("utf-8"))
+    isbn_metadata = response_json["message"]["items"]
+    next_cursor = response_json["message"]["next-cursor"]
     return next_cursor, isbn_metadata
 
 
@@ -2107,23 +2073,23 @@ def download_crossref_event_url(url: str, i: int = 0):
 
 def download_crossref_page_events(url: str, headers: dict) -> tuple:
     """
-    Download crossref events from a single page page
+    Download crossref events from a single page
 
     :param url: The url to send the request to
     :param headers: Headers to send with the request
     :return: The cursor, event counter, total numebr of events, the events
     """
-    response = get_response(url, headers)
-    if response.status_code == 200:
-        response_json = response.json()
-        total_events = response_json["message"]["total-results"]
-        events = response_json["message"]["events"]
-        next_cursor = response_json["message"]["next-cursor"]
-        counter = len(events)
-
-        return next_cursor, counter, total_events, events
-    else:
+    try:
+        response = retry_session(num_retries=5, backoff_factor=0.8).get(url, headers=headers)
+    except MaxRetryError:
         raise ConnectionError(f"Error requesting url: {url}, response: {response.text}")
+    response_json = response.json()
+    total_events = response_json["message"]["total-results"]
+    events = response_json["message"]["events"]
+    next_cursor = response_json["message"]["next-cursor"]
+    counter = len(events)
+
+    return next_cursor, counter, total_events, events
 
 
 def transform_crossref_events(events: List[dict], max_threads: int = 1) -> List[dict]:

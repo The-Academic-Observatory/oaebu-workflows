@@ -22,8 +22,11 @@ import subprocess
 from typing import Dict, List, Optional
 
 import pendulum
+from datetime import timedelta
 from airflow.exceptions import AirflowException
 from airflow.models.taskinstance import TaskInstance
+from observatory.platform.utils.dag_run_sensor import DagRunSensor
+
 from google.cloud.bigquery import SourceFormat
 
 from oaebu_workflows.config import schema_folder as default_schema_folder
@@ -223,6 +226,7 @@ class OnixTelescope(SnapshotTelescope):
         airflow_vars: List = None,
         airflow_conns: List = None,
         workflow_id: int = None,
+        sensor_dag_ids: List[str] = None,
     ):
         """Construct an OnixTelescope instance.
 
@@ -245,6 +249,7 @@ class OnixTelescope(SnapshotTelescope):
         :param airflow_vars: list of airflow variable keys, for each variable, it is checked if it exists in airflow.
         :param airflow_conns: list of airflow connection keys, for each connection, it is checked if it exists in airflow.
         :param workflow_id: api workflow id.
+        :param sensor_dag_ids: ids of dags to wait for before running
         """
 
         if airflow_vars is None:
@@ -261,6 +266,10 @@ class OnixTelescope(SnapshotTelescope):
 
         if dag_id is None:
             dag_id = make_dag_id(self.DAG_ID_PREFIX, organisation_name)
+
+        self.sensor_dag_ids = sensor_dag_ids
+        if sensor_dag_ids is None:
+            self.sensor_dag_ids = []
 
         dataset_description = f"{organisation_name} ONIX feeds"
         self.organisation_name = organisation_name
@@ -287,7 +296,19 @@ class OnixTelescope(SnapshotTelescope):
             load_bigquery_table_kwargs={"ignore_unknown_values": True},
         )
 
-        # self.organisation = organisation
+        # Add a list of ExternalTask sensors to wait for other DAGs to finish
+        for sensor_id in self.sensor_dag_ids:
+            self.add_operator(
+                DagRunSensor(
+                    task_id=f"{sensor_id}_sensor",
+                    external_dag_id=sensor_id,
+                    mode="reschedule",
+                    duration=timedelta(days=7),  # Look back up to 7 days from execution date
+                    poke_interval=int(timedelta(hours=1).total_seconds()),  # Check at this interval if dag run is ready
+                    timeout=int(timedelta(days=2).total_seconds()),  # Sensor will fail after 2 days of waiting
+                )
+            )
+
         self.add_setup_task(self.check_dependencies)
         self.add_setup_task(self.list_release_info)
         self.add_task(self.move_files_to_in_progress)

@@ -89,11 +89,6 @@ def get_dataset_type_info(api: ObservatoryApi):
         name="ONIX Workflow",
         table_type=TableType(id=ttids[TableTypeId.partitioned]),
     )
-    dataset_type_info[DatasetTypeId.oapen_workflow] = DatasetType(
-        type_id=DatasetTypeId.oapen_workflow,
-        name="OAPEN Workflow",
-        table_type=TableType(id=ttids[TableTypeId.partitioned]),
-    )
     return dataset_type_info
 
 
