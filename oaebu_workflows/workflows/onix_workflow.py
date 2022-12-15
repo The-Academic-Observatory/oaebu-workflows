@@ -23,11 +23,12 @@ from pathlib import Path
 from typing import List, Optional
 import json
 from urllib3.exceptions import MaxRetryError
+import re
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import pendulum
 from airflow.exceptions import AirflowException
-from google.cloud.bigquery import SourceFormat
+from google.cloud.bigquery import SourceFormat, Client
 
 from oaebu_workflows.config import schema_folder as default_schema_folder
 from oaebu_workflows.config import sql_folder
@@ -48,6 +49,7 @@ from observatory.platform.utils.gc_utils import (
     select_table_shard_dates,
     upload_files_to_cloud_storage,
     upload_file_to_cloud_storage,
+    create_bigquery_view,
 )
 from observatory.platform.utils.jinja2_utils import render_template
 from observatory.platform.utils.config_utils import find_schema
@@ -140,10 +142,12 @@ class OnixWorkflowRelease(AbstractRelease):
         crossref_metadata_table_id: str = "crossref_metadata",
         crossref_events_table_id: str = "crossref_events",
         oaebu_data_qa_dataset: str = "oaebu_data_qa",
+        oaebu_latest_data_qa_dataset: str = "oaebu_data_qa_latset",
         workflow_dataset: str = "onix_workflow",
         oaebu_intermediate_dataset: str = "oaebu_intermediate",
         oaebu_dataset: str = "oaebu",
-        oaebu_elastic_dataset: str = "data_export",
+        oaebu_export_dataset: str = "data_export",
+        oaebu_latest_export_dataset: str = "data_export_latest",
         worksid_table: str = "onix_workid_isbn",
         worksid_error_table: str = "onix_workid_isbn_errors",
         workfamilyid_table: str = "onix_workfamilyid_isbn",
@@ -164,10 +168,17 @@ class OnixWorkflowRelease(AbstractRelease):
         :param crossref_metadata_table_id: The name of the corssref metadata table
         :param crossref_events_table_id: The name of the crossref events table
         :param oaebu_data_qa_dataset: OAEBU Data QA dataset.
+        :param oaebu_latest_data_qa_dataset: OAEBU Data QA dataset with the latest data views
         :param workflow_dataset: Onix workflow dataset.
         :param oaebu_intermediate_dataset: OAEBU intermediate dataset.
         :param oaebu_dataset: OAEBU dataset.
-        :param oaebu_elastic_dataset: OAEBU elastic dataset.
+        :param oaebu_export_dataset: OAEBU data export dataset.
+        :param oaebu_latest_export_dataset: OAEBU data export dataset with the latest data views
+        :param worksid_error_table: table ID of the worksid table
+        :param workfamilyid_table: table ID of the workfamilyid table
+        :param data_location: Regaion location of the data in google cloud
+        :param dataset_description: Description to give to the workflow tables
+        :param oaebu_intermediate_match_suffix: Suffix to append to intermediate tables
         """
 
         self.dag_id = dag_id
@@ -208,10 +219,12 @@ class OnixWorkflowRelease(AbstractRelease):
         self.book_table_id = book_table_id
         self.book_product_table_id = book_product_table_id
         self.oaebu_data_qa_dataset = oaebu_data_qa_dataset
+        self.oaebu_latest_data_qa_dataset = oaebu_latest_data_qa_dataset
         self.workflow_dataset = workflow_dataset
         self.oaebu_intermediate_dataset = oaebu_intermediate_dataset
         self.oaebu_dataset = oaebu_dataset
-        self.oaebu_elastic_dataset = oaebu_elastic_dataset
+        self.oaebu_export_dataset = oaebu_export_dataset
+        self.oaebu_latest_export_dataset = oaebu_latest_export_dataset
         self.oaebu_intermediate_match_suffix = oaebu_intermediate_match_suffix
 
     @property
@@ -428,6 +441,9 @@ class OnixWorkflow(Workflow):
 
         # Create OAEBU Elastic Export tables
         self.create_oaebu_export_tasks(data_partners)
+
+        # Create the (non-sharded) views of the sharded tables
+        self.add_task(self.create_oaebu_latest_views)
 
         # Cleanup tasks
         self.add_task(self.cleanup)
@@ -990,7 +1006,7 @@ class OnixWorkflow(Workflow):
         :param release: Onix workflow release information.
         """
 
-        output_dataset = release.oaebu_elastic_dataset
+        output_dataset = release.oaebu_export_dataset
         data_location = release.data_location
         release_date = release.release_date
 
@@ -1069,7 +1085,7 @@ class OnixWorkflow(Workflow):
         :param ucl_isbn: isbn field if it is  a relevant data source for this publisher
         """
 
-        output_dataset = release.oaebu_elastic_dataset
+        output_dataset = release.oaebu_export_dataset
         data_location = release.data_location
         release_date = release.release_date
 
@@ -1260,6 +1276,24 @@ class OnixWorkflow(Workflow):
                     self.create_oaebu_data_qa_google_analytics_tasks(data_partner)
 
                 self.create_oaebu_data_qa_intermediate_tasks(data_partner)
+
+    def create_oaebu_latest_views(self, release: OnixWorkflowRelease, **kwargs):
+        # Create latest data QA views
+        create_latest_views_from_dataset(
+            self.gcp_project_id,
+            from_dataset=release.oaebu_data_qa_dataset,
+            to_dataset=release.oaebu_latest_data_qa_dataset,
+            date_match=release.release_date.strftime("%Y%m%d"),
+            data_location=release.data_location,
+        )
+        # Create latest data export views
+        create_latest_views_from_dataset(
+            self.gcp_project_id,
+            from_dataset=release.oaebu_export_dataset,
+            to_dataset=release.oaebu_latest_export_dataset,
+            date_match=release.release_date.strftime("%Y%m%d"),
+            data_location=release.data_location,
+        )
 
     def create_oaebu_data_qa_onix(self, *args, **kwargs):
         """Create ONIX quality assurance metrics."""
@@ -2139,3 +2173,41 @@ def transform_event(event: dict) -> dict:
 
             new[k] = transform_event(v)
         return new
+
+
+def create_latest_views_from_dataset(
+    project_id: str, from_dataset: str, to_dataset: str, date_match: str, data_location: str
+):
+    """Creates views from all sharded tables from a dataset with a matching a date string.
+
+    :param project_id: The project id
+    :param from_dataset: The dataset containing the sharded tables
+    :param to_dataset: The dataset to contain the views
+    :param date_match: The date string to match. e.g. for a table named 'this_table20220101', this would be '20220101'
+    :param data_location: The regional location of the data in google cloud
+    :raises AirflowException: Raised if no tables are matched to the given date
+    """
+    # Make to_dataset if it doesn't exist
+    create_bigquery_dataset(project_id, dataset_id=to_dataset, location=data_location)
+
+    # Get the tables from the from_dataset
+    client = Client(project_id)
+    tables = [t.table_id for t in client.list_tables(from_dataset)]
+
+    # Find the tables with specified date string
+    regex_string = rf"^\w+{date_match}\b"
+    matched_tables = [re.findall(regex_string, t) for t in tables]
+    matched_tables = [t[0] for t in matched_tables if t]
+    if not len(matched_tables):
+        raise AirflowException(f"No tables matching date {date_match} in dataset {project_id}.{from_dataset}")
+
+    # Create all of the views
+    for table in matched_tables:
+        query = f"SELECT * FROM `{project_id}.{from_dataset}.{table}`"
+        view_name = re.match(r"\D+", table).group()  # Drop the date from the table for the view name
+        create_bigquery_view(
+            project_id=project_id,
+            dataset_id=to_dataset,
+            view_name=view_name,
+            query=query,
+        )
