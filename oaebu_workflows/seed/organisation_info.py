@@ -65,6 +65,13 @@ def get_organisation_info():
         download_bucket="oaebu-obp-download",
         transform_bucket="oaebu-obp-transform",
     )
+    name = "CEU Press"
+    organisation_info[name] = Organisation(
+        name=name,
+        project_id="oaebu-ceu-press",
+        download_bucket="oaebu-ceu-press-download",
+        transform_bucket="oaebu-ceu-press-transform",
+    )
     name = "Curtin University"
     organisation_info[name] = Organisation(
         name=name,

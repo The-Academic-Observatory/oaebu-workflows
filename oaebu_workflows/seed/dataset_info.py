@@ -92,6 +92,14 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["OBP Thoth Onix Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.onix),
     )
+    name = "CEU Press Onix Dataset"
+    dataset_info[name] = Dataset(
+        name=name,
+        service="google",
+        address="oaebu-ceu-press.onix.onix",
+        workflow=workflows["CEU Press ONIX Telescope"],
+        dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.onix),
+    )
     name = "ANU Press Google Analytics Dataset"
     dataset_info[name] = Dataset(
         name=name,
@@ -146,6 +154,22 @@ def get_dataset_info(api: ObservatoryApi):
         service="google",
         address="oaebu-umich-press.google.google_books_traffic",
         workflow=workflows["UoMP Google Books Telescope"],
+        dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.google_books_traffic),
+    )
+    name = "CEU Press Google Books Sales Dataset"
+    dataset_info[name] = Dataset(
+        name=name,
+        service="google",
+        address="oaebu-ceu-press.google.google_books_sales",
+        workflow=workflows["CEU Press Google Books Telescope"],
+        dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.google_books_sales),
+    )
+    name = "CEU Press Google Books Traffic Dataset"
+    dataset_info[name] = Dataset(
+        name=name,
+        service="google",
+        address="oaebu-ceu-press.google.google_books_traffic",
+        workflow=workflows["CEU Press Google Books Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.google_books_traffic),
     )
     name = "ANU Press JSTOR Country Dataset"
@@ -210,6 +234,22 @@ def get_dataset_info(api: ObservatoryApi):
         service="google",
         address="oaebu-witts-press.jstor.jstor_institution",
         workflow=workflows["Wits Press JSTOR Telescope"],
+        dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.jstor_institution),
+    )
+    name = "CEU Press JSTOR Country Dataset"
+    dataset_info[name] = Dataset(
+        name=name,
+        service="google",
+        address="oaebu-ceu-press.jstor.jstor_country",
+        workflow=workflows["CEU Press JSTOR Telescope"],
+        dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.jstor_country),
+    )
+    name = "CEU Press JSTOR Institution Dataset"
+    dataset_info[name] = Dataset(
+        name=name,
+        service="google",
+        address="oaebu-ceu-press.jstor.jstor_institution",
+        workflow=workflows["CEU Press JSTOR Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.jstor_institution),
     )
     name = "UCL Press OAPEN IRUS UK Dataset"
@@ -298,6 +338,14 @@ def get_dataset_info(api: ObservatoryApi):
         service="google",
         address="oaebu-umich-press.oaebu.book_product",
         workflow=workflows["UoMP ONIX Workflow"],
+        dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.onix_workflow),
+    )
+    name = "CEU Press ONIX Workflow Dataset"
+    dataset_info[name] = Dataset(
+        name=name,
+        service="google",
+        address="oaebu-ceu-press.oaebu.book_product",
+        workflow=workflows["CEU Press ONIX Workflow"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.onix_workflow),
     )
     return dataset_info
