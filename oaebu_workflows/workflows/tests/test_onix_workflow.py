@@ -50,6 +50,7 @@ from oaebu_workflows.workflows.onix_workflow import (
     dois_from_onix,
     download_crossref_isbn_metadata,
     download_crossref_event_url,
+    create_latest_views_from_dataset,
 )
 from observatory.api.client import ApiClient, Configuration
 from observatory.api.client.api.observatory_api import ObservatoryApi  # noqa: E501
@@ -637,7 +638,8 @@ class TestOnixWorkflow(ObservatoryTestCase):
                         "export_oaebu_table.book_product_year_metrics": ["export_oaebu_qa_metrics"],
                         "export_oaebu_table.book_product_subject_year_metrics": ["export_oaebu_qa_metrics"],
                         "export_oaebu_table.book_product_author_metrics": ["export_oaebu_qa_metrics"],
-                        "export_oaebu_qa_metrics": ["cleanup"],
+                        "export_oaebu_qa_metrics": ["create_oaebu_latest_views"],
+                        "create_oaebu_latest_views": ["cleanup"],
                         "cleanup": ["add_new_dataset_releases"],
                         "add_new_dataset_releases": [],
                     },
@@ -807,7 +809,8 @@ class TestOnixWorkflow(ObservatoryTestCase):
                         "export_oaebu_table.book_product_year_metrics": ["export_oaebu_qa_metrics"],
                         "export_oaebu_table.book_product_subject_year_metrics": ["export_oaebu_qa_metrics"],
                         "export_oaebu_table.book_product_author_metrics": ["export_oaebu_qa_metrics"],
-                        "export_oaebu_qa_metrics": ["cleanup"],
+                        "export_oaebu_qa_metrics": ["create_oaebu_latest_views"],
+                        "create_oaebu_latest_views": ["cleanup"],
                         "cleanup": ["add_new_dataset_releases"],
                         "add_new_dataset_releases": [],
                     },
@@ -2010,6 +2013,8 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
         env = ObservatoryEnvironment(self.gcp_project_id, self.data_location, api_host=self.host, api_port=self.port)
         bucket_name = env.transform_bucket
         fake_onix_dataset_id = env.add_dataset(prefix="onix")
+        fake_sharded_dataset = env.add_dataset(prefix="sharded_data")
+        fake_view_dataset = env.add_dataset(prefix="views")
         with env.create():
             onix_table_file = test_fixtures_folder("onix_workflow", "onix_query_test.jsonl")
             blob = os.path.join(self.test_onix_folder, os.path.basename(onix_table_file))
@@ -2038,13 +2043,55 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
             actual_isbns = isbns_from_onix(self.gcp_project_id, fake_onix_dataset_id, "onix")
             actual_dois = dois_from_onix(self.gcp_project_id, fake_onix_dataset_id, "onix")
             fake_isbns = [entry["ISBN13"] for entry in fake_onix]
-            fake_dois = [entry["Doi"] for entry in fake_onix]
+            fake_dois = [entry["DOI"] for entry in fake_onix]
 
             # Check there are no duplicates and the contents are the same
             assert len(actual_isbns) == len(set(fake_isbns))
             assert set(actual_isbns) == set(fake_isbns)
             assert len(actual_dois) == len(set(fake_dois))
             assert set(actual_dois) == set(fake_dois)
+
+            # Test the creation of latest data views. We will use the onix.jsonl fixture for testing.
+            previous_release_date = pendulum.datetime(2022, 6, 6)  # Add another release date
+            data = [fake_onix, fake_onix[:2]]
+            for release, table in zip([release_date, previous_release_date], data):
+                test_table = Table(
+                    "data_export",
+                    True,
+                    fake_sharded_dataset,
+                    table,
+                    find_schema(self.schema_path, "onix"),
+                )
+                bq_load_tables(
+                    tables=[test_table],
+                    bucket_name=bucket_name,
+                    release_date=release,
+                    data_location=self.data_location,
+                    project_id=self.gcp_project_id,
+                )
+
+            # Now make the views from this dataset
+            date_string = release_date.strftime("%Y%m%d")
+            create_latest_views_from_dataset(
+                project_id=self.gcp_project_id,
+                from_dataset=fake_sharded_dataset,
+                to_dataset=fake_view_dataset,
+                date_match=date_string,
+                data_location=self.data_location,
+            )
+
+            # Grab the data from the view and make assertions
+            view_data = run_bigquery_query(f"SELECT * FROM {self.gcp_project_id}.{fake_view_dataset}.data_export")
+            view_isbns = [entry["ISBN13"] for entry in view_data]
+            view_dois = [entry["DOI"] for entry in view_data]
+            actual_isbns = [entry["ISBN13"] for entry in fake_onix]
+            actual_dois = [entry["DOI"] for entry in fake_onix]
+
+            assert len(view_data) == len(fake_onix)
+            assert len(actual_isbns) == len(view_isbns)
+            assert set(actual_isbns) == set(view_isbns)
+            assert len(actual_dois) == len(view_dois)
+            assert set(actual_dois) == set(view_dois)
 
     def setup_fake_data_tables(
         self, dataset_id: str, settings_dataset_id: str, fixtures_dataset_id: str, release_date: pendulum.DateTime
@@ -2227,10 +2274,12 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
         partner_release_date = pendulum.datetime(2022, 6, 13)
         onix_dataset_id = env.add_dataset(prefix="onix")
         oaebu_data_qa_dataset_id = env.add_dataset(prefix="oaebu_data_qa")
+        oaebu_latest_data_qa_dataset_id = env.add_dataset(prefix="oaebu_data_qa_latest")
         onix_workflow_dataset_id = env.add_dataset(prefix="onix_workflow")
         oaebu_intermediate_dataset_id = env.add_dataset(prefix="oaebu_intermediate")
         oaebu_output_dataset_id = env.add_dataset(prefix="oaebu_output")
-        oaebu_elastic_dataset_id = env.add_dataset(prefix="oaebu_elastic")
+        oaebu_export_dataset_id = env.add_dataset(prefix="oaebu_export")
+        oaebu_latest_export_dataset_id = env.add_dataset(prefix="oaebu_export_latest")
         oaebu_settings_dataset_id = env.add_dataset(prefix="settings")
         oaebu_fixtures_dataset_id = env.add_dataset(prefix="fixtures")
         oaebu_crossref_dataset_id = env.add_dataset(prefix="crossref")
@@ -2326,14 +2375,46 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                         onix_dataset_id=onix_dataset_id,
                         onix_table_id=self.onix_table_id,
                         oaebu_data_qa_dataset=oaebu_data_qa_dataset_id,
+                        oaebu_latest_data_qa_dataset=oaebu_latest_data_qa_dataset_id,
                         workflow_dataset=onix_workflow_dataset_id,
                         oaebu_intermediate_dataset=oaebu_intermediate_dataset_id,
                         oaebu_dataset=oaebu_output_dataset_id,
-                        oaebu_elastic_dataset=oaebu_elastic_dataset_id,
+                        oaebu_export_dataset=oaebu_export_dataset_id,
+                        oaebu_latest_export_dataset=oaebu_latest_export_dataset_id,
                     )
                 )
 
                 release_suffix = release_date.strftime("%Y%m%d")
+
+                # Make the SQL queries for data QA
+                data_qa_sql = {
+                    "onix_invalid_isbn": f"SELECT ISBN13 from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.onix_invalid_isbn{release_suffix}",
+                    "onix_aggregate_metrics": f"SELECT * from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.onix_aggregate_metrics{release_suffix}",
+                    "jstor_invalid_isbn": f"SELECT * from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.jstor_invalid_isbn{release_suffix}",
+                    "jstor_invalid_eisbn": f"SELECT * from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.jstor_invalid_eisbn{release_suffix}",
+                    "jstor_country_unmatched_ISBN": f"SELECT ISBN from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.jstor_country_unmatched_ISBN{release_suffix}",
+                    "google_books_sales_invalid_isbn": f"SELECT * from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.google_books_sales_invalid_isbn{release_suffix}",
+                    "google_books_sales_unmatched_Primary_ISBN": f"SELECT Primary_ISBN from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.google_books_sales_unmatched_Primary_ISBN{release_suffix}",
+                    "google_books_traffic_invalid_isbn": f"SELECT * from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.google_books_traffic_invalid_isbn{release_suffix}",
+                    "google_books_traffic_unmatched_Primary_ISBN": f"SELECT Primary_ISBN from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.google_books_traffic_unmatched_Primary_ISBN{release_suffix}",
+                    "oapen_irus_uk_invalid_isbn": f"SELECT * from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.oapen_irus_uk_invalid_isbn{release_suffix}",
+                    "oapen_irus_uk_unmatched_ISBN": f"SELECT ISBN from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.oapen_irus_uk_unmatched_ISBN{release_suffix}",
+                }
+                if include_google_analytics:
+                    data_qa_sql[
+                        "google_analytics_invalid_isbn"
+                    ] = f"SELECT * from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.google_analytics_invalid_isbn{release_suffix}"
+
+                    data_qa_sql[
+                        "google_analytics_unmatched_publication_id"
+                    ] = f"SELECT publication_id from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.google_analytics_unmatched_publication_id{release_suffix}"
+
+                # Create the latest data QA SQL as well
+                latest_data_qa_sql = {}
+                for k, sql in data_qa_sql.items():
+                    latest_data_qa_sql[k] = sql.replace(
+                        oaebu_data_qa_dataset_id, oaebu_latest_data_qa_dataset_id
+                    ).replace(release_suffix, "")
 
                 # Aggregate works
                 ti = env.run_task(telescope.aggregate_works.__name__)
@@ -2421,8 +2502,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 self.assertEqual(expected_state, ti.state)
 
                 # Check invalid ISBN13s picked up in ONIX
-                sql = f"SELECT ISBN13 from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.onix_invalid_isbn{release_suffix}"
-                records = run_bigquery_query(sql)
+                records = run_bigquery_query(data_qa_sql["onix_invalid_isbn"])
                 isbns = set([record["ISBN13"] for record in records])
                 self.assertEqual(len(isbns), 1)
                 self.assertTrue("112" in isbns)
@@ -2432,8 +2512,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 self.assertEqual(expected_state, ti.state)
 
                 # Check ONIX aggregate metrics are correct
-                sql = f"SELECT * from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.onix_aggregate_metrics{release_suffix}"
-                records = run_bigquery_query(sql)
+                records = run_bigquery_query(data_qa_sql["onix_aggregate_metrics"])
                 self.assertEqual(len(records), 1)
                 self.assertEqual(records[0]["table_size"], 4)
                 self.assertEqual(records[0]["no_isbns"], 0)
@@ -2451,10 +2530,8 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 )
                 self.assertEqual(expected_state, ti.state)
                 # Check JSTOR ISBN are valid
-                sql = (
-                    f"SELECT * from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.jstor_invalid_isbn{release_suffix}"
-                )
-                records = run_bigquery_query(sql)
+
+                records = run_bigquery_query(data_qa_sql["jstor_invalid_isbn"])
                 isbns = set([record["ISBN"] for record in records])
                 self.assertEqual(len(isbns), 4)
                 self.assertTrue("111" in isbns)
@@ -2463,8 +2540,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 self.assertTrue("112" in isbns)
 
                 # Check JSTOR eISBN are valid
-                sql = f"SELECT * from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.jstor_invalid_eisbn{release_suffix}"
-                records = run_bigquery_query(sql)
+                records = run_bigquery_query(data_qa_sql["jstor_invalid_eisbn"])
                 isbns = set([record["eISBN"] for record in records])
                 self.assertEqual(len(isbns), 4)
                 self.assertTrue("111" in isbns)
@@ -2479,8 +2555,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 self.assertEqual(expected_state, ti.state)
 
                 # Check JSTOR unmatched ISBN picked up
-                sql = f"SELECT ISBN from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.jstor_country_unmatched_ISBN{release_suffix}"
-                records = run_bigquery_query(sql)
+                records = run_bigquery_query(data_qa_sql["jstor_country_unmatched_ISBN"])
                 isbns = set([record["ISBN"] for record in records])
                 self.assertEqual(len(isbns), 3)
                 self.assertTrue("111" in isbns)
@@ -2504,8 +2579,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 self.assertEqual(expected_state, ti.state)
 
                 # Check Google Books Sales ISBN are valid
-                sql = f"SELECT * from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.google_books_sales_invalid_isbn{release_suffix}"
-                records = run_bigquery_query(sql)
+                records = run_bigquery_query(data_qa_sql["google_books_sales_invalid_isbn"])
                 isbns = set([record["Primary_ISBN"] for record in records])
                 self.assertEqual(len(isbns), 4)
                 self.assertTrue("111" in isbns)
@@ -2520,8 +2594,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 self.assertEqual(expected_state, ti.state)
 
                 # Check Google Books Sales unmatched ISBN picked up
-                sql = f"SELECT Primary_ISBN from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.google_books_sales_unmatched_Primary_ISBN{release_suffix}"
-                records = run_bigquery_query(sql)
+                records = run_bigquery_query(data_qa_sql["google_books_sales_unmatched_Primary_ISBN"])
                 isbns = set([record["Primary_ISBN"] for record in records])
                 self.assertEqual(len(isbns), 3)
                 self.assertTrue("111" in isbns)
@@ -2532,8 +2605,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 ti = env.run_task(telescope.create_oaebu_data_qa_google_books_traffic_isbn.__name__)
                 self.assertEqual(expected_state, ti.state)
                 # Check Google Books Traffic ISBN are valid
-                sql = f"SELECT * from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.google_books_traffic_invalid_isbn{release_suffix}"
-                records = run_bigquery_query(sql)
+                records = run_bigquery_query(data_qa_sql["google_books_traffic_invalid_isbn"])
                 isbns = set([record["Primary_ISBN"] for record in records])
                 self.assertEqual(len(isbns), 4)
                 self.assertTrue("111" in isbns)
@@ -2548,8 +2620,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 self.assertEqual(expected_state, ti.state)
 
                 # Check Google Books Traffic unmatched ISBN picked up
-                sql = f"SELECT Primary_ISBN from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.google_books_traffic_unmatched_Primary_ISBN{release_suffix}"
-                records = run_bigquery_query(sql)
+                records = run_bigquery_query(data_qa_sql["google_books_traffic_unmatched_Primary_ISBN"])
                 isbns = set([record["Primary_ISBN"] for record in records])
                 self.assertEqual(len(isbns), 3)
                 self.assertTrue("111" in isbns)
@@ -2561,8 +2632,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 self.assertEqual(expected_state, ti.state)
 
                 # Check OAPEN IRUS UK ISBN are valid
-                sql = f"SELECT * from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.oapen_irus_uk_invalid_isbn{release_suffix}"
-                records = run_bigquery_query(sql)
+                records = run_bigquery_query(data_qa_sql["oapen_irus_uk_invalid_isbn"])
                 isbns = set([record["ISBN"] for record in records])
                 self.assertEqual(len(isbns), 4)
                 self.assertTrue("111" in isbns)
@@ -2577,8 +2647,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 self.assertEqual(expected_state, ti.state)
 
                 # Check OAPEN IRUS UK unmatched ISBN picked up
-                sql = f"SELECT ISBN from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.oapen_irus_uk_unmatched_ISBN{release_suffix}"
-                records = run_bigquery_query(sql)
+                records = run_bigquery_query(data_qa_sql["oapen_irus_uk_unmatched_ISBN"])
                 isbns = set([record["ISBN"] for record in records])
                 self.assertEqual(len(isbns), 3)
                 self.assertTrue("111" in isbns)
@@ -2590,8 +2659,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                     env.run_task(telescope.create_oaebu_data_qa_google_analytics_isbn.__name__)
 
                     # Check Google Analytics ISBN are valid
-                    sql = f"SELECT * from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.google_analytics_invalid_isbn{release_suffix}"
-                    records = run_bigquery_query(sql)
+                    records = run_bigquery_query(data_qa_sql["google_analytics_invalid_isbn"])
                     isbns = set([record["publication_id"] for record in records])
                     self.assertEqual(len(isbns), 1)
                     self.assertTrue("(none)" in isbns)
@@ -2605,8 +2673,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                     )
 
                     # Check Google Analytics unmatched ISBN picked up
-                    sql = f"SELECT publication_id from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.google_analytics_unmatched_publication_id{release_suffix}"
-                    records = run_bigquery_query(sql)
+                    records = run_bigquery_query(data_qa_sql["google_analytics_unmatched_publication_id"])
                     isbns = set([record["publication_id"] for record in records])
                     self.assertEqual(len(isbns), 1)
                     self.assertTrue("(none)" in isbns)
@@ -2633,12 +2700,12 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                     ti = env.run_task(f"{telescope.export_oaebu_table.__name__}.{table}")
                     self.assertEqual(expected_state, ti.state, msg=f"table: {table}")
                     # Check that the data_export tables tables exist and have the correct number of rows
-                    table_id = f"{self.gcp_project_id}.{oaebu_elastic_dataset_id}.{self.gcp_project_id.replace('-', '_')}_{table}{release_suffix}"
+                    table_id = f"{self.gcp_project_id}.{oaebu_export_dataset_id}.{self.gcp_project_id.replace('-', '_')}_{table}{release_suffix}"
                     self.assert_table_integrity(table_id, expected_rows=exp_rows)
 
                 # Book product list content assertion
                 self.assert_table_content(
-                    f"{gcp_project_id}.{oaebu_elastic_dataset_id}.{self.gcp_project_id.replace('-', '_')}_book_product_list{release_suffix}",
+                    f"{gcp_project_id}.{oaebu_export_dataset_id}.{self.gcp_project_id.replace('-', '_')}_book_product_list{release_suffix}",
                     load_jsonl(test_fixtures_folder("onix_workflow", "book_product_list.jsonl")),
                 )
 
@@ -2686,6 +2753,23 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                     and oaebu_wfam["111"] is None
                     and oaebu_wfam["211"] is None
                 )
+
+                # Create the views from the export and data QA tables
+                env.run_task(telescope.create_oaebu_latest_views.__name__)
+
+                # Check data QA views are the same as the tables
+                for k in data_qa_sql.keys():
+                    table_data = run_bigquery_query(data_qa_sql[k])
+                    view_data = run_bigquery_query(latest_data_qa_sql[k])
+                    self.assertEqual(table_data, view_data)
+
+                for export_table, exp_rows in export_tables:
+                    export_view = run_bigquery_query(
+                        f"SELECT * FROM {self.gcp_project_id}.{oaebu_latest_export_dataset_id}.{self.gcp_project_id.replace('-', '_')}_{export_table}"
+                    )
+                    self.assertEqual(expected_state, ti.state, msg=f"table: {table}")
+                    # Check that the data_export tables (views) has the correct number of rows
+                    self.assertEqual(len(export_view), exp_rows)
 
                 # Cleanup
                 env.run_task(telescope.cleanup.__name__)
