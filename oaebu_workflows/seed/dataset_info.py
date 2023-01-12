@@ -48,7 +48,7 @@ def get_dataset_info(api: ObservatoryApi):
     dataset_info[name] = Dataset(
         name=name,
         service="google",
-        address="keegan-dev.onix.onix",
+        address="oaebu-oapen.onix.onix",
         workflow=workflows["OAPEN Press ONIX Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.onix),
     )
@@ -256,7 +256,7 @@ def get_dataset_info(api: ObservatoryApi):
     dataset_info[name] = Dataset(
         name=name,
         service="google",
-        address="keegan-dev.oaebu.book_product",
+        address="oaebu-oapen.oaebu.book_product",
         workflow=workflows["OAPEN Press ONIX Workflow"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.onix_workflow),
     )
