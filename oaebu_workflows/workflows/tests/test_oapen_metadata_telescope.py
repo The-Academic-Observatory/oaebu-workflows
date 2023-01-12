@@ -24,7 +24,7 @@ import pendulum
 import vcr
 from airflow.exceptions import AirflowException
 
-from oaebu_workflows.api_type_ids import DatasetTypeId
+from oaebu_workflows.api_type_ids import DatasetTypeId, WorkflowTypeId
 from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.workflows.oapen_metadata_telescope import (
     OapenMetadataRelease,
@@ -108,8 +108,8 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
         self.processing_test_fields = test_fixtures_folder("oapen_metadata", "processing_test_valid_fields.json")
 
     def setup_api(self):
-        name = "Oapen Metadata Telescope"
-        workflow_type = WorkflowType(name=name, type_id=OapenMetadataTelescope.DAG_ID)
+        name = "Oapen Metadata"
+        workflow_type = WorkflowType(name=name, type_id=WorkflowTypeId.oapen_metadata)
         self.api.put_workflow_type(workflow_type)
 
         organisation = Organisation(
@@ -183,7 +183,7 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
             self.setup_connections(env)
             self.setup_api()
             dag_file = os.path.join(module_file_path("oaebu_workflows.dags"), "oapen_metadata_telescope.py")
-            self.assert_dag_load("oapen_metadata", dag_file)
+            self.assert_dag_load(OapenMetadataTelescope.DAG_ID, dag_file)
 
     def test_workflow(self):
         """Test workflow task execution."""

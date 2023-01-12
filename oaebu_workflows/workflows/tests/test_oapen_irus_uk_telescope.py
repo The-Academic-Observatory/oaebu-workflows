@@ -107,7 +107,7 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
     def setup_api(self, env=None):
         dt = pendulum.now("UTC")
 
-        name = "Oapen Metadata Telescope"
+        name = "Oapen Metadata"
         workflow_type = WorkflowType(name=name, type_id=OapenIrusUkTelescope.DAG_ID_PREFIX)
         self.api.put_workflow_type(workflow_type)
 
