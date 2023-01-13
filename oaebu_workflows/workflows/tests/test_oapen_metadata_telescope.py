@@ -43,9 +43,7 @@ from observatory.platform.utils.test_utils import (
     module_file_path,
     find_free_port,
 )
-from observatory.platform.utils.workflow_utils import (
-    blob_name,
-)
+from observatory.platform.utils.workflow_utils import blob_name
 from observatory.api.testing import ObservatoryApiEnvironment
 from observatory.api.client import ApiClient, Configuration
 from observatory.api.client.api.observatory_api import ObservatoryApi  # noqa: E501
@@ -207,13 +205,8 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
                     # Test that all dependencies are specified: no error should be thrown
                     env.run_task(wf.check_dependencies.__name__)
 
-                    start_date, end_date, first_release = wf.get_release_info(
-                        dag=dag,
-                        data_interval_end=pendulum.datetime(2021, 1, 31),
-                    )
-
                     # Use release info for other tasks
-                    release = OapenMetadataRelease(wf.dag_id, start_date, end_date, first_release)
+                    release = OapenMetadataRelease(wf.dag_id, pendulum.datetime(year=2021, month=2, day=6))
 
                     # Download task
                     with vcr.VCR().use_cassette(self.valid_download_cassette, record_mode="None"):
@@ -276,14 +269,15 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
     def test_airflow_vars(self):
         """Cover case when airflow_vars is given."""
 
-        wf = OapenMetadataTelescope(workflow_id=1, airflow_vars=[AirflowVars.DOWNLOAD_BUCKET])
+        wf = OapenMetadataTelescope(workflow_id=1)
         self.assertEqual(
             set(wf.airflow_vars),
             {
+                AirflowVars.DATA_PATH,
+                AirflowVars.PROJECT_ID,
+                AirflowVars.DATA_LOCATION,
                 AirflowVars.DOWNLOAD_BUCKET,
                 AirflowVars.TRANSFORM_BUCKET,
-                AirflowVars.DATA_LOCATION,
-                AirflowVars.PROJECT_ID,
             },
         )
 
