@@ -19,19 +19,19 @@ import os
 import re
 import shutil
 import subprocess
+from datetime import timedelta
 from typing import Dict, List, Optional
 
 import pendulum
-from datetime import timedelta
 from airflow.exceptions import AirflowException
 from airflow.models.taskinstance import TaskInstance
-from observatory.platform.utils.dag_run_sensor import DagRunSensor
-
 from google.cloud.bigquery import SourceFormat
 
 from oaebu_workflows.config import schema_folder as default_schema_folder
+from oaebu_workflows.dag_tag import Tag
 from observatory.platform.utils.airflow_utils import AirflowConns, AirflowVars
 from observatory.platform.utils.config_utils import observatory_home, find_schema
+from observatory.platform.utils.dag_run_sensor import DagRunSensor
 from observatory.platform.utils.http_download import download_file
 from observatory.platform.utils.proc_utils import wait_for_process
 from observatory.platform.utils.workflow_utils import (
@@ -39,7 +39,6 @@ from observatory.platform.utils.workflow_utils import (
     blob_name,
     bq_load_shard,
     make_dag_id,
-    make_org_id,
     make_sftp_connection,
     table_ids_from_path,
 )
@@ -47,7 +46,6 @@ from observatory.platform.workflows.snapshot_telescope import (
     SnapshotRelease,
     SnapshotTelescope,
 )
-from oaebu_workflows.dag_tag import Tag
 
 ONIX_PARSER_NAME = "coki-onix-parser.jar"
 ONIX_PARSER_URL = "https://github.com/The-Academic-Observatory/onix-parser/releases/download/v1.3.0/coki-onix-parser-1.2-SNAPSHOT-shaded.jar"

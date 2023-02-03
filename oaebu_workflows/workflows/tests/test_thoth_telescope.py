@@ -19,12 +19,12 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 import pendulum
-from airflow.models.connection import Connection
-from airflow.operators.python_operator import PythonOperator
-from airflow.exceptions import AirflowException
-from airflow.utils.state import State
-from airflow import DAG
 import vcr
+from airflow import DAG
+from airflow.exceptions import AirflowException
+from airflow.models import Connection
+from airflow.operators.python import PythonOperator
+from airflow.utils.state import State
 
 from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.workflows.thoth_telescope import (
@@ -37,28 +37,26 @@ from oaebu_workflows.workflows.thoth_telescope import (
     DEFAULT_FORMAT_SPECIFICATION,
     DEFAULT_HOST_NAME,
 )
+from observatory.api.client import ApiClient, Configuration
+from observatory.api.client.api.observatory_api import ObservatoryApi
+from observatory.api.client.model.dataset import Dataset
+from observatory.api.client.model.dataset_type import DatasetType
+from observatory.api.client.model.organisation import Organisation
+from observatory.api.client.model.table_type import TableType
+from observatory.api.client.model.workflow import Workflow
+from observatory.api.client.model.workflow_type import WorkflowType
+from observatory.api.testing import ObservatoryApiEnvironment
+from observatory.platform.utils.airflow_utils import AirflowConns
 from observatory.platform.utils.file_utils import load_jsonl
 from observatory.platform.utils.gc_utils import bigquery_sharded_table_id
+from observatory.platform.utils.release_utils import get_dataset_releases
 from observatory.platform.utils.test_utils import (
     ObservatoryEnvironment,
     ObservatoryTestCase,
     module_file_path,
     find_free_port,
 )
-from observatory.api.testing import ObservatoryApiEnvironment
-from observatory.api.client import ApiClient, Configuration
-from observatory.api.client.api.observatory_api import ObservatoryApi
-from observatory.api.client.model.organisation import Organisation
-from observatory.api.client.model.workflow import Workflow
-from observatory.api.client.model.workflow_type import WorkflowType
-from observatory.api.client.model.dataset import Dataset
-from observatory.api.client.model.dataset_type import DatasetType
-from observatory.api.client.model.table_type import TableType
-from observatory.platform.utils.release_utils import get_dataset_releases
-from observatory.platform.utils.airflow_utils import AirflowConns
 from observatory.platform.utils.url_utils import retry_session
-from airflow.models import Connection
-from airflow.utils.state import State
 
 FAKE_ORG_NAME = "fake_org_name"
 FAKE_PUBLISHER_ID = "fake_publisher_id"
