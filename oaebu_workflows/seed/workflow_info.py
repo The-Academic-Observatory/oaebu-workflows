@@ -38,7 +38,7 @@ def get_workflow_info(api: ObservatoryApi):
         extra={},
         tags=None,
     )
-    name = "OAPEN Metadata Telescope"
+    name = "OAPEN Metadata"
     workflow_info[name] = Workflow(
         name=name,
         organisation=Organisation(id=orgids["OAPEN Press"]),

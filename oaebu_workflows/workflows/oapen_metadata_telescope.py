@@ -35,47 +35,47 @@ from oaebu_workflows.api_type_ids import DatasetTypeId
 from oaebu_workflows.config import schema_folder as default_schema_folder
 from observatory.platform.utils.airflow_utils import AirflowConns, AirflowVars
 from observatory.platform.utils.url_utils import get_user_agent
-from observatory.platform.utils.workflow_utils import make_sftp_connection
-from observatory.platform.workflows.stream_telescope import StreamTelescope, StreamRelease
+from observatory.platform.utils.workflow_utils import make_sftp_connection, make_release_date
+from observatory.platform.workflows.snapshot_telescope import SnapshotTelescope, SnapshotRelease
 from oaebu_workflows.dag_tag import Tag
 
 # Download job will wait 120 seconds between first 2 attempts, then 30 minutes for the following 3
 DOWNLOAD_RETRY_CHAIN = wait_chain(*[wait_fixed(120) for _ in range(2)] + [wait_fixed(1800) for _ in range(3)])
 
 
-class OapenMetadataRelease(StreamRelease):
-    def __init__(self, dag_id: str, start_date: pendulum.DateTime, end_date: pendulum.DateTime, first_release: bool):
+class OapenMetadataRelease(SnapshotRelease):
+    def __init__(self, dag_id: str, release_date: pendulum.DateTime):
         """Construct a OapenMetadataRelease instance
         :param dag_id: the id of the DAG.
         :param start_date: the start_date of the release.
         :param end_date: the end_date of the release.
         """
-        super().__init__(dag_id, start_date, end_date, first_release)
+        super().__init__(dag_id, release_date)
 
     @property
     def download_path(self) -> str:
         """Path to store the original oapen metadata XML file"""
-        return os.path.join(self.download_folder, f"oapen_metadata_{self.end_date.format('YYYYMMDD')}.xml")
+        return os.path.join(self.download_folder, f"oapen_metadata_{self.release_date.format('YYYYMMDD')}.xml")
 
     @property
     def transform_path(self) -> str:
         """Path to store the transformed oapen ONIX file"""
-        return os.path.join(self.transform_folder, f"oapen_onix_{self.end_date.format('YYYYMMDD')}.xml")
+        return os.path.join(self.transform_folder, f"oapen_onix_{self.release_date.format('YYYYMMDD')}.xml")
 
     @property
     def invalid_products_path(self) -> str:
         """Path to store the transformed oapen ONIX file"""
         return os.path.join(
-            self.transform_folder, f"oapen_onix_invalid_products_{self.end_date.format('YYYYMMDD')}.xml"
+            self.transform_folder, f"oapen_onix_invalid_products_{self.release_date.format('YYYYMMDD')}.xml"
         )
 
 
-class OapenMetadataTelescope(StreamTelescope):
+class OapenMetadataTelescope(SnapshotTelescope):
     """Oapen Metadata Telescope"""
 
     METADATA_URL = "https://library.oapen.org/download-export?format=onix"
-    DAG_ID = "oapen_metadata"
     SFTP_UPLOAD_DIR = "/telescopes/onix/oapen_press/upload"
+    DAG_ID = "oapen_metadata"
 
     def __init__(
         self,
@@ -120,7 +120,6 @@ class OapenMetadataTelescope(StreamTelescope):
             start_date,
             schedule_interval,
             dataset_id,
-            merge_partition_field="",
             schema_folder=schema_folder,
             airflow_conns=airflow_conns,
             airflow_vars=airflow_vars,
@@ -143,8 +142,8 @@ class OapenMetadataTelescope(StreamTelescope):
 
     def make_release(self, **kwargs) -> OapenMetadataRelease:
         # Make Release instance
-        start_date, end_date, first_release = self.get_release_info(**kwargs)
-        release = OapenMetadataRelease(self.dag_id, start_date, end_date, first_release)
+        release_date = make_release_date(**kwargs)
+        release = OapenMetadataRelease(self.dag_id, release_date)
         return release
 
     def download(self, release: OapenMetadataRelease, **kwargs):
@@ -154,6 +153,13 @@ class OapenMetadataTelescope(StreamTelescope):
         """
         logging.info(f"Downloading metadata XML from url: {OapenMetadataTelescope.METADATA_URL}")
         download_oapen_metadata(release.download_path)
+
+    def upload_downloaded(self, release: OapenMetadataRelease, **kwargs):
+        """Task to upload the downloaded OAPEN metadata
+
+        :param release: an OapenMetadataRelease instance.
+        """
+        super().upload_downloaded([release], **kwargs)
 
     def transform(self, release: OapenMetadataRelease, **kwargs):
         """Transform the oapen metadata XML file into a valid ONIX file
@@ -179,6 +185,13 @@ class OapenMetadataTelescope(StreamTelescope):
         if errors:
             raise AirflowException("Errors found in processed OAPEN ONIX file. Cannot proceed without valid ONIX.")
 
+    def upload_transformed(self, release: OapenMetadataRelease, **kwargs):
+        """Task to upload the transformed OAPEN metadata
+
+        :param release: an OapenMetadataRelease instance
+        """
+        super().upload_transformed([release], **kwargs)
+
     def upload_to_sftp_server(self, release: OapenMetadataRelease, **kwargs):
         """Uploads the transformed ONIX file to the SFTP server
 
@@ -190,6 +203,13 @@ class OapenMetadataTelescope(StreamTelescope):
             if not sftp_con.exists(self.sftp_upload_dir):
                 raise AirflowException(f"SFTP server directory: {self.sftp_upload_dir} does not exist")
             sftp_con.put(release.transform_path, upload_path)
+
+    def cleanup(self, release: OapenMetadataRelease, **kwargs):
+        """Deletes downloaded and transformed release files.
+
+        :param release: an OapenMetadataRelease instance.
+        """
+        super().cleanup([release], **kwargs)
 
 
 @retry(
