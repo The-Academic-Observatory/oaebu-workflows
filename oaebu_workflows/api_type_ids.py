@@ -50,6 +50,7 @@ class WorkflowTypeId:
     doab = "doab"
     oapen_metadata = "oapen_metadata"
     onix = "onix"
+    thoth_onix = "thoth_onix"
     google_analytics = "google_analytics"
     google_books = "google_books"
     jstor = "jstor"

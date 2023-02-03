@@ -84,6 +84,14 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["UoMP ONIX Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.onix),
     )
+    name = "OBP Thoth Onix Dataset"
+    dataset_info[name] = Dataset(
+        name=name,
+        service="google",
+        address="oaebu-obp.onix.onix",
+        workflow=workflows["OBP Thoth Onix Telescope"],
+        dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.onix),
+    )
     name = "ANU Press Google Analytics Dataset"
     dataset_info[name] = Dataset(
         name=name,
