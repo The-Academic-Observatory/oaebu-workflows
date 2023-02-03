@@ -292,6 +292,22 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["Wits Press OAPEN IRUS-UK Telescope"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.oapen_irus_uk),
     )
+    name = "OBP OAPEN IRUS UK Dataset"
+    dataset_info[name] = Dataset(
+        name=name,
+        service="google",
+        address="oaebu-obp.oapen.oapen_irus_uk",
+        workflow=workflows["OBP OAPEN IRUS-UK Telescope"],
+        dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.oapen_irus_uk),
+    )
+    name = "CEU Press OAPEN IRUS UK Dataset"
+    dataset_info[name] = Dataset(
+        name=name,
+        service="google",
+        address="oaebu-ceu-press.oapen.oapen_irus_uk",
+        workflow=workflows["CEU Press OAPEN IRUS-UK Telescope"],
+        dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.oapen_irus_uk),
+    )
     name = "UCL Press UCL Discovery Dataset"
     dataset_info[name] = Dataset(
         name=name,
