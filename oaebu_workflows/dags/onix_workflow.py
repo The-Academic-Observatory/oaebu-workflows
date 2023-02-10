@@ -144,8 +144,11 @@ for workflow in workflows:
     org_name = workflow.organisation.name
     gcp_project_id = workflow.organisation.project_id
     gcp_bucket_name = workflow.organisation.transform_bucket
+
+    # Create data partner list
     data_partners = get_oaebu_partner_data(workflow.organisation.id)
 
+    # Initialise the dag
     workflow = OnixWorkflow(
         org_name=org_name,
         gcp_project_id=gcp_project_id,

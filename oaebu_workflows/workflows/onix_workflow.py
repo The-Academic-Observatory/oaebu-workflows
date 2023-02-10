@@ -34,7 +34,7 @@ from tenacity import wait_exponential_jitter
 from oaebu_workflows.config import schema_folder as default_schema_folder
 from oaebu_workflows.config import sql_folder
 from oaebu_workflows.workflows.oaebu_partners import OaebuPartner
-from oaebu_workflows.workflows.onix_telescope import OnixTelescope
+from oaebu_workflows.api_type_ids import DatasetTypeId
 from oaebu_workflows.workflows.onix_work_aggregation import (
     BookWorkAggregator,
     BookWorkFamilyAggregator,
@@ -401,9 +401,11 @@ class OnixWorkflow(Workflow):
         )
 
         # Wait for data partner workflows to finish
-        partner_data_dag_prefix_ids = [OnixTelescope.DAG_ID_PREFIX]
-        partner_data_dag_prefix_ids.extend(list(set([partner.dag_id_prefix for partner in data_partners])))
+        partner_data_dag_prefix_ids = list(set([partner.dag_id_prefix for partner in data_partners]))
         partner_data_dag_prefix_ids.sort()  # Sort so that order is deterministic
+        # Assert that there is an onix dataset for this workflow
+        if not DatasetTypeId.onix in [partner.dataset_type_id for partner in data_partners]:
+            raise AirflowException(f"No ONIX task is configured for this workflow. {data_partners}")
         with self.parallel_tasks():
             for dag_prefix in partner_data_dag_prefix_ids:
                 ext_dag_id = make_dag_id(dag_prefix, org_name)
@@ -830,24 +832,27 @@ class OnixWorkflow(Workflow):
 
     def create_oaebu_intermediate_table_tasks(self, data_partners: List[OaebuPartner]):
         """Create tasks for generating oaebu intermediate tables for each OAEBU data partner.
+        Will exclude ONIX from the data partners.
         :param data_partners: List of oaebu partner data.
         """
 
         with self.parallel_tasks():
-            for data in data_partners:
+            for data_partner in [
+                i for i in data_partners if i.dataset_type_id != self.dataset_type_info["onix"].type_id
+            ]:
                 fn = partial(
                     self.create_oaebu_intermediate_table,
-                    orig_project_id=data.gcp_project_id,
-                    orig_dataset=data.gcp_dataset_id,
-                    orig_table=data.gcp_table_id,
-                    orig_isbn=data.isbn_field_name,
-                    sharded=data.sharded,
+                    orig_project_id=data_partner.gcp_project_id,
+                    orig_dataset=data_partner.gcp_dataset_id,
+                    orig_table=data_partner.gcp_table_id,
+                    orig_isbn=data_partner.isbn_field_name,
+                    sharded=data_partner.sharded,
                 )
 
                 # Populate the __name__ attribute of the partial object (it lacks one by default).
                 # Scheme: create_oaebu_intermediate_table.dataset.table
                 update_wrapper(fn, self.create_oaebu_intermediate_table)
-                fn.__name__ += f".{data.gcp_dataset_id}.{data.gcp_table_id}"
+                fn.__name__ += f".{data_partner.gcp_dataset_id}.{data_partner.gcp_table_id}"
 
                 self.add_task(fn)
 
@@ -930,6 +935,7 @@ class OnixWorkflow(Workflow):
             onix_dataset_id=release.onix_dataset_id,
             dataset_id=release.oaebu_intermediate_dataset,
             onix_release_date=release.onix_release_date,
+            onix_table_id=self.onix_table_id,
             release_date=release_date,
             onix_workflow=True,
             onix_workflow_dataset=release.workflow_dataset,
@@ -1254,13 +1260,16 @@ class OnixWorkflow(Workflow):
 
     def create_oaebu_data_qa_tasks(self, data_partners: List[OaebuPartner]):
         """Create tasks for outputing QA metrics from our OAEBU data.  It will create output tables in the oaebu_data_qa dataset.
+        Will exclude ONIX from the data partners.
         :param data_partners: List of oaebu partner data.
         """
 
         with self.parallel_tasks():
             self.create_oaebu_data_qa_onix()
 
-            for data_partner in data_partners:
+            for data_partner in [
+                i for i in data_partners if i.dataset_type_id != self.dataset_type_info["onix"].type_id
+            ]:
 
                 if (
                     data_partner.dataset_type_id == self.dataset_type_info["jstor_country"].type_id

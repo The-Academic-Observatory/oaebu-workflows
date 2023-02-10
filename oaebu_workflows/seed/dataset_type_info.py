@@ -32,14 +32,10 @@ def get_dataset_type_info(api: ObservatoryApi):
         name="DOAB",
         table_type=TableType(id=ttids[TableTypeId.regular]),
     )
-    dataset_type_info[DatasetTypeId.oapen_metadata] = DatasetType(
-        type_id=DatasetTypeId.oapen_metadata,
-        name="OAPEN Metadata",
-        table_type=TableType(id=ttids[TableTypeId.regular]),
-    )
     dataset_type_info[DatasetTypeId.onix] = DatasetType(
         type_id="onix",
         name="ONIX",
+        extra={"isbn_field_name": "ISBN13", "title_field_name": "TitleDetails.TitleElements.TitleText"},
         table_type=TableType(id=ttids[TableTypeId.sharded]),
     )
     dataset_type_info[DatasetTypeId.google_analytics] = DatasetType(

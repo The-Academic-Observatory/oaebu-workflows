@@ -17,6 +17,7 @@
 import os
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
+import json
 
 import pendulum
 import vcr
@@ -30,6 +31,7 @@ from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.workflows.thoth_telescope import (
     ThothTelescope,
     thoth_download_onix,
+    thoth_collapse_subjects,
     make_workflow_folder,
     blob_name_from_path,
     get_data_path,
@@ -89,6 +91,8 @@ class TestThothTelescope(ObservatoryTestCase):
         # Fixtures
         self.download_cassette = os.path.join(test_fixtures_folder("thoth"), "thoth_download_cassette.yaml")
         self.test_table = os.path.join(test_fixtures_folder("thoth"), "test_table.jsonl")
+        self.test_subjects_input = os.path.join(test_fixtures_folder("thoth"), "test_subjects_input.json")
+        self.test_subjects_expected = os.path.join(test_fixtures_folder("thoth"), "test_subjects_expected.json")
 
     def setup_api(self):
 
@@ -238,19 +242,19 @@ class TestThothTelescope(ObservatoryTestCase):
                 )
 
                 # Downloaded file
-                self.assert_file_integrity(download_file_path, "d02bcbb97e887acbbbaa55a1b77f51ef", "md5")
+                self.assert_file_integrity(download_file_path, "78b8c27c9c63fb0f2d721b7d856f4e3c", "md5")
 
                 # Uploaded download blob
                 self.assert_blob_integrity(env.download_bucket, download_blob, download_file_path)
 
                 # Transformed file
-                self.assert_file_integrity(transform_file_path, "782d3888162dac8f1afdaf20e42b278f", "md5")
+                self.assert_file_integrity(transform_file_path, "bda19178", "gzip_crc")
 
                 # Uploaded transform blob
                 self.assert_blob_integrity(env.transform_bucket, transform_blob, transform_file_path)
 
                 # Uploaded table
-                self.assert_table_integrity(test_table_id, expected_rows=1)
+                self.assert_table_integrity(test_table_id, expected_rows=2)
                 self.assert_table_content(test_table_id, load_jsonl(self.test_table))
 
                 # Test cleanup
@@ -320,8 +324,19 @@ class TestThothTelescope(ObservatoryTestCase):
             with thoth_vcr.use_cassette(self.download_cassette):
                 thoth_download_onix(FAKE_PUBLISHER_ID, tempdir, download_filename="fake_download.xml", num_retries=0)
             self.assert_file_integrity(
-                os.path.join(tempdir, "fake_download.xml"), "d02bcbb97e887acbbbaa55a1b77f51ef", "md5"
+                os.path.join(tempdir, "fake_download.xml"), "78b8c27c9c63fb0f2d721b7d856f4e3c", "md5"
             )
+
+    def test_thoth_collapse_subjects(self):
+        """Tests the thoth_collapse_subjects function"""
+        with open(self.test_subjects_input, "r") as f:
+            onix = json.load(f)
+        actual_onix = thoth_collapse_subjects(onix)
+        with open(self.test_subjects_expected, "r") as f:
+            expected_onix = json.load(f)
+
+        assert len(actual_onix) == len(expected_onix)
+        assert json.dumps(actual_onix, sort_keys=True) == json.dumps(expected_onix, sort_keys=True)
 
     def test_thoth_api(self):
         """Tests that HTTP requests to the thoth API are successful"""
