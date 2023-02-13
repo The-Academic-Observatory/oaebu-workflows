@@ -154,6 +154,20 @@ CREATE TEMP FUNCTION group_items_ucl_country(items ARRAY<STRUCT<download_count I
   )
 );
 
+# Helper Function:
+{#
+Output Schema:
+lower_trim_word                 STRING   NULLABLE
+#}
+CREATE TEMP FUNCTION custom_split(str STRING, sep STRING) AS (
+  ARRAY(
+    SELECT LOWER(TRIM(word)) 
+    FROM UNNEST(SPLIT(IFNULL(str,''),sep)) AS word
+    WHERE TRIM(word) != ''
+    )
+);
+
+
 {#
 The purpose of this block of SQL is to create an empty row of data, which comforms to the OAPEN raw data.
 
@@ -367,12 +381,10 @@ onix_ebook_titles_raw as (
                     subject.SubjectCode
                 FROM UNNEST(onix.Subjects) as subject
                 WHERE subject.SubjectSchemeIdentifier = "Thema_subject_category") as thema_subjects,
-            (SELECT
-                ARRAY(
-                    SELECT
-                        TRIM(LOWER(keyword)) FROM UNNEST(SPLIT(subject.SubjectHeadingText[SAFE_OFFSET(0)], ';')) as keyword)
-                    FROM UNNEST(onix.Subjects) as subject
-                    WHERE subject.SubjectSchemeIdentifier = "Keywords") as keywords,
+            (SELECT 
+                custom_split(heading,';') 
+            FROM UNNEST(onix.Subjects) as subject, UNNEST(subject.SubjectHeadingText) as heading
+            WHERE subject.SubjectSchemeIdentifier = "Keywords") as keywords,
             (SELECT
                 ARRAY(
                     SELECT as STRUCT
