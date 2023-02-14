@@ -85,8 +85,8 @@ class ThothTelescope(Workflow):
         workflow_id: int = None,
         host_name: str = "https://export.thoth.pub",
         format_specification: str = DEFAULT_FORMAT_SPECIFICATION,
-        download_file_name: str = "thoth_onix.xml",
-        transform_file_name: str = "thoth_onix.jsonl",
+        download_file_name: str = "onix.xml",
+        transform_file_name: str = "onix.jsonl",
         dataset_description: str = "Thoth ONIX Feed",
     ):
         """Construct an ThothOnixTelescope instance.
@@ -185,6 +185,7 @@ class ThothTelescope(Workflow):
             publisher_id=self.publisher_id,
             download_folder=self.download_folder,
             format_spec=self.format_specification,
+            download_filename=self.download_file_name,
         )
 
     def upload_downloaded(self, release: ThothRelease, **kwargs) -> None:
@@ -272,7 +273,7 @@ class ThothTelescope(Workflow):
 def thoth_download_onix(
     publisher_id: str,
     download_folder: str,
-    download_filename: str = "thoth_onix.xml",
+    download_filename: str = "onix.xml",
     host_name: str = DEFAULT_HOST_NAME,
     format_spec: str = "onix_3.0::oapen",
     num_retries: int = 3,

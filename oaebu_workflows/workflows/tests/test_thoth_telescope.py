@@ -237,9 +237,7 @@ class TestThothTelescope(ObservatoryTestCase):
                 transform_file_path = os.path.join(telescope.transform_folder, telescope.transform_file_name)
                 download_blob = blob_name_from_path(download_file_path)
                 transform_blob = blob_name_from_path(transform_file_path)
-                test_table_id = (
-                    f"{self.project_id}.{dataset_id}.{bigquery_sharded_table_id(telescope.DAG_ID_PREFIX, release_date)}"
-                )
+                test_table_id = f"{self.project_id}.{dataset_id}.{bigquery_sharded_table_id('onix', release_date)}"
 
                 # Downloaded file
                 self.assert_file_integrity(download_file_path, "78b8c27c9c63fb0f2d721b7d856f4e3c", "md5")
