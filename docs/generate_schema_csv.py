@@ -92,7 +92,7 @@ def generate_latest_files():
     for file in table_files:
         filename = os.path.basename(file)
         date_str = r.search(filename)
-        date_str_start = date_str.span()[0]
+        date_str_start = date_str.span()[0] if date_str else len(filename) - 3  # -3 for 'csv'
         table_name = filename[: date_str_start - 1]  # -1 accounts for _
         table_schemas[table_name] = table_schemas.get(table_name, list())
         table_schemas[table_name].append(file)
