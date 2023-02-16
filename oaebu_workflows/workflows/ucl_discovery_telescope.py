@@ -29,7 +29,7 @@ from oaebu_workflows.config import schema_folder as default_schema_folder
 from observatory.api.client.model.organisation import Organisation
 from observatory.platform.utils.airflow_utils import AirflowVars
 from observatory.platform.utils.file_utils import list_to_jsonl_gz
-from observatory.platform.utils.url_utils import retry_session
+from observatory.platform.utils.url_utils import retry_get_url
 from observatory.platform.utils.workflow_utils import add_partition_date, make_dag_id
 from observatory.platform.workflows.organisation_telescope import OrganisationRelease, OrganisationTelescope
 from oaebu_workflows.dag_tag import Tag
@@ -87,7 +87,7 @@ class UclDiscoveryRelease(OrganisationRelease):
         :return: None.
         """
         logging.info(f"Downloading metadata from {self.eprint_metadata_url}")
-        response = retry_session(num_retries=5).get(self.eprint_metadata_url)
+        response = retry_get_url(self.eprint_metadata_url, num_retries=5)
         if response.status_code == 200:
             response_content = response.content.decode("utf-8")
             csv_reader = csv.DictReader(response_content.splitlines())
@@ -313,7 +313,7 @@ def get_downloads_per_country(countries_url: str) -> Tuple[List[dict], int]:
     :param countries_url: The url to the downloads per country info
     :return: Number of total downloads and list of downloads per country, country code and country name.
     """
-    response = retry_session(num_retries=5).get(countries_url)
+    response = retry_get_url(countries_url, num_retries=5)
     response_content = response.content.decode("utf-8")
     if response_content == "\n":
         return [], 0

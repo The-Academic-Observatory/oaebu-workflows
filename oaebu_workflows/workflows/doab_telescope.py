@@ -27,7 +27,7 @@ from oaebu_workflows.api_type_ids import DatasetTypeId
 from oaebu_workflows.config import schema_folder as default_schema_folder
 from observatory.platform.utils.airflow_utils import AirflowVars
 from observatory.platform.utils.file_utils import list_to_jsonl_gz
-from observatory.platform.utils.url_utils import get_user_agent, retry_session
+from observatory.platform.utils.url_utils import get_user_agent, retry_get_url
 from observatory.platform.utils.workflow_utils import convert, upload_files_from_list
 from observatory.platform.workflows.stream_telescope import (
     StreamRelease,
@@ -64,7 +64,7 @@ class DoabRelease(StreamRelease):
         """
         logging.info(f"Downloading csv from url: {DoabTelescope.CSV_URL}")
         headers = {"User-Agent": f"{get_user_agent(package_name='oaebu_workflows')}"}
-        response = retry_session().get(DoabTelescope.CSV_URL, headers=headers)
+        response = retry_get_url(DoabTelescope.CSV_URL, headers=headers)
         if response.status_code == 200:
             with open(self.csv_path, "w") as f:
                 f.write(response.content.decode("utf-8"))

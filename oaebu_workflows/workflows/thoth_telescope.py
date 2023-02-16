@@ -29,7 +29,7 @@ from observatory.platform.utils.airflow_utils import AirflowVars
 from oaebu_workflows.config import schema_folder as default_schema_folder
 from oaebu_workflows.workflows.onix_telescope import parse_onix
 from observatory.platform.utils.config_utils import find_schema
-from observatory.platform.utils.url_utils import retry_session
+from observatory.platform.utils.url_utils import retry_get_url
 from observatory.platform.utils.file_utils import list_files
 from observatory.platform.utils.gc_utils import upload_files_to_cloud_storage
 from observatory.platform.utils.workflow_utils import (
@@ -287,7 +287,7 @@ def thoth_download_onix(
     """
     url = THOTH_URL.format(host_name=host_name, format_specification=format_spec, publisher_id=publisher_id)
     logging.info(f"Downloading ONIX XML from {url}")
-    response = retry_session(num_retries=num_retries).get(url)
+    response = retry_get_url(url, num_retries=num_retries)
     if response.status_code != 200:
         raise AirflowException(
             f"Request for URL {url} was unsuccessful with code: {response.status_code}\nContent response: {response.content.decode('utf-8')}"

@@ -20,15 +20,15 @@ import shutil
 from datetime import timedelta
 from functools import partial, update_wrapper
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 import json
-from urllib3.exceptions import MaxRetryError
 import re
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import pendulum
 from airflow.exceptions import AirflowException
 from google.cloud.bigquery import SourceFormat, Client
+from tenacity.wait import wait_exponential_jitter
 
 from oaebu_workflows.config import schema_folder as default_schema_folder
 from oaebu_workflows.config import sql_folder
@@ -40,7 +40,7 @@ from oaebu_workflows.workflows.onix_work_aggregation import (
 )
 from observatory.platform.utils.dag_run_sensor import DagRunSensor
 from observatory.platform.utils.file_utils import list_to_jsonl_gz
-from observatory.platform.utils.url_utils import get_user_agent, retry_session
+from observatory.platform.utils.url_utils import get_user_agent, retry_get_url
 from observatory.platform.utils.gc_utils import (
     bigquery_sharded_table_id,
     create_bigquery_dataset,
@@ -335,7 +335,7 @@ class OnixWorkflow(Workflow):
         data_partners: List[OaebuPartner] = None,
         workflow_id: int = None,
         mailto: str = "agent@observatory.academy",
-        max_threads: int = os.cpu_count(),
+        max_threads: int = 2 * os.cpu_count() - 1,
     ):
         """Initialises the workflow object.
         :param org_name: Organisation name.
@@ -1856,7 +1856,8 @@ def isbns_from_onix(project_id: str, onix_dataset_id: str, onix_table_id: str) -
 
     :param project_id: The GCP project containing the relevant Onix dataset
     :param onix_dataset_id: The GCP dataset containing the relevant Onix table
-    :param onix_talbe_id: The GCP Onix table name
+    :param onix_table_id: The GCP Onix table name
+    :return: The list of ISBNs from the specified table
     """
     sql = f"""
     SELECT
@@ -1877,7 +1878,8 @@ def dois_from_onix(project_id: str, onix_dataset_id: str, onix_table_id: str) ->
 
     :param project_id: The GCP project containing the relevant Onix dataset
     :param onix_dataset_id: The GCP dataset containing the relevant Onix table
-    :param onix_talbe_id: The GCP Onix table name
+    :param onix_tabke_id: The GCP Onix table name
+    :return: The list of DOIs from the specified table
     """
     sql = f"""
     SELECT
@@ -1897,6 +1899,7 @@ def download_crossref_metadata(isbns: List[str], max_threads: int = 1) -> List[d
 
     :param isbns: The list of ISBNs to grab metadata for
     :param max_threads: The maximum number of threads to split the download tasks into
+    :return: The deduplicated list of DOIs
     """
     dois = []
     print(f"Beginning crossref metadata download from {len(isbns)} ISBNs with {max_threads} workers")
@@ -1921,7 +1924,7 @@ def download_crossref_metadata(isbns: List[str], max_threads: int = 1) -> List[d
     return deduped_dois
 
 
-def download_crossref_isbn_metadata(url: str, i: int = 0):
+def download_crossref_isbn_metadata(url: str, i: int = 0) -> List[dict]:
     """
     Downloads all crossref metadata from a url, iterating through pages if there is more than one
     The metadata API will return the same cursor for each unique request, but the cursor will point to a new page each
@@ -1929,6 +1932,7 @@ def download_crossref_isbn_metadata(url: str, i: int = 0):
 
     :param url: The url send the request to
     :param i: Worker number
+    :return: The metadata for this ISBN
     """
     metadata = []
     headers = {"User-Agent": get_user_agent(package_name="oaebu_workflows")}
@@ -1945,7 +1949,7 @@ def download_crossref_isbn_metadata(url: str, i: int = 0):
     return metadata
 
 
-def download_crossref_page_metadata(url: str, headers: dict, i: int = 0):
+def download_crossref_page_metadata(url: str, headers: dict, i: int = 0) -> Tuple[str, List[dict]]:
     """
     Sends a request to a url and extends the result to the input list.
     On rare occassions, we get back a dictionary in a different format. There's a retry loop for this case.
@@ -1953,13 +1957,10 @@ def download_crossref_page_metadata(url: str, headers: dict, i: int = 0):
     :param url: The url to send the request to
     :headers: Headers to attach to the request
     :i: The process number
+    :return: The cursor for the next page (if it exists) and the metadata from the URL
     """
     print(f"{i+1}: Retrieving ISBN data from: {url}")
-    try:
-        response = retry_session(num_retries=5, backoff_factor=0.8).get(url, headers=headers)
-    except MaxRetryError:
-        raise ConnectionError(f"{i+1}: Error downloading file from {url}, status_code={response.status_code}")
-    # Check if authorisation with the api token was successful or not, raise error if not successful
+    response = retry_get_url(url, num_retries=5, headers=headers)
     response_json = json.loads(response.content.decode("utf-8"))
     isbn_metadata = response_json["message"]["items"]
     next_cursor = response_json["message"]["next-cursor"]
@@ -1970,7 +1971,8 @@ def transform_crossref_metadata(metadata: List[dict], max_threads: int = 1) -> L
     """
     Spawns workers to transform crossref metadata
 
-    :param all_events: A list of crossref metadata items to transform
+    :param metadata: A list of crossref metadata items to transform
+    :param max_threads: The maxiumum number of threads to utilise for the transforming process
     :return: transformed metadata, the order of the items in the input list is not preserved
     """
     print(f"Beginning crossref metadata transform with {max_threads} workers")
@@ -1989,9 +1991,9 @@ def transform_metadata_item(item: dict) -> dict:
     """
     Transform a single Crossref Metadata JSON dictionary
 
-    :param item: a JSON dictionary.
+    :param item: A single crossref metadata item.
+    :return: The transformed metadata item
     """
-
     if isinstance(item, dict):
         new = {}
         for k, v in item.items():
@@ -2020,6 +2022,7 @@ def dois_from_crossref_metadata(project_id: str, dataset_id: str, metadata_table
     :param project_id: The GCP project ID
     :param dataset_id: The GCP dataset ID
     :param metadata_table_id: The ID of the metadata table on GCP
+    :return: All DOIs present in the metadata table
     """
     sql = f"SELECT DISTINCT(DOI) FROM `{project_id}.{dataset_id}.{metadata_table_id}`"
     query_results = run_bigquery_query(sql)
@@ -2038,15 +2041,23 @@ def download_crossref_events(
     Spawns multiple threads to download event data (DOI and publisher only) for each doi supplied.
     The url template was made with reference to the crossref event api:
     https://www.eventdata.crossref.org/guide/service/query-api/
+    Note that the max_threads will cap at 15 because the events API will return a 429 if more than 15 requests are made
+    per second. Each API request happens to take roughly 1 second. Having more threadsthan necessary slows down the
+    download process as the retry script will wait a minimum of two seconds between each attempt.
 
-    :param release: The onix workflow release object
     :param dois: The list of DOIs to download the events for
+    :param start_date: The start date for events we're interested in
+    :param end_date: The end date for events we're interested in
+    :param mailto: The email to use as a reference for who is requesting the data
+    :param max_threads: The maximum threads to spawn for the downloads.
+    :return: All events for the input DOIs
     """
     event_url_template = CROSSREF_EVENT_URL_TEMPLATE
     edited_event_url_template = CROSSREF_EDITED_EVENT_URL_TEMPLATE
     deleted_event_url_template = CROSSREF_DELETED_EVENT_URL_TEMPLATE
     url_start_date = start_date.strftime("%Y-%m-%d")
     url_end_date = end_date.strftime("%Y-%m-%d")
+    max_threads = min(max_threads, 15)
 
     event_urls = [
         event_url_template.format(doi=doi, mailto=mailto, start_date=url_start_date, end_date=url_end_date)
@@ -2062,33 +2073,28 @@ def download_crossref_events(
     ]
     urls = event_urls + edited_urls + deleted_urls
 
-    all_events = []
     print(f"Beginning crossref event data download from {len(urls)} URLs with {max_threads} workers")
     print(
         f"Downloading DOI data using URL: {event_url_template.format(doi='***', mailto=mailto, start_date=url_start_date, end_date=url_end_date)}"
     )
+    all_events = []
     with ThreadPoolExecutor(max_workers=max_threads) as executor:
         futures = []
         for i, url in enumerate(urls):
-            futures.append(
-                executor.submit(
-                    download_crossref_event_url,
-                    url,
-                    i=i,
-                )
-            )
+            futures.append(executor.submit(download_crossref_event_url, url, i=i))
         for future in as_completed(futures):
             all_events.extend(future.result())
 
     return all_events
 
 
-def download_crossref_event_url(url: str, i: int = 0):
+def download_crossref_event_url(url: str, i: int = 0) -> List[dict]:
     """
     Downloads all crossref events from a url, iterating through pages if there is more than one
 
     :param url: The url send the request to
     :param i: Worker number
+    :return: The events from this URL
     """
     events = []
     headers = {"User-Agent": get_user_agent(package_name="oaebu_workflows")}
@@ -2105,18 +2111,15 @@ def download_crossref_event_url(url: str, i: int = 0):
     return events
 
 
-def download_crossref_page_events(url: str, headers: dict) -> tuple:
+def download_crossref_page_events(url: str, headers: dict) -> Tuple[str, int, int, List[dict]]:
     """
     Download crossref events from a single page
 
     :param url: The url to send the request to
     :param headers: Headers to send with the request
-    :return: The cursor, event counter, total numebr of events, the events
+    :return: The cursor, event counter, total numebr of events and the events for the URL
     """
-    try:
-        response = retry_session(num_retries=5, backoff_factor=0.8).get(url, headers=headers)
-    except MaxRetryError:
-        raise ConnectionError(f"Error requesting url: {url}, response: {response.text}")
+    response = retry_get_url(url, num_retries=5, wait=wait_exponential_jitter(initial=0.5, max=60), headers=headers)
     response_json = response.json()
     total_events = response_json["message"]["total-results"]
     events = response_json["message"]["events"]
@@ -2131,6 +2134,7 @@ def transform_crossref_events(events: List[dict], max_threads: int = 1) -> List[
     Spawns workers to transforms crossref events
 
     :param all_events: A list of the events to transform
+    :param max_threads: The maximum number of threads to utilise for the transforming process
     :return: transformed events, the order of the events in the input list is not preserved
     """
     print(f"Beginning crossref event transform with {max_threads} workers")
@@ -2177,7 +2181,7 @@ def transform_event(event: dict) -> dict:
 
 def create_latest_views_from_dataset(
     project_id: str, from_dataset: str, to_dataset: str, date_match: str, data_location: str
-):
+) -> None:
     """Creates views from all sharded tables from a dataset with a matching a date string.
 
     :param project_id: The project id

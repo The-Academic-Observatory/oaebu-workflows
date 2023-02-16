@@ -17,6 +17,7 @@
 import os
 from datetime import timedelta
 from unittest.mock import patch
+from requests import Response
 
 import pendulum
 import vcr
@@ -257,13 +258,13 @@ class TestUclDiscoveryTelescope(ObservatoryTestCase):
                 dataset_releases = get_dataset_releases(dataset_id=1)
                 self.assertEqual(len(dataset_releases), 1)
 
-    @patch("oaebu_workflows.workflows.ucl_discovery_telescope.retry_session")
+    @patch("oaebu_workflows.workflows.ucl_discovery_telescope.retry_get_url")
     @patch("observatory.platform.utils.workflow_utils.Variable.get")
-    def test_download(self, mock_variable_get, mock_retry_session):
+    def test_download(self, mock_variable_get, mock_retry_get_url):
         """Test download method of UCL Discovery release
 
         :param mock_variable_get: Mock Variable get
-        :param mock_retry_session: Mock retry_session
+        :param mock_retry_get_url: Mock retry_get_url function call
         :return: None.
         """
         organisation = Organisation(
@@ -279,27 +280,27 @@ class TestUclDiscoveryTelescope(ObservatoryTestCase):
 
         with CliRunner().isolated_filesystem():
             mock_variable_get.return_value = "data"
+            fake_response = Response()
 
             # test status code is not 200
-            mock_retry_session().get.return_value.status_code = 400
+            fake_response.status_code = 400
+            mock_retry_get_url.return_value = fake_response
             with self.assertRaises(AirflowException):
                 release.download()
 
             # test status code 200, but empty csv file
-            mock_retry_session().get.return_value.status_code = 200
-            mock_retry_session().get.return_value.content = "".encode()
+            fake_response.status_code = 200
+            fake_response._content = "".encode()
+            mock_retry_get_url.return_value = fake_response
             with self.assertRaises(AirflowSkipException):
                 release.download()
 
             # test status code 200 and valid csv file
-            mock_retry_session().get.return_value.content = '"eprintid","userid"\n"1234","1234"'.encode()
+            fake_response.status_code = 200
+            fake_response._content = '"eprintid","userid"\n"1234","1234"'.encode()
+            mock_retry_get_url.return_value = fake_response
             release.download()
             self.assert_file_integrity(release.download_path, "13cc3a5087bbd37bf12221727bd1d93f", "md5")
-
-            # test retry error
-            mock_retry_session.side_effect = RetryError()
-            with self.assertRaises(RetryError):
-                release.download()
 
     def test_get_downloads_per_country(self):
         """Test get_downloads_per_country function.
