@@ -65,12 +65,9 @@ class DoabRelease(StreamRelease):
         logging.info(f"Downloading csv from url: {DoabTelescope.CSV_URL}")
         headers = {"User-Agent": f"{get_user_agent(package_name='oaebu_workflows')}"}
         response = retry_get_url(DoabTelescope.CSV_URL, headers=headers)
-        if response.status_code == 200:
-            with open(self.csv_path, "w") as f:
-                f.write(response.content.decode("utf-8"))
-            logging.info(f"Downloaded csv successful to {self.csv_path}")
-        else:
-            raise AirflowException(f"Download csv unsuccessful, {response.text}")
+        with open(self.csv_path, "w") as f:
+            f.write(response.content.decode("utf-8"))
+        logging.info(f"Downloaded csv successful to {self.csv_path}")
 
         with open(self.csv_path, "r") as f:
             csv_dict = [row for row in csv.DictReader(f)]
