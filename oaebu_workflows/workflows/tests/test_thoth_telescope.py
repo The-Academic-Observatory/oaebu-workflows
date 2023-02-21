@@ -50,13 +50,13 @@ from observatory.platform.utils.airflow_utils import AirflowConns
 from observatory.platform.utils.file_utils import load_jsonl
 from observatory.platform.utils.gc_utils import bigquery_sharded_table_id
 from observatory.platform.utils.release_utils import get_dataset_releases
+from observatory.platform.utils.url_utils import retry_get_url
 from observatory.platform.utils.test_utils import (
     ObservatoryEnvironment,
     ObservatoryTestCase,
     module_file_path,
     find_free_port,
 )
-from observatory.platform.utils.url_utils import retry_session
 
 FAKE_ORG_NAME = "fake_org_name"
 FAKE_PUBLISHER_ID = "fake_publisher_id"
@@ -325,9 +325,9 @@ class TestThothTelescope(ObservatoryTestCase):
 
     def test_thoth_api(self):
         """Tests that HTTP requests to the thoth API are successful"""
-        base_response = retry_session(num_retries=2).get(DEFAULT_HOST_NAME)
-        format_response = retry_session(num_retries=2).get(
-            f"{DEFAULT_HOST_NAME}/specifications/{DEFAULT_FORMAT_SPECIFICATION}"
+        base_response = retry_get_url(DEFAULT_HOST_NAME, num_retries=2)
+        format_response = retry_get_url(
+            f"{DEFAULT_HOST_NAME}/specifications/{DEFAULT_FORMAT_SPECIFICATION}", num_retries=2
         )
         self.assertEqual(base_response.status_code, 200)
         self.assertEqual(format_response.status_code, 200)

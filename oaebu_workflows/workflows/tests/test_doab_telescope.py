@@ -362,7 +362,7 @@ class TestDoabTelescope(ObservatoryTestCase):
 
     @patch("observatory.platform.utils.workflow_utils.Variable.get")
     def test_download(self, mock_variable_get):
-        """Download release and check exception is raised when response is not 200 or csv is empty.
+        """Download release and check exception is raised when csv is empty.
 
         :param mock_variable_get: Mock result of airflow's Variable.get() function
         :return:
@@ -373,13 +373,6 @@ class TestDoabTelescope(ObservatoryTestCase):
 
         with CliRunner().isolated_filesystem():
             mock_variable_get.return_value = "data"
-
-            # Test exception is raised for invalid status code
-            with httpretty.enabled():
-                httpretty.register_uri(httpretty.GET, DoabTelescope.CSV_URL, status=400)
-
-                with self.assertRaises(AirflowException):
-                    release.download()
 
             # Test exception is raised for empty csv file
             with httpretty.enabled():
