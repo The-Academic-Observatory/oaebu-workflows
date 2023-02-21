@@ -28,7 +28,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import pendulum
 from airflow.exceptions import AirflowException
 from google.cloud.bigquery import SourceFormat, Client
-from tenacity.wait import wait_exponential_jitter
+from ratelimit import limits, sleep_and_retry
+from tenacity import wait_exponential_jitter
 
 from oaebu_workflows.config import schema_folder as default_schema_folder
 from oaebu_workflows.config import sql_folder
@@ -2117,8 +2118,9 @@ def download_crossref_page_events(url: str, headers: dict) -> Tuple[str, int, in
 
     :param url: The url to send the request to
     :param headers: Headers to send with the request
-    :return: The cursor, event counter, total numebr of events and the events for the URL
+    :return: The cursor, event counter, total number of events and the events for the URL
     """
+    crossref_events_limiter()
     response = retry_get_url(url, num_retries=5, wait=wait_exponential_jitter(initial=0.5, max=60), headers=headers)
     response_json = response.json()
     total_events = response_json["message"]["total-results"]
@@ -2127,6 +2129,13 @@ def download_crossref_page_events(url: str, headers: dict) -> Tuple[str, int, in
     counter = len(events)
 
     return next_cursor, counter, total_events, events
+
+
+@sleep_and_retry
+@limits(calls=15, period=1)
+def crossref_events_limiter():
+    """ "Task to throttle the calls to the crossref events API"""
+    return
 
 
 def transform_crossref_events(events: List[dict], max_threads: int = 1) -> List[dict]:
