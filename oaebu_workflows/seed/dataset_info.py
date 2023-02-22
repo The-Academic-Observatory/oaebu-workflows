@@ -348,6 +348,14 @@ def get_dataset_info(api: ObservatoryApi):
         workflow=workflows["UoMP ONIX Workflow"],
         dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.onix_workflow),
     )
+    name = "OBP ONIX Workflow Dataset"
+    dataset_info[name] = Dataset(
+        name=name,
+        service="google",
+        address="oaebu-obp.oaebu.book_product",
+        workflow=workflows["OBP ONIX Workflow"],
+        dataset_type=get_dataset_type(api=api, type_id=DatasetTypeId.onix_workflow),
+    )
     name = "CEU Press ONIX Workflow Dataset"
     dataset_info[name] = Dataset(
         name=name,
