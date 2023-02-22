@@ -29,7 +29,7 @@ import pendulum
 from airflow.exceptions import AirflowException
 from google.cloud.bigquery import SourceFormat, Client
 from ratelimit import limits, sleep_and_retry
-from tenacity import wait_exponential_jitter
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from oaebu_workflows.config import schema_folder as default_schema_folder
 from oaebu_workflows.config import sql_folder
@@ -1958,6 +1958,11 @@ def download_crossref_isbn_metadata(url: str, fields: List[str] = METADATA_FIELD
     return metadata
 
 
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential_jitter(initial=5, max=300),
+    retry=retry_if_exception_type(KeyError),
+)
 def download_crossref_page_metadata(url: str, headers: dict, i: int = 0) -> Tuple[str, List[dict]]:
     """
     Sends a request to a url and extends the result to the input list.
