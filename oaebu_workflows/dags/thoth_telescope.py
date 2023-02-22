@@ -56,8 +56,6 @@ for workflow in workflows:
         source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
         catchup=False,
         format_specification="onix_3.0::oapen",
-        download_file_name="thoth_onix.xml",
-        transform_file_name="thoth_onix.jsonl",
         dataset_description=dataset_description,
     )
 
