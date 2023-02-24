@@ -39,6 +39,7 @@ from oaebu_workflows.workflows.onix_workflow import (
     OnixWorkflow,
     OnixWorkflowRelease,
     CROSSREF_METADATA_URL,
+    METADATA_FIELDS,
     CROSSREF_EVENT_URL_TEMPLATE,
     CROSSREF_DELETED_EVENT_URL_TEMPLATE,
     CROSSREF_EDITED_EVENT_URL_TEMPLATE,
@@ -1944,7 +1945,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
             test_fixtures_folder("onix_workflow", "crossref_download_function_test.yaml"), record_mode="none"
         ):
             metadata_url = CROSSREF_METADATA_URL.format(isbn=good_test_isbn)
-            metadata = download_crossref_isbn_metadata(metadata_url, i=0)
+            metadata = download_crossref_isbn_metadata(metadata_url, fields=['passed'], i=0)
             assert metadata == [{"passed": True}], f"Metadata return incorrect. Got {metadata}"
 
             events_start = pendulum.date(2020, 1, 1)

@@ -96,13 +96,8 @@ METADATA_FIELDS = [
     "clinical-trial-number",
     "alternative-id",
 ]
-CROSSREF_METADATA_URL = (
-    "https://api.crossref.org/works?filter=isbn:{isbn}"
-    # Return columns
-    f"&select={','.join(METADATA_FIELDS)}"
-    # Max row return
-    "&rows=1000"
-)
+
+CROSSREF_METADATA_URL = "https://api.crossref.org/works?filter=isbn:{isbn}&rows=1000"
 # The metadata url template was made with reference to the crossref metadata api:
 # https://api.crossref.org/swagger-ui/index.html#/Works/get_works
 
@@ -1920,7 +1915,7 @@ def download_crossref_metadata(isbns: List[str], max_threads: int = 1) -> List[d
         futures = []
         for i, isbn in enumerate(isbns):
             url = CROSSREF_METADATA_URL.format(isbn=isbn)
-            futures.append(executor.submit(download_crossref_isbn_metadata, url, i=i))
+            futures.append(executor.submit(download_crossref_isbn_metadata, url, fields=METADATA_FIELDS, i=i))
         for future in as_completed(futures):
             dois.extend(future.result())
 
@@ -1934,13 +1929,14 @@ def download_crossref_metadata(isbns: List[str], max_threads: int = 1) -> List[d
     return deduped_dois
 
 
-def download_crossref_isbn_metadata(url: str, i: int = 0) -> List[dict]:
+def download_crossref_isbn_metadata(url: str, fields: List[str] = METADATA_FIELDS, i: int = 0) -> List[dict]:
     """
     Downloads all crossref metadata from a url, iterating through pages if there is more than one
     The metadata API will return the same cursor for each unique request, but the cursor will point to a new page each
     time the request is made.
 
     :param url: The url send the request to
+    :param fields: The metadata fields to return
     :param i: Worker number
     :return: The metadata for this ISBN
     """
@@ -1955,6 +1951,9 @@ def download_crossref_isbn_metadata(url: str, i: int = 0) -> List[dict]:
             # Break out of the loop when new data stops being returned
             break
 
+    # Return only the desired fields
+    metadata = [{k: v for k, v in m.items() if k in fields} for m in metadata]
+    metadata = [m for m in metadata if m]  # remove empty dicts
     print(f"{i + 1}: {url} successful")
     return metadata
 
