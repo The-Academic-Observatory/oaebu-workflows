@@ -23,21 +23,20 @@ import pendulum
 from airflow.exceptions import AirflowException
 from airflow.models import Variable
 from google.cloud.bigquery import SourceFormat
-from airflow.secrets.environment_variables import EnvironmentVariablesBackend
 
-from observatory.platform.utils.airflow_utils import AirflowVars
+from observatory.platform.utils.airflow_utils import AirflowVars, make_workflow_folder
 from oaebu_workflows.config import schema_folder as default_schema_folder
 from oaebu_workflows.workflows.onix_telescope import parse_onix
 from observatory.platform.utils.config_utils import find_schema
 from observatory.platform.utils.url_utils import retry_get_url
-from observatory.platform.utils.file_utils import list_to_jsonl_gz, load_jsonl, list_files
+from observatory.platform.utils.file_utils import list_to_jsonl_gz, load_jsonl, list_files, blob_name_from_path
 from observatory.platform.utils.gc_utils import upload_files_to_cloud_storage
 from observatory.platform.utils.workflow_utils import (
     SubFolder,
     bq_load_shard,
     table_ids_from_path,
     make_release_date,
-    delete_old_xcoms,
+    cleanup,
 )
 from observatory.platform.workflows.workflow import Workflow, Release
 
@@ -336,65 +335,3 @@ def thoth_collapse_subjects(onix: List[dict]) -> List[dict]:
             del row["Subjects"][i]
 
     return onix
-
-
-def make_workflow_folder(dag_id: str, release_date: pendulum.DateTime, *subdirs: str) -> str:
-    """Return the path to this dag release's workflow folder. Will also create it if it doesn't exist
-
-    :param dag_id: The ID of the dag. This is used to find/create the workflow folder
-    :param release_date: The release date
-    :param subdirs: The folder path structure (if any) to create inside the workspace. e.g. 'download' or 'transform'
-    :return: the path of the workflow folder
-    """
-    release_string = release_date.format("YYYY_MM_DD")
-    path = os.path.join(get_data_path(), dag_id, f"{dag_id}_{release_string}", *subdirs)
-    os.makedirs(path, exist_ok=True)
-    return path
-
-
-# bucket_name/dag_name/dag_id/transform/file_name
-def blob_name_from_path(local_filepath: str) -> str:
-    """Creates a blob name from a local file path
-
-    :param local_filepath: The local filepath
-    :return: The name of the blob on cloud storage
-    """
-    # Get the workflow folder for this file and find where the data path starts
-    data_path = get_data_path()
-    if not local_filepath.startswith(data_path):
-        raise AirflowException("Provided local path does not begin with the DATA PATH variable")
-    blob = local_filepath[len(data_path) :]
-    blob = blob.strip(os.path.sep)  # Remove leading/trailing slashes
-    return blob
-
-
-def get_data_path() -> str:
-    """Grabs the DATA_PATH airflow vairable
-
-    :raises AirflowException: Raised if the variable does not exist
-    :return: DATA_PATH variable contents
-    """
-    # Try to get value from env variable first, saving costs from GC secret usage
-    data_path = EnvironmentVariablesBackend().get_variable(AirflowVars.DATA_PATH)
-    if not data_path:
-        data_path = Variable.get(AirflowVars.DATA_PATH)
-    if not data_path:
-        raise AirflowException("DATA_PATH variable could not be found.")
-    return data_path
-
-
-def cleanup(dag_id: str, execution_date: str, workflow_folder: str = None, retention_days=31) -> None:
-    """Delete all files, folders and XComs associated with this release.
-
-    :param dag_id: The ID of the DAG to remove XComs
-    :param execution_date: The execution date of the DAG run
-    :param workflow_folder: The top-level workflow folder to clean up
-    :param retention_days: How many days of Xcom messages to retain
-    """
-    if workflow_folder:
-        try:
-            shutil.rmtree(workflow_folder)
-        except FileNotFoundError as e:
-            logging.warning(f"No such file or directory {workflow_folder}: {e}")
-
-    delete_old_xcoms(dag_id=dag_id, execution_date=execution_date, retention_days=retention_days)
