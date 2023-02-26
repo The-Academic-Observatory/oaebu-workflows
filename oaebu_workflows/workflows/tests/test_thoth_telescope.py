@@ -21,10 +21,7 @@ import json
 
 import pendulum
 import vcr
-from airflow import DAG
-from airflow.exceptions import AirflowException
 from airflow.models import Connection
-from airflow.operators.python import PythonOperator
 from airflow.utils.state import State
 
 from oaebu_workflows.config import test_fixtures_folder
@@ -32,10 +29,7 @@ from oaebu_workflows.workflows.thoth_telescope import (
     ThothTelescope,
     thoth_download_onix,
     thoth_collapse_subjects,
-    make_workflow_folder,
     blob_name_from_path,
-    get_data_path,
-    cleanup,
     DEFAULT_FORMAT_SPECIFICATION,
     DEFAULT_HOST_NAME,
 )
@@ -95,7 +89,6 @@ class TestThothTelescope(ObservatoryTestCase):
         self.test_subjects_expected = os.path.join(test_fixtures_folder("thoth"), "test_subjects_expected.json")
 
     def setup_api(self):
-
         name = "Thoth Telescope"
         workflow_type = WorkflowType(name=name, type_id=ThothTelescope.DAG_ID_PREFIX)
         self.api.put_workflow_type(workflow_type)
@@ -271,47 +264,6 @@ class TestThothTelescope(ObservatoryTestCase):
                 self.assertEqual(len(dataset_releases), 1)
 
     # Function tests
-    @patch("oaebu_workflows.workflows.thoth_telescope.EnvironmentVariablesBackend.get_variable")
-    @patch("oaebu_workflows.workflows.thoth_telescope.Variable.get")
-    def test_get_data_path(self, mock_variable_get, mock_env_variable_get):
-        """Tests the function that retrieves the data_path airflow variable"""
-        # 1 - no variable available
-        mock_env_variable_get.return_value = None
-        mock_variable_get.return_value = None
-        self.assertRaises(AirflowException, get_data_path)
-        # 2 - available in environment backend
-        mock_env_variable_get.return_value = "env_return"
-        self.assertEqual("env_return", get_data_path())
-        # 3 - available in google secrets
-        mock_env_variable_get.return_value = None
-        mock_variable_get.return_value = "google_return"
-        self.assertEqual("google_return", get_data_path())
-        # 4 - available in environment and google secrets. We prefer the environment backend usage
-        mock_env_variable_get.return_value = "env_return"
-        self.assertEqual("env_return", get_data_path())
-
-    @patch("oaebu_workflows.workflows.thoth_telescope.EnvironmentVariablesBackend.get_variable")
-    def test_make_workflow_folder(self, mock_get_variable):
-        """Tests the make_workflow_folder function"""
-        with TemporaryDirectory() as tempdir:
-            mock_get_variable.return_value = tempdir
-            path = make_workflow_folder(
-                "test_dag", pendulum.datetime(year=1000, month=6, day=14), "sub_folder", "subsub_folder"
-            )
-            self.assertEqual(path, os.path.join(tempdir, f"test_dag/test_dag_1000_06_14/sub_folder/subsub_folder"))
-
-    @patch("oaebu_workflows.workflows.thoth_telescope.EnvironmentVariablesBackend.get_variable")
-    def test_blob_name_from_path(self, mock_get_variable):
-        """Tests the blob_name from_path function"""
-        with TemporaryDirectory() as tempdir:
-            mock_get_variable.return_value = tempdir
-            invalid_path = os.path.join("some", "fake", "invalid", "path", "file.txt")
-            valid_path_1 = os.path.join(tempdir, "some", "fake", "valid", "path", "file.txt")
-            valid_path_2 = os.path.join(valid_path_1, "")  # Trailing slash
-            self.assertRaises(AirflowException, blob_name_from_path, invalid_path)
-            self.assertEqual(blob_name_from_path(valid_path_1), "some/fake/valid/path/file.txt")
-            self.assertEqual(blob_name_from_path(valid_path_2), "some/fake/valid/path/file.txt")
-
     def test_download_onix(self):
         """
         Tests the download_onix function.
@@ -344,44 +296,3 @@ class TestThothTelescope(ObservatoryTestCase):
         )
         self.assertEqual(base_response.status_code, 200)
         self.assertEqual(format_response.status_code, 200)
-
-    def test_cleanup(self):
-        """
-        Tests the cleanup function.
-        Creates a task and pushes and Xcom. Also creates a fake workflow directory.
-        Both the Xcom and the directory should be deleted by the cleanup() function
-        """
-
-        def create_xcom(**kwargs):
-            ti = kwargs["ti"]
-            execution_date = kwargs["execution_date"]
-            ti.xcom_push("topic", {"release_date": execution_date.format("YYYYMMDD"), "something": "info"})
-
-        env = ObservatoryEnvironment(enable_api=False, enable_elastic=False)
-        with env.create():
-            execution_date = pendulum.datetime(2023, 1, 1)
-            with DAG(
-                dag_id="test_dag",
-                schedule_interval="@daily",
-                default_args={"owner": "airflow", "start_date": execution_date},
-                catchup=True,
-            ) as dag:
-                kwargs = {"task_id": "create_xcom"}
-                op = PythonOperator(python_callable=create_xcom, **kwargs)
-
-            with TemporaryDirectory() as workflow_dir:
-                # Create some files in the workflow folder
-                subdir = os.path.join(workflow_dir, "test_directory")
-                os.mkdir(subdir)
-
-                # DAG Run
-                with env.create_dag_run(dag=dag, execution_date=execution_date):
-                    ti = env.run_task("create_xcom")
-                    self.assertEqual("success", ti.state)
-                    msgs = ti.xcom_pull(key="topic", task_ids="create_xcom", include_prior_dates=True)
-                    self.assertIsInstance(msgs, dict)
-                    cleanup("test_dag", execution_date, workflow_folder=workflow_dir, retention_days=0)
-                    msgs = ti.xcom_pull(key="topic", task_ids="create_xcom", include_prior_dates=True)
-                    self.assertEqual(msgs, None)
-                    self.assertEqual(os.path.isdir(subdir), False)
-                    self.assertEqual(os.path.isdir(workflow_dir), False)
