@@ -33,9 +33,13 @@ from tenacity import retry, stop_after_attempt, wait_chain, wait_fixed, retry_if
 
 from oaebu_workflows.api_type_ids import DatasetTypeId
 from oaebu_workflows.config import schema_folder as default_schema_folder
+from oaebu_workflows.workflows.onix_telescope import parse_onix
 from observatory.platform.utils.airflow_utils import AirflowConns, AirflowVars
 from observatory.platform.utils.url_utils import get_user_agent
-from observatory.platform.utils.workflow_utils import make_sftp_connection, make_release_date
+from observatory.platform.utils.file_utils import list_to_jsonl_gz, load_jsonl, blob_name_from_path, list_files
+from observatory.platform.utils.workflow_utils import make_release_date, table_ids_from_path, bq_load_shard
+from observatory.platform.utils.config_utils import find_schema
+from observatory.platform.utils.gc_utils import upload_files_to_cloud_storage
 from observatory.platform.workflows.snapshot_telescope import SnapshotTelescope, SnapshotRelease
 from oaebu_workflows.dag_tag import Tag
 
@@ -59,8 +63,8 @@ class OapenMetadataRelease(SnapshotRelease):
 
     @property
     def transform_path(self) -> str:
-        """Path to store the transformed oapen ONIX file"""
-        return os.path.join(self.transform_folder, f"oapen_onix_{self.release_date.format('YYYYMMDD')}.xml")
+        """Path to store the fully transformed oapen ONIX jsonl file"""
+        return os.path.join(self.transform_folder, f"oapen_onix_{self.release_date.format('YYYYMMDD')}.jsonl")
 
     @property
     def invalid_products_path(self) -> str:
@@ -80,6 +84,10 @@ class OapenMetadataTelescope(SnapshotTelescope):
     def __init__(
         self,
         workflow_id: int,
+        data_location: str,
+        project_id: str,
+        download_bucket: str,
+        transform_bucket: str,
         dag_id: str = DAG_ID,
         start_date: pendulum.DateTime = pendulum.datetime(2018, 5, 14),
         schedule_interval: str = "@weekly",
@@ -88,11 +96,14 @@ class OapenMetadataTelescope(SnapshotTelescope):
         airflow_vars: List = None,
         airflow_conns: List = None,
         dataset_type_id: str = DatasetTypeId.oapen_metadata,
-        sftp_upload_dir: str = SFTP_UPLOAD_DIR,
     ):
         """Construct a OapenMetadataTelescope instance.
 
         :param workflow_id: api workflow id.
+        :param data_location: the location for the BigQuery dataset.
+        :param project_id: The google cloud project ID
+        :param download_bucket: The google download bucket
+        :param transform_bucket: The google transform bucket
         :param dag_id: the id of the DAG.
         :param start_date: the start date of the DAG.
         :param schedule_interval: the schedule interval of the DAG.
@@ -128,7 +139,10 @@ class OapenMetadataTelescope(SnapshotTelescope):
             tags=[Tag.oaebu],
         )
 
-        self.sftp_upload_dir = sftp_upload_dir
+        self.data_location = data_location
+        self.project_id = project_id
+        self.download_bucket = download_bucket
+        self.transform_bucket = transform_bucket
         self.onix_product_fields_file = os.path.join(self.schema_folder, "OAPEN_ONIX_product_fields.json")
         self.onix_header_fields_file = os.path.join(self.schema_folder, "OAPEN_ONIX_header_fields.json")
 
@@ -137,7 +151,7 @@ class OapenMetadataTelescope(SnapshotTelescope):
         self.add_task(self.upload_downloaded)
         self.add_task(self.transform)
         self.add_task(self.upload_transformed)
-        self.add_task(self.upload_to_sftp_server)
+        self.add_task(self.bq_load)
         self.add_task(self.cleanup)
 
     def make_release(self, **kwargs) -> OapenMetadataRelease:
@@ -159,10 +173,23 @@ class OapenMetadataTelescope(SnapshotTelescope):
 
         :param release: an OapenMetadataRelease instance.
         """
-        super().upload_downloaded([release], **kwargs)
+        download_files = list_files(release.download_folder)
+        if len(download_files) != 1:
+            raise AirflowException(
+                f"Unexpected number of files in download folder. Expected 1, found {len(download_files)}"
+            )
+
+        blob = blob_name_from_path(download_files[0])
+        success = upload_files_to_cloud_storage(self.download_bucket, [blob], download_files)
+        if not success:
+            raise AirflowException("Blob could not be uploaded to cloud storage")
 
     def transform(self, release: OapenMetadataRelease, **kwargs):
         """Transform the oapen metadata XML file into a valid ONIX file
+        This involves several steps
+        1) Parse the XML metadata to keep our desired fields and remove invalid products
+        2) Parse the validated ONIX file through the java parser to return .jsonl format
+        3) Update the contributor.personname field
 
         :param release: an OapenMetadataRelease instance.
         """
@@ -170,39 +197,62 @@ class OapenMetadataTelescope(SnapshotTelescope):
             onix_product_fields = json.load(f)
         with open(self.onix_header_fields_file) as f:
             onix_header_fields = json.load(f)
-        with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            validated_onix = os.path.join(tmp_dir, "onix.xml")
             oapen_metadata_parse(
                 release.download_path,
-                tmp_file.name,
+                validated_onix,
                 onix_product_fields=onix_product_fields,
                 onix_header_fields=onix_header_fields,
             )
-            remove_invalid_products(
-                tmp_file.name, release.transform_path, invalid_products_file=release.invalid_products_path
-            )
-        # Assert that the new onix file is valid
-        errors = validate_onix(release.transform_path)
-        if errors:
-            raise AirflowException("Errors found in processed OAPEN ONIX file. Cannot proceed without valid ONIX.")
+            remove_invalid_products(validated_onix, validated_onix, invalid_products_file=release.invalid_products_path)
+            # Assert that the new onix file is valid
+            if validate_onix(validated_onix):
+                raise AirflowException("Errors found in processed OAPEN ONIX file. Cannot proceed without valid ONIX.")
+            # Parse the onix file through the Java parser
+            parse_onix(tmp_dir, release.transform_folder)
+
+        # Add the Contributors.PersonName field
+        onix = create_personname_field(load_jsonl(os.path.join(release.transform_folder, "full.jsonl")))
+        list_to_jsonl_gz(release.transform_path, onix)
 
     def upload_transformed(self, release: OapenMetadataRelease, **kwargs):
         """Task to upload the transformed OAPEN metadata
 
         :param release: an OapenMetadataRelease instance
         """
-        super().upload_transformed([release], **kwargs)
+        transform_files = list_files(release.transform_folder)
+        if len(transform_files) != 5:
+            raise AirflowException(
+                f"Unexpected number of files in download folder. Expected 5, found {len(transform_files)}"
+            )
+        blobs = []
+        for file in transform_files:
+            blobs.append(blob_name_from_path(file))
+        success = upload_files_to_cloud_storage(self.transform_bucket, blobs, transform_files)
+        if not success:
+            raise AirflowException("Blob could not be uploaded to cloud storage")
 
-    def upload_to_sftp_server(self, release: OapenMetadataRelease, **kwargs):
-        """Uploads the transformed ONIX file to the SFTP server
+    def bq_load(self, release: OapenMetadataRelease, **kwargs):
+        """Load the transformed ONIX file into bigquery
 
-        :param release: an OapenMetadataRelease instance.
+        :param release: an OapenMetadataRelease instance
         """
-        upload_path = os.path.join(self.sftp_upload_dir, os.path.basename(release.transform_path))
-        logging.info(f"Uploading file '{release.transform_path}' to SFTP server path '{upload_path}'")
-        with make_sftp_connection() as sftp_con:
-            if not sftp_con.exists(self.sftp_upload_dir):
-                raise AirflowException(f"SFTP server directory: {self.sftp_upload_dir} does not exist")
-            sftp_con.put(release.transform_path, upload_path)
+        transform_blob = blob_name_from_path(release.transform_path)
+        table_id, _ = table_ids_from_path(release.transform_path)
+        schema_file_path = find_schema(path=self.schema_folder, table_name="onix")
+        bq_load_shard(
+            schema_file_path=schema_file_path,
+            project_id=self.project_id,
+            transform_bucket=release.transform_bucket,
+            transform_blob=transform_blob,
+            dataset_id=self.dataset_id,
+            data_location=self.data_location,
+            table_id=table_id,
+            release_date=release.release_date,
+            source_format=self.source_format,
+            dataset_description=self.dataset_description,
+        )
 
     def cleanup(self, release: OapenMetadataRelease, **kwargs):
         """Deletes downloaded and transformed release files.
@@ -413,3 +463,21 @@ def process_xml_element(xml_elem: ElementTree.Element, viable_fields: dict, xml_
             if e.tag.endswith(field_key):
                 child = ElementTree.SubElement(xml_parent, field_key)
                 process_xml_element(e, viable_fields[field_key], child)
+
+
+def create_personname_field(onix: List[dict]) -> List[dict]:
+    """Given an ONIX feed, attempts to populate the Contributors.PersonName field by concatenating the
+    Contributors.NamesBeforeKey and Contributors.KeyNames fields where possible
+
+    :param onix: The input onix feed
+    :return: The onix feed with the PersonName field populated where possible
+    """
+
+    def _can_make_personname(contributor: dict) -> bool:
+        return contributor.get("KeyNames") and contributor.get("NamesBeforeKey") and not contributor.get("PersonName")
+
+    for entry in [i for i in onix if i.get("Contributors")]:
+        for c in entry["Contributors"]:
+            if _can_make_personname(c) and not c.get("PersonName"):
+                c["PersonName"] = f"{c['NamesBeforeKey']} {c['KeyNames']}"
+    return onix
