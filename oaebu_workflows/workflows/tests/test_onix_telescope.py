@@ -17,13 +17,14 @@
 import os
 import shutil
 from tempfile import TemporaryDirectory
+import json
 
 import pendulum
 from airflow.models import Connection
 from airflow.utils.state import State
 
 from oaebu_workflows.config import test_fixtures_folder
-from oaebu_workflows.workflows.onix_telescope import OnixTelescope, parse_onix
+from oaebu_workflows.workflows.onix_telescope import OnixTelescope, parse_onix, onix_collapse_subjects
 from observatory.api.client import ApiClient, Configuration
 from observatory.api.client.api.observatory_api import ObservatoryApi  # noqa: E501
 from observatory.api.client.model.dataset import Dataset
@@ -304,8 +305,7 @@ class TestOnixTelescope(ObservatoryTestCase):
                     self.assertEqual(ti.state, State.SUCCESS)
 
                     transform_file_path = os.path.join(transform_folder, "onix.jsonl")
-                    expected_file_hash = "84d46e2942df615f18d270e18e0ebb26"
-                    self.assert_file_integrity(transform_file_path, expected_file_hash, "md5")
+                    self.assert_file_integrity(transform_file_path, "5656547cee6a3a24ff22280ae69cd351", "md5")
 
                     # Test upload to cloud storage
                     ti = env.run_task(telescope.upload_transformed.__name__)
@@ -356,3 +356,16 @@ class TestOnixTelescope(ObservatoryTestCase):
             output_file = os.path.join(output_dir, "full.jsonl")
             self.assertTrue(os.path.exists(output_file))
             self.assert_file_integrity(output_file, "84d46e2942df615f18d270e18e0ebb26", "md5")
+
+    def test_onix_collapse_subjects(self):
+        """Tests the thoth_collapse_subjects function"""
+        test_subjects_input = os.path.join(test_fixtures_folder("onix"), "test_subjects_input.json")
+        test_subjects_expected = os.path.join(test_fixtures_folder("onix"), "test_subjects_expected.json")
+        with open(test_subjects_input, "r") as f:
+            onix = json.load(f)
+        actual_onix = onix_collapse_subjects(onix)
+        with open(test_subjects_expected, "r") as f:
+            expected_onix = json.load(f)
+
+        self.assertEqual(len(actual_onix), len(expected_onix))
+        self.assertEqual(json.dumps(actual_onix, sort_keys=True), json.dumps(expected_onix, sort_keys=True))

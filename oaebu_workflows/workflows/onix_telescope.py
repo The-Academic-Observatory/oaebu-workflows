@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Author: James Diprose
+# Author: James Diprose, Keegan Smith
 
 import logging
 import os
 import re
-import shutil
+import json
 import subprocess
 from datetime import timedelta
 from typing import Dict, List, Optional
@@ -31,6 +31,7 @@ from oaebu_workflows.config import schema_folder as default_schema_folder
 from oaebu_workflows.dag_tag import Tag
 from observatory.platform.utils.airflow_utils import AirflowConns, AirflowVars
 from observatory.platform.utils.config_utils import observatory_home, find_schema
+from observatory.platform.utils.file_utils import load_jsonl
 from observatory.platform.utils.dag_run_sensor import DagRunSensor
 from observatory.platform.utils.http_download import download_file
 from observatory.platform.utils.proc_utils import wait_for_process
@@ -131,15 +132,12 @@ class OnixRelease(SnapshotRelease):
 
         :return: None.
         """
-
-        # Transform release
         parse_onix(self.download_folder, self.transform_folder)
-
-        # Rename file to onix.jsonl
-        shutil.move(
-            os.path.join(self.transform_folder, "full.jsonl"),
-            os.path.join(self.transform_folder, self.TRANSFORM_FILES_REGEX),
-        )
+        onix = onix_collapse_subjects(load_jsonl(os.path.join(self.transform_folder, "full.jsonl")))
+        with open(os.path.join(self.transform_folder, self.TRANSFORM_FILES_REGEX), "w") as f:
+            for line in onix:
+                json.dump(line, f)
+                f.write("\n")
 
     def move_files_to_finished(self):
         """Move ONIX file to finished folder
@@ -442,3 +440,44 @@ def parse_onix(input_dir: str, output_dir: str):
 
     if p.returncode != 0:
         raise AirflowException(f"bash command failed `{cmd}`: {stderr}")
+
+
+def onix_collapse_subjects(onix: List[dict]) -> List[dict]:
+    """The book product table creation requires the keywords (under Subjects.SubjectHeadingText) to occur only once
+    Some ONIX feeds return all keywords as separate entires. This function finds and collapses each keyword into a
+    semi-colon separated string. Other common separators will be replaced with semi-colons.
+
+    :param onix: The onix feed
+    :return: The onix feed after collapsing the keywords of each row
+    """
+    for row in onix:
+        # Create the joined keywords in this row
+        keywords = []
+        for subject in row["Subjects"]:
+            if subject["SubjectSchemeIdentifier"] != "Keywords":
+                continue
+            subject_heading_text = [i for i in subject["SubjectHeadingText"] if i is not None]  # Remove Nones
+            if not subject_heading_text:  # Empty list
+                continue
+            keywords.append("; ".join(subject_heading_text))
+        # Enforce a split by semicolon
+        keywords = "; ".join(keywords)
+        keywords = keywords.replace(",", ";")
+        keywords = keywords.replace(":", ";")
+
+        # Replace one of the subrows with the new keywords string
+        keywords_replaced = False
+        remove_indexes = []
+        for i, subject in enumerate(row["Subjects"]):
+            if subject["SubjectSchemeIdentifier"] == "Keywords":
+                if not keywords_replaced:
+                    subject["SubjectHeadingText"] = [keywords]
+                    keywords_replaced = True
+                else:
+                    remove_indexes.append(i)
+
+        # Remove additional "keywords" subrows
+        for i in sorted(remove_indexes, reverse=True):
+            del row["Subjects"][i]
+
+    return onix
