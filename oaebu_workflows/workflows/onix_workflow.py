@@ -26,7 +26,8 @@ import re
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import pendulum
-from airflow.exceptions import AirflowException
+from airflow.exceptions import AirflowException, PoolNotFound
+from airflow.api.common.experimental.pool import create_pool, get_pool
 from google.cloud.bigquery import SourceFormat, Client
 from ratelimit import limits, sleep_and_retry
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
@@ -395,6 +396,22 @@ class OnixWorkflow(Workflow):
             tags=[Tag.oaebu],
         )
 
+        # Create pools for crossref API calls if they don't exist
+        # Pools are necessary to throttle the maxiumum number of requests we can make per second and avoid 429 errors
+        # and potentially being locked out of the servers
+        crossref_metadata_pool = "crossref_metadata_pool"
+        metadata_pool_max = 25
+        crossref_events_pool = "crossref_events_pool"
+        events_pool_max = 15
+        try:
+            get_pool(crossref_metadata_pool)
+        except PoolNotFound:
+            create_pool(crossref_metadata_pool, metadata_pool_max, "Crossref Metadata API Pool")
+        try:
+            get_pool(crossref_events_pool)
+        except PoolNotFound:
+            create_pool(crossref_events_pool, events_pool_max, "Crossref Events API Pool")
+
         # Wait for data partner workflows to finish
         partner_data_dag_prefix_ids = list(set([partner.dag_id_prefix for partner in data_partners]))
         partner_data_dag_prefix_ids.sort()  # Sort so that order is deterministic
@@ -422,8 +439,16 @@ class OnixWorkflow(Workflow):
         self.add_task(self.bq_load_workfamilyid_lookup)
 
         # Create crossref metadata and event tables
-        self.add_task(self.create_oaebu_crossref_metadata_table)
-        self.add_task(self.create_oaebu_crossref_events_table)
+        self.add_task(
+            self.create_oaebu_crossref_metadata_table,
+            pool=crossref_metadata_pool,
+            pool_slots=min(self.max_threads, metadata_pool_max),
+        )
+        self.add_task(
+            self.create_oaebu_crossref_events_table,
+            pool=crossref_events_pool,
+            pool_slots=min(self.max_threads, events_pool_max),
+        )
 
         # Create book table
         self.add_task(self.create_oaebu_book_table)
