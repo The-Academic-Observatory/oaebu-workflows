@@ -474,7 +474,7 @@ class OnixWorkflow(Workflow):
         onix_release_dates = select_table_shard_dates(
             project_id=self.gcp_project_id,
             dataset_id=self.onix_dataset_id,
-            table_id=self.onix_table_id,
+            table_name=self.onix_table_id,
             end_date=release_date,
         )
 
