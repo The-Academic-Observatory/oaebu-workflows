@@ -213,7 +213,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         configuration = Configuration(host=f"http://{self.host}:{self.port}")
         api_client = ApiClient(configuration)
         self.api = ObservatoryApi(api_client=api_client)  # noqa: E501
-        self.env = ObservatoryApiEnvironment(host=self.host, port=self.port)
+        self.env = ObservatoryEnvironment(self.project_id, self.data_location, api_host=self.host, api_port=self.port)
 
         # Onix data partner to pass to the telescope for initialisation
         self.fake_onix_data_partner = OaebuPartner(
@@ -1945,7 +1945,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
             test_fixtures_folder("onix_workflow", "crossref_download_function_test.yaml"), record_mode="none"
         ):
             metadata_url = CROSSREF_METADATA_URL.format(isbn=good_test_isbn)
-            metadata = download_crossref_isbn_metadata(metadata_url, fields=['passed'], i=0)
+            metadata = download_crossref_isbn_metadata(metadata_url, fields=["passed"], i=0)
             assert metadata == [{"passed": True}], f"Metadata return incorrect. Got {metadata}"
 
             events_start = pendulum.date(2020, 1, 1)
