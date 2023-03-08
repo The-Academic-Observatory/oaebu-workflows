@@ -9,7 +9,7 @@ See the [OAPEN Metadata webpage](https://www.oapen.org/resources/15635975-metada
 +------------------------------+------------+
 | Summary                      |            |
 +==============================+============+
-| Average runtime              |  5min      |
+| Average runtime              |  10min     |
 +------------------------------+------------+
 | Average download size        |  150-200MB |
 +------------------------------+------------+
@@ -17,7 +17,7 @@ See the [OAPEN Metadata webpage](https://www.oapen.org/resources/15635975-metada
 +------------------------------+------------+
 | Harvest Frequency            | Weekly     |
 +------------------------------+------------+
-| Runs on remote worker        | True       |
+| Runs on remote worker        | False      |
 +------------------------------+------------+
 | Catchup missed runs          | False      |
 +------------------------------+------------+
@@ -35,13 +35,7 @@ See the [OAPEN Metadata webpage](https://www.oapen.org/resources/15635975-metada
 
 ### Airflow Connections
 
-The OAPEN metadata is freely accessible, so no credentials are required for it. However, the telescope will upload the XML to the SFTP server once finished processing.
-
-The (url-encoded) ssh username, password and host key to connect to the SFTP server:
-
-```bash
-sftp_service: ssh://user-name:password@host-name:port?host_key=host-key
-```
+The OAPEN metadata is freely accessible, so no credentials are required for it.
 
 ## Schedule
 
@@ -49,7 +43,7 @@ The XML file containing metadata is updated daily at +0000GMT. This telescope is
 
 ## Results
 
-There are no resulting tables from this telescope. Its purpose is to transfrom the OAPEN Metadata into a valid ONIX file. This can then be picked up and loaded by the [ONIX Telescope](onix.md).
+The resulting ONIX table will be stored in BigQuery - `oaebu-oapen.onix.onixYYYYMMDD`
 
 ## Tasks
 
@@ -81,6 +75,6 @@ The transform step modifies the downloaded metadata into a valid ONIX format. Th
    :header-rows: 1
 ```
 
-### Upload to SFTP Server
+### Load to BigQuery
 
-After checking that the metadata is now in a valid ONIX format, the ONIX XML is uploaded to the SFTP server. This can then be picked up by the [ONIX telescope](onix.md) and integrated into the proceeding workflows as normal.
+The valid ONIX feed can now be loaded from the transform bucket into a BigQuery sharded table.
