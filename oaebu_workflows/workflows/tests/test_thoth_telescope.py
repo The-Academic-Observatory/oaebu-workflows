@@ -17,7 +17,6 @@
 import os
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
-import json
 
 import pendulum
 import vcr
@@ -28,7 +27,6 @@ from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.workflows.thoth_telescope import (
     ThothTelescope,
     thoth_download_onix,
-    thoth_collapse_subjects,
     blob_name_from_path,
     DEFAULT_FORMAT_SPECIFICATION,
     DEFAULT_HOST_NAME,
@@ -85,8 +83,6 @@ class TestThothTelescope(ObservatoryTestCase):
         # Fixtures
         self.download_cassette = os.path.join(test_fixtures_folder("thoth"), "thoth_download_cassette.yaml")
         self.test_table = os.path.join(test_fixtures_folder("thoth"), "test_table.jsonl")
-        self.test_subjects_input = os.path.join(test_fixtures_folder("thoth"), "test_subjects_input.json")
-        self.test_subjects_expected = os.path.join(test_fixtures_folder("thoth"), "test_subjects_expected.json")
 
     def setup_api(self):
         name = "Thoth Telescope"
@@ -276,17 +272,6 @@ class TestThothTelescope(ObservatoryTestCase):
             self.assert_file_integrity(
                 os.path.join(tempdir, "fake_download.xml"), "78b8c27c9c63fb0f2d721b7d856f4e3c", "md5"
             )
-
-    def test_thoth_collapse_subjects(self):
-        """Tests the thoth_collapse_subjects function"""
-        with open(self.test_subjects_input, "r") as f:
-            onix = json.load(f)
-        actual_onix = thoth_collapse_subjects(onix)
-        with open(self.test_subjects_expected, "r") as f:
-            expected_onix = json.load(f)
-
-        assert len(actual_onix) == len(expected_onix)
-        assert json.dumps(actual_onix, sort_keys=True) == json.dumps(expected_onix, sort_keys=True)
 
     def test_thoth_api(self):
         """Tests that HTTP requests to the thoth API are successful"""

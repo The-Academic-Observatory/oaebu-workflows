@@ -21,12 +21,11 @@ import logging
 
 import pendulum
 from airflow.exceptions import AirflowException
-from airflow.models import Variable
 from google.cloud.bigquery import SourceFormat
 
 from observatory.platform.utils.airflow_utils import AirflowVars, make_workflow_folder
 from oaebu_workflows.config import schema_folder as default_schema_folder
-from oaebu_workflows.workflows.onix_telescope import parse_onix
+from oaebu_workflows.workflows.onix_telescope import parse_onix, onix_collapse_subjects
 from observatory.platform.utils.config_utils import find_schema
 from observatory.platform.utils.url_utils import retry_get_url
 from observatory.platform.utils.file_utils import list_to_jsonl_gz, load_jsonl, list_files, blob_name_from_path
@@ -215,7 +214,7 @@ class ThothTelescope(Workflow):
 
         # Collapse the keywords field and save
         logging.info("Transforming onix feed - collapsing keywords")
-        transformed = thoth_collapse_subjects(load_jsonl(os.path.join(self.transform_folder, "full.jsonl")))
+        transformed = onix_collapse_subjects(load_jsonl(os.path.join(self.transform_folder, "full.jsonl")))
         list_to_jsonl_gz(os.path.join(self.transform_folder, self.transform_file_name), transformed)
 
     def upload_transformed(self, release: ThothRelease, **kwargs) -> None:
@@ -297,41 +296,3 @@ def thoth_download_onix(
     download_path = os.path.join(download_folder, download_filename)
     with open(download_path, "wb") as f:
         f.write(response.content)
-
-
-def thoth_collapse_subjects(onix: List[dict]) -> List[dict]:
-    """The book product table creation requires the keywords (under Subjects.SubjectHeadingText) to occur only once
-    Thoth returns all keywords as separate entires. This function finds and collapses each keyword into a semi-colon
-    separated string.
-
-    :param onix: The onix feed
-    :return: The onix feed after collapsing the keywords of each row
-    """
-    for row in onix:
-        # Create the joined keywords in this row
-        keywords = []
-        for subject in row["Subjects"]:
-            if subject["SubjectSchemeIdentifier"] != "Keywords":
-                continue
-            subject_heading_text = [i for i in subject["SubjectHeadingText"] if i is not None]  # Remove Nones
-            if not subject_heading_text:  # Empty list
-                continue
-            keywords.append("; ".join(subject_heading_text))
-        keywords = "; ".join(keywords)
-
-        # Replace one of the subrows with the new keywords string
-        keywords_replaced = False
-        remove_indexes = []
-        for i, subject in enumerate(row["Subjects"]):
-            if subject["SubjectSchemeIdentifier"] == "Keywords":
-                if not keywords_replaced:
-                    subject["SubjectHeadingText"] = [keywords]
-                    keywords_replaced = True
-                else:
-                    remove_indexes.append(i)
-
-        # Remove additional "keywords" subrows
-        for i in sorted(remove_indexes, reverse=True):
-            del row["Subjects"][i]
-
-    return onix
