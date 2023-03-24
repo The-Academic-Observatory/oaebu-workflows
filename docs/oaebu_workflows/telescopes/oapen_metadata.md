@@ -58,22 +58,8 @@ Note that if the metadata file is part-way through an update (occurring daily at
 
 The transform step modifies the downloaded metadata into a valid ONIX format. This is done in two steps:
 
-1. The XML is loaded and all unnecessary fields are removed. The fields deemed necessary are described by the header and product schema files below
+1. The XML is loaded and all unnecessary fields are removed. The fields deemed necessary are described by the header and a supplied product schema (.json file)
 2. The resulting XML is parsed through the Python [onixcheck](https://pypi.org/project/onixcheck/). This reveals any remaining invalid products. These products are removed from the file. The removed products are saved to a separate file and uploaded to the transform bucket for storage.
-
-```eval_rst
-.. csv-table::
-   :file: ../../schemas/OAPEN_ONIX_header_fields_latest.csv
-   :width: 100%
-   :header-rows: 1
-```
-
-```eval_rst
-.. csv-table::
-   :file: ../../schemas/OAPEN_ONIX_product_fields_latest.csv
-   :width: 100%
-   :header-rows: 1
-```
 
 ### Load to BigQuery
 

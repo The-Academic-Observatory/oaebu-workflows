@@ -11,4 +11,5 @@ output data to other places. Workflows are built on top of Apache Airflow's DAGs
     oapen_metadata
     oapen_irus_uk
     onix
+    thoth
     ucl_discovery
