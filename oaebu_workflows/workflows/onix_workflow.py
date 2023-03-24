@@ -417,10 +417,11 @@ class OnixWorkflow(Workflow):
         partner_data_dag_prefix_ids.sort()  # Sort so that order is deterministic
         # Assert that there is an onix dataset for this workflow
         if not DatasetTypeId.onix in [partner.dataset_type_id for partner in data_partners]:
-            raise AirflowException(f"No ONIX task is configured for this workflow. {data_partners}")
+            raise AirflowException(f"No ONIX task is configured for this workflow: {self.dag_id}")
         with self.parallel_tasks():
             for dag_prefix in partner_data_dag_prefix_ids:
-                ext_dag_id = make_dag_id(dag_prefix, org_name)
+                # oapen metadata is a special case, making its own onix feed
+                ext_dag_id = make_dag_id(dag_prefix, org_name) if dag_prefix != "oapen_metadata" else "oapen_metadata"
                 sensor = DagRunSensor(
                     task_id=f"{ext_dag_id}_sensor",
                     external_dag_id=ext_dag_id,

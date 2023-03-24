@@ -34,6 +34,7 @@ from oaebu_workflows.workflows.oapen_metadata_telescope import (
     remove_invalid_products,
     find_onix_product,
     process_xml_element,
+    create_personname_field,
 )
 from observatory.platform.utils.airflow_utils import AirflowVars
 from observatory.platform.utils.test_utils import (
@@ -43,7 +44,7 @@ from observatory.platform.utils.test_utils import (
     module_file_path,
     find_free_port,
 )
-from observatory.platform.utils.workflow_utils import blob_name
+from observatory.platform.utils.file_utils import blob_name_from_path, list_files, gzip_file_crc, get_file_hash
 from observatory.api.testing import ObservatoryApiEnvironment
 from observatory.api.client import ApiClient, Configuration
 from observatory.api.client.api.observatory_api import ObservatoryApi  # noqa: E501
@@ -159,15 +160,21 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
 
     def test_dag_structure(self):
         """Test that the Oapen Metadata DAG has the correct structure"""
-        dag = OapenMetadataTelescope(workflow_id=1).make_dag()
+        dag = OapenMetadataTelescope(
+            data_location="us",
+            workflow_id=1,
+            project_id="test-project",
+            download_bucket="download_bucket",
+            transform_bucket="transform_bucket",
+        ).make_dag()
         self.assert_dag_structure(
             {
                 "check_dependencies": ["download"],
                 "download": ["upload_downloaded"],
                 "upload_downloaded": ["transform"],
                 "transform": ["upload_transformed"],
-                "upload_transformed": ["upload_to_sftp_server"],
-                "upload_to_sftp_server": ["cleanup"],
+                "upload_transformed": ["bq_load"],
+                "bq_load": ["cleanup"],
                 "cleanup": [],
             },
             dag,
@@ -189,7 +196,13 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
         upload_dir_name = "upload"
         env = ObservatoryEnvironment(self.project_id, self.data_location, api_host=self.host, api_port=self.api_port)
         self.dataset_id = env.add_dataset()
-        wf = OapenMetadataTelescope(dataset_id=self.dataset_id, workflow_id=1, sftp_upload_dir=upload_dir_name)
+        wf = OapenMetadataTelescope(
+            data_location=self.data_location,
+            workflow_id=1,
+            project_id=self.project_id,
+            download_bucket=env.download_bucket,
+            transform_bucket=env.transform_bucket,
+        )
         dag = wf.make_dag()
 
         with env.create():
@@ -221,41 +234,39 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
                     # Upload transform task
                     env.run_task(wf.upload_transformed.__name__)
 
-                    # Upload to sftp server task
-                    env.run_task(wf.upload_to_sftp_server.__name__)
+                    # Bigquery load task
+                    env.run_task(wf.bq_load.__name__)
 
                     # Test that these functions have worked as intended
-
                     # Test download task
                     self.assertEqual(1, len(os.listdir(os.path.dirname(release.download_path))))
                     self.assert_file_integrity(release.download_path, "6df963cd448fe3ec8acb76bf49b34928", "md5")
 
                     # Test that download file uploaded to BQ
                     self.assert_blob_integrity(
-                        env.download_bucket, blob_name(release.download_path), release.download_path
+                        env.download_bucket, blob_name_from_path(release.download_path), release.download_path
                     )
 
                     # Test transform task
-                    self.assertEqual(2, len(os.listdir(os.path.dirname(release.transform_path))))
-                    self.assert_file_integrity(
-                        release.transform_path, "181b9eefb66a00acb9066456e73dee82", "md5"
-                    )  # The transformed XML file
-                    self.assert_file_integrity(
-                        release.invalid_products_path, "297173aa0a09aa1dc538eadfc48285c5", "md5"
-                    )  # Invalid products file
+                    self.assertEqual(5, len(os.listdir(os.path.dirname(release.transform_path))))
+                    actual_file_hashes = []
+                    for t_file in list_files(release.transform_folder):
+                        if t_file == release.transform_path:
+                            actual_file_hashes.append(gzip_file_crc(t_file))
+                        else:
+                            actual_file_hashes.append(get_file_hash(file_path=t_file))
+                    expected_file_hashes = [
+                        "297173aa0a09aa1dc538eadfc48285c5",  # oapen_onix_invalid_products_20210206.xml
+                        "d41d8cd98f00b204e9800998ecf8427e",  # update.jsonl - empty
+                        "ecf04d998a7110d80d2eab47d058cfac",  # full.jsonl
+                        "d41d8cd98f00b204e9800998ecf8427e",  # delete.jsonl - empty
+                        "e3474ca2",  # oapen_onix_20210206.jsonl (gzipped jsonl)
+                    ]
+                    self.assertEqual(sorted(actual_file_hashes), sorted(expected_file_hashes))
 
                     # Test that transformed files uploaded to BQ
-                    self.assert_blob_integrity(
-                        env.transform_bucket, blob_name(release.transform_path), release.transform_path
-                    )
-                    self.assert_blob_integrity(
-                        env.transform_bucket, blob_name(release.invalid_products_path), release.invalid_products_path
-                    )
-
-                    # Test that the transformed XML file was uploaded to SFTP server
-                    self.assertEqual(1, len(os.listdir(sftp_dir_local_path)))
-                    sftp_filepath = os.path.join(sftp_dir_local_path, os.path.basename(release.transform_path))
-                    self.assert_file_integrity(sftp_filepath, "181b9eefb66a00acb9066456e73dee82", "md5")
+                    for t_file in list_files(release.transform_folder):
+                        self.assert_blob_integrity(env.transform_bucket, blob_name_from_path(t_file), t_file)
 
                     # Test that all data deleted
                     download_folder, extract_folder, transform_folder = (
@@ -269,7 +280,13 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
     def test_airflow_vars(self):
         """Cover case when airflow_vars is given."""
 
-        wf = OapenMetadataTelescope(workflow_id=1)
+        wf = wf = OapenMetadataTelescope(
+            data_location="us",
+            workflow_id=1,
+            project_id="test-project",
+            download_bucket="download_bucket",
+            transform_bucket="transform_bucket",
+        )
         self.assertEqual(
             set(wf.airflow_vars),
             {
@@ -314,9 +331,16 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
 
     def test_oapen_metadata_parse(self):
         """Tests the function used to parse the relevant fields into an onix file"""
-        with open(OapenMetadataTelescope(workflow_id=1).onix_product_fields_file) as f:
+        wf = OapenMetadataTelescope(
+            data_location="us",
+            workflow_id=1,
+            project_id="test-project",
+            download_bucket="download_bucket",
+            transform_bucket="transform_bucket",
+        )
+        with open(wf.onix_product_fields_file) as f:
             onix_product_fields = json.load(f)
-        with open(OapenMetadataTelescope(workflow_id=1).onix_header_fields_file) as f:
+        with open(wf.onix_header_fields_file) as f:
             onix_header_fields = json.load(f)
         parsed_file = NamedTemporaryFile(delete=False)
 
@@ -423,3 +447,24 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
         assert (
             expected_xml == test_xml
         ), f"Processed XML is not equal to expected XML. Expected {expected_xml}, got {test_xml}"
+
+    def test_create_personname_field(self):
+        """Tests the function that creates the personname field"""
+        input_onix = [
+            {"Contributors": [{"PersonName": "John Doe", "KeyNames": None, "NamesBeforeKey": None}]},
+            {"Contributors": [{"PersonName": None, "KeyNames": "Doe", "NamesBeforeKey": "John"}]},
+            {"Contributors": [{"PersonName": None, "KeyNames": "Doe", "NamesBeforeKey": None}]},
+            {"Contributors": [{"PersonName": None, "KeyNames": None, "NamesBeforeKey": None}]},
+            {"empty": "empty"},
+        ]
+        expected_out = [
+            {"Contributors": [{"PersonName": "John Doe", "KeyNames": None, "NamesBeforeKey": None}]},
+            {"Contributors": [{"PersonName": "John Doe", "KeyNames": "Doe", "NamesBeforeKey": "John"}]},
+            {"Contributors": [{"PersonName": None, "KeyNames": "Doe", "NamesBeforeKey": None}]},
+            {"Contributors": [{"PersonName": None, "KeyNames": None, "NamesBeforeKey": None}]},
+            {"empty": "empty"},
+        ]
+        output_onix = create_personname_field(input_onix)
+        self.assertEqual(len(output_onix), len(expected_out))
+        for actual, expected in zip(output_onix, expected_out):
+            self.assertDictEqual(actual, expected)

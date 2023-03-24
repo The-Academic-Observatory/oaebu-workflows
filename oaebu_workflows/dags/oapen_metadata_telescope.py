@@ -26,5 +26,16 @@ api = make_observatory_api()
 workflow_type = api.get_workflow_type(type_id=WorkflowTypes.oapen_metadata)
 workflows = api.get_workflows(workflow_type_id=workflow_type.id, limit=1)
 if len(workflows):
-    workflow = OapenMetadataTelescope(workflow_id=workflows[0].id, dag_id=OapenMetadataTelescope.DAG_ID)
+    organisation = workflows[0].organisation
+    project_id = organisation.project_id
+    download_bucket = organisation.download_bucket
+    transform_bucket = organisation.transform_bucket
+    workflow = OapenMetadataTelescope(
+        workflow_id=workflows[0].id,
+        dag_id=OapenMetadataTelescope.DAG_ID,
+        download_bucket=download_bucket,
+        transform_bucket=transform_bucket,
+        data_location="us",
+        project_id=project_id,
+    )
     globals()[workflow.dag_id] = workflow.make_dag()
