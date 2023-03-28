@@ -265,7 +265,7 @@ class OapenMetadataTelescope(SnapshotTelescope):
 @retry(
     stop=stop_after_attempt(5),
     wait=DOWNLOAD_RETRY_CHAIN,
-    retry=retry_if_exception_type((ElementTree.ParseError, ConnectionError)),
+    retry=retry_if_exception_type((ElementTree.ParseError, ConnectionError, AirflowException)),
     reraise=True,
 )
 def download_oapen_metadata(download_path: str, metadata_url: str = OapenMetadataTelescope.METADATA_URL) -> None:
@@ -273,7 +273,8 @@ def download_oapen_metadata(download_path: str, metadata_url: str = OapenMetadat
     OAPEN's downloader can give an incomplete file if the metadata is partially generated.
     In this scenario, we should wait until the metadata generator has finished.
     Otherwise, an attempt to parse the data will result in an XML ParseError.
-    OAPEN metadata generation can take over an hour,
+    Another scenario is that OAPEN returns only a header in the XML. We want this to also raise an error.
+    OAPEN metadata generation can take over an hour
 
     :param download_path: filepath to store te downloaded file
     :param metadata_url: the url to query for the metadata
@@ -292,6 +293,10 @@ def download_oapen_metadata(download_path: str, metadata_url: str = OapenMetadat
     # Attempt to parse the XML, will raise an ElementTree.ParseError exception if it's invalid
     ElementTree.parse(download_path)
     logging.info("XML file is valid")
+
+    # Check that more than just the header is returned
+    if "<Product>" not in response.content.decode("utf-8"):
+        raise AirflowException("No products found in metadata")
 
 
 def oapen_metadata_parse(input_xml: str, output_xml: str, onix_product_fields: dict, onix_header_fields: dict) -> None:
