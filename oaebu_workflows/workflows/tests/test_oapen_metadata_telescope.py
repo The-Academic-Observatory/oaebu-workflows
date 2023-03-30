@@ -92,6 +92,9 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
         self.invalid_download_cassette = test_fixtures_folder("oapen_metadata", "oapen_metadata_cassette_invalid.yaml")
         self.bad_response_cassette = test_fixtures_folder("oapen_metadata", "oapen_metadata_cassette_bad_response.yaml")
         self.empty_download_cassette = test_fixtures_folder("oapen_metadata", "oapen_metadata_cassette_empty.yaml")
+        self.header_only_download_cassette = test_fixtures_folder(
+            "oapen_metadata", "oapen_metadata_cassette_header_only.yaml"
+        )
 
         # XML files for testing
         self.valid_download_xml = test_fixtures_folder("oapen_metadata", "oapen_metadata_download_valid.xml")
@@ -324,6 +327,12 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
         # For empty XML
         with vcr.VCR().use_cassette(self.empty_download_cassette, record_mode="none", allow_playback_repeats=True):
             self.assertRaises(ElementTree.ParseError, download_oapen_metadata, download_file.name)
+
+        # For only-header XML
+        with vcr.VCR().use_cassette(
+            self.header_only_download_cassette, record_mode="none", allow_playback_repeats=True
+        ):
+            self.assertRaises(AirflowException, download_oapen_metadata, download_file.name)
 
         # For non-200 response code
         with vcr.VCR().use_cassette(self.bad_response_cassette, record_mode="none", allow_playback_repeats=True):
