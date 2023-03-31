@@ -38,6 +38,7 @@ class DatasetTypeId:
     jstor_institution = "jstor_institution"
     oapen_irus_uk = "oapen_irus_uk"
     ucl_discovery = "ucl_discovery"
+    fulcrum = "fulcrum"
 
     # Workflow dataset types, i.e., dataset types for datasets created by various non Telescope workflows.
     onix_workflow = "onix_workflow"
@@ -56,6 +57,7 @@ class WorkflowTypeId:
     jstor = "jstor"
     oapen_irus_uk = "oapen_irus_uk"
     ucl_discovery = "ucl_discovery"
+    fulcrum = "fulcrum"
 
     # Workflow dataset types, i.e., dataset types for datasets created by various non Telescope workflows.
     onix_workflow = "onix_workflow"

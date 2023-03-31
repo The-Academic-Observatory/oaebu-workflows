@@ -10,6 +10,7 @@ output data to other places. Workflows are built on top of Apache Airflow's DAGs
     jstor
     oapen_metadata
     oapen_irus_uk
+    fulcrum
     onix
     thoth
     ucl_discovery
