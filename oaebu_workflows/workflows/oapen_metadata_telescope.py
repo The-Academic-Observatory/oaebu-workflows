@@ -244,7 +244,7 @@ class OapenMetadataTelescope(SnapshotTelescope):
         bq_load_shard(
             schema_file_path=schema_file_path,
             project_id=self.project_id,
-            transform_bucket=release.transform_bucket,
+            transform_bucket=self.transform_bucket,
             transform_blob=transform_blob,
             dataset_id=self.dataset_id,
             data_location=self.data_location,
