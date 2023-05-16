@@ -23,12 +23,13 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 import json
 import re
+from datetime import datetime
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import pendulum
 from airflow.exceptions import AirflowException, PoolNotFound
 from airflow.api.common.experimental.pool import create_pool, get_pool
-from google.cloud.bigquery import SourceFormat, Client
+from google.cloud.bigquery import SourceFormat, Client, Row
 from ratelimit import limits, sleep_and_retry
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
@@ -67,54 +68,9 @@ from observatory.platform.utils.api import make_observatory_api
 from oaebu_workflows.seed.dataset_type_info import get_dataset_type_info
 from oaebu_workflows.dag_tag import Tag
 
-METADATA_FIELDS = [
-    "DOI",
-    "URL",
-    "type",
-    "title",
-    "abstract",
-    "issued",
-    "ISSN",
-    "ISBN",
-    "issn-type",
-    "publisher-location",
-    "publisher",
-    "member",
-    "prefix",
-    "container-title",
-    "short-container-title",
-    "group-title",
-    "references-count",
-    "is-referenced-by-count",
-    "subject",
-    "published-print",
-    "license",
-    "volume",
-    "funder",
-    "page",
-    "author",
-    "link",
-    "clinical-trial-number",
-    "alternative-id",
-]
-
-CROSSREF_METADATA_URL = "https://api.crossref.org/works?filter=isbn:{isbn}&rows=1000"
-# The metadata url template was made with reference to the crossref metadata api:
-# https://api.crossref.org/swagger-ui/index.html#/Works/get_works
-
 CROSSREF_EVENT_URL_TEMPLATE = (
     "https://api.eventdata.crossref.org/v1/events?mailto={mailto}"
     "&from-collected-date={start_date}&until-collected-date={end_date}&rows=1000"
-    "&obj-id={doi}"
-)
-CROSSREF_EDITED_EVENT_URL_TEMPLATE = (
-    "https://api.eventdata.crossref.org/v1/events/edited?mailto={mailto}"
-    "&from-updated-date={start_date}&until-updated-date={end_date}&rows=1000"
-    "&obj-id={doi}"
-)
-CROSSREF_DELETED_EVENT_URL_TEMPLATE = (
-    "https://api.eventdata.crossref.org/v1/events/deleted?mailto={mailto}"
-    "&from-updated-date={start_date}&until-updated-date={end_date}&rows=1000"
     "&obj-id={doi}"
 )
 
@@ -130,6 +86,7 @@ class OnixWorkflowRelease(AbstractRelease):
         dag_id: str,
         release_date: pendulum.DateTime,
         onix_release_date: pendulum.DateTime,
+        crossref_metadata_release_date: pendulum.DateTime,
         gcp_project_id: str,
         gcp_bucket_name: str,
         onix_dataset_id: str = "onix",
@@ -181,6 +138,7 @@ class OnixWorkflowRelease(AbstractRelease):
         self.dag_id = dag_id
         self.release_date = release_date
         self.onix_release_date = onix_release_date
+        self.crossref_metadata_release_date = crossref_metadata_release_date
 
         # Prepare filesystem
         self.worksid_table = worksid_table
@@ -320,9 +278,13 @@ class OnixWorkflow(Workflow):
         country_dataset_id: str = "oaebu_reference",
         onix_dataset_id: str = "onix",
         onix_table_id: str = "onix",
-        crossref_dataset_id: str = "crossref",
         subject_project_id: str = "oaebu-public-data",
         subject_dataset_id: str = "oaebu_reference",
+        crossref_project_id: str = "academic-observatory",
+        crossref_master_dataset_id: str = "crossref",
+        crossref_oaebu_dataset_id: str = "crossref",
+        crossref_metadata_table_id: str = "crossref_metadata",
+        crossref_events_table_id: str = "crossref_events",
         schema_folder: str = default_schema_folder(),
         dag_id: Optional[str] = None,
         start_date: Optional[pendulum.DateTime] = pendulum.datetime(2022, 8, 1),
@@ -371,6 +333,11 @@ class OnixWorkflow(Workflow):
         self.onix_table_id = onix_table_id
         self.subject_project_id = subject_project_id
         self.subject_dataset_id = subject_dataset_id
+        self.crossref_project_id = crossref_project_id
+        self.crossref_master_dataset_id = crossref_master_dataset_id
+        self.crossref_oaebu_dataset_id = crossref_oaebu_dataset_id
+        self.crossref_metadata_table_id = crossref_metadata_table_id
+        self.crossref_events_table_id = crossref_events_table_id
         self.schema_folder = schema_folder
         self.crossref_start_date = crossref_start_date
         self.mailto = mailto
@@ -384,7 +351,6 @@ class OnixWorkflow(Workflow):
         # Public Book Data
         self.country_project_id = country_project_id
         self.country_dataset_id = country_dataset_id
-        self.crossref_dataset_id = crossref_dataset_id
 
         # Initialise Telesecope base class
         super().__init__(
@@ -399,14 +365,8 @@ class OnixWorkflow(Workflow):
         # Create pools for crossref API calls if they don't exist
         # Pools are necessary to throttle the maxiumum number of requests we can make per second and avoid 429 errors
         # and potentially being locked out of the servers
-        crossref_metadata_pool = "crossref_metadata_pool"
-        metadata_pool_max = 25
         crossref_events_pool = "crossref_events_pool"
         events_pool_max = 15
-        try:
-            get_pool(crossref_metadata_pool)
-        except PoolNotFound:
-            create_pool(crossref_metadata_pool, metadata_pool_max, "Crossref Metadata API Pool")
         try:
             get_pool(crossref_events_pool)
         except PoolNotFound:
@@ -440,11 +400,7 @@ class OnixWorkflow(Workflow):
         self.add_task(self.bq_load_workfamilyid_lookup)
 
         # Create crossref metadata and event tables
-        self.add_task(
-            self.create_oaebu_crossref_metadata_table,
-            pool=crossref_metadata_pool,
-            pool_slots=min(self.max_threads, metadata_pool_max),
-        )
+        self.add_task(self.create_oaebu_crossref_metadata_table)
         self.add_task(
             self.create_oaebu_crossref_events_table,
             pool=crossref_events_pool,
@@ -506,9 +462,20 @@ class OnixWorkflow(Workflow):
 
         if not len(onix_release_dates):
             raise AirflowException("OnixWorkflow.make_release: no ONIX releases found")
-
         onix_release_date = onix_release_dates[0]
-        onix_release_date = pendulum.datetime(onix_release_date.year, onix_release_date.month, onix_release_date.day)
+
+        # Get Crossref Metadata release date
+        crossref_metadata_release_dates = select_table_shard_dates(
+            project_id=self.gcp_project_id,
+            dataset_id=self.crossref_master_dataset_id,
+            table_name=self.crossref_metadata_table_id,
+            end_date=release_date,
+        )
+
+        if not len(crossref_metadata_release_dates):
+            raise AirflowException("OnixWorkflow.make_release: no Crossref Metadata releases found")
+        crossref_metadata_release_date = crossref_metadata_release_dates[0]
+
         return OnixWorkflowRelease(
             dag_id=self.dag_id,
             release_date=release_date,
@@ -517,6 +484,7 @@ class OnixWorkflow(Workflow):
             onix_dataset_id=self.onix_dataset_id,
             onix_table_id=self.onix_table_id,
             onix_release_date=onix_release_date,
+            crossref_metadata_release_date=crossref_metadata_release_date,
         )
 
     def get_onix_records(self, project_id: str, dataset_id: str, table_id: str) -> List[dict]:
@@ -663,15 +631,27 @@ class OnixWorkflow(Workflow):
         sharded_onix_id = bigquery_sharded_table_id(self.onix_table_id, release.onix_release_date)
         isbns = isbns_from_onix(self.gcp_project_id, self.onix_dataset_id, sharded_onix_id)
 
-        # Download and tranfrom the metadata
-        metadata = download_crossref_metadata(isbns, max_threads=self.max_threads)
+        # Query the metadata table and filter for these isbns
+        sharded_metadata_id = bigquery_sharded_table_id(
+            self.crossref_metadata_table_id, release.crossref_metadata_release_date
+        )
+        template_path = os.path.join(sql_folder(), "crossref_metadata_filter_isbn.sql.jinja2")
+        sql = render_template(
+            template_path,
+            isbns=isbns,
+            project_id=self.crossref_project_id,
+            dataset_id=self.crossref_master_dataset_id,
+            crossref_metadata_table_id=sharded_metadata_id,
+        )
+        print("Retrieving metadata from master table")
+        metadata = run_bigquery_query(sql)
         metadata = transform_crossref_metadata(metadata, max_threads=self.max_threads)
 
         # Zip and upload to google cloud
         list_to_jsonl_gz(
             release.crossref_metadata_filename,
             metadata,
-        )  # Save metadata to gzipped jsonl file
+        )
         blob_name = os.path.join(
             release.transform_folder,
             os.path.basename(release.crossref_metadata_filename),
@@ -688,7 +668,7 @@ class OnixWorkflow(Workflow):
             project_id=release.project_id,
             transform_bucket=release.transform_bucket,
             transform_blob=blob_name,
-            dataset_id=self.crossref_dataset_id,
+            dataset_id=self.crossref_oaebu_dataset_id,
             data_location=release.data_location,
             table_id=release.crossref_metadata_table_id,
             release_date=release.release_date,
@@ -705,12 +685,16 @@ class OnixWorkflow(Workflow):
         """
         # Get the unique dois from the metadata table
         metadata_table_id = bigquery_sharded_table_id(release.crossref_metadata_table_id, release.release_date)
-        dois = dois_from_crossref_metadata(release.project_id, self.crossref_dataset_id, metadata_table_id)
+        dois = dois_from_crossref_metadata(release.project_id, self.crossref_oaebu_dataset_id, metadata_table_id)
 
         # Download and transform all events
-        start_date = self.crossref_start_date
-        end_date = release.release_date.subtract(days=1).date()
-        events = download_crossref_events(dois, start_date, end_date, self.mailto, max_threads=self.max_threads)
+        events = download_crossref_events(
+            dois,
+            start_date=self.crossref_start_date,
+            end_date=release.release_date,
+            mailto=self.mailto,
+            max_threads=self.max_threads,
+        )
         events = transform_crossref_events(events, max_threads=self.max_threads)
 
         # Zip and upload to google cloud
@@ -735,7 +719,7 @@ class OnixWorkflow(Workflow):
             project_id=release.project_id,
             transform_bucket=release.transform_bucket,
             transform_blob=blob_name,
-            dataset_id=self.crossref_dataset_id,
+            dataset_id=self.crossref_oaebu_dataset_id,
             data_location=release.data_location,
             table_id=release.crossref_events_table_id,
             release_date=release.release_date,
@@ -764,7 +748,7 @@ class OnixWorkflow(Workflow):
         sql = render_template(
             template_path,
             project_id=release.project_id,
-            crossref_dataset_id=self.crossref_dataset_id,
+            crossref_dataset_id=self.crossref_oaebu_dataset_id,
             crossref_events_table_id=crossref_events_table_id,
             crossref_metadata_table_id=crossref_metadata_table_id,
         )
@@ -1291,7 +1275,6 @@ class OnixWorkflow(Workflow):
             for data_partner in [
                 i for i in data_partners if i.dataset_type_id != self.dataset_type_info["onix"].type_id
             ]:
-
                 if (
                     data_partner.dataset_type_id == self.dataset_type_info["jstor_country"].type_id
                     or data_partner.dataset_type_id == self.dataset_type_info["jstor_institution"].type_id
@@ -1924,89 +1907,6 @@ def dois_from_onix(project_id: str, onix_dataset_id: str, onix_table_id: str) ->
     return dois
 
 
-def download_crossref_metadata(isbns: List[str], max_threads: int = 1) -> List[dict]:
-    """
-    Spawns multiple threads to download metadata (DOI and publisher only) for each isbn supplied.
-
-    :param isbns: The list of ISBNs to grab metadata for
-    :param max_threads: The maximum number of threads to split the download tasks into
-    :return: The deduplicated list of DOIs
-    """
-    dois = []
-    print(f"Beginning crossref metadata download from {len(isbns)} ISBNs with {max_threads} workers")
-    print(
-        "Downloading ISBN data using URL (with substitued ISBN values):" f"{CROSSREF_METADATA_URL.format(isbn='***')}"
-    )
-    with ThreadPoolExecutor(max_workers=max_threads) as executor:
-        futures = []
-        for i, isbn in enumerate(isbns):
-            url = CROSSREF_METADATA_URL.format(isbn=isbn)
-            futures.append(executor.submit(download_crossref_isbn_metadata, url, fields=METADATA_FIELDS, i=i))
-        for future in as_completed(futures):
-            dois.extend(future.result())
-
-    # The API will return x results for each DOI where x is the number of ISBNS associated with that DOI
-    # Effectively, if a DOI has 2 ISBNs, we will get 2 identical returns for that DOI
-    # Deduplicate the result:
-    deduped_dois = []
-    for i in range(len(dois)):
-        if dois[i] not in dois[i + 1 :]:
-            deduped_dois.append(dois[i])
-    return deduped_dois
-
-
-def download_crossref_isbn_metadata(url: str, fields: List[str] = METADATA_FIELDS, i: int = 0) -> List[dict]:
-    """
-    Downloads all crossref metadata from a url, iterating through pages if there is more than one
-    The metadata API will return the same cursor for each unique request, but the cursor will point to a new page each
-    time the request is made.
-
-    :param url: The url send the request to
-    :param fields: The metadata fields to return
-    :param i: Worker number
-    :return: The metadata for this ISBN
-    """
-    metadata = []
-    headers = {"User-Agent": get_user_agent(package_name="oaebu_workflows")}
-    cursor = "*"
-    while True:
-        tmp_url = url + f"&cursor={cursor}"
-        cursor, isbn_metadata = download_crossref_page_metadata(tmp_url, headers, i=i)
-        metadata.extend(isbn_metadata)
-        if not isbn_metadata:
-            # Break out of the loop when new data stops being returned
-            break
-
-    # Return only the desired fields
-    metadata = [{k: v for k, v in m.items() if k in fields} for m in metadata]
-    metadata = [m for m in metadata if m]  # remove empty dicts
-    print(f"{i + 1}: {url} successful")
-    return metadata
-
-
-@retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential_jitter(initial=5, max=300),
-    retry=retry_if_exception_type(KeyError),
-)
-def download_crossref_page_metadata(url: str, headers: dict, i: int = 0) -> Tuple[str, List[dict]]:
-    """
-    Sends a request to a url and extends the result to the input list.
-    On rare occassions, we get back a dictionary in a different format. There's a retry loop for this case.
-
-    :param url: The url to send the request to
-    :headers: Headers to attach to the request
-    :i: The process number
-    :return: The cursor for the next page (if it exists) and the metadata from the URL
-    """
-    print(f"{i+1}: Retrieving ISBN data from: {url}")
-    response = retry_get_url(url, num_retries=5, headers=headers)
-    response_json = json.loads(response.content.decode("utf-8"))
-    isbn_metadata = response_json["message"]["items"]
-    next_cursor = response_json["message"]["next-cursor"]
-    return next_cursor, isbn_metadata
-
-
 def transform_crossref_metadata(metadata: List[dict], max_threads: int = 1) -> List[dict]:
     """
     Spawns workers to transform crossref metadata
@@ -2020,7 +1920,7 @@ def transform_crossref_metadata(metadata: List[dict], max_threads: int = 1) -> L
     with ThreadPoolExecutor(max_workers=max_threads) as executor:
         futures = []
         for item in metadata:
-            futures.append(executor.submit(transform_metadata_item, item))
+            futures.append(executor.submit(transform_metadata_item, dict(item)))
         for future in as_completed(futures):
             transformed_metadata.append(future.result())
     print("Crossref metadata transform complete")
@@ -2039,13 +1939,11 @@ def transform_metadata_item(item: dict) -> dict:
         for k, v in item.items():
             # Replace hyphens with underscores for BigQuery compatibility
             k = k.replace("-", "_")
-
-            # Get inner array for date parts
-            if k == "date_parts":
-                v = v[0]
-                if None in v:
-                    # "date-parts" : [ [ null ] ]
-                    v = []
+            if k == "date_time":
+                try:
+                    v = v.strftime("%Y-%m-%dT%H:%M:%SZ")
+                except ValueError:
+                    v = ""
 
             new[k] = transform_metadata_item(v)
         return new
@@ -2093,8 +1991,6 @@ def download_crossref_events(
     :return: All events for the input DOIs
     """
     event_url_template = CROSSREF_EVENT_URL_TEMPLATE
-    edited_event_url_template = CROSSREF_EDITED_EVENT_URL_TEMPLATE
-    deleted_event_url_template = CROSSREF_DELETED_EVENT_URL_TEMPLATE
     url_start_date = start_date.strftime("%Y-%m-%d")
     url_end_date = end_date.strftime("%Y-%m-%d")
     max_threads = min(max_threads, 15)
@@ -2103,24 +1999,15 @@ def download_crossref_events(
         event_url_template.format(doi=doi, mailto=mailto, start_date=url_start_date, end_date=url_end_date)
         for doi in dois
     ]
-    edited_urls = [
-        edited_event_url_template.format(doi=doi, mailto=mailto, start_date=url_start_date, end_date=url_end_date)
-        for doi in dois
-    ]
-    deleted_urls = [
-        deleted_event_url_template.format(doi=doi, mailto=mailto, start_date=url_start_date, end_date=url_end_date)
-        for doi in dois
-    ]
-    urls = event_urls + edited_urls + deleted_urls
 
-    print(f"Beginning crossref event data download from {len(urls)} URLs with {max_threads} workers")
+    print(f"Beginning crossref event data download from {len(event_urls)} URLs with {max_threads} workers")
     print(
         f"Downloading DOI data using URL: {event_url_template.format(doi='***', mailto=mailto, start_date=url_start_date, end_date=url_end_date)}"
     )
     all_events = []
     with ThreadPoolExecutor(max_workers=max_threads) as executor:
         futures = []
-        for i, url in enumerate(urls):
+        for i, url in enumerate(event_urls):
             futures.append(executor.submit(download_crossref_event_url, url, i=i))
         for future in as_completed(futures):
             all_events.extend(future.result())
