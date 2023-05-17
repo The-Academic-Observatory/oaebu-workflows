@@ -43,9 +43,6 @@ from oaebu_workflows.workflows.onix_workflow import (
     download_crossref_events,
     transform_crossref_events,
     transform_event,
-    transform_crossref_metadata,
-    transform_metadata_item,
-    isbns_from_onix,
     dois_from_onix,
     download_crossref_event_url,
     create_latest_views_from_dataset,
@@ -1976,47 +1973,7 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
         assert not bad_events, f"Events should have returned nothing, instead returned {bad_events}"
 
     def test_crossref_transform(self):
-        # Test transformation functions
-        input_metadata = [
-            {
-                "publisher": "University of Minnesota Press",
-                "published-print": {"date-parts": [["2017", "10", "24"]]},
-                "DOI": "10.5749/j.ctt1pwt6tp",
-                "type": "monograph",
-                "is-referenced-by-count": 10,
-                "title": ["Postcolonial Automobility"],
-                "prefix": "10.5749",
-                "author": [{"given": "Lindsey B.", "family": "Green-Simms", "sequence": "first", "affiliation": []}],
-                "member": "3779",
-                "issued": {"date-parts": [[]]},
-                "ISBN": ["9780136019701"],
-                "references-count": 0,
-            }
-        ]
-        expected_transformed_metadata = [
-            {
-                "publisher": "University of Minnesota Press",
-                "published_print": {"date_parts": [["2017", "10", "24"]]},
-                "DOI": "10.5749/j.ctt1pwt6tp",
-                "type": "monograph",
-                "is_referenced_by_count": 10,
-                "title": ["Postcolonial Automobility"],
-                "prefix": "10.5749",
-                "author": [{"given": "Lindsey B.", "family": "Green-Simms", "sequence": "first", "affiliation": []}],
-                "member": "3779",
-                "issued": {"date_parts": [[]]},
-                "ISBN": ["9780136019701"],
-                "references_count": 0,
-            }
-        ]
-
-        # Standalone transform
-        actual_transformed_metadata = transform_metadata_item(input_metadata[0])
-        expected_transformed_metadata[0] == actual_transformed_metadata
-        # List transform
-        actual_transformed_metadata = transform_crossref_metadata(input_metadata)
-        assert len(actual_transformed_metadata) == 1
-        assert expected_transformed_metadata == actual_transformed_metadata
+        """Test the function that transforms the crossref events data"""
 
         input_events = [
             {
@@ -2119,14 +2076,10 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 project_id=self.gcp_project_id,
             )
 
-            actual_isbns = isbns_from_onix(self.gcp_project_id, fake_onix_dataset_id, "onix")
             actual_dois = dois_from_onix(self.gcp_project_id, fake_onix_dataset_id, "onix")
-            fake_isbns = [entry["ISBN13"] for entry in fake_onix]
             fake_dois = [entry["DOI"] for entry in fake_onix]
 
             # Check there are no duplicates and the contents are the same
-            assert len(actual_isbns) == len(set(fake_isbns))
-            assert set(actual_isbns) == set(fake_isbns)
             assert len(actual_dois) == len(set(fake_dois))
             assert set(actual_dois) == set(fake_dois)
 
@@ -2662,15 +2615,15 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 actual_content = json.loads(json.dumps([dict(row) for row in rows], default=str))
                 for row in actual_content:
                     if "metadata" in row:  # TODO: remove this necessity
-                        row['metadata']["crossref_objects"] = sorted(
-                            row['metadata']["crossref_objects"], key=lambda x: x["published_year_month"]
+                        row["metadata"]["crossref_objects"] = sorted(
+                            row["metadata"]["crossref_objects"], key=lambda x: x["published_year_month"]
                         )
                 self.assertIsNotNone(rows)
                 if expected_content is not None:
                     for row in expected_content:
                         if "metadata" in row:  # TODO: remove this necessity
-                            row['metadata']["crossref_objects"] = sorted(
-                                row['metadata']["crossref_objects"], key=lambda x: x["published_year_month"]
+                            row["metadata"]["crossref_objects"] = sorted(
+                                row["metadata"]["crossref_objects"], key=lambda x: x["published_year_month"]
                             )
                         self.assertIn(row, actual_content)
                         actual_content.remove(row)
