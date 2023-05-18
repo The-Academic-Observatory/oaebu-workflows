@@ -21,17 +21,15 @@ from datetime import timedelta
 from functools import partial, update_wrapper
 from pathlib import Path
 from typing import List, Optional, Tuple
-import json
 import re
-from datetime import datetime
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import pendulum
 from airflow.exceptions import AirflowException, PoolNotFound
 from airflow.api.common.experimental.pool import create_pool, get_pool
-from google.cloud.bigquery import SourceFormat, Client, Row
+from google.cloud.bigquery import SourceFormat, Client
 from ratelimit import limits, sleep_and_retry
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
+from tenacity import wait_exponential_jitter
 
 from oaebu_workflows.config import schema_folder as default_schema_folder
 from oaebu_workflows.config import sql_folder
@@ -466,7 +464,7 @@ class OnixWorkflow(Workflow):
 
         # Get Crossref Metadata release date
         crossref_metadata_release_dates = select_table_shard_dates(
-            project_id=self.gcp_project_id,
+            project_id=self.crossref_project_id,
             dataset_id=self.crossref_master_dataset_id,
             table_name=self.crossref_metadata_table_id,
             end_date=release_date,
@@ -623,58 +621,33 @@ class OnixWorkflow(Workflow):
 
     def create_oaebu_crossref_metadata_table(self, release: OnixWorkflowRelease, **kwargs):
         """
-        Download, transform, upload and create a table for crossref metadata
+        Creates the crossref metadata table by querying the AO master table and matching on this publisher's ISBNs
 
         :param release: The onix workflow release object
         """
-        # Query the project's Onix table for ISBNs
         sharded_onix_id = bigquery_sharded_table_id(self.onix_table_id, release.onix_release_date)
-        isbns = isbns_from_onix(self.gcp_project_id, self.onix_dataset_id, sharded_onix_id)
-
-        # Query the metadata table and filter for these isbns
+        fq_onix_table_id = f"{self.gcp_project_id}.{self.onix_dataset_id}.{sharded_onix_id}"
         sharded_metadata_id = bigquery_sharded_table_id(
             self.crossref_metadata_table_id, release.crossref_metadata_release_date
         )
-        template_path = os.path.join(sql_folder(), "crossref_metadata_filter_isbn.sql.jinja2")
+        fq_crossref_metadata_table_id = (
+            f"{self.crossref_project_id}.{self.crossref_master_dataset_id}.{sharded_metadata_id}"
+        )
         sql = render_template(
-            template_path,
-            isbns=isbns,
-            project_id=self.crossref_project_id,
-            dataset_id=self.crossref_master_dataset_id,
-            crossref_metadata_table_id=sharded_metadata_id,
+            template_path=os.path.join(sql_folder(), "crossref_metadata_filter_isbn.sql.jinja2"),
+            onix_table_id=fq_onix_table_id,
+            crossref_metadata_table_id=fq_crossref_metadata_table_id,
         )
-        print("Retrieving metadata from master table")
-        metadata = run_bigquery_query(sql)
-        metadata = transform_crossref_metadata(metadata, max_threads=self.max_threads)
-
-        # Zip and upload to google cloud
-        list_to_jsonl_gz(
-            release.crossref_metadata_filename,
-            metadata,
-        )
-        blob_name = os.path.join(
-            release.transform_folder,
-            os.path.basename(release.crossref_metadata_filename),
-        )
-        upload_file_to_cloud_storage(
-            release.transform_bucket,
-            blob_name,
-            release.crossref_metadata_filename,
-        )
-        schema_file_path = find_schema(path=self.schema_folder, table_name=release.crossref_metadata_table_id)
-        # load the table into bigquery
-        bq_load_shard(
-            schema_file_path=schema_file_path,
-            project_id=release.project_id,
-            transform_bucket=release.transform_bucket,
-            transform_blob=blob_name,
+        print("Creating crossref metadata table from master table")
+        schema_file_path = find_schema(path=self.schema_folder, table_name=self.crossref_metadata_table_id)
+        sharded_oaebu_metadata_id = bigquery_sharded_table_id(self.crossref_metadata_table_id, release.release_date)
+        create_bigquery_table_from_query(
+            sql,
+            project_id=self.gcp_project_id,
             dataset_id=self.crossref_oaebu_dataset_id,
-            data_location=release.data_location,
-            table_id=release.crossref_metadata_table_id,
-            release_date=release.release_date,
-            source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
-            dataset_description=release.dataset_description,
-            **{},
+            table_id=sharded_oaebu_metadata_id,
+            location=release.data_location,
+            schema_file_path=schema_file_path,
         )
 
     def create_oaebu_crossref_events_table(self, release: OnixWorkflowRelease, **kwargs):
@@ -1864,27 +1837,6 @@ class OnixWorkflow(Workflow):
             )
 
 
-def isbns_from_onix(project_id: str, onix_dataset_id: str, onix_table_id: str) -> List[str]:
-    """
-    Queries an Onix table to obtain its unique ISBNs
-
-    :param project_id: The GCP project containing the relevant Onix dataset
-    :param onix_dataset_id: The GCP dataset containing the relevant Onix table
-    :param onix_table_id: The GCP Onix table name
-    :return: The list of ISBNs from the specified table
-    """
-    sql = f"""
-    SELECT
-        DISTINCT(ISBN13)
-    FROM
-        `{project_id}.{onix_dataset_id}.{onix_table_id}`
-    """
-    isbn_rows = run_bigquery_query(sql)
-    isbns = [row["ISBN13"] for row in isbn_rows]
-    isbns = list(filter(None, isbns))  # Remove null values
-    return isbns
-
-
 def dois_from_onix(project_id: str, onix_dataset_id: str, onix_table_id: str) -> List[str]:
     """
     Queries an Onix table to obtain its unique DOIs.
@@ -1905,52 +1857,6 @@ def dois_from_onix(project_id: str, onix_dataset_id: str, onix_table_id: str) ->
     dois = [row["Doi"] for row in doi_rows]
     dois = list(filter(None, dois))  # Remove null values
     return dois
-
-
-def transform_crossref_metadata(metadata: List[dict], max_threads: int = 1) -> List[dict]:
-    """
-    Spawns workers to transform crossref metadata
-
-    :param metadata: A list of crossref metadata items to transform
-    :param max_threads: The maxiumum number of threads to utilise for the transforming process
-    :return: transformed metadata, the order of the items in the input list is not preserved
-    """
-    print(f"Beginning crossref metadata transform with {max_threads} workers")
-    transformed_metadata = []
-    with ThreadPoolExecutor(max_workers=max_threads) as executor:
-        futures = []
-        for item in metadata:
-            futures.append(executor.submit(transform_metadata_item, dict(item)))
-        for future in as_completed(futures):
-            transformed_metadata.append(future.result())
-    print("Crossref metadata transform complete")
-    return transformed_metadata
-
-
-def transform_metadata_item(item: dict) -> dict:
-    """
-    Transform a single Crossref Metadata JSON dictionary
-
-    :param item: A single crossref metadata item.
-    :return: The transformed metadata item
-    """
-    if isinstance(item, dict):
-        new = {}
-        for k, v in item.items():
-            # Replace hyphens with underscores for BigQuery compatibility
-            k = k.replace("-", "_")
-            if k == "date_time":
-                try:
-                    v = v.strftime("%Y-%m-%dT%H:%M:%SZ")
-                except ValueError:
-                    v = ""
-
-            new[k] = transform_metadata_item(v)
-        return new
-    elif isinstance(item, list):
-        return [transform_metadata_item(i) for i in item]
-    else:
-        return item
 
 
 def dois_from_crossref_metadata(project_id: str, dataset_id: str, metadata_table_id: str) -> List[str]:
