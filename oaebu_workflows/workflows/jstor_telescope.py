@@ -24,6 +24,7 @@ import os.path
 import shutil
 from collections import OrderedDict
 from typing import List, Optional
+from tempfile import TemporaryDirectory
 
 import pendulum
 import requests
@@ -31,129 +32,67 @@ from airflow.exceptions import AirflowException
 from airflow.hooks.base import BaseHook
 from airflow.models.taskinstance import TaskInstance
 from bs4 import BeautifulSoup, SoupStrainer
-from google.cloud import bigquery
-from google.cloud.bigquery import SourceFormat
+from google.cloud.bigquery import TimePartitioningType, SourceFormat
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import Resource, build
 from tenacity import retry, stop_after_attempt, wait_exponential, wait_fixed
 
 from oaebu_workflows.config import schema_folder as default_schema_folder
-from observatory.api.client.model.organisation import Organisation
-from observatory.platform.utils.airflow_utils import AirflowConns, AirflowVars
-from observatory.platform.utils.file_utils import list_to_jsonl_gz
-from observatory.platform.utils.url_utils import get_user_agent
-from observatory.platform.utils.workflow_utils import SubFolder, workflow_path
-from observatory.platform.utils.workflow_utils import add_partition_date, convert, make_dag_id
-from observatory.platform.workflows.organisation_telescope import OrganisationRelease, OrganisationTelescope
-from oaebu_workflows.dag_tag import Tag
+from observatory.api.client.model.dataset_release import DatasetRelease
+from observatory.platform.api import make_observatory_api
+from observatory.platform.airflow import AirflowConns
+from observatory.platform.files import save_jsonl_gz
+from observatory.platform.utils.url_utils import get_user_agent, retry_get_url
+from observatory.platform.gcs import gcs_upload_files, gcs_blob_uri, gcs_blob_name_from_path
+from observatory.platform.bigquery import bq_load_table, bq_table_id, bq_find_schema, bq_create_dataset
+from observatory.platform.observatory_config import CloudWorkspace
+from observatory.platform.files import add_partition_date, convert
+from observatory.platform.workflows.workflow import (
+    Workflow,
+    PartitionRelease,
+    cleanup,
+    set_task_state,
+    check_workflow_inputs,
+)
 
 
-class JstorRelease(OrganisationRelease):
+class JstorRelease(PartitionRelease):
     def __init__(
-        self, dag_id: str, release_date: pendulum.DateTime, reports_info: List[dict], organisation: Organisation
+        self,
+        dag_id: str,
+        run_id: str,
+        data_interval_start: pendulum.DateTime,
+        data_interval_end: pendulum.DateTime,
+        partition_date: pendulum.DateTime,
+        reports_info: List[dict],
     ):
         """Construct a JstorRelease.
 
-        :param release_date: the release date, corresponds to the last day of the month being processed..
+        :param dag_id: The ID of the DAG
+        :param run_id: The Airflow run ID
+        :param data_interval_start: The beginning of the data interval
+        :param data_interval_end: The end of the data interval
+        :param partition_date: the partition date, corresponds to the last day of the month being processed.
         :param reports_info: list with report_type (country or institution) and url of reports
         """
-
-        self.reports_info = reports_info
-        download_files_regex = f"^{JstorTelescope.DAG_ID_PREFIX}_(country|institution)\.tsv$"
-        transform_files_regex = f"^{JstorTelescope.DAG_ID_PREFIX}_(country|institution)\.jsonl.gz"
-
         super().__init__(
-            dag_id,
-            release_date,
-            organisation,
-            download_files_regex=download_files_regex,
-            transform_files_regex=transform_files_regex,
+            dag_id=dag_id,
+            run_id=run_id,
+            partition_date=partition_date,
         )
-
-    def download_path(self, report_type: str) -> str:
-        """Creates full download path
-
-        :param report_type: The report type (country or institution)
-        :return: Download path
-        """
-        return os.path.join(self.download_folder, f"{JstorTelescope.DAG_ID_PREFIX}_{report_type}.tsv")
-
-    def transform_path(self, report_type: str) -> str:
-        """Creates full transform path
-
-        :param report_type: The report type (country or institution)
-        :return: Transform path
-        """
-        return os.path.join(self.transform_folder, f"{JstorTelescope.DAG_ID_PREFIX}_{report_type}.jsonl.gz")
-
-    def transform(self):
-        """Transform a Jstor release into json lines format and gzip the result.
-
-        :return: None.
-        """
-        for file in self.download_files:
-            release_date = get_release_date(file)
-            release_column = release_date.strftime("%b-%Y")  # e.g. Jan-2020
-            usage_month = release_date.strftime("%Y-%m")
-            results = []
-            # Check if report has header in old or new format based on the first line
-            with open(file, "r") as tsv_file:
-                first_line = tsv_file.readline()
-                with open(file, "r") as tsv_file:
-                    # Skip the header section of the file for the new format
-                    if first_line.startswith("Report_Name"):
-                        line = None
-                        while line != "\n":
-                            line = next(tsv_file)
-                    csv_reader = csv.DictReader(tsv_file, delimiter="\t")
-                    for row in csv_reader:
-                        transformed_row = OrderedDict((convert(k), v) for k, v in row.items())
-                        # As of 2022-07, Some column names have changed and conflict with our schema
-                        transformed_row.pop(release_column, None)
-                        if "Usage_Month" not in transformed_row:
-                            transformed_row["Usage_Month"] = usage_month
-                        if "Total_Item_Requests" not in transformed_row:
-                            transformed_row["Total_Item_Requests"] = transformed_row.pop("Reporting_Period_Total")
-                        results.append(transformed_row)
-
-            results = add_partition_date(results, self.release_date, bigquery.TimePartitioningType.MONTH)
-            report_type = "country" if "country" in file else "institution"
-            list_to_jsonl_gz(self.transform_path(report_type), results)
-
-    def cleanup(self) -> None:
-        """Delete files of downloaded, extracted and transformed release. Add to parent method cleanup and assign a
-        label to the gmail messages that have been processed.
-
-        :return: None.
-        """
-        super().cleanup()
-
-        service = create_gmail_service()
-        label_id = get_label_id(service, JstorTelescope.PROCESSED_LABEL_NAME)
-        for report in self.reports_info:
-            message_id = report["id"]
-            body = {"addLabelIds": [label_id]}
-            response = service.users().messages().modify(userId="me", id=message_id, body=body).execute()
-            try:
-                message_id = response["id"]
-                logging.info(
-                    f"Added label '{JstorTelescope.PROCESSED_LABEL_NAME}' to GMAIL message, message_id: "
-                    f"{message_id}"
-                )
-            except KeyError:
-                raise AirflowException(f"Unsuccessful adding label to GMAIL message, message_id: {message_id}")
+        self.reports_info = reports_info
+        self.data_interval_start = data_interval_start
+        self.data_interval_end = data_interval_end
+        self.download_country_path = os.path.join(self.download_folder, "country.tsv")
+        self.download_institution_path = os.path.join(self.download_folder, "institution.tsv")
+        self.transform_country_path = os.path.join(self.transform_folder, "country.jsonl.gz")
+        self.transform_institution_path = os.path.join(self.transform_folder, "institution.jsonl.gz")
 
 
-class JstorTelescope(OrganisationTelescope):
-    """
-    The JSTOR telescope.
-
-    Saved to the BigQuery tables: <project_id>.jstor.jstor_countryYYYYMMDD and
-    <project_id>.jstor.jstor_institutionYYYYMMDD
-    """
+class JstorTelescope(Workflow):
+    """The JSTOR telescope."""
 
     REPORTS_INFO = "reports_info"
-    DAG_ID_PREFIX = "jstor"
     PROCESSED_LABEL_NAME = "processed_report"
 
     # download settings
@@ -165,89 +104,85 @@ class JstorTelescope(OrganisationTelescope):
 
     def __init__(
         self,
-        organisation: Organisation,
+        dag_id: str,
+        cloud_workspace: CloudWorkspace,
         publisher_id: str,
-        dag_id: Optional[str] = None,
-        start_date: pendulum.DateTime = pendulum.datetime(2016, 10, 1),
-        schedule_interval: str = "0 0 4 * *",  # 4th day of every month
-        dataset_id: str = "jstor",
+        bq_dataset_id: str = "jstor",
+        bq_country_table_name: str = "jstor_country",
+        bq_institution_table_name: str = "jstor_institution",
+        bq_dataset_description: str = "Data from JSTOR sources",
+        bq_country_table_description: str = None,
+        bq_institution_table_description: str = None,
+        api_dataset_id: str = "jstor",
         schema_folder: str = default_schema_folder(),
-        source_format: str = SourceFormat.NEWLINE_DELIMITED_JSON,
-        dataset_description: str = "",
+        gmail_api_conn_id: str = "gmail_api",
+        observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
         catchup: bool = False,
-        airflow_vars: List = None,
-        airflow_conns: List = None,
         max_active_runs: int = 1,
-        workflow_id: int = None,
+        schedule_interval: str = "0 0 4 * *",  # 4th day of every month
+        start_date: pendulum.DateTime = pendulum.datetime(2016, 10, 1),
     ):
         """Construct a JstorTelescope instance.
-        :param organisation: the Organisation of which data is processed.
-        :param publisher_id: the publisher ID, obtained from the 'extra' info from the API regarding the telescope.
-        :param dag_id: the id of the DAG.
-        :param start_date: the start date of the DAG.
-        :param schedule_interval: the schedule interval of the DAG.
-        :param dataset_id: the BigQuery dataset id.
-        :param schema_folder: the SQL schema path.
-        :param source_format: the format of the data to load into BigQuery.
-        :param dataset_description: description for the BigQuery dataset.
-        :param catchup: whether to catchup the DAG or not.
-        :param airflow_vars: list of airflow variable keys, for each variable it is checked if it exists in airflow
-        :param max_active_runs: the maximum number of DAG runs that can be run at once.
-        :param workflow_id: api workflow id.
+        :param dag_id: The ID of the DAG
+        :param cloud_workspace: The CloudWorkspace object for this DAG
+        :param publisher_id: The ID of the publisher for this DAG
+        :param bq_dataset_id: The BigQuery dataset ID
+        :param bq_country_table_name: The name of the BigQuery JSTOR country table
+        :param bq_institution_table_name: The name of the BigQuery JSTOR institution table
+        :param bq_dataset_description: Description for the BigQuery dataset
+        :param bq_country_table_description: Description for the BigQuery JSTOR country table
+        :param bq_institution_table_description: Description for the BigQuery JSTOR institution table
+        :param api_dataset_id: The ID to store the dataset release in the API
+        :param schema_folder: The path to the SQL schema folder
+        :param gmail_api_conn_id: Airflow connection ID for the Gmail API
+        :param observatory_api_conn_id: Airflow connection ID for the overvatory API
+        :param catchup: Whether to catchup the DAG or not
+        :param max_active_runs: The maximum number of DAG runs that can be run concurrently
+        :param schedule_interval: The schedule interval of the DAG
+        :param start_date: The start date of the DAG
         """
-
-        if airflow_vars is None:
-            airflow_vars = [
-                AirflowVars.DATA_PATH,
-                AirflowVars.PROJECT_ID,
-                AirflowVars.DATA_LOCATION,
-                AirflowVars.DOWNLOAD_BUCKET,
-                AirflowVars.TRANSFORM_BUCKET,
-            ]
-        if airflow_conns is None:
-            airflow_conns = [AirflowConns.GMAIL_API]
-
-        if dag_id is None:
-            dag_id = make_dag_id(self.DAG_ID_PREFIX, organisation.name)
-
         super().__init__(
-            organisation,
             dag_id,
             start_date,
             schedule_interval,
-            dataset_id,
-            schema_folder,
-            source_format=source_format,
-            dataset_description=dataset_description,
             catchup=catchup,
-            airflow_vars=airflow_vars,
-            airflow_conns=airflow_conns,
+            airflow_conns=[gmail_api_conn_id, observatory_api_conn_id],
             max_active_runs=max_active_runs,
-            workflow_id=workflow_id,
-            tags=[Tag.oaebu],
-            load_bigquery_table_kwargs={"ignore_unknown_values": True},
+            tags=["oaebu"],
         )
-        self.publisher_id = publisher_id
 
-        self.add_setup_task_chain([self.check_dependencies, self.list_reports, self.download_reports])
-        self.add_task_chain(
-            [
-                self.upload_downloaded,
-                self.transform,
-                self.upload_transformed,
-                self.bq_load_partition,
-                self.cleanup,
-                self.add_new_dataset_releases,
-            ]
-        )
+        self.dag_id = dag_id
+        self.cloud_workspace = cloud_workspace
+        self.publisher_id = publisher_id
+        self.bq_dataset_id = bq_dataset_id
+        self.bq_country_table_name = bq_country_table_name
+        self.bq_institution_table_name = bq_institution_table_name
+        self.bq_dataset_description = bq_dataset_description
+        self.bq_country_table_description = bq_country_table_description
+        self.bq_institution_table_description = bq_institution_table_description
+        self.api_dataset_id = api_dataset_id
+        self.schema_folder = schema_folder
+        self.gmail_api_conn_id = gmail_api_conn_id
+        self.observatory_api_conn_id = observatory_api_conn_id
+
+        check_workflow_inputs(self)
+
+        self.add_setup_task(self.check_dependencies)
+        self.add_setup_task(self.list_reports)
+        self.add_setup_task(self.download_reports)
+        self.add_task(self.upload_downloaded)
+        self.add_task(self.transform)
+        self.add_task(self.upload_transformed)
+        self.add_task(self.bq_load)
+        self.add_task(self.add_new_dataset_releases)
+        self.add_task(self.cleanup)
 
     def make_release(self, **kwargs) -> List[JstorRelease]:
         """Make release instances. The release is passed as an argument to the function (TelescopeFunction) that is
         called in 'task_callable'.
 
-        :param kwargs: the context passed from the PythonOperator. See
-        https://airflow.apache.org/docs/stable/macros-ref.html for a list of the keyword arguments that are
-        passed to this argument.
+        :param kwargs: the context passed from the PythonOperator.
+        See https://airflow.apache.org/docs/stable/macros-ref.html for the keyword arguments that can be passed
         :return: A list of grid release instances
         """
 
@@ -258,33 +193,37 @@ class JstorTelescope(OrganisationTelescope):
         releases = []
         for release_date in available_releases:
             reports_info = available_releases[release_date]
-            releases.append(JstorRelease(self.dag_id, pendulum.parse(release_date), reports_info, self.organisation))
+            partition_date = pendulum.parse(release_date)
+            data_interval_start = partition_date.start_of("month")
+            data_interval_end = partition_date.add(days=1).start_of("month")
+            releases.append(
+                JstorRelease(
+                    dag_id=self.dag_id,
+                    run_id=kwargs["run_id"],
+                    partition_date=partition_date,
+                    data_interval_start=data_interval_start,
+                    data_interval_end=data_interval_end,
+                    reports_info=reports_info,
+                )
+            )
         return releases
 
     def check_dependencies(self, **kwargs) -> bool:
         """Check dependencies of DAG. Add to parent method to additionally check for a publisher id
+
         :return: True if dependencies are valid.
         """
         super().check_dependencies()
-
-        if self.publisher_id is None:
-            expected_extra = {"publisher_id": "jstor_publisher_id"}
-            raise AirflowException(f"Publisher ID is not set in 'extra' of telescope, extra example: {expected_extra}")
         return True
 
     def list_reports(self, **kwargs) -> bool:
         """Lists all Jstor releases for a given month and publishes their report_type, download_url and
         release_date's as an XCom.
 
-        :param kwargs: the context passed from the BranchPythonOperator. See
-        https://airflow.apache.org/docs/stable/macros-ref.html
-        for a list of the keyword arguments that are passed to this argument.
         :return: Whether to continue the DAG
         """
-
         service = create_gmail_service()
         available_reports = list_reports(service, self.publisher_id)
-
         continue_dag = len(available_reports) > 0
         if continue_dag:
             # Push messages
@@ -299,59 +238,189 @@ class JstorTelescope(OrganisationTelescope):
         downloaded to a temporary location, afterwards the release info can be pushed as an xcom and the report is
         moved to the correct location.
 
-        :param kwargs: the context passed from the BranchPythonOperator. See
-        https://airflow.apache.org/docs/stable/macros-ref.html
-        for a list of the keyword arguments that are passed to this argument.
         :return: Whether to continue the DAG (always True)
         """
         ti: TaskInstance = kwargs["ti"]
         available_reports = ti.xcom_pull(
             key=JstorTelescope.REPORTS_INFO, task_ids=self.list_reports.__name__, include_prior_dates=False
         )
-        reports_folder = workflow_path(SubFolder.downloaded.value, self.dag_id, "tmp_reports")
         available_releases = {}
-        for report in available_reports:
-            # Download report to temporary file
-            url = report["url"]
-            tmp_download_path = os.path.join(reports_folder, "report.tsv")
-            download_report(url, tmp_download_path)
+        with TemporaryDirectory() as reports_folder:
+            for report in available_reports:
+                # Download report to temporary file
+                url = report["url"]
+                tmp_download_path = os.path.join(reports_folder, "report.tsv")
+                download_report(url, tmp_download_path)
 
-            # Get the release date
-            release_date = get_release_date(tmp_download_path)
+                # Get the release date
+                start_date, end_date = get_release_date(tmp_download_path)
 
-            # Create temporarily release and move report to correct path
-            release = JstorRelease(self.dag_id, release_date, [report], self.organisation)
-            shutil.move(tmp_download_path, release.download_path(report["type"]))
+                # Create temporary release and move report to correct path
+                release = JstorRelease(
+                    dag_id=self.dag_id,
+                    run_id=kwargs["run_id"],
+                    data_interval_start=start_date,
+                    data_interval_end=end_date.add(days=1).start_of("month"),
+                    partition_date=end_date,
+                    reports_info=[report],
+                )
+                download_path = (
+                    release.download_country_path if report["type"] == "country" else release.download_institution_path
+                )
+                shutil.move(tmp_download_path, download_path)
 
-            release_date = release_date.format("YYYYMMDD")
+                release_date = release.partition_date.format("YYYYMMDD")
 
-            # Add reports to list with available releases
-            try:
-                available_releases[release_date].append(report)
-            except KeyError:
-                available_releases[release_date] = [report]
+                # Add reports to list with available releases
+                try:
+                    available_releases[release_date].append(report)
+                except KeyError:
+                    available_releases[release_date] = [report]
 
         ti.xcom_push(JstorTelescope.RELEASE_INFO, available_releases)
         return True
 
-    def transform(self, releases: List[JstorRelease], **kwargs):
-        """Task to transform the Jstor releases for a given month.
+    def upload_downloaded(self, releases: List[JstorRelease], **kwargs) -> None:
+        """Uploads the downloaded files to GCS for each release
 
-        :param releases: a list of Jstor releases.
-        :return: None.
+        :param releases: List of JstorRelease instances:
         """
         for release in releases:
-            release.transform()
+            success = gcs_upload_files(
+                bucket_name=self.cloud_workspace.download_bucket,
+                file_paths=[release.download_country_path, release.download_institution_path],
+            )
+            set_task_state(success, kwargs["ti"].task_id, release=release)
+
+    def transform(self, releases: List[JstorRelease], **kwargs):
+        """Task to transform the Jstor releases for a given month."""
+        for release in releases:
+            jstor_transform(
+                download_country=release.download_country_path,
+                download_institution=release.download_institution_path,
+                transfrom_country=release.transform_country_path,
+                transform_institution=release.transform_institution_path,
+                partition_date=release.partition_date,
+            )
+
+    def upload_transformed(self, releases: List[JstorRelease], **kwargs) -> None:
+        """Uploads the transformed files to GCS for each release"""
+        for release in releases:
+            success = gcs_upload_files(
+                bucket_name=self.cloud_workspace.transform_bucket,
+                file_paths=[release.transform_country_path, release.transform_institution_path],
+            )
+            set_task_state(success, kwargs["ti"].task_id, release=release)
+
+    def bq_load(self, releases: List[JstorRelease], **kwargs) -> None:
+        """Loads the sales and traffic data into BigQuery"""
+        bq_create_dataset(
+            project_id=self.cloud_workspace.project_id,
+            dataset_id=self.bq_dataset_id,
+            location=self.cloud_workspace.data_location,
+            description=self.bq_dataset_description,
+        )
+
+        for release in releases:
+            for table_name, table_description, file_path in [
+                (self.bq_country_table_name, self.bq_country_table_description, release.transform_country_path),
+                (
+                    self.bq_institution_table_name,
+                    self.bq_institution_table_description,
+                    release.transform_institution_path,
+                ),
+            ]:
+                uri = gcs_blob_uri(self.cloud_workspace.transform_bucket, gcs_blob_name_from_path(file_path))
+                table_id = bq_table_id(self.cloud_workspace.project_id, self.bq_dataset_id, table_name)
+                state = bq_load_table(
+                    uri=uri,
+                    table_id=table_id,
+                    schema_file_path=bq_find_schema(path=self.schema_folder, table_name=table_name),
+                    source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
+                    partition_type=TimePartitioningType.MONTH,
+                    partition=True,
+                    partition_field="release_date",
+                    table_description=table_description,
+                    ignore_unknown_values=True,
+                )
+                set_task_state(state, kwargs["ti"].task_id, release=release)
+
+    def add_new_dataset_releases(self, releases: List[JstorRelease], **kwargs) -> None:
+        """Adds release information to API."""
+        api = make_observatory_api(observatory_api_conn_id=self.observatory_api_conn_id)
+        for release in releases:
+            dataset_release = DatasetRelease(
+                dag_id=self.dag_id,
+                dataset_id=self.api_dataset_id,
+                dag_run_id=release.run_id,
+                data_interval_start=release.data_interval_start,
+                data_interval_end=release.data_interval_end,
+                partition_date=release.partition_date,
+            )
+            api.post_dataset_release(dataset_release)
+
+    def cleanup(self, releases: List[JstorRelease], **kwargs) -> None:
+        """Delete all files, folders and XComs associated with this release.
+        Assign a label to the gmail messages that have been processed."""
+        for release in releases:
+            cleanup(
+                dag_id=self.dag_id, execution_date=kwargs["execution_date"], workflow_folder=release.workflow_folder
+            )
+            service = create_gmail_service()
+            label_id = get_label_id(service, JstorTelescope.PROCESSED_LABEL_NAME)
+            for report in release.reports_info:
+                message_id = report["id"]
+                body = {"addLabelIds": [label_id]}
+                response = service.users().messages().modify(userId="me", id=message_id, body=body).execute()
+                try:
+                    message_id = response["id"]
+                    logging.info(
+                        f"Added label '{JstorTelescope.PROCESSED_LABEL_NAME}' to GMAIL message, message_id: "
+                        f"{message_id}"
+                    )
+                except KeyError:
+                    set_task_state(False, kwargs["ti"].task_id, release=release)
 
 
-def create_headers() -> dict:
-    """Create a headers dict that can be used to make a request
+def jstor_transform(
+    download_country, download_institution, transfrom_country, transform_institution, partition_date
+) -> None:
+    """Transform a Jstor release into json lines format and gzip the result._summary_
 
-    :return: headers dictionary
+    :param download_country: The path to the country download report
+    :param download_institution: The path to the institution download report
+    :param transfrom_country: The path to write the transformed country file to
+    :param transform_institution: The path to write the transformed institution file to
+    :param partition_date: The partition/release date of this report
     """
+    for download_file, transform_file in zip(
+        [download_country, download_institution], [transfrom_country, transform_institution]
+    ):
+        release_column = partition_date.strftime("%b-%Y")  # e.g. Jan-2020
+        usage_month = partition_date.strftime("%Y-%m")
+        results = []
+        # Check if report has header in old or new format based on the first line
+        with open(download_file, "r") as tsv_file:
+            first_line = tsv_file.readline()
+            tsv_file.seek(0)
+            if first_line.startswith("Report_Name"):
+                line = None
+                while line != "\n":
+                    line = next(tsv_file)
+            csv_reader = csv.DictReader(tsv_file, delimiter="\t")
+            for row in csv_reader:
+                transformed_row = OrderedDict((convert(k), v) for k, v in row.items())
+                transformed_row.pop(release_column, None)
+                if "Usage_Month" not in transformed_row:
+                    transformed_row["Usage_Month"] = usage_month
+                if "Total_Item_Requests" not in transformed_row:
+                    transformed_row["Total_Item_Requests"] = transformed_row.pop("Reporting_Period_Total")
+                results.append(transformed_row)
 
-    headers = {"User-Agent": get_user_agent(package_name="oaebu_workflows")}
-    return headers
+        results = add_partition_date(
+            results, partition_date, TimePartitioningType.MONTH, partition_field="release_date"
+        )
+        save_jsonl_gz(transform_file, results)
 
 
 @retry(
@@ -362,7 +431,7 @@ def create_headers() -> dict:
         multiplier=JstorTelescope.MULTIPLIER, exp_base=JstorTelescope.EXP_BASE, max=JstorTelescope.MAX_WAIT_TIME
     ),
 )
-def get_header_info(url: str) -> [str, str]:
+def get_header_info(url: str) -> List[str, str]:
     """Get header info from url and parse for filename and extension of file.
 
     :param url: Download url
@@ -373,7 +442,8 @@ def get_header_info(url: str) -> [str, str]:
         f'attempt: {get_header_info.retry.statistics["attempt_number"]}, '
         f'idle for: {get_header_info.retry.statistics["idle_for"]}'
     )
-    response = requests.head(url, allow_redirects=True, headers=create_headers())
+    headers = {"User-Agent": get_user_agent(package_name="oaebu_workflows")}
+    response = requests.head(url, allow_redirects=True, headers=headers)
     if response.status_code != 200:
         raise AirflowException(
             f"Could not get HEAD of report download url, reason: {response.reason}, "
@@ -391,12 +461,11 @@ def get_header_info(url: str) -> [str, str]:
         multiplier=JstorTelescope.MULTIPLIER, exp_base=JstorTelescope.EXP_BASE, max=JstorTelescope.MAX_WAIT_TIME
     ),
 )
-def download_report(url: str, download_path: str):
+def download_report(url: str, download_path: str) -> None:
     """Download report from url to a file.
 
     :param url: Download url
     :param download_path: Path to download data to
-    :return: Whether download was successful
     """
     logging.info(
         f"Downloading report: {url}, "
@@ -404,13 +473,8 @@ def download_report(url: str, download_path: str):
         f'attempt: {download_report.retry.statistics["attempt_number"]}, '
         f'idle for: {download_report.retry.statistics["idle_for"]}'
     )
-    response = requests.get(url, headers=create_headers())
-    if response.status_code != 200:
-        raise AirflowException(
-            f"Could not download content from report url, reason: {response.reason}, "
-            f"status_code: {response.status_code}"
-        )
-
+    headers = {"User-Agent": get_user_agent(package_name="oaebu_workflows")}
+    response = retry_get_url(url, headers=headers)
     content = response.content.decode("utf-8")
     with open(download_path, "w") as f:
         f.write(content)
@@ -446,10 +510,7 @@ def get_release_date(report_path: str) -> pendulum.DateTime:
         raise AirflowException(
             f"Report contains data that is not from exactly 1 month, start date: {start_date}, end date: {end_date}"
         )
-
-    # Get the release date based on last day of the month
-    release_date = end_date
-    return release_date
+    return start_date, end_date
 
 
 def get_release_date_deprecated(report_path: str) -> pendulum.DateTime:
@@ -459,7 +520,7 @@ def get_release_date_deprecated(report_path: str) -> pendulum.DateTime:
     Also checks if the reports contains data from the same month only.
 
     :param report_path: The path to the JSTOR report
-    :return: The release date, defaults to end of the month
+    :return: The start and end dates
     """
     # Load report data into list of dicts
     with open(report_path) as tsv_file:
@@ -477,9 +538,10 @@ def get_release_date_deprecated(report_path: str) -> pendulum.DateTime:
         )
 
     # get the release date from the last usage month
-    release_date = pendulum.from_format(last_usage_month, "YYYY-MM").end_of("month")
+    start_date = pendulum.from_format(first_usage_month, "YYYY-MM").start_of("month").start_of("day")
+    end_date = pendulum.from_format(last_usage_month, "YYYY-MM").end_of("month").start_of("day")
 
-    return release_date
+    return start_date, end_date
 
 
 def create_gmail_service() -> Resource:
@@ -487,7 +549,7 @@ def create_gmail_service() -> Resource:
 
     :return: Gmail service instance
     """
-    gmail_api_conn = BaseHook.get_connection(AirflowConns.GMAIL_API)
+    gmail_api_conn = BaseHook.get_connection("gmail_api")
     scopes = ["https://www.googleapis.com/auth/gmail.readonly", "https://www.googleapis.com/auth/gmail.modify"]
     creds = Credentials.from_authorized_user_info(gmail_api_conn.extra_dejson, scopes=scopes)
 

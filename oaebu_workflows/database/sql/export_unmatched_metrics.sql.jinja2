@@ -19,13 +19,13 @@ Primarily, the goal is to create a flat structure which is suitable for graphing
 #}
 
 WITH google_analytics as (
-    {% if google_analytics %}
+    {% if google_analytics_unmatched_table_id %}
     SELECT
         {{ google_analytics_isbn }} as ISBN,
         title,
         release_date,
         "google_analytics" as source
-    FROM `{{ project_id }}.{{ dataset_id }}.{{ google_analytics_table }}_unmatched_{{ google_analytics_isbn }}{{ release.strftime('%Y%m%d') }}`
+    FROM `{{ google_analytics_unmatched_table_id }}`
     {% else %}
     SELECT
         CAST(NULL as STRING) as ISBN,
@@ -36,13 +36,13 @@ WITH google_analytics as (
 ),
 
 google_books as (
-    {% if google_books %}
+    {% if google_books_unmatched_table_id %}
     SELECT
         {{ google_books_isbn }} as ISBN,
         title,
         release_date,
         "google_books" as source
-    FROM `{{ project_id }}.{{ dataset_id }}.{{ google_books_table }}_unmatched_{{ google_books_isbn }}{{ release.strftime('%Y%m%d') }}`
+    FROM `{{ google_books_unmatched_table_id }}`
     {% else %}
     SELECT
         CAST(NULL as STRING) as ISBN,
@@ -53,13 +53,13 @@ google_books as (
 ),
 
 jstor as (
-    {% if jstor %}
+    {% if jstor_unmatched_table_id %}
     SELECT
         {{ jstor_isbn }} as ISBN,
         title,
         release_date,
         "jstor" as source
-    FROM `{{ project_id }}.{{ dataset_id }}.{{ jstor_table }}_unmatched_{{ jstor_isbn }}{{ release.strftime('%Y%m%d') }}`
+    FROM `{{ jstor_unmatched_table_id }}`
     {% else %}
     SELECT
         CAST(NULL as STRING) as ISBN,
@@ -70,13 +70,13 @@ jstor as (
 ),
 
 oapen as (
-    {% if oapen %}
+    {% if oapen_irus_uk_unmatched_table_id %}
     SELECT
-        {{ oapen_isbn }} as ISBN,
+        {{ oapen_irus_uk_isbn }} as ISBN,
         title,
         release_date,
         "oapen" as source
-    FROM `{{ project_id }}.{{ dataset_id }}.{{ oapen_table }}_unmatched_{{ oapen_isbn }}{{ release.strftime('%Y%m%d') }}`
+    FROM `{{ oapen_irus_uk_unmatched_table_id }}`
     {% else %}
     SELECT
         CAST(NULL as STRING) as ISBN,
@@ -87,19 +87,36 @@ oapen as (
 ),
 
 ucl_discovery as (
-    {% if ucl_discovery %}
+    {% if ucl_discovery_unmatched_table_id %}
     SELECT
-        {{ ucl_isbn }} as ISBN,
+        {{ ucl_discovery_isbn }} as ISBN,
         title,
         release_date,
         "ucl_discovery" as source
-    FROM `{{ project_id }}.{{ dataset_id }}.{{ ucl_table }}_unmatched_{{ ucl_isbn }}{{ release.strftime('%Y%m%d') }}`
+    FROM `{{ ucl_discovery_unmatched_table_id }}`
     {% else %}
     SELECT
         CAST(NULL as STRING) as ISBN,
         CAST(NULL as STRING) as title,
         CAST(NULL as DATE) as release_date,
         "ucl_discovery" as source
+    {% endif %}
+),
+
+fulcrum as (
+    {% if fulcrum_unmatched_table_id %}
+    SELECT
+        {{ fulcrum_isbn }} as ISBN,
+        title,
+        release_date,
+        "fulcrum" as source
+    FROM `{{ fulcrum_unmatched_table_id }}`
+    {% else %}
+    SELECT
+        CAST(NULL as STRING) as ISBN,
+        CAST(NULL as STRING) as title,
+        CAST(NULL as DATE) as release_date,
+        "fulcrum" as source
     {% endif %}
 ),
 
@@ -123,11 +140,13 @@ SELECT
     ARRAY_AGG(DISTINCT IF(source = "jstor", title, NULL) IGNORE NULLS LIMIT 1)[SAFE_OFFSET(0)] as jstor_title,
     ARRAY_AGG(DISTINCT IF(source = "oapen", title, NULL) IGNORE NULLS LIMIT 1)[SAFE_OFFSET(0)] as oapen_title,
     ARRAY_AGG(DISTINCT IF(source = "ucl_discovery", title, NULL) IGNORE NULLS LIMIT 1)[SAFE_OFFSET(0)] as ucl_discovery_title,
+    ARRAY_AGG(DISTINCT IF(source = "fulcrum", title, NULL) IGNORE NULLS LIMIT 1)[SAFE_OFFSET(0)] as fulcrum_title,
     "google_analytics" in UNNEST(ARRAY_AGG(source)) as in_google_analytics,
     "google_books" in UNNEST(ARRAY_AGG(source)) as in_google_books,
     "jstor" in UNNEST(ARRAY_AGG(source)) as in_jstor,
     "oapen" in UNNEST(ARRAY_AGG(source)) as in_oapen,
     "ucl_discovery" in UNNEST(ARRAY_AGG(source)) as in_ucl_discovery,
+    "fulcrum" in UNNEST(ARRAY_AGG(source)) as in_fulcrum,
 FROM all_un_matched
 WHERE ISBN IS NOT NULL
 GROUP BY ISBN, release_date

@@ -23,34 +23,18 @@ import httpretty
 import pendulum
 from airflow.exceptions import AirflowException
 from airflow.models.connection import Connection
+from airflow.utils.state import State
 from click.testing import CliRunner
 from googleapiclient.discovery import build
 from googleapiclient.http import HttpMockSequence
 
 from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.workflows.jstor_telescope import JstorRelease, JstorTelescope, get_label_id, get_release_date
-from observatory.api.client.model.organisation import Organisation
-from observatory.platform.utils.airflow_utils import AirflowConns
-from observatory.platform.utils.test_utils import (
-    ObservatoryEnvironment,
-    ObservatoryTestCase,
-    module_file_path,
-    find_free_port,
-)
-from observatory.platform.utils.workflow_utils import blob_name, table_ids_from_path
-from observatory.api.testing import ObservatoryApiEnvironment
-from observatory.api.client import ApiClient, Configuration
-from observatory.api.client.api.observatory_api import ObservatoryApi  # noqa: E501
-from observatory.api.client.model.organisation import Organisation
-from observatory.api.client.model.workflow import Workflow
-from observatory.api.client.model.workflow_type import WorkflowType
-from observatory.api.client.model.dataset import Dataset
-from observatory.api.client.model.dataset_type import DatasetType
-from observatory.api.client.model.table_type import TableType
-from observatory.platform.utils.release_utils import get_dataset_releases
-from observatory.platform.utils.airflow_utils import AirflowConns
-from airflow.models import Connection
-from airflow.utils.state import State
+from observatory.platform.observatory_environment import ObservatoryEnvironment, ObservatoryTestCase, find_free_port
+from observatory.platform.observatory_config import Workflow
+from observatory.platform.gcs import gcs_blob_name_from_path
+from observatory.platform.bigquery import bq_table_id
+from observatory.platform.api import get_dataset_releases
 
 
 class TestJstorTelescope(ObservatoryTestCase):
@@ -65,18 +49,14 @@ class TestJstorTelescope(ObservatoryTestCase):
         super(TestJstorTelescope, self).__init__(*args, **kwargs)
         self.project_id = os.getenv("TEST_GCP_PROJECT_ID")
         self.data_location = os.getenv("TEST_GCP_DATA_LOCATION")
-        self.organisation_name = "ANU Press"
-        self.extra = {"publisher_id": "anupress"}
-        self.host = "localhost"
-        self.api_port = find_free_port()
+        self.publisher_id = "anupress"
 
         self.release_date = pendulum.parse("20220701").end_of("month")
-        publisher_id = self.extra.get("publisher_id")
         self.country_report = {
             "path": test_fixtures_folder("jstor", "country_20220801.tsv"),
             "url": "https://www.jstor.org/admin/reports/download/249192019",
             "headers": {
-                "Content-Disposition": f"attachment; filename=PUB_{publisher_id}_PUBBCU_"
+                "Content-Disposition": f"attachment; filename=PUB_{self.publisher_id}_PUBBCU_"
                 f'{self.release_date.strftime("%Y%m%d")}.tsv'
             },
             "download_hash": "9330cc71f8228838ac84abb33cedb3b8",
@@ -87,7 +67,7 @@ class TestJstorTelescope(ObservatoryTestCase):
             "path": test_fixtures_folder("jstor", "institution_20220801.tsv"),
             "url": "https://www.jstor.org/admin/reports/download/129518301",
             "headers": {
-                "Content-Disposition": f"attachment; filename=PUB_{publisher_id}_PUBBIU_"
+                "Content-Disposition": f"attachment; filename=PUB_{self.publisher_id}_PUBBIU_"
                 f'{self.release_date.strftime("%Y%m%d")}.tsv'
             },
             "download_hash": "1c78c316766a3f7306d6c19440250484",
@@ -103,73 +83,11 @@ class TestJstorTelescope(ObservatoryTestCase):
             },
         }
 
-        # API environment
-        self.host = "localhost"
-        self.port = find_free_port()
-        configuration = Configuration(host=f"http://{self.host}:{self.port}")
-        api_client = ApiClient(configuration)
-        self.api = ObservatoryApi(api_client=api_client)  # noqa: E501
-        self.env = ObservatoryApiEnvironment(host=self.host, port=self.port)
-        self.org_name = "Curtin Press"
-
-    def setup_api(self):
-        dt = pendulum.now("UTC")
-
-        name = "Jstor Telescope"
-        workflow_type = WorkflowType(name=name, type_id=JstorTelescope.DAG_ID_PREFIX)
-        self.api.put_workflow_type(workflow_type)
-
-        organisation = Organisation(
-            name=self.org_name,
-            project_id="project",
-            download_bucket="download_bucket",
-            transform_bucket="transform_bucket",
-        )
-        self.api.put_organisation(organisation)
-
-        telescope = Workflow(
-            name=name,
-            workflow_type=WorkflowType(id=1),
-            organisation=Organisation(id=1),
-            extra={},
-        )
-        self.api.put_workflow(telescope)
-
-        table_type = TableType(
-            type_id="partitioned",
-            name="partitioned bq table",
-        )
-        self.api.put_table_type(table_type)
-
-        dataset_type = DatasetType(
-            type_id=JstorTelescope.DAG_ID_PREFIX,
-            name="ds type",
-            extra={},
-            table_type=TableType(id=1),
-        )
-        self.api.put_dataset_type(dataset_type)
-
-        dataset = Dataset(
-            name="Jstor Dataset",
-            address="project.dataset.table",
-            service="bigquery",
-            workflow=Workflow(id=1),
-            dataset_type=DatasetType(id=1),
-        )
-        self.api.put_dataset(dataset)
-
-    def setup_connections(self, env):
-        # Add Observatory API connection
-        conn = Connection(conn_id=AirflowConns.OBSERVATORY_API, uri=f"http://:password@{self.host}:{self.port}")
-        env.add_connection(conn)
-
     def test_dag_structure(self):
-        """Test that the Jstor DAG has the correct structure.
-
-        :return: None
-        """
-        organisation = Organisation(name=self.organisation_name)
-        dag = JstorTelescope(organisation, self.extra.get("publisher_id")).make_dag()
+        """Test that the Jstor DAG has the correct structure."""
+        dag = JstorTelescope(
+            "jstor", cloud_workspace=self.fake_cloud_workspace, publisher_id=self.publisher_id
+        ).make_dag()
         self.assert_dag_structure(
             {
                 "check_dependencies": ["list_reports"],
@@ -177,34 +95,35 @@ class TestJstorTelescope(ObservatoryTestCase):
                 "download_reports": ["upload_downloaded"],
                 "upload_downloaded": ["transform"],
                 "transform": ["upload_transformed"],
-                "upload_transformed": ["bq_load_partition"],
-                "bq_load_partition": ["cleanup"],
-                "cleanup": ["add_new_dataset_releases"],
-                "add_new_dataset_releases": [],
+                "upload_transformed": ["bq_load"],
+                "bq_load": ["add_new_dataset_releases"],
+                "add_new_dataset_releases": ["cleanup"],
+                "cleanup": [],
             },
             dag,
         )
 
     def test_dag_load(self):
-        """Test that the Jstor DAG can be loaded from a DAG bag.
+        """Test that the Jstor DAG can be loaded from a DAG bag."""
 
-        :return: None
-        """
-
-        env = ObservatoryEnvironment(self.project_id, self.data_location, api_host=self.host, api_port=self.port)
+        env = ObservatoryEnvironment(
+            workflows=[
+                Workflow(
+                    dag_id="jstor_test_telescope",
+                    name="My JSTOR Workflow",
+                    class_name="oaebu_workflows.workflows.jstor_telescope.JstorTelescope",
+                    cloud_workspace=self.fake_cloud_workspace,
+                    kwargs=dict(publisher_id=self.publisher_id),
+                )
+            ],
+        )
         with env.create():
-            self.setup_connections(env)
-            self.setup_api()
-            dag_file = os.path.join(module_file_path("oaebu_workflows.dags"), "jstor_telescope.py")
-            self.assert_dag_load("jstor_curtin_press", dag_file)
+            self.assert_dag_load_from_config("jstor_test_telescope")
 
     @patch("oaebu_workflows.workflows.jstor_telescope.build")
     @patch("oaebu_workflows.workflows.jstor_telescope.Credentials")
     def test_telescope(self, mock_account_credentials, mock_build):
-        """Test the Jstor telescope end to end.
-
-        :return: None.
-        """
+        """Test the Jstor telescope end to end."""
 
         mock_account_credentials.from_json_keyfile_dict.return_value = ""
 
@@ -216,37 +135,35 @@ class TestJstorTelescope(ObservatoryTestCase):
         mock_build.return_value = build("gmail", "v1", http=http)
 
         # Setup Observatory environment
-        env = ObservatoryEnvironment(self.project_id, self.data_location, api_host=self.host, api_port=self.port)
+        env = ObservatoryEnvironment(
+            self.project_id, self.data_location, api_host="localhost", api_port=find_free_port()
+        )
         dataset_id = env.add_dataset()
 
         # Setup Telescope
         execution_date = pendulum.datetime(year=2020, month=11, day=1)
-        organisation = Organisation(
-            name=self.organisation_name,
-            project_id=self.project_id,
-            download_bucket=env.download_bucket,
-            transform_bucket=env.transform_bucket,
-        )
         telescope = JstorTelescope(
-            organisation=organisation, publisher_id=self.extra.get("publisher_id"), dataset_id=dataset_id, workflow_id=1
+            dag_id="jstor_test_telescope",
+            cloud_workspace=env.cloud_workspace,
+            publisher_id=self.publisher_id,
+            bq_dataset_id=dataset_id,
         )
         dag = telescope.make_dag()
 
         # Create the Observatory environment and run tests
         with env.create(task_logging=True):
-            self.setup_connections(env)
-            self.setup_api()
             with env.create_dag_run(dag, execution_date):
                 # add gmail connection
                 conn = Connection(
-                    conn_id=AirflowConns.GMAIL_API,
+                    conn_id="gmail_api",
                     uri="google-cloud-platform://?token=123&refresh_token=123"
                     "&client_id=123.apps.googleusercontent.com&client_secret=123",
                 )
                 env.add_connection(conn)
 
                 # Test that all dependencies are specified: no error should be thrown
-                env.run_task(telescope.check_dependencies.__name__)
+                ti = env.run_task(telescope.check_dependencies.__name__)
+                self.assertEqual(ti.state, State.SUCCESS)
 
                 # Test list releases task with files available
                 with httpretty.enabled():
@@ -255,6 +172,7 @@ class TestJstorTelescope(ObservatoryTestCase):
                             report["url"], report["path"], headers=report["headers"], method=httpretty.HEAD
                         )
                     ti = env.run_task(telescope.list_reports.__name__)
+                    self.assertEqual(ti.state, State.SUCCESS)
                 available_reports = ti.xcom_pull(
                     key=JstorTelescope.REPORTS_INFO, task_ids=telescope.list_reports.__name__, include_prior_dates=False
                 )
@@ -270,6 +188,7 @@ class TestJstorTelescope(ObservatoryTestCase):
                     for report in [self.country_report, self.institution_report]:
                         self.setup_mock_file_download(report["url"], report["path"], headers=report["headers"])
                     ti = env.run_task(telescope.download_reports.__name__)
+                    self.assertEqual(ti.state, State.SUCCESS)
 
                 # use release info for other tasks
                 available_releases = ti.xcom_pull(
@@ -283,70 +202,90 @@ class TestJstorTelescope(ObservatoryTestCase):
                     self.assertEqual(self.release_date.date(), pendulum.parse(release_date).date())
                     self.assertIsInstance(reports_info, list)
                     self.assertListEqual(expected_reports_info, reports_info)
-                release = JstorRelease(telescope.dag_id, pendulum.parse(release_date), reports_info, organisation)
+                release = JstorRelease(
+                    dag_id=telescope.dag_id,
+                    run_id=env.dag_run.run_id,
+                    data_interval_start=pendulum.parse(release_date).start_of("month"),
+                    data_interval_end=pendulum.parse(release_date).add(days=1).start_of("month"),
+                    partition_date=pendulum.parse(release_date),
+                    reports_info=reports_info,
+                )
 
-                self.assertEqual(2, len(release.download_files))
-                for file in release.download_files:
-                    if "country" in file:
-                        expected_file_hash = self.country_report["download_hash"]
-                    else:
-                        expected_file_hash = self.institution_report["download_hash"]
-                    self.assert_file_integrity(file, expected_file_hash, "md5")
-
+                self.assertTrue(os.path.exists(release.download_country_path))
+                self.assertTrue(os.path.exists(release.download_institution_path))
+                self.assert_file_integrity(release.download_country_path, self.country_report["download_hash"], "md5")
+                self.assert_file_integrity(
+                    release.download_institution_path, self.institution_report["download_hash"], "md5"
+                )
                 # Test that file uploaded
-                env.run_task(telescope.upload_downloaded.__name__)
-                for file in release.download_files:
-                    self.assert_blob_integrity(env.download_bucket, blob_name(file), file)
+                ti = env.run_task(telescope.upload_downloaded.__name__)
+                self.assertEqual(ti.state, State.SUCCESS)
+                self.assert_blob_integrity(
+                    env.download_bucket,
+                    gcs_blob_name_from_path(release.download_country_path),
+                    release.download_country_path,
+                )
+                self.assert_blob_integrity(
+                    env.download_bucket,
+                    gcs_blob_name_from_path(release.download_institution_path),
+                    release.download_institution_path,
+                )
 
                 # Test that file transformed
-                env.run_task(telescope.transform.__name__)
-                self.assertEqual(2, len(release.transform_files))
-                for file in release.transform_files:
-                    print(file)
-                    if "country" in file:
-                        expected_file_hash = self.country_report["transform_hash"]
-                    else:
-                        expected_file_hash = self.institution_report["transform_hash"]
-                    self.assert_file_integrity(file, expected_file_hash, "gzip_crc")
+                ti = env.run_task(telescope.transform.__name__)
+                self.assertEqual(ti.state, State.SUCCESS)
+                self.assertTrue(os.path.exists(release.transform_country_path))
+                self.assertTrue(os.path.exists(release.transform_institution_path))
+                self.assert_file_integrity(
+                    release.transform_country_path, self.country_report["transform_hash"], "gzip_crc"
+                )
+                self.assert_file_integrity(
+                    release.transform_institution_path, self.institution_report["transform_hash"], "gzip_crc"
+                )
 
                 # Test that transformed file uploaded
-                env.run_task(telescope.upload_transformed.__name__)
-                for file in release.transform_files:
-                    self.assert_blob_integrity(env.transform_bucket, blob_name(file), file)
+                ti = env.run_task(telescope.upload_transformed.__name__)
+                self.assertEqual(ti.state, State.SUCCESS)
+                self.assert_blob_integrity(
+                    env.transform_bucket,
+                    gcs_blob_name_from_path(release.transform_country_path),
+                    release.transform_country_path,
+                )
+                self.assert_blob_integrity(
+                    env.transform_bucket,
+                    gcs_blob_name_from_path(release.transform_institution_path),
+                    release.transform_institution_path,
+                )
 
                 # Test that data loaded into BigQuery
-                env.run_task(telescope.bq_load_partition.__name__)
-                for file in release.transform_files:
-                    table_id, _ = table_ids_from_path(file)
-                    table_id = f'{self.project_id}.{dataset_id}.{table_id}${release.release_date.strftime("%Y%m")}'
-                    if "country" in file:
-                        expected_rows = self.country_report["table_rows"]
-                    else:
-                        expected_rows = self.institution_report["table_rows"]
-                    self.assert_table_integrity(table_id, expected_rows)
-
-                # Test that all telescope data deleted
-                download_folder, extract_folder, transform_folder = (
-                    release.download_folder,
-                    release.extract_folder,
-                    release.transform_folder,
-                )
-                env.run_task(telescope.cleanup.__name__)
-                self.assert_cleanup(download_folder, extract_folder, transform_folder)
-
-                # add_dataset_release_task
-                dataset_releases = get_dataset_releases(dataset_id=1)
-                self.assertEqual(len(dataset_releases), 0)
-                ti = env.run_task("add_new_dataset_releases")
+                ti = env.run_task(telescope.bq_load.__name__)
                 self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = get_dataset_releases(dataset_id=1)
+                country_table_id = bq_table_id(
+                    telescope.cloud_workspace.project_id, telescope.bq_dataset_id, telescope.bq_country_table_name
+                )
+                institution_table_id = bq_table_id(
+                    telescope.cloud_workspace.project_id,
+                    telescope.bq_dataset_id,
+                    telescope.bq_institution_table_name,
+                )
+                self.assert_table_integrity(country_table_id, self.country_report["table_rows"])
+                self.assert_table_integrity(institution_table_id, self.institution_report["table_rows"])
+
+                # Add_dataset_release_task
+                dataset_releases = get_dataset_releases(dag_id=telescope.dag_id, dataset_id=telescope.api_dataset_id)
+                self.assertEqual(len(dataset_releases), 0)
+                ti = env.run_task(telescope.add_new_dataset_releases.__name__)
+                self.assertEqual(ti.state, State.SUCCESS)
+                dataset_releases = get_dataset_releases(dag_id=telescope.dag_id, dataset_id=telescope.api_dataset_id)
                 self.assertEqual(len(dataset_releases), 1)
 
-    def test_get_label_id(self):
-        """Test getting label id both when label already exists and does not exist yet.
+                # Test that all telescope data deleted
+                ti = env.run_task(telescope.cleanup.__name__)
+                self.assertEqual(ti.state, State.SUCCESS)
+                self.assert_cleanup(release.workflow_folder)
 
-        :return: None.
-        """
+    def test_get_label_id(self):
+        """Test getting label id both when label already exists and does not exist yet."""
         list_labels_no_match = {
             "labels": [
                 {
@@ -402,10 +341,7 @@ class TestJstorTelescope(ObservatoryTestCase):
 
     def test_get_release_date(self):
         """Test that the get_release_date returns the correct release date and raises an exception when dates are
-        incorrect
-
-        :return: None.
-        """
+        incorrect"""
         with CliRunner().isolated_filesystem():
             # Test reports in new format with header
             new_report_content = (
@@ -431,14 +367,16 @@ class TestJstorTelescope(ObservatoryTestCase):
                         f.write(old_report_content.format(start_date=report["start"], end_date=report["end"]))
 
             # Test new report is successful
-            release_date = get_release_date(reports[0]["file"])
-            self.assertEqual(pendulum.parse(reports[0]["end"]), release_date)
+            start_date, end_date = get_release_date(reports[0]["file"])
+            self.assertEqual(pendulum.parse(reports[0]["start"]), start_date)
+            self.assertEqual(pendulum.parse(reports[0]["end"]), end_date)
             # Test new report fails
             with self.assertRaises(AirflowException):
                 get_release_date(reports[1]["file"])
             # Test old report is successful
-            release_date = get_release_date(reports[2]["file"])
-            self.assertEqual(pendulum.parse(reports[2]["end"]).end_of("month"), release_date)
+            start_date, end_date = get_release_date(reports[2]["file"])
+            self.assertEqual(pendulum.parse(reports[2]["start"]).start_of("month").start_of("day"), start_date)
+            self.assertEqual(pendulum.parse(reports[2]["end"]).end_of("month").start_of("day"), end_date)
             # Test old report fails
             with self.assertRaises(AirflowException):
                 get_release_date(reports[3]["file"])

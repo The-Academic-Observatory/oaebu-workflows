@@ -17,10 +17,8 @@
 import logging
 import os
 import re
-import json
 import subprocess
-from datetime import timedelta
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import pendulum
 from airflow.exceptions import AirflowException
@@ -28,24 +26,23 @@ from airflow.models.taskinstance import TaskInstance
 from google.cloud.bigquery import SourceFormat
 
 from oaebu_workflows.config import schema_folder as default_schema_folder
-from oaebu_workflows.dag_tag import Tag
-from observatory.platform.utils.airflow_utils import AirflowConns, AirflowVars
-from observatory.platform.utils.config_utils import observatory_home, find_schema
-from observatory.platform.utils.file_utils import load_jsonl
-from observatory.platform.utils.dag_run_sensor import DagRunSensor
+from observatory.api.client.model.dataset_release import DatasetRelease
+from observatory.platform.api import make_observatory_api
+from observatory.platform.airflow import AirflowConns
+from observatory.platform.files import load_jsonl, save_jsonl_gz
+from observatory.platform.gcs import gcs_blob_uri, gcs_upload_files, gcs_blob_name_from_path
+from observatory.platform.bigquery import bq_find_schema, bq_load_table, bq_sharded_table_id, bq_create_dataset
 from observatory.platform.utils.http_download import download_file
 from observatory.platform.utils.proc_utils import wait_for_process
-from observatory.platform.utils.workflow_utils import (
-    SftpFolders,
-    blob_name,
-    bq_load_shard,
-    make_dag_id,
-    make_sftp_connection,
-    table_ids_from_path,
-)
-from observatory.platform.workflows.snapshot_telescope import (
+from observatory.platform.observatory_config import CloudWorkspace
+from observatory.platform.config import observatory_home
+from observatory.platform.sftp import SftpFolders, make_sftp_connection
+from observatory.platform.workflows.workflow import (
     SnapshotRelease,
-    SnapshotTelescope,
+    Workflow,
+    cleanup,
+    set_task_state,
+    check_workflow_inputs,
 )
 
 ONIX_PARSER_NAME = "coki-onix-parser.jar"
@@ -53,230 +50,88 @@ ONIX_PARSER_URL = "https://github.com/The-Academic-Observatory/onix-parser/relea
 
 
 class OnixRelease(SnapshotRelease):
-    DOWNLOAD_FILES_REGEX = r"^.*\.(onx|xml)$"
-    TRANSFORM_FILES_REGEX = "onix.jsonl"
-
     def __init__(
         self,
         *,
         dag_id: str,
-        release_date: pendulum.DateTime,
-        file_name: str,
-        organisation_name: str,
-        download_bucket: str,
-        transform_bucket: str,
+        run_id: str,
+        snapshot_date: pendulum.DateTime,
+        onix_file_name: str,
     ):
         """Construct an OnixRelease.
 
-        :param dag_id: the DAG id.
-        :param release_date: the release date.
-        :param file_name: the ONIX file name.
-        :param organisation_name: the organisation name.
-        :param download_bucket: the download bucket name.
-        :param transform_bucket: the transform bucket name.
+        :param dag_id: The ID of the DAG
+        :param run_id: The Airflow run ID
+        :param snapshot_date: The date of the snapshot/release
+        :param onix_file_name: The ONIX file name.
         """
-
-        self.organisation_name = organisation_name
-        self._download_bucket = download_bucket
-        self._transform_bucket = transform_bucket
-
-        super().__init__(dag_id, release_date, self.DOWNLOAD_FILES_REGEX, None, self.TRANSFORM_FILES_REGEX)
-        self.organisation_name = organisation_name
-        self.file_name = file_name
-        self.sftp_folders = SftpFolders(dag_id, organisation_name)
-
-    @property
-    def download_file(self) -> str:
-        """Get the path to the downloaded file.
-
-        :return: the file path.
-        """
-
-        return os.path.join(self.download_folder, self.file_name)
-
-    @property
-    def download_bucket(self):
-        """The download bucket name.
-
-        :return: the download bucket name.
-        """
-        return self._download_bucket
-
-    @property
-    def transform_bucket(self):
-        """The transform bucket name.
-
-        :return: the transform bucket name.
-        """
-        return self._transform_bucket
-
-    def move_files_to_in_progress(self):
-        """Move ONIX file to in-progress folder
-        :return: None.
-        """
-
-        self.sftp_folders.move_files_to_in_progress(self.file_name)
-
-    def download(self):
-        """Downloads an individual ONIX release from the SFTP server.
-
-        :return: None.
-        """
-
-        with make_sftp_connection() as sftp:
-            in_progress_file = os.path.join(self.sftp_folders.in_progress, self.file_name)
-            sftp.get(in_progress_file, localpath=self.download_file)
-
-    def transform(self):
-        """Transform ONIX release.
-
-        :return: None.
-        """
-        parse_onix(self.download_folder, self.transform_folder)
-        onix = onix_collapse_subjects(load_jsonl(os.path.join(self.transform_folder, "full.jsonl")))
-        with open(os.path.join(self.transform_folder, self.TRANSFORM_FILES_REGEX), "w") as f:
-            for line in onix:
-                json.dump(line, f)
-                f.write("\n")
-
-    def move_files_to_finished(self):
-        """Move ONIX file to finished folder
-        :return: None.
-        """
-
-        self.sftp_folders.move_files_to_finished(self.file_name)
+        super().__init__(dag_id=dag_id, run_id=run_id, snapshot_date=snapshot_date)
+        self.onix_file_name = onix_file_name
+        self.download_path = os.path.join(self.download_folder, self.onix_file_name)
+        self.transform_path = os.path.join(self.transform_folder, "onix.jsonl.gz")
 
 
-def list_release_info(
-    *,
-    sftp_upload_folder: str,
-    date_regex: str,
-) -> List[Dict]:
-    """List the ONIX release info, a release date and a file name for each release.
-
-    :param sftp_upload_folder: the SFTP upload folder.
-    :param date_regex: the regex for extracting the date from the filename.
-    :return: the release information.
-    """
-
-    results = []
-    with make_sftp_connection() as sftp:
-        sftp.makedirs(sftp_upload_folder)
-        files = sftp.listdir(sftp_upload_folder)
-        for file_name in files:
-            if re.match(OnixRelease.DOWNLOAD_FILES_REGEX, file_name):
-                try:
-                    date_str = re.search(date_regex, file_name).group(0)
-                except AttributeError:
-                    msg = f"Could not find date with pattern `{date_regex}` in file name {file_name}"
-                    logging.error(msg)
-                    raise AirflowException(msg)
-                results.append({"release_date": date_str, "file_name": file_name})
-    return results
-
-
-class OnixTelescope(SnapshotTelescope):
-    DAG_ID_PREFIX = "onix"
-
+class OnixTelescope(Workflow):
     def __init__(
         self,
         *,
-        organisation_name: str,
-        project_id: str,
-        download_bucket: str,
-        transform_bucket: str,
-        data_location: str,
+        dag_id: str,
+        cloud_workspace: CloudWorkspace,
+        sftp_root: str,
         date_regex: str,
-        dag_id: Optional[str] = None,
-        start_date: pendulum.DateTime = pendulum.datetime(2021, 3, 28),
-        schedule_interval: str = "@weekly",
-        dataset_id: str = "onix",
+        bq_dataset_id: str = "onix",
+        bq_table_name: str = "onix",
+        bq_dataset_description: str = "ONIX data provided by Org",
+        bq_table_description: str = None,
+        api_dataset_id: str = "onix",
         schema_folder: str = default_schema_folder(),
-        source_format: str = SourceFormat.NEWLINE_DELIMITED_JSON,
+        observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
+        sftp_service_conn_id: str = "sftp_service",
         catchup: bool = False,
-        airflow_vars: List = None,
-        airflow_conns: List = None,
-        workflow_id: int = None,
-        sensor_dag_ids: List[str] = None,
+        schedule_interval: str = "@weekly",
+        start_date: pendulum.DateTime = pendulum.datetime(2021, 3, 28),
     ):
         """Construct an OnixTelescope instance.
-
-        :param organisation_name: the organisation name.
-        :param project_id: the Google Cloud project id.
-        :param download_bucket: the Google Cloud download bucket.
-        :param transform_bucket: the Google Cloud transform bucket.
-        :param data_location: the location for the BigQuery dataset.
-        :param date_regex: a regular expression for extracting a date string from an ONIX file name.
-        `date_regex` into a date object.
-        :param dag_id: the id of the DAG, by default this is automatically generated based on the DAG_ID_PREFIX
-        and the organisation name.
-        :param start_date: the start date of the DAG.
-        :param schedule_interval: the schedule interval of the DAG.
-        :param dataset_id: the BigQuery dataset id.
-        :param schema_folder: the SQL schema path.
-        :param source_format: the format of the data to load into BigQuery.
-        :param catchup: whether to catchup the DAG or not.
-        :param airflow_vars: list of airflow variable keys, for each variable, it is checked if it exists in airflow.
-        :param airflow_conns: list of airflow connection keys, for each connection, it is checked if it exists in airflow.
-        :param workflow_id: api workflow id.
-        :param sensor_dag_ids: ids of dags to wait for before running
+        :param dag_id: The ID of the DAG
+        :param cloud_workspace: The CloudWorkspace object for this DAG
+        :param sftp_root: The working root of the SFTP server
+        :param date_regex: Regular expression for extracting a date string from an ONIX file name
+        :param bq_dataset_id: The BigQuery dataset ID
+        :param bq_table_name: The BigQuery table name
+        :param bq_dataset_description: Description for the BigQuery dataset
+        :param bq_table_description: Description for the biguery table
+        :param api_dataset_id: The ID to store the dataset release in the API
+        :param schema_folder: The path to the SQL schema folder
+        :param observatory_api_conn_id: Airflow connection ID for the overvatory API
+        :param sftp_service_conn_id: Airflow connection ID for the SFTP service
+        :param catchup: Whether to catchup the DAG or not
+        :param schedule_interval: The schedule interval of the DAG
+        :param start_date: The start date of the DAG
         """
-
-        if airflow_vars is None:
-            airflow_vars = [
-                AirflowVars.DATA_PATH,
-                AirflowVars.PROJECT_ID,
-                AirflowVars.DATA_LOCATION,
-                AirflowVars.DOWNLOAD_BUCKET,
-                AirflowVars.TRANSFORM_BUCKET,
-            ]
-
-        if airflow_conns is None:
-            airflow_conns = [AirflowConns.SFTP_SERVICE]
-
-        if dag_id is None:
-            dag_id = make_dag_id(self.DAG_ID_PREFIX, organisation_name)
-
-        self.sensor_dag_ids = sensor_dag_ids
-        if sensor_dag_ids is None:
-            self.sensor_dag_ids = []
-
-        dataset_description = f"{organisation_name} ONIX feeds"
-        self.organisation_name = organisation_name
-        self.project_id = project_id
-        self.download_bucket = download_bucket
-        self.transform_bucket = transform_bucket
-        self.data_location = data_location
-        self.date_regex = date_regex
-
         super().__init__(
             dag_id,
             start_date,
             schedule_interval,
-            dataset_id,
-            schema_folder,
-            source_format=source_format,
-            dataset_description=dataset_description,
             catchup=catchup,
-            airflow_vars=airflow_vars,
-            airflow_conns=airflow_conns,
-            workflow_id=workflow_id,
-            tags=[Tag.oaebu],
-            load_bigquery_table_kwargs={"ignore_unknown_values": True},
+            airflow_conns=[observatory_api_conn_id, sftp_service_conn_id],
+            tags=["oaebu"],
         )
+        self.dag_id = dag_id
+        self.cloud_workspace = cloud_workspace
+        self.sftp_root = sftp_root
+        self.date_regex = date_regex
+        self.bq_dataset_id = bq_dataset_id
+        self.bq_table_name = bq_table_name
+        self.bq_dataset_description = bq_dataset_description
+        self.bq_table_description = bq_table_description
+        self.api_dataset_id = api_dataset_id
+        self.schema_folder = schema_folder
+        self.observatory_api_conn_id = observatory_api_conn_id
+        self.sftp_service_conn_id = sftp_service_conn_id
 
-        # Add a list of ExternalTask sensors to wait for other DAGs to finish
-        for sensor_id in self.sensor_dag_ids:
-            self.add_operator(
-                DagRunSensor(
-                    task_id=f"{sensor_id}_sensor",
-                    external_dag_id=sensor_id,
-                    mode="reschedule",
-                    duration=timedelta(days=7),  # Look back up to 7 days from execution date
-                    poke_interval=int(timedelta(hours=1).total_seconds()),  # Check at this interval if dag run is ready
-                    timeout=int(timedelta(days=2).total_seconds()),  # Sensor will fail after 2 days of waiting
-                )
-            )
+        self.sftp_folders = SftpFolders(dag_id, sftp_conn_id=sftp_service_conn_id, sftp_root=sftp_root)
+
+        check_workflow_inputs(self)
 
         self.add_setup_task(self.check_dependencies)
         self.add_setup_task(self.list_release_info)
@@ -287,21 +142,30 @@ class OnixTelescope(SnapshotTelescope):
         self.add_task(self.upload_transformed)
         self.add_task(self.bq_load)
         self.add_task(self.move_files_to_finished)
-        self.add_task(self.cleanup)
         self.add_task(self.add_new_dataset_releases)
+        self.add_task(self.cleanup)
 
     def list_release_info(self, **kwargs):
         """Lists all ONIX releases and publishes their file names as an XCom.
 
-        :param kwargs: the context passed from the BranchPythonOperator. See
-        https://airflow.apache.org/docs/stable/macros-ref.html
-        for a list of the keyword arguments that are passed to this argument.
+        :param kwargs: the context passed from the BranchPythonOperator.
+        See https://airflow.apache.org/docs/stable/macros-ref.html for the keyword arguments that can be passed
         :return: the identifier of the task to execute next.
         """
 
         # List release dates
-        sftp_upload_folder = SftpFolders(self.dag_id, self.organisation_name).upload
-        release_info = list_release_info(sftp_upload_folder=sftp_upload_folder, date_regex=self.date_regex)
+        release_info = []
+        with make_sftp_connection(self.sftp_service_conn_id) as sftp:
+            files = sftp.listdir(self.sftp_folders.upload)
+            for file_name in files:
+                if re.match(self.date_regex, file_name):
+                    try:
+                        date_str = re.search(self.date_regex, file_name).group(0)
+                    except AttributeError:
+                        msg = f"Could not find date with pattern `{self.date_regex}` in file name {file_name}"
+                        logging.error(msg)
+                        raise AirflowException(msg)
+                    release_info.append({"release_date": date_str, "file_name": file_name})
 
         # Publish XCom
         continue_dag = len(release_info)
@@ -316,10 +180,7 @@ class OnixTelescope(SnapshotTelescope):
         """Make release instances. The release is passed as an argument to the function (TelescopeFunction) that is
         called in 'task_callable'.
 
-        :param kwargs: the context passed from the PythonOperator. See
-        https://airflow.apache.org/docs/stable/macros-ref.html for a list of the keyword arguments that are
-        passed to this argument.
-        :return: a list of GeonamesRelease instances.
+        :return: a list of Onix release instances.
         """
 
         ti: TaskInstance = kwargs["ti"]
@@ -328,92 +189,104 @@ class OnixTelescope(SnapshotTelescope):
         )
         releases = []
         for record in records:
-            release_date = pendulum.parse(record["release_date"])
-            file_name = record["file_name"]
+            onix_file_name = record["file_name"]
             releases.append(
                 OnixRelease(
                     dag_id=self.dag_id,
-                    release_date=release_date,
-                    file_name=file_name,
-                    organisation_name=self.organisation_name,
-                    download_bucket=self.download_bucket,
-                    transform_bucket=self.transform_bucket,
+                    run_id=kwargs["run_id"],
+                    snapshot_date=pendulum.parse(record["release_date"]),
+                    onix_file_name=onix_file_name,
                 )
             )
         return releases
 
     def move_files_to_in_progress(self, releases: List[OnixRelease], **kwargs):
         """Move ONIX files to SFTP in-progress folder.
-
-        :param releases: a list of ONIX releases.
-        :return: None.
-        """
-
-        for release in releases:
-            release.move_files_to_in_progress()
+        :param releases: a list of Onix release instances"""
+        self.sftp_folders.move_files_to_in_progress([release.onix_file_name for release in releases])
 
     def download(self, releases: List[OnixRelease], **kwargs):
-        """Task to download the ONIX releases.
+        """Task to download the ONIX releases."""
+        with make_sftp_connection(self.sftp_service_conn_id) as sftp:
+            for release in releases:
+                in_progress_file = os.path.join(self.sftp_folders.in_progress, release.onix_file_name)
+                sftp.get(in_progress_file, localpath=release.download_path)
 
-        :param releases: a list of ONIX releases.
-        :return: None.
-        """
-
+    def upload_downloaded(self, releases: List[OnixRelease], **kwargs):
+        """Uploads the downloaded onix file to GCS"""
         for release in releases:
-            release.download()
+            success = gcs_upload_files(
+                bucket_name=self.cloud_workspace.download_bucket, file_paths=[release.download_path]
+            )
+            set_task_state(success, kwargs["ti"].task_id, release=release)
 
     def transform(self, releases: List[OnixRelease], **kwargs):
-        """Task to transform the ONIX releases.
-
-        :param releases: a list of ONIX releases.
-        :return: None.
-        """
+        """Task to transform the ONIX releases."""
 
         # Transform each release
         for release in releases:
-            release.transform()
+            parse_onix(release.download_folder, release.transform_folder)
+            onix = onix_collapse_subjects(load_jsonl(os.path.join(release.transform_folder, "full.jsonl")))
+            save_jsonl_gz(release.transform_path, onix)
 
-    def bq_load(self, releases: List[SnapshotRelease], **kwargs):
-        """Task to load each transformed release to BigQuery.
+    def upload_transformed(self, releases: List[OnixRelease], **kwargs):
+        """Uploads the transformed file to GCS"""
+        for release in releases:
+            success = gcs_upload_files(
+                bucket_name=self.cloud_workspace.transform_bucket, file_paths=[release.transform_path]
+            )
+            set_task_state(success, kwargs["ti"].task_id, release=release)
 
-        The table_id is set to the file name without the extension.
-
-        :param releases: a list of releases.
-        :return: None.
-        """
-
+    def bq_load(self, releases: List[OnixRelease], **kwargs):
+        """Task to load each transformed release to BigQuery."""
+        bq_create_dataset(
+            project_id=self.cloud_workspace.project_id,
+            dataset_id=self.bq_dataset_id,
+            location=self.cloud_workspace.data_location,
+            description=self.bq_dataset_description,
+        )
         # Load each transformed release
         for release in releases:
-            for transform_path in release.transform_files:
-                transform_blob = blob_name(transform_path)
-                table_id, _ = table_ids_from_path(transform_path)
-                schema_file_path = find_schema(path=self.schema_folder, table_name=table_id)
-                bq_load_shard(
-                    schema_file_path=schema_file_path,
-                    project_id=self.project_id,
-                    transform_bucket=self.transform_bucket,
-                    transform_blob=transform_blob,
-                    dataset_id=self.dataset_id,
-                    data_location=self.data_location,
-                    table_id=table_id,
-                    release_date=release.release_date,
-                    source_format=self.source_format,
-                    dataset_description=self.dataset_description,
-                    **self.load_bigquery_table_kwargs,
-                )
+            table_id = bq_sharded_table_id(
+                self.cloud_workspace.project_id, self.bq_dataset_id, self.bq_table_name, release.snapshot_date
+            )
+            uri = gcs_blob_uri(self.cloud_workspace.transform_bucket, gcs_blob_name_from_path(release.transform_path))
+            state = bq_load_table(
+                uri=uri,
+                table_id=table_id,
+                schema_file_path=bq_find_schema(path=self.schema_folder, table_name=self.bq_table_name),
+                source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
+                table_description=self.bq_table_description,
+            )
+            set_task_state(state, kwargs["ti"].task_id, release=release)
 
     def move_files_to_finished(self, releases: List[OnixRelease], **kwargs):
-        """Move ONIX files to SFTP finished folder.
+        """Move ONIX files to SFTP finished folder."""
+        self.sftp_folders.move_files_to_finished([release.onix_file_name for release in releases])
 
-        :param releases: a list of ONIX releases.
-        :return: None.
-        """
-
+    def add_new_dataset_releases(self, releases: List[OnixRelease], **kwargs) -> None:
+        """Adds release information to API."""
+        api = make_observatory_api(observatory_api_conn_id=self.observatory_api_conn_id)
         for release in releases:
-            release.move_files_to_finished()
+            dataset_release = DatasetRelease(
+                dag_id=self.dag_id,
+                dataset_id=self.api_dataset_id,
+                dag_run_id=release.run_id,
+                snapshot_date=release.snapshot_date,
+                data_interval_start=kwargs["data_interval_start"],
+                data_interval_end=kwargs["data_interval_end"],
+            )
+            api.post_dataset_release(dataset_release)
+
+    def cleanup(self, releases: List[OnixRelease], **kwargs) -> None:
+        """Delete all files, folders and XComs associated with this release."""
+        for release in releases:
+            cleanup(
+                dag_id=self.dag_id, execution_date=kwargs["execution_date"], workflow_folder=release.workflow_folder
+            )
 
 
-def parse_onix(input_dir: str, output_dir: str):
+def parse_onix(input_dir: str, output_dir: str) -> None:
     """Runs the onix parser on an onix file/files
 
     :param input_dir: The directory containing the onix input

@@ -59,7 +59,7 @@ SELECT
         SUM(month.oapen_irus_uk.unique_item_investigations) as unique_item_investigations,
         SUM(month.oapen_irus_uk.unique_item_requests) as unique_item_requests
     ) as oapen_irus_uk,
-FROM `{{ project_id }}.{{ dataset_id }}.book_product{{ release.strftime('%Y%m%d') }}`, UNNEST(onix.authors) as author, UNNEST(months) as month
+FROM `{{ book_product_table_id }}`, UNNEST(onix.authors) as author, UNNEST(months) as month
 WHERE month.oapen_irus_uk IS NOT NULL OR month.google_books_traffic IS NOT NULL OR month.google_books_sales IS NOT NULL
 GROUP BY author.PersonName, month
 ORDER BY author.PersonName ASC, month DESC

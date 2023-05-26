@@ -19,12 +19,10 @@ from __future__ import annotations
 import json
 import os
 
-from oaebu_workflows.config import elastic_mappings_folder
-from oaebu_workflows.dags.elastic_import_workflow import load_elastic_mappings_oaebu
-from observatory.platform.utils.config_utils import module_file_path
+from oaebu_workflows.config import elastic_mappings_folder, load_elastic_mappings_oaebu
+from observatory.platform.observatory_config import Workflow, CloudWorkspace
 from observatory.platform.utils.jinja2_utils import render_template
-from observatory.platform.utils.test_utils import ObservatoryEnvironment, ObservatoryTestCase
-from observatory.platform.utils.workflow_utils import make_dag_id
+from observatory.platform.observatory_environment import ObservatoryEnvironment, ObservatoryTestCase
 
 
 class TestElasticImportWorkflow(ObservatoryTestCase):
@@ -152,18 +150,27 @@ class TestElasticImportWorkflow(ObservatoryTestCase):
             self.assertEqual(expected_mappings, actual_mappings)
 
     def test_dag_load(self):
-        """Test that the DAG can be loaded from a DAG bag.
-
-        :return: None
-        """
-
-        env = ObservatoryEnvironment(self.project_id, self.data_location, enable_api=False)
+        """Test that the DAG can be loaded from a DAG bag."""
+        env = ObservatoryEnvironment(
+            enable_api=False,
+            workflows=[
+                Workflow(
+                    dag_id="elastic_import_test",
+                    name="Elastic Import Workflow",
+                    class_name="observatory.platform.workflows.elastic_import_workflow.ElasticImportWorkflow",
+                    cloud_workspace=CloudWorkspace(
+                        project_id=self.project_id,
+                        download_bucket="download-bucket",
+                        transform_bucket="transform-bucket",
+                        data_location=self.data_location,
+                    ),
+                    kwargs=dict(
+                        sensor_dag_ids=["onix_workflow_test"],
+                        kibana_spaces=["oaebu-test-press"],
+                        elastic_import_config="oaebu_workflows.config.ELASTIC_IMPORT_CONFIG",
+                    ),
+                )
+            ],
+        )
         with env.create():
-            expected_dag_ids = [
-                make_dag_id("elastic_import", suffix)
-                for suffix in ["anu_press", "ucl_press", "wits_university_press", "university_of_michigan_press"]
-            ]
-
-            dag_file = os.path.join(module_file_path("oaebu_workflows.dags"), "elastic_import_workflow.py")
-            for dag_id in expected_dag_ids:
-                self.assert_dag_load(dag_id, dag_file)
+            self.assert_dag_load_from_config("elastic_import_test")

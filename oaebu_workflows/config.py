@@ -13,9 +13,18 @@
 # limitations under the License.
 
 # Author: James Diprose
-
-from observatory.platform.utils.config_utils import module_file_path
 import os
+import json
+import re
+from typing import Dict
+
+from airflow.exceptions import AirflowException
+
+from observatory.platform.config import module_file_path
+from observatory.platform.workflows.elastic_import_workflow import ElasticImportConfig
+from observatory.platform.utils.jinja2_utils import render_template
+from observatory.platform.elastic.kibana import TimeField
+from observatory.platform.elastic.elastic import KeepInfo, KeepOrder
 
 
 def test_fixtures_folder(*subdirs) -> str:
@@ -46,6 +55,42 @@ def sql_folder() -> str:
     return module_file_path("oaebu_workflows.database.sql")
 
 
+####################################
+### For Elastic workflow Imports ###
+####################################
+
+
+def load_elastic_mappings_oaebu(path: str, table_prefix: str) -> Dict:
+    """For the OAEBU project, load the Elastic mappings for a given table_prefix.
+    :param path: the path to the mappings files.
+    :param table_prefix: the table_id prefix (without shard date).
+    :return: the rendered mapping as a Dict.
+    """
+
+    if not table_prefix.startswith("oaebu"):
+        raise ValueError("Table must begin with 'oaebu'")
+    elif "unmatched" in table_prefix:
+        mappings_path = os.path.join(path, "oaebu-unmatched-metrics-mappings.json.jinja2")
+        return json.loads(render_template(mappings_path))
+    elif "institution_list" in table_prefix:
+        mappings_path = os.path.join(path, "oaebu-institution-list-mappings.json.jinja2")
+        return json.loads(render_template(mappings_path))
+    else:
+        # Aggregation level
+        aggregation_level_search = re.search(r"(?<=book_)(.*?)(?=_)", table_prefix)
+        if aggregation_level_search:
+            aggregation_level = aggregation_level_search.group(1)
+        else:
+            raise AirflowException(f"Aggregation Level not found in table_prefix: {table_prefix}")
+
+        # Make mappings path
+        suffix = re.search(f"_book_{aggregation_level}_(.*)", table_prefix).group(1)
+        mappings_file_name = f"oaebu-{suffix}-mappings.json.jinja2".replace("_", "-")
+        mappings_path = os.path.join(path, mappings_file_name)
+
+        return json.loads(render_template(mappings_path, aggregation_level=aggregation_level))
+
+
 def elastic_mappings_folder() -> str:
     """Get the Elasticsearch mappings path.
 
@@ -53,3 +98,21 @@ def elastic_mappings_folder() -> str:
     """
 
     return module_file_path("oaebu_workflows.database.mappings")
+
+
+ELASTIC_OAEBU_KIBANA_TIME_FIELDS = [
+    TimeField("^oaebu-.*-unmatched-book-metrics$", "release_date"),
+    TimeField("^oaebu-.*-book-product-list$", "time_field"),
+    TimeField("^oaebu-.*$", "month"),
+]
+ELASTIC_INDEX_KEEP_INFO = {
+    "": KeepInfo(ordering=KeepOrder.newest, num=3),
+    "oaebu": KeepInfo(ordering=KeepOrder.newest, num=3),
+}
+
+ELASTIC_IMPORT_CONFIG = ElasticImportConfig(
+    elastic_mappings_path=elastic_mappings_folder(),
+    elastic_mappings_func=load_elastic_mappings_oaebu,
+    kibana_time_fields=ELASTIC_OAEBU_KIBANA_TIME_FIELDS,
+    index_keep_info=ELASTIC_INDEX_KEEP_INFO,
+)

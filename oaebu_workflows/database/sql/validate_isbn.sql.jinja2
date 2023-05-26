@@ -18,7 +18,7 @@ WITH isbn_check as (
 SELECT
   {{ isbn }}, is_isbn13({{ isbn }}) valid
 FROM
-    `{{ project_id }}.{{ dataset_id }}.{{ table_id }}`
+    `{{ table_id }}`
 )
 
 SELECT

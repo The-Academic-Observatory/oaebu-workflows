@@ -22,4 +22,4 @@ ChangeLog
 /oaebu_workflows/workflows/oapen_cloud_function.zip
 docs/schemas
 *.Rhistory
-
+.env
