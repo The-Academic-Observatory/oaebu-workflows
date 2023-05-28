@@ -27,193 +27,65 @@ from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.hooks.base import BaseHook
 from google.auth import environment_vars
 from google.auth.transport.requests import AuthorizedSession
-from google.cloud import bigquery
+from google.cloud.bigquery import TimePartitioningType, SourceFormat
 from google.oauth2.service_account import IDTokenCredentials
 from googleapiclient.discovery import Resource, build
 from googleapiclient.errors import HttpError
 from oauth2client.service_account import ServiceAccountCredentials
 
 from oaebu_workflows.config import schema_folder as default_schema_folder
-from observatory.api.client.model.organisation import Organisation
-from observatory.platform.utils.airflow_utils import AirflowConns, AirflowVars
-from observatory.platform.utils.file_utils import get_file_hash, list_to_jsonl_gz
-from observatory.platform.utils.gc_utils import (
-    copy_blob_from_cloud_storage,
-    create_cloud_storage_bucket,
-    download_blob_from_cloud_storage,
-    upload_file_to_cloud_storage,
+from observatory.api.client.model.dataset_release import DatasetRelease
+from observatory.platform.api import make_observatory_api
+from observatory.platform.airflow import AirflowConns
+from observatory.platform.files import get_file_hash, save_jsonl_gz
+from observatory.platform.files import add_partition_date
+from observatory.platform.bigquery import bq_load_table, bq_table_id, bq_find_schema, bq_create_dataset
+from observatory.platform.observatory_config import CloudWorkspace
+from observatory.platform.workflows.workflow import (
+    PartitionRelease,
+    Workflow,
+    cleanup,
+    set_task_state,
+    check_workflow_inputs,
 )
-from observatory.platform.utils.workflow_utils import (
-    SubFolder,
-    add_partition_date,
-    blob_name,
-    make_dag_id,
-    make_org_id,
-    workflow_path,
+from observatory.platform.gcs import (
+    gcs_copy_blob,
+    gcs_create_bucket,
+    gcs_download_blob,
+    gcs_upload_file,
+    gcs_upload_files,
+    gcs_blob_uri,
+    gcs_blob_name_from_path,
 )
-from observatory.platform.workflows.organisation_telescope import (
-    OrganisationRelease,
-    OrganisationTelescope,
-)
-from oaebu_workflows.dag_tag import Tag
 
 
-class OapenIrusUkRelease(OrganisationRelease):
-    def __init__(self, dag_id: str, release_date: pendulum.DateTime, organisation: Organisation):
+class OapenIrusUkRelease(PartitionRelease):
+    def __init__(
+        self,
+        dag_id: str,
+        run_id: str,
+        data_interval_start: pendulum.DateTime,
+        data_interval_end: pendulum.DateTime,
+        partition_date: pendulum.DateTime,
+    ):
         """Create a OapenIrusUkRelease instance.
 
-        :param dag_id: the DAG id.
-        :param release_date: the date of the release.
-        :param organisation: the Organisation of which data is processed.
+        :param dag_id: The ID of the DAG
+        :param run_id: The Airflow run ID
+        :param partition_date: The date of the partition/release
         """
-
-        transform_files_regex = f"{OapenIrusUkTelescope.DAG_ID_PREFIX}.jsonl.gz"
-        super().__init__(dag_id, release_date, organisation, transform_files_regex=transform_files_regex)
-        self.organisation_id = make_org_id(organisation.name)
-
-    @property
-    def blob_name(self) -> str:
-        """Blob name for the access stats data, includes telescope dir
-
-        :return: Blob name
-        """
-        return blob_name(
-            os.path.join(self.download_folder, f'{self.release_date.strftime("%Y_%m")}_{self.organisation_id}.jsonl.gz')
+        super().__init__(dag_id=dag_id, run_id=run_id, partition_date=partition_date)
+        self.data_interval_start = data_interval_start
+        self.data_interval_end = data_interval_end
+        self.download_path = os.path.join(self.download_folder, "oapen_irus_uk.jsonl.gz")
+        self.transform_path = os.path.join(self.transform_folder, "oapen_irus_uk.jsonl.gz")
+        self.blob_name = gcs_blob_name_from_path(
+            os.path.join(self.download_folder, f'{self.partition_date.format("YYYY_MM")}.jsonl.gz')
         )
-
-    @property
-    def download_path(self) -> str:
-        """Creates path to store the downloaded oapen irus uk data
-
-        :return: Full path to the download file
-        """
-        return os.path.join(self.download_folder, f"{OapenIrusUkTelescope.DAG_ID_PREFIX}.jsonl.gz")
-
-    @property
-    def transform_path(self) -> str:
-        """Creates path to store the transformed oapen irus uk data
-
-        :return: Full path to the transform file
-        """
-        return os.path.join(self.transform_folder, f"{OapenIrusUkTelescope.DAG_ID_PREFIX}.jsonl.gz")
-
-    def create_cloud_function(self, max_instances: int):
-        """Create/update the google cloud function that is inside the oapen project id if the source code has changed.
-
-        :param max_instances: The limit on the maximum number of function instances that may coexist at a given time.
-        :return: None.
-        """
-
-        # set up cloud function variables
-        oapen_project_id = OapenIrusUkTelescope.OAPEN_PROJECT_ID
-        source_bucket = OapenIrusUkTelescope.OAPEN_BUCKET
-        function_name = OapenIrusUkTelescope.FUNCTION_NAME
-        function_region = OapenIrusUkTelescope.FUNCTION_REGION
-        function_source_url = OapenIrusUkTelescope.FUNCTION_SOURCE_URL
-        function_blob_name = OapenIrusUkTelescope.FUNCTION_BLOB_NAME
-        location = f"projects/{oapen_project_id}/locations/{function_region}"
-        full_name = f"{location}/functions/{function_name}"
-
-        # zip source code and upload to bucket
-        success, upload = upload_source_code_to_bucket(
-            function_source_url, oapen_project_id, source_bucket, function_blob_name
-        )
-        if not success:
-            raise AirflowException("Could not upload source code of cloud function to bucket.")
-
-        # initialise cloud functions api
-        creds = ServiceAccountCredentials.from_json_keyfile_name(os.environ.get(environment_vars.CREDENTIALS))
-        service = build("cloudfunctions", "v2beta", credentials=creds, cache_discovery=False, static_discovery=False)
-
-        # update or create cloud function
-        exists = cloud_function_exists(service, full_name)
-        if not exists or upload is True:
-            update = True if exists else False
-            success, msg = create_cloud_function(
-                service, location, full_name, source_bucket, function_blob_name, max_instances, update
-            )
-            if success:
-                logging.info(f"Creating or patching cloud function successful, response: {msg}")
-            else:
-                raise AirflowException(f"Creating or patching cloud function unsuccessful, error: {msg}")
-        else:
-            logging.info(f"Using existing cloud function, source code has not changed.")
-
-    def call_cloud_function(self, publisher_name_v4: str, publisher_uuid_v5: str):
-        """Call the google cloud function that is inside the oapen project id
-
-        :param publisher_name_v4: the publisher name, used with OAPEN counter v4 data
-        :param publisher_uuid_v5: the publisher UUID, used with OAPEN counter v5 data
-        :return: None.
-        """
-        # set up cloud function variables
-        oapen_project_id = OapenIrusUkTelescope.OAPEN_PROJECT_ID
-        source_bucket = OapenIrusUkTelescope.OAPEN_BUCKET
-        function_name = OapenIrusUkTelescope.FUNCTION_NAME
-        function_region = OapenIrusUkTelescope.FUNCTION_REGION
-        location = f"projects/{oapen_project_id}/locations/{function_region}"
-        full_name = f"{location}/functions/{function_name}"
-        geoip_license_key = BaseHook.get_connection(AirflowConns.GEOIP_LICENSE_KEY).password
-
-        # get the publisher_uuid or publisher_id, both are set to empty strings when publisher id is 'oapen'
-        if self.release_date >= pendulum.datetime(2020, 4, 1):
-            airflow_conn = AirflowConns.OAPEN_IRUS_UK_API
-        else:
-            airflow_conn = AirflowConns.OAPEN_IRUS_UK_LOGIN
-        username = BaseHook.get_connection(airflow_conn).login
-        password = BaseHook.get_connection(airflow_conn).password
-
-        # initialise cloud functions api
-        creds = ServiceAccountCredentials.from_json_keyfile_name(os.environ.get(environment_vars.CREDENTIALS))
-        service = build("cloudfunctions", "v2beta", credentials=creds, cache_discovery=False, static_discovery=False)
-
-        # Get cloud function uri
-        function_uri = cloud_function_exists(service, full_name)
-
-        call_cloud_function(
-            function_uri,
-            self.release_date.strftime("%Y-%m"),
-            username,
-            password,
-            geoip_license_key,
-            publisher_name_v4,
-            publisher_uuid_v5,
-            source_bucket,
-            self.blob_name,
-        )
-
-    def transfer(self):
-        """Transfer blob from bucket inside oapen project to bucket in airflow project.
-
-        :return: None.
-        """
-        success = copy_blob_from_cloud_storage(self.blob_name, OapenIrusUkTelescope.OAPEN_BUCKET, self.download_bucket)
-        if not success:
-            raise AirflowException("Transfer blob unsuccessful")
-
-    def download_transform(self):
-        """Download blob with access stats to a local file.
-
-        :return: None.
-        """
-        success = download_blob_from_cloud_storage(self.download_bucket, self.blob_name, self.download_path)
-        if not success:
-            raise AirflowException("Download blob unsuccessful")
-
-        # Read gzipped data and create list of dicts
-        with gzip.open(self.download_path, "r") as f:
-            results = [json.loads(line) for line in f]
-
-        # Add partition date
-        results = add_partition_date(results, self.release_date, bigquery.TimePartitioningType.MONTH)
-
-        # Write list into gzipped JSON Lines file
-        list_to_jsonl_gz(self.transform_path, results)
+        self.cloud_function_path = os.path.join(self.download_folder, "oapen_cloud_function.zip")
 
 
-class OapenIrusUkTelescope(OrganisationTelescope):
-    DAG_ID_PREFIX = "oapen_irus_uk"
-
+class OapenIrusUkTelescope(Workflow):
     OAPEN_PROJECT_ID = "oapen-usage-data-gdpr-proof"  # The oapen project id.
     OAPEN_BUCKET = f"{OAPEN_PROJECT_ID}_cloud-function"  # Storage bucket with the source code
     FUNCTION_NAME = "oapen-access-stats"  # Name of the google cloud function
@@ -229,88 +101,86 @@ class OapenIrusUkTelescope(OrganisationTelescope):
 
     def __init__(
         self,
-        organisation: Organisation,
+        dag_id: str,
+        cloud_workspace: CloudWorkspace,
         publisher_name_v4: str,
         publisher_uuid_v5: str,
-        dag_id: Optional[str] = None,
+        bq_dataset_id: str = "oapen",
+        bq_table_name: str = "oapen_irus_uk",
+        bq_dataset_description: str = "OAPEN Irus dataset",
+        bq_table_description: str = None,
+        schema_folder: str = default_schema_folder(),
+        api_dataset_id: str = "oapen",
+        max_cloud_function_instances: int = 0,
+        observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
+        geoip_license_conn_id: str = "geoip_license_key",
+        oapen_irus_api_conn_id: str = "oapen_irus_uk_api",
+        oapen_irus_login_conn_id: str = "oapen_irus_uk_login",
+        catchup: bool = True,
         start_date: pendulum.DateTime = pendulum.datetime(2015, 6, 1),
         schedule_interval: str = "0 0 14 * *",
-        dataset_id: str = "oapen",
-        schema_folder: str = default_schema_folder(),
-        dataset_description: str = "OAPEN dataset",
-        table_descriptions: Dict = None,
-        catchup: bool = True,
-        airflow_vars: List = None,
-        airflow_conns: List = None,
-        max_active_runs=5,
-        max_cloud_function_instances: int = 0,
-        workflow_id: int = None,
+        max_active_runs: int = 5,
     ):
-
         """The OAPEN irus uk telescope.
-        :param organisation: the Organisation the DAG will process.
-        :param publisher_name_v4: the publisher name, used with OAPEN counter v4 data, obtained from the 'extra' info
-        :param publisher_uuid_v5: the publisher UUID, used with OAPEN counter v5 data, obtained from the 'extra' info
-        :param dag_id: the id of the DAG.
-        :param start_date: the start date of the DAG.
-        :param schedule_interval: the schedule interval of the DAG.
-        :param dataset_id: the BigQuery dataset id.
-        :param schema_folder: the SQL schema path.
-        :param dataset_description: description for the BigQuery dataset.
-        :param table_descriptions: a dictionary with table ids and corresponding table descriptions.
-        :param catchup:  whether to catchup the DAG or not.
-        :param airflow_vars: list of airflow variable keys, for each variable it is checked if it exists in airflow.
-        :param airflow_conns: list of airflow connection keys, for each connection it is checked if it exists in airflow
-        :param max_cloud_function_instances: the maximum cloud function instances.
-        :param workflow_id: api workflow id.
+        :param dag_id: The ID of the DAG
+        :param cloud_workspace: The CloudWorkspace object for this DAG
+        :param publisher_name_v4: The publisher's name for version 4
+        :param publisher_uuid_v5: The publisher's uuid for version 5
+        :param bq_dataset_id: The BigQuery dataset ID
+        :param bq_table_name: The BigQuery table name
+        :param bq_dataset_description: Description for the BigQuery dataset
+        :param bq_table_description: Description for the biguery table
+        :param schema_folder: The path to the SQL schema folder
+        :param api_dataset_id: The ID to store the dataset release in the API
+        :param max_cloud_function_instances:
+        :param observatory_api_conn_id: Airflow connection ID for the overvatory API
+        :param geoip_license_conn_id: The Airflow connection ID for the GEOIP license
+        :param oapen_irus_api_conn_id: The Airflow connection ID for IRUS API - for counter 5
+        :param oapen_irus_login_conn_id: The Airflow connection ID for IRUS API (login) - for counter 4
+        :param catchup: Whether to catchup the DAG or not
+        :param start_date: The start date of the DAG
+        :param schedule_interval: The schedule interval of the DAG
+        :param max_active_runs: The maximum number of concurrent DAG instances
         """
-
-        if airflow_vars is None:
-            airflow_vars = [
-                AirflowVars.DATA_PATH,
-                AirflowVars.PROJECT_ID,
-                AirflowVars.DATA_LOCATION,
-                AirflowVars.DOWNLOAD_BUCKET,
-                AirflowVars.TRANSFORM_BUCKET,
-            ]
-
-        if airflow_conns is None:
-            airflow_conns = [
-                AirflowConns.GEOIP_LICENSE_KEY,
-                AirflowConns.OAPEN_IRUS_UK_API,
-                AirflowConns.OAPEN_IRUS_UK_LOGIN,
-            ]
-
-        if table_descriptions is None:
-            table_descriptions = {
-                self.DAG_ID_PREFIX: "Access stats from the OAPEN IRUS UK platform. Before 2020-04 "
+        if bq_table_description is None:
+            bq_table_description = {
+                "oapen_irus_uk": "Access stats from the OAPEN IRUS UK platform. Before 2020-04 "
                 "from: https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/. "
                 "After 2020-04 from the OAPEN_SUSHI API (documentation not "
                 "published)."
             }
 
-        if dag_id is None:
-            dag_id = make_dag_id(self.DAG_ID_PREFIX, organisation.name)
-
         super().__init__(
-            organisation,
             dag_id,
             start_date,
             schedule_interval,
-            dataset_id,
-            schema_folder,
-            dataset_description=dataset_description,
             catchup=catchup,
-            airflow_vars=airflow_vars,
-            airflow_conns=airflow_conns,
+            airflow_conns=[
+                observatory_api_conn_id,
+                geoip_license_conn_id,
+                oapen_irus_api_conn_id,
+                oapen_irus_login_conn_id,
+            ],
             max_active_runs=max_active_runs,
-            workflow_id=workflow_id,
-            table_descriptions=table_descriptions,
-            tags=[Tag.oaebu],
+            tags=["oaebu"],
         )
-        self.max_cloud_function_instances = max_cloud_function_instances
+        self.dag_id = dag_id
+        self.cloud_workspace = cloud_workspace
         self.publisher_name_v4 = publisher_name_v4
         self.publisher_uuid_v5 = publisher_uuid_v5
+        self.bq_dataset_id = bq_dataset_id
+        self.bq_table_name = bq_table_name
+        self.bq_dataset_description = bq_dataset_description
+        self.bq_table_description = bq_table_description
+        self.schema_folder = schema_folder
+        self.api_dataset_id = api_dataset_id
+        self.max_cloud_function_instances = max_cloud_function_instances
+        self.observatory_api_conn_id = observatory_api_conn_id
+        self.geoip_license_conn_id = geoip_license_conn_id
+        self.oapen_irus_api_conn_id = oapen_irus_api_conn_id
+        self.oapen_irus_login_conn_id = oapen_irus_login_conn_id
+
+        check_workflow_inputs(self)
 
         self.add_setup_task(self.check_dependencies)
         # create PythonOperator with task concurrency of 1, so tasks to create cloud function never run in parallel
@@ -319,61 +189,218 @@ class OapenIrusUkTelescope(OrganisationTelescope):
         self.add_task(self.transfer)
         self.add_task(self.download_transform)
         self.add_task(self.upload_transformed)
-        self.add_task(self.bq_load_partition)
-        self.add_task(self.cleanup)
+        self.add_task(self.bq_load)
         self.add_task(self.add_new_dataset_releases)
+        self.add_task(self.cleanup)
 
     def make_release(self, **kwargs) -> List[OapenIrusUkRelease]:
         """Create a list of OapenIrusUkRelease instances for a given month.
+        Say the dag is scheduled to run on 2022-04-07
+        Interval_start will be 2022-03-01
+        Interval_end will be 2022-04-01
+        partition_date will be 2022-03-31
 
+        :param kwargs: the context passed from the PythonOperator.
+        See https://airflow.apache.org/docs/stable/macros-ref.html for the keyword arguments that can be passed
         :return: list of OapenIrusUkRelease instances
         """
         # Get release_date
-        release_date = pendulum.instance(kwargs["execution_date"]).end_of("month")
+        data_interval_start = kwargs["data_interval_start"].start_of("month")
+        data_interval_end = kwargs["data_interval_end"].start_of("month")
+        partition_date = data_interval_start.end_of("month")
 
-        logging.info(f"Release date: {release_date}")
-        releases = [OapenIrusUkRelease(self.dag_id, release_date, self.organisation)]
+        logging.info(f"Release/partition date: {partition_date}")
+        releases = [
+            OapenIrusUkRelease(
+                dag_id=self.dag_id,
+                run_id=kwargs["run_id"],
+                data_interval_start=data_interval_start,
+                data_interval_end=data_interval_end,
+                partition_date=partition_date,
+            )
+        ]
         return releases
-
-    def create_cloud_function(self, releases: List[OapenIrusUkRelease], **kwargs):
-        """Task to create the cloud function for each release.
-
-        :param releases: list of OapenIrusUkRelease instances
-        :return: None.
-        """
-        for release in releases:
-            release.create_cloud_function(self.max_cloud_function_instances)
-
-    def call_cloud_function(self, releases: List[OapenIrusUkRelease], **kwargs):
-        """Task to call the cloud function for each release.
-
-        :param releases: list of OapenIrusUkRelease instances
-        :return: None.
-        """
-        for release in releases:
-            release.call_cloud_function(self.publisher_name_v4, self.publisher_uuid_v5)
 
     def transfer(self, releases: List[OapenIrusUkRelease], **kwargs):
         """Task to transfer the file for each release.
 
         :param releases: the list of OapenIrusUkRelease instances.
-        :return: None.
         """
         for release in releases:
-            release.transfer()
+            success = gcs_copy_blob(
+                blob_name=release.blob_name,
+                src_bucket=OapenIrusUkTelescope.OAPEN_BUCKET,
+                dst_bucket=self.cloud_workspace.download_bucket,
+            )
+            set_task_state(success, kwargs["ti"].task_id, release=release)
 
     def download_transform(self, releases: List[OapenIrusUkRelease], **kwargs):
-        """Task to download the access stats to a local file for each release.
-
-        :param releases: the list of OapenIrusUkRelease instances.
-        :return: None.
-        """
+        """Task to download the access stats to a local file for each release."""
         for release in releases:
-            release.download_transform()
+            success = gcs_download_blob(
+                bucket_name=self.cloud_workspace.download_bucket,
+                blob_name=release.blob_name,
+                file_path=release.download_path,
+            )
+            set_task_state(success, kwargs["ti"].task_id, release=release)
+
+            # Read gzipped data and create list of dicts
+            with gzip.open(release.download_path, "r") as f:
+                results = [json.loads(line) for line in f]
+
+            # Add partition date
+            results = add_partition_date(
+                results, release.partition_date, TimePartitioningType.MONTH, partition_field="release_date"
+            )
+
+            # Write list into gzipped JSON Lines file
+            save_jsonl_gz(release.transform_path, results)
+
+    def create_cloud_function(self, releases: List[OapenIrusUkRelease], **kwargs):
+        """Task to create the cloud function for each release."""
+        for release in releases:
+            # set up cloud function variables
+            oapen_project_id = OapenIrusUkTelescope.OAPEN_PROJECT_ID
+            source_bucket = OapenIrusUkTelescope.OAPEN_BUCKET
+            function_name = OapenIrusUkTelescope.FUNCTION_NAME
+            function_region = OapenIrusUkTelescope.FUNCTION_REGION
+            function_source_url = OapenIrusUkTelescope.FUNCTION_SOURCE_URL
+            function_blob_name = OapenIrusUkTelescope.FUNCTION_BLOB_NAME
+            location = f"projects/{oapen_project_id}/locations/{function_region}"
+            full_name = f"{location}/functions/{function_name}"
+
+            # zip source code and upload to bucket
+            success, upload = upload_source_code_to_bucket(
+                source_url=function_source_url,
+                project_id=oapen_project_id,
+                bucket_name=source_bucket,
+                blob_name=function_blob_name,
+                cloud_function_path=release.cloud_function_path,
+            )
+            set_task_state(success, kwargs["ti"].task_id, release=release)
+
+            # initialise cloud functions api
+            creds = ServiceAccountCredentials.from_json_keyfile_name(os.environ.get(environment_vars.CREDENTIALS))
+            service = build(
+                "cloudfunctions", "v2beta", credentials=creds, cache_discovery=False, static_discovery=False
+            )
+
+            # update or create cloud function
+            exists = cloud_function_exists(service, full_name)
+            if not exists or upload is True:
+                update = True if exists else False
+                success, msg = create_cloud_function(
+                    service,
+                    location,
+                    full_name,
+                    source_bucket,
+                    function_blob_name,
+                    self.max_cloud_function_instances,
+                    update,
+                )
+                set_task_state(success, kwargs["ti"].task_id, release=release)
+                logging.info(f"Creating or patching cloud function successful, response: {msg}")
+            else:
+                logging.info(f"Using existing cloud function, source code has not changed.")
+
+    def call_cloud_function(self, releases: List[OapenIrusUkRelease], **kwargs):
+        """Task to call the cloud function for each release."""
+        for release in releases:
+            # set up cloud function variables
+            oapen_project_id = OapenIrusUkTelescope.OAPEN_PROJECT_ID
+            source_bucket = OapenIrusUkTelescope.OAPEN_BUCKET
+            function_name = OapenIrusUkTelescope.FUNCTION_NAME
+            function_region = OapenIrusUkTelescope.FUNCTION_REGION
+            location = f"projects/{oapen_project_id}/locations/{function_region}"
+            full_name = f"{location}/functions/{function_name}"
+            geoip_license_key = BaseHook.get_connection(self.geoip_license_conn_id).password
+
+            # get the publisher_uuid or publisher_id, both are set to empty strings when publisher id is 'oapen'
+            if release.partition_date >= pendulum.datetime(2020, 4, 1):
+                airflow_conn = self.oapen_irus_api_conn_id
+            else:
+                airflow_conn = self.oapen_irus_login_conn_id
+            username = BaseHook.get_connection(airflow_conn).login
+            password = BaseHook.get_connection(airflow_conn).password
+
+            # initialise cloud functions api
+            creds = ServiceAccountCredentials.from_json_keyfile_name(os.environ.get(environment_vars.CREDENTIALS))
+            service = build(
+                "cloudfunctions", "v2beta", credentials=creds, cache_discovery=False, static_discovery=False
+            )
+
+            # Get cloud function uri
+            function_uri = cloud_function_exists(service, full_name)
+
+            call_cloud_function(
+                function_uri,
+                release.partition_date.format("YYYY-MM"),
+                username,
+                password,
+                geoip_license_key,
+                self.publisher_name_v4,
+                self.publisher_uuid_v5,
+                source_bucket,
+                release.blob_name,
+            )
+
+    def upload_transformed(self, releases: List[OapenIrusUkRelease], **kwargs) -> None:
+        """Uploads the transformed files to GCS for each release"""
+        for release in releases:
+            success = gcs_upload_files(
+                bucket_name=self.cloud_workspace.transform_bucket,
+                file_paths=[release.transform_path],
+            )
+            set_task_state(success, kwargs["ti"].task_id, release=release)
+
+    def bq_load(self, releases: List[OapenIrusUkRelease], **kwargs) -> None:
+        """Loads the sales and traffic data into BigQuery"""
+        bq_create_dataset(
+            project_id=self.cloud_workspace.project_id,
+            dataset_id=self.bq_dataset_id,
+            location=self.cloud_workspace.data_location,
+            description=self.bq_dataset_description,
+        )
+        for release in releases:
+            uri = gcs_blob_uri(self.cloud_workspace.transform_bucket, gcs_blob_name_from_path(release.transform_path))
+            table_id = bq_table_id(self.cloud_workspace.project_id, self.bq_dataset_id, self.bq_table_name)
+            state = bq_load_table(
+                uri=uri,
+                table_id=table_id,
+                schema_file_path=bq_find_schema(path=self.schema_folder, table_name=self.bq_table_name),
+                source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
+                partition_type=TimePartitioningType.MONTH,
+                partition=True,
+                partition_field="release_date",
+                table_description=self.bq_table_description,
+                ignore_unknown_values=True,
+            )
+            set_task_state(state, kwargs["ti"].task_id, release=release)
+
+    def add_new_dataset_releases(self, releases: List[OapenIrusUkRelease], **kwargs) -> None:
+        """Adds release information to API."""
+        api = make_observatory_api(observatory_api_conn_id=self.observatory_api_conn_id)
+        for release in releases:
+            dataset_release = DatasetRelease(
+                dag_id=self.dag_id,
+                dataset_id=self.api_dataset_id,
+                dag_run_id=release.run_id,
+                data_interval_start=release.data_interval_start,
+                data_interval_end=release.data_interval_end,
+                partition_date=release.partition_date,
+            )
+            api.post_dataset_release(dataset_release)
+
+    def cleanup(self, releases: List[OapenIrusUkRelease], **kwargs) -> None:
+        """Delete all files, folders and XComs associated with this release."""
+        for release in releases:
+            cleanup(
+                dag_id=self.dag_id, execution_date=kwargs["execution_date"], workflow_folder=release.workflow_folder
+            )
 
 
 def upload_source_code_to_bucket(
-    source_url: str, project_id: str, bucket_name: str, blob_name: str
+    source_url: str, project_id: str, bucket_name: str, blob_name: str, cloud_function_path: str
 ) -> Tuple[bool, bool]:
     """Upload source code of cloud function to storage bucket
 
@@ -381,28 +408,28 @@ def upload_source_code_to_bucket(
     :param project_id: The project id with the bucket
     :param bucket_name: The bucket name
     :param blob_name: The blob name
+    :param cloud_function_path: The local path to the cloud function
     :return: Whether task was successful and whether file was uploaded
     """
 
     # Get zip file with source code from github release
-    telescope_folder = workflow_path(SubFolder.downloaded.value, OapenIrusUkTelescope.DAG_ID_PREFIX)
-    filepath = os.path.join(telescope_folder, "oapen_cloud_function.zip")
-
     response = requests.get(source_url)
-    with open(filepath, "wb") as f:
+    with open(cloud_function_path, "wb") as f:
         f.write(response.content)
 
     # Check if current md5 hash matches expected md5 hash
     expected_md5_hash = OapenIrusUkTelescope.FUNCTION_MD5_HASH
-    actual_md5_hash = get_file_hash(file_path=filepath, algorithm="md5")
+    actual_md5_hash = get_file_hash(file_path=cloud_function_path, algorithm="md5")
     if expected_md5_hash != actual_md5_hash:
         raise AirflowException(f"md5 hashes do not match, expected: {expected_md5_hash}, actual: {actual_md5_hash}")
 
     # Create storage bucket
-    create_cloud_storage_bucket(bucket_name, location="EU", project_id=project_id, lifecycle_delete_age=1)
+    gcs_create_bucket(bucket_name=bucket_name, location="EU", project_id=project_id, lifecycle_delete_age=1)
 
     # upload zip to cloud storage
-    success, upload = upload_file_to_cloud_storage(bucket_name, blob_name, filepath, project_id=project_id)
+    success, upload = gcs_upload_file(
+        bucket_name=bucket_name, blob_name=blob_name, file_path=cloud_function_path, project_id=project_id
+    )
     return success, upload
 
 
@@ -506,7 +533,7 @@ def call_cloud_function(
     publisher_uuid_v5: str,
     bucket_name: str,
     blob_name: str,
-):
+) -> None:
     """Iteratively call cloud function, until it has finished processing all publishers.
     When a publisher name/uuid  is given, there is only 1 publisher, if it is empty the cloud function will process
     all available publishers. In that case, when the data is downloaded from the new platform it can be done in 1
@@ -522,7 +549,6 @@ def call_cloud_function(
     :param publisher_uuid_v5: UUID of the publisher (used for counter version 5)
     :param bucket_name: Name of the bucket to store oapen access stats data
     :param blob_name: Blob name to store oapen access stats data
-    :return: None
     """
     creds = IDTokenCredentials.from_service_account_file(
         os.environ.get(environment_vars.CREDENTIALS), target_audience=function_uri

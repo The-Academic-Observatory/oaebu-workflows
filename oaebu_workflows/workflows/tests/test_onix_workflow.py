@@ -14,28 +14,20 @@
 
 # Author: Tuan Chien
 
-import hashlib
 import os
-import unittest
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
 import vcr
 import shutil
-import json
+from typing import List
 
 import pendulum
-from airflow.exceptions import AirflowException
-from airflow.models import Connection, DagBag
-from airflow.sensors.base import BaseSensorOperator
+from airflow.models import DagBag
 from airflow.utils.state import State
-from click.testing import CliRunner
-from google.cloud import bigquery
-from google.cloud.bigquery import SourceFormat
 
 from oaebu_workflows.config import schema_folder as default_schema_folder
 from oaebu_workflows.config import test_fixtures_folder
-from oaebu_workflows.api_type_ids import DatasetTypeId, WorkflowTypeId, TableTypeId
-from oaebu_workflows.workflows.oaebu_partners import OaebuPartner
+from oaebu_workflows.oaebu_partners import OaebuPartner, OAEBU_DATA_PARTNER_DATASETS
 from oaebu_workflows.workflows.onix_workflow import (
     OnixWorkflow,
     OnixWorkflowRelease,
@@ -43,101 +35,31 @@ from oaebu_workflows.workflows.onix_workflow import (
     download_crossref_events,
     transform_crossref_events,
     transform_event,
-    dois_from_onix,
+    dois_from_table,
     download_crossref_event_url,
     create_latest_views_from_dataset,
+    get_onix_records,
 )
-from observatory.api.client import ApiClient, Configuration
-from observatory.api.client.api.observatory_api import ObservatoryApi  # noqa: E501
-from observatory.api.client.model.dataset import Dataset
-from observatory.api.client.model.dataset_type import DatasetType
-from observatory.api.client.model.organisation import Organisation
-from observatory.api.client.model.table_type import TableType
-from observatory.api.client.model.workflow import Workflow
-from observatory.api.client.model.workflow_type import WorkflowType
-from oaebu_workflows.seed.dataset_type_info import get_dataset_type_info
-from observatory.api.testing import ObservatoryApiEnvironment
-from observatory.platform.utils.airflow_utils import AirflowConns
-from observatory.platform.utils.file_utils import load_jsonl
-from observatory.platform.utils.config_utils import find_schema
-from observatory.platform.utils.gc_utils import (
-    run_bigquery_query,
-    upload_files_to_cloud_storage,
-    upload_file_to_cloud_storage,
-)
-from observatory.platform.utils.release_utils import get_dataset_releases
-from observatory.platform.utils.test_utils import (
+from observatory.platform.api import get_dataset_releases
+from observatory.platform.observatory_config import Workflow
+from observatory.platform.files import load_jsonl
+from observatory.platform.bigquery import bq_find_schema, bq_run_query, bq_sharded_table_id, bq_table_id
+from observatory.platform.gcs import gcs_upload_file, gcs_blob_name_from_path
+from observatory.platform.config import module_file_path
+from observatory.platform.observatory_environment import (
     ObservatoryEnvironment,
     ObservatoryTestCase,
     Table,
-    bq_load_tables,
-    make_dummy_dag,
-    module_file_path,
     find_free_port,
+    random_id,
+    make_dummy_dag,
+    bq_load_tables,
+    load_and_parse_json,
 )
-from observatory.platform.utils.test_utils import random_id
-from observatory.platform.utils.workflow_utils import (
-    bq_load_partition,
-    bq_load_shard,
-    make_dag_id,
-    table_ids_from_path,
-)
-from observatory.api.utils import seed_table_type, seed_dataset_type
-from oaebu_workflows.seed.table_type_info import get_table_type_info
-from oaebu_workflows.seed.dataset_type_info import get_dataset_type_info
-
-
-class TestOnixWorkflowRelease(unittest.TestCase):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        with patch("observatory.platform.utils.gc_utils.select_table_shard_dates") as mock_sel_table_suffixes:
-            mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
-            self.release = OnixWorkflowRelease(
-                dag_id="did",
-                release_date=pendulum.datetime(2021, 4, 20),
-                onix_release_date=pendulum.datetime(2021, 1, 1),
-                crossref_metadata_release_date=pendulum.datetime(2021, 2, 1),
-                gcp_project_id="pid",
-                gcp_bucket_name="bucket",
-            )
-
-    def test_transform_bucket(self):
-        self.assertEqual(self.release.transform_bucket, "bucket")
-
-    def test_transform_folder(self):
-        self.assertEqual(self.release.transform_folder, "did/20210420")
-
-    def test_transform_files(self):
-        self.assertEqual(
-            self.release.transform_files,
-            [
-                self.release.workslookup_filename,
-                self.release.workslookup_errors_filename,
-                self.release.worksfamilylookup_filename,
-            ],
-        )
-
-    def test_download_bucket(self):
-        self.assertEqual(self.release.download_bucket, str())
-
-    def test_download_files(self):
-        self.assertEqual(self.release.download_files, list())
-
-    def test_extract_files(self):
-        self.assertEqual(self.release.extract_files, list())
-
-    def test_download_folder(self):
-        self.assertEqual(self.release.download_folder, str())
-
-    def test_extract_folder(self):
-        self.assertEqual(self.release.extract_folder, str())
 
 
 class TestOnixWorkflow(ObservatoryTestCase):
-    """
-    Test the OnixWorkflow class.
-    """
+    """Functionally test the workflow"""
 
     onix_data = [
         {
@@ -186,1762 +108,375 @@ class TestOnixWorkflow(ObservatoryTestCase):
         },
     ]
 
-    class MockTelescopeResponse:
-        def __init__(self):
-            self.organisation = Organisation(
-                name="test",
-                project_id="project_id",
-            )
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.telescope = TestOnixWorkflow.MockTelescopeResponse()
-        self.project_id = os.getenv("TEST_GCP_PROJECT_ID")
+
+        self.timestamp = pendulum.now()
+        self.schema_path = default_schema_folder()
+        self.onix_table_id = "onix"
+        self.test_onix_folder = random_id()  # "onix_workflow_test_onix_table"
+
+        # For telescope Initialisation
+        self.snapshot_date = pendulum.datetime(2021, 1, 1)
+        self.dag_id = "onix_workflow_test"
+        self.gcp_project_id = os.getenv("TEST_GCP_PROJECT_ID")
         self.data_location = os.getenv("TEST_GCP_DATA_LOCATION")
-        self.bucket_name = "bucket_name"
-
-        # API environment
-        self.host = "localhost"
-        self.port = find_free_port()
-        configuration = Configuration(host=f"http://{self.host}:{self.port}")
-        api_client = ApiClient(configuration)
-        self.api = ObservatoryApi(api_client=api_client)  # noqa: E501
-        self.env = ObservatoryEnvironment(self.project_id, self.data_location, api_host=self.host, api_port=self.port)
-
-        # Onix data partner to pass to the telescope for initialisation
-        self.fake_onix_data_partner = OaebuPartner(
-            dataset_type_id=DatasetTypeId.onix,
-            dag_id_prefix="test_dag",
-            gcp_project_id="test_project",
-            gcp_dataset_id="test_dataset",
-            gcp_table_id="test_table",
+        self.fake_onix_data_partner = OaebuPartner(  # Onix data partner to pass to the telescope for initialisation
+            type_id="onix",
+            bq_dataset_id="test_dataset",
+            bq_table_name="test_table",
             isbn_field_name="isbn",
             title_field_name="title",
             sharded=True,
         )
 
-    def seed_db(self):
-        table_type_info = get_table_type_info()
-        seed_table_type(table_type_info=table_type_info, api=self.api)
-
-        dataset_type_info = get_dataset_type_info(self.api)
-        seed_dataset_type(api=self.api, dataset_type_info=dataset_type_info)
-
-        @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
-        @patch("oaebu_workflows.workflows.onix_workflow.OnixWorkflow.make_release")
-        @patch("observatory.platform.utils.gc_utils.select_table_shard_dates")
-        def test_ctor_gen_dag_id(self, mock_sel_table_suffixes, mock_mr, mock_api):
-            mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
-            mock_api.return_value = self.api
-
-            with self.env.create():
-                self.seed_db()
-                with CliRunner().isolated_filesystem():
-                    mock_mr.return_value = OnixWorkflowRelease(
-                        dag_id="onix_workflow_test",
-                        release_date=pendulum.datetime(2021, 1, 1),
-                        onix_release_date=pendulum.datetime(2021, 1, 1),
-                        gcp_project_id=self.telescope.organisation.project_id,
-                        gcp_bucket_name=self.bucket_name,
-                        onix_dataset_id="",
-                        onix_table_id="onix",
-                    )
-                    wf = OnixWorkflow(
-                        org_name=self.telescope.organisation.name,
-                        gcp_project_id=self.telescope.organisation.project_id,
-                        gcp_bucket_name=self.bucket_name,
-                        data_partners=[self.fake_onix_data_partner],
-                    )
-
-                    release = wf.make_release(execution_date=pendulum.datetime(2021, 1, 1))
-                    self.assertEqual(wf.dag_id, "onix_workflow_test")
-                    self.assertEqual(
-                        release.workslookup_filename, "onix_workflow_test/20210101/onix_workid_isbn.jsonl.gz"
-                    )
-                    self.assertEqual(
-                        release.workslookup_errors_filename,
-                        "onix_workflow_test/20210101/onix_workid_isbn_errors.jsonl.gz",
-                    )
-                    self.assertEqual(
-                        release.worksfamilylookup_filename,
-                        "onix_workflow_test/20210101/onix_workfamilyid_isbn.jsonl.gz",
-                    )
-
-                    self.assertEqual(release.onix_table_id, "onix")
-                    self.assertEqual(release.release_date, pendulum.datetime(2021, 1, 1, 0, 0, 0, 0))
-                    self.assertEqual(release.project_id, "project_id")
-                    self.assertEqual(release.transform_bucket, "bucket_name")
-                    self.assertIsInstance(wf.operators[0][0], BaseSensorOperator)
-
-        @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
-        @patch("oaebu_workflows.workflows.onix_workflow.OnixWorkflow.make_release")
-        @patch("observatory.platform.utils.gc_utils.select_table_shard_dates")
-        def test_ctor_gen_assign_dag_id(self, mock_sel_table_suffixes, mock_mr, mock_api):
-            mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
-            mock_api.return_value = self.api
-
-            with self.env.create():
-                self.seed_db()
-                with CliRunner().isolated_filesystem():
-                    wf = OnixWorkflow(
-                        org_name=self.telescope.organisation.name,
-                        gcp_project_id=self.telescope.organisation.project_id,
-                        gcp_bucket_name=self.bucket_name,
-                        dag_id="dagid",
-                        data_partners=[self.fake_onix_data_partner],
-                    )
-
-                    mock_mr.return_value = OnixWorkflowRelease(
-                        dag_id="dagid",
-                        release_date=pendulum.datetime(2021, 1, 1),
-                        onix_release_date=pendulum.datetime(2021, 1, 1),
-                        gcp_project_id=self.telescope.organisation.project_id,
-                        gcp_bucket_name=self.bucket_name,
-                        onix_dataset_id="",
-                        onix_table_id="onix",
-                    )
-
-                    release = wf.make_release(execution_date=pendulum.datetime(2021, 1, 1))
-
-                    self.assertEqual(release.dag_id, "dagid")
-                    self.assertEqual(release.workslookup_filename, "dagid/20210101/onix_workid_isbn.jsonl.gz")
-                    self.assertEqual(
-                        release.workslookup_errors_filename, "dagid/20210101/onix_workid_isbn_errors.jsonl.gz"
-                    )
-                    self.assertEqual(
-                        release.worksfamilylookup_filename, "dagid/20210101/onix_workfamilyid_isbn.jsonl.gz"
-                    )
-
-                    self.assertEqual(release.onix_table_id, "onix")
-                    self.assertEqual(release.release_date, pendulum.datetime(2021, 1, 1, 0, 0, 0, 0))
-                    self.assertEqual(release.project_id, "project_id")
-                    self.assertEqual(release.transform_bucket, "bucket_name")
-                    self.assertIsInstance(wf.operators[0][0], BaseSensorOperator)
-
-        @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
-        @patch("oaebu_workflows.workflows.onix_workflow.OnixWorkflow.make_release")
-        @patch("observatory.platform.utils.gc_utils.select_table_shard_dates")
-        def test_ctor(self, mock_sel_table_suffixes, mock_mr, mock_api):
-            mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
-            mock_api.return_value = self.api
-
-            with self.env.create():
-                self.seed_db()
-                with CliRunner().isolated_filesystem():
-                    wf = OnixWorkflow(
-                        org_name=self.telescope.organisation.name,
-                        gcp_project_id=self.telescope.organisation.project_id,
-                        gcp_bucket_name=self.bucket_name,
-                        data_partners=[self.fake_onix_data_partner],
-                    )
-
-                    mock_mr.return_value = OnixWorkflowRelease(
-                        dag_id="onix_workflow_test",
-                        release_date=pendulum.datetime(2021, 1, 1),
-                        onix_release_date=pendulum.datetime(2021, 1, 1),
-                        gcp_project_id=self.telescope.organisation.project_id,
-                        gcp_bucket_name=self.bucket_name,
-                        onix_dataset_id="onix",
-                        onix_table_id="onix",
-                    )
-
-                    release = wf.make_release(execution_date=pendulum.datetime(2021, 1, 1))
-
-                    self.assertEqual(wf.dag_id, "onix_workflow_test")
-                    self.assertEqual(wf.org_name, "test")
-                    self.assertEqual(wf.gcp_bucket_name, "bucket_name")
-
-                    self.assertEqual(release.dag_id, "onix_workflow_test")
-                    self.assertEqual(release.release_date, pendulum.datetime(2021, 1, 1))
-                    self.assertEqual(release.transform_folder, "onix_workflow_test/20210101")
-                    self.assertEqual(release.worksid_table, "onix_workid_isbn")
-                    self.assertEqual(release.worksid_error_table, "onix_workid_isbn_errors")
-                    self.assertEqual(release.workfamilyid_table, "onix_workfamilyid_isbn")
-
-                    self.assertEqual(
-                        release.workslookup_filename, "onix_workflow_test/20210101/onix_workid_isbn.jsonl.gz"
-                    )
-                    self.assertEqual(
-                        release.workslookup_errors_filename,
-                        "onix_workflow_test/20210101/onix_workid_isbn_errors.jsonl.gz",
-                    )
-                    self.assertEqual(
-                        release.worksfamilylookup_filename,
-                        "onix_workflow_test/20210101/onix_workfamilyid_isbn.jsonl.gz",
-                    )
-
-                    self.assertEqual(release.workflow_dataset, "onix_workflow")
-                    self.assertEqual(release.project_id, "project_id")
-                    self.assertEqual(release.onix_dataset_id, "onix")
-                    self.assertEqual(release.data_location, "us")
-                    self.assertEqual(release.dataset_description, "ONIX workflow tables")
-
-                    self.assertEqual(release.onix_table_id, "onix")
-
-        @patch("oaebu_workflows.workflows.onix_workflow.OnixWorkflow.make_release")
-        @patch("observatory.platform.utils.gc_utils.select_table_shard_dates")
-        def test_ctor_dataset_overrides(self, mock_sel_table_suffixes, mock_mr):
-            mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
-            with CliRunner().isolated_filesystem():
-                release = OnixWorkflowRelease(
-                    dag_id="dag",
-                    release_date=pendulum.datetime(2000, 1, 1),
-                    onix_release_date=pendulum.datetime(2000, 1, 1),
-                    gcp_project_id="project",
-                    gcp_bucket_name="bucket",
-                )
-                self.assertEqual(release.workflow_dataset, "onix_workflow")
-                self.assertEqual(release.oaebu_intermediate_dataset, "oaebu_intermediate")
-                self.assertEqual(release.oaebu_data_qa_dataset, "oaebu_data_qa")
-
-                # Override
-                release = OnixWorkflowRelease(
-                    dag_id="dag",
-                    release_date=pendulum.datetime(2000, 1, 1),
-                    onix_release_date=pendulum.datetime(2000, 1, 1),
-                    gcp_project_id="project",
-                    gcp_bucket_name="bucket",
-                    workflow_dataset="override",
-                    oaebu_intermediate_dataset="override",
-                    oaebu_data_qa_dataset="override",
-                )
-
-                self.assertEqual(release.workflow_dataset, "override")
-                self.assertEqual(release.oaebu_intermediate_dataset, "override")
-                self.assertEqual(release.oaebu_data_qa_dataset, "override")
-
-        @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
-        @patch("oaebu_workflows.workflows.onix_workflow.run_bigquery_query")
-        @patch("observatory.platform.utils.gc_utils.select_table_shard_dates")
-        def test_get_onix_records(self, mock_sel_table_suffixes, mock_bq_query, mock_api):
-            mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
-            mock_bq_query.return_value = TestOnixWorkflow.onix_data
-            mock_api.return_value = self.api
-
-            with self.env.create():
-                self.seed_db()
-                with CliRunner().isolated_filesystem():
-                    wf = OnixWorkflow(
-                        org_name=self.telescope.organisation.name,
-                        gcp_project_id=self.telescope.organisation.project_id,
-                        gcp_bucket_name=self.bucket_name,
-                        data_partners=[self.fake_onix_data_partner],
-                    )
-                    records = wf.get_onix_records("project_id", "ds_id", "table_id")
-                    self.assertEqual(len(records), 3)
-                    self.assertEqual(records[0]["ISBN13"], "111")
-
-        @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
-        @patch("oaebu_workflows.workflows.onix_workflow.select_table_shard_dates")
-        def test_make_release(self, mock_sel_table_suffixes, mock_api):
-            mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
-            mock_api.return_value = self.api
-
-            with self.env.create():
-                self.seed_db()
-                with CliRunner().isolated_filesystem():
-                    wf = OnixWorkflow(
-                        org_name=self.telescope.organisation.name,
-                        gcp_project_id=self.telescope.organisation.project_id,
-                        gcp_bucket_name=self.bucket_name,
-                        data_partners=[self.fake_onix_data_partner],
-                    )
-
-                    kwargs = {"next_execution_date": pendulum.datetime(2021, 2, 1)}
-                    release = wf.make_release(**kwargs)
-                    self.assertIsInstance(release, OnixWorkflowRelease)
-                    self.assertEqual(release.dag_id, "onix_workflow_test")
-                    self.assertEqual(release.release_date, pendulum.datetime(2021, 1, 31))
-                    self.assertEqual(release.onix_release_date, pendulum.datetime(2021, 1, 1))
-                    self.assertEqual(release.project_id, "project_id")
-                    self.assertEqual(release.onix_dataset_id, "onix")
-                    self.assertEqual(release.onix_table_id, "onix")
-                    self.assertEqual(release.bucket_name, "bucket_name")
-
-        @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
-        @patch("oaebu_workflows.workflows.onix_workflow.select_table_shard_dates")
-        def test_make_release_no_releases(self, mock_sel_table_suffixes, mock_api):
-            mock_sel_table_suffixes.return_value = []
-            mock_api.return_value = self.api
-
-            with self.env.create():
-                self.seed_db()
-                with CliRunner().isolated_filesystem():
-                    wf = OnixWorkflow(
-                        org_name=self.telescope.organisation.name,
-                        gcp_project_id=self.telescope.organisation.project_id,
-                        gcp_bucket_name=self.bucket_name,
-                        data_partners=[self.fake_onix_data_partner],
-                    )
-
-                    with self.assertRaises(AirflowException):
-                        kwargs = {"next_execution_date": pendulum.datetime(2021, 2, 1)}
-                        wf.make_release(**kwargs)
-
-        @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
-        @patch("oaebu_workflows.workflows.onix_workflow.OnixWorkflow.make_release")
-        @patch("observatory.platform.utils.gc_utils.select_table_shard_dates")
-        def test_cleanup(self, mock_sel_table_suffixes, mock_mr, mock_api):
-            mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
-            mock_api.return_value = self.api
-
-            with self.env.create():
-                self.seed_db()
-                with CliRunner().isolated_filesystem():
-                    wf = OnixWorkflow(
-                        org_name=self.telescope.organisation.name,
-                        gcp_project_id=self.telescope.organisation.project_id,
-                        gcp_bucket_name=self.bucket_name,
-                        data_partners=[self.fake_onix_data_partner],
-                    )
-
-                    mock_mr.return_value = OnixWorkflowRelease(
-                        dag_id="onix_workflow_test",
-                        release_date=pendulum.datetime(2021, 1, 1),
-                        onix_release_date=pendulum.datetime(2021, 1, 1),
-                        gcp_project_id=self.telescope.organisation.project_id,
-                        gcp_bucket_name=self.bucket_name,
-                        onix_dataset_id="onix",
-                        onix_table_id="onix",
-                    )
-
-                    release = wf.make_release(execution_date=pendulum.datetime(2021, 1, 1))
-                    self.assertTrue(os.path.isdir(release.transform_folder))
-                    wf.cleanup(release)
-                    self.assertFalse(os.path.isdir(release.transform_folder))
-
-    @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
-    def test_dag_structure_ignore_google_analytics(self, mock_api):
-        mock_api.return_value = self.api
-
-        with self.env.create():
-            self.seed_db()
-            dataset_type_info = get_dataset_type_info(self.api)
-            data_partners = [
-                OaebuPartner(
-                    dataset_type_id=dataset_type_info["jstor_country"].type_id,
-                    dag_id_prefix="jstor",
-                    gcp_project_id="project",
-                    gcp_dataset_id="dataset",
-                    gcp_table_id="jstor_country",
-                    isbn_field_name="isbn",
-                    title_field_name="Book_Title",
-                    sharded=False,
-                ),
-                OaebuPartner(
-                    dataset_type_id=dataset_type_info["oapen_irus_uk"].type_id,
-                    dag_id_prefix="oapen_irus_uk",
-                    gcp_project_id="project",
-                    gcp_dataset_id="dataset",
-                    gcp_table_id="oapen_irus_uk",
-                    isbn_field_name="ISBN",
-                    title_field_name="book_title",
-                    sharded=False,
-                ),
-                OaebuPartner(
-                    dataset_type_id=dataset_type_info["google_books_sales"].type_id,
-                    dag_id_prefix="google_books",
-                    gcp_project_id="project",
-                    gcp_dataset_id="dataset",
-                    gcp_table_id="google_books_sales",
-                    isbn_field_name="Primary_ISBN",
-                    title_field_name="Title",
-                    sharded=False,
-                ),
-                OaebuPartner(
-                    dataset_type_id=dataset_type_info["google_books_traffic"].type_id,
-                    dag_id_prefix="google_books",
-                    gcp_project_id="project",
-                    gcp_dataset_id="dataset",
-                    gcp_table_id="google_books_traffic",
-                    isbn_field_name="Primary_ISBN",
-                    title_field_name="Title",
-                    sharded=False,
-                ),
-                OaebuPartner(
-                    dataset_type_id=dataset_type_info["onix"].type_id,
-                    dag_id_prefix="onix",
-                    gcp_project_id="project",
-                    gcp_dataset_id="dataset",
-                    gcp_table_id="onix",
-                    isbn_field_name="ISBN13",
-                    title_field_name="Title",
-                    sharded=False,
-                ),
-            ]
-
-            with CliRunner().isolated_filesystem():
-                wf = OnixWorkflow(
-                    org_name=self.telescope.organisation.name,
-                    gcp_project_id=self.telescope.organisation.project_id,
-                    gcp_bucket_name=self.bucket_name,
-                    data_partners=data_partners,
-                )
-                dag = wf.make_dag()
-                expected_dag_structure = {
-                    "google_books_test_sensor": ["aggregate_works"],
-                    "jstor_test_sensor": ["aggregate_works"],
-                    "oapen_irus_uk_test_sensor": ["aggregate_works"],
-                    "onix_test_sensor": ["aggregate_works"],
-                    "aggregate_works": ["upload_aggregation_tables"],
-                    "upload_aggregation_tables": ["bq_load_workid_lookup"],
-                    "bq_load_workid_lookup": ["bq_load_workid_lookup_errors"],
-                    "bq_load_workid_lookup_errors": ["bq_load_workfamilyid_lookup"],
-                    "bq_load_workfamilyid_lookup": ["create_oaebu_crossref_metadata_table"],
-                    "create_oaebu_crossref_metadata_table": ["create_oaebu_crossref_events_table"],
-                    "create_oaebu_crossref_events_table": ["create_oaebu_book_table"],
-                    "create_oaebu_book_table": [
-                        "create_oaebu_intermediate_table.dataset.google_books_sales",
-                        "create_oaebu_intermediate_table.dataset.oapen_irus_uk",
-                        "create_oaebu_intermediate_table.dataset.google_books_traffic",
-                        "create_oaebu_intermediate_table.dataset.jstor_country",
-                    ],
-                    "create_oaebu_intermediate_table.dataset.jstor_country": ["create_oaebu_book_product_table"],
-                    "create_oaebu_intermediate_table.dataset.oapen_irus_uk": ["create_oaebu_book_product_table"],
-                    "create_oaebu_intermediate_table.dataset.google_books_sales": ["create_oaebu_book_product_table"],
-                    "create_oaebu_intermediate_table.dataset.google_books_traffic": ["create_oaebu_book_product_table"],
-                    "create_oaebu_book_product_table": [
-                        "export_oaebu_table.book_product_year_metrics",
-                        "export_oaebu_table.book_product_subject_bisac_metrics",
-                        "create_oaebu_data_qa_jstor_isbn.dataset.jstor_country",
-                        "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.google_books_sales",
-                        "export_oaebu_table.book_product_subject_year_metrics",
-                        "export_oaebu_table.book_product_author_metrics",
-                        "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.google_books_traffic",
-                        "export_oaebu_table.book_product_metrics_city",
-                        "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.jstor_country",
-                        "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.oapen_irus_uk",
-                        "create_oaebu_data_qa_google_books_traffic_isbn",
-                        "export_oaebu_table.book_product_metrics_country",
-                        "export_oaebu_table.book_product_publisher_metrics",
-                        "export_oaebu_table.book_product_subject_bic_metrics",
-                        "export_oaebu_table.institution_list",
-                        "create_oaebu_data_qa_oapen_irus_uk_isbn",
-                        "export_oaebu_table.book_product_list",
-                        "export_oaebu_table.book_product_subject_thema_metrics",
-                        "create_oaebu_data_qa_google_books_sales_isbn",
-                        "create_oaebu_data_qa_onix_aggregate",
-                        "export_oaebu_table.book_product_metrics_events",
-                        "export_oaebu_table.book_product_metrics",
-                        "create_oaebu_data_qa_onix_isbn",
-                        "export_oaebu_table.book_product_metrics_institution",
-                    ],
-                    "create_oaebu_data_qa_onix_isbn": ["export_oaebu_qa_metrics"],
-                    "create_oaebu_data_qa_onix_aggregate": ["export_oaebu_qa_metrics"],
-                    "create_oaebu_data_qa_jstor_isbn.dataset.jstor_country": ["export_oaebu_qa_metrics"],
-                    "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.jstor_country": [
-                        "export_oaebu_qa_metrics"
-                    ],
-                    "create_oaebu_data_qa_oapen_irus_uk_isbn": ["export_oaebu_qa_metrics"],
-                    "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.oapen_irus_uk": [
-                        "export_oaebu_qa_metrics"
-                    ],
-                    "create_oaebu_data_qa_google_books_sales_isbn": ["export_oaebu_qa_metrics"],
-                    "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.google_books_sales": [
-                        "export_oaebu_qa_metrics"
-                    ],
-                    "create_oaebu_data_qa_google_books_traffic_isbn": ["export_oaebu_qa_metrics"],
-                    "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.google_books_traffic": [
-                        "export_oaebu_qa_metrics"
-                    ],
-                    "export_oaebu_table.book_product_list": ["export_oaebu_qa_metrics"],
-                    "export_oaebu_table.book_product_metrics": ["export_oaebu_qa_metrics"],
-                    "export_oaebu_table.book_product_metrics_country": ["export_oaebu_qa_metrics"],
-                    "export_oaebu_table.book_product_metrics_institution": ["export_oaebu_qa_metrics"],
-                    "export_oaebu_table.institution_list": ["export_oaebu_qa_metrics"],
-                    "export_oaebu_table.book_product_metrics_city": ["export_oaebu_qa_metrics"],
-                    "export_oaebu_table.book_product_metrics_events": ["export_oaebu_qa_metrics"],
-                    "export_oaebu_table.book_product_publisher_metrics": ["export_oaebu_qa_metrics"],
-                    "export_oaebu_table.book_product_subject_bic_metrics": ["export_oaebu_qa_metrics"],
-                    "export_oaebu_table.book_product_subject_bisac_metrics": ["export_oaebu_qa_metrics"],
-                    "export_oaebu_table.book_product_subject_thema_metrics": ["export_oaebu_qa_metrics"],
-                    "export_oaebu_table.book_product_year_metrics": ["export_oaebu_qa_metrics"],
-                    "export_oaebu_table.book_product_subject_year_metrics": ["export_oaebu_qa_metrics"],
-                    "export_oaebu_table.book_product_author_metrics": ["export_oaebu_qa_metrics"],
-                    "export_oaebu_qa_metrics": ["create_oaebu_latest_views"],
-                    "create_oaebu_latest_views": ["cleanup"],
-                    "cleanup": ["add_new_dataset_releases"],
-                    "add_new_dataset_releases": [],
-                }
-                self.assert_dag_structure(expected_dag_structure, dag)
-
-    @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
-    def test_dag_structure_with_google_analytics(self, mock_api):
-        mock_api.return_value = self.api
-
-        with self.env.create():
-            self.seed_db()
-            dataset_type_info = get_dataset_type_info(self.api)
-            data_partners = [
-                OaebuPartner(
-                    dataset_type_id=dataset_type_info["jstor_country"].type_id,
-                    dag_id_prefix="jstor",
-                    gcp_project_id="project",
-                    gcp_dataset_id="dataset",
-                    gcp_table_id="jstor_country",
-                    isbn_field_name="isbn",
-                    title_field_name="Book_Title",
-                    sharded=False,
-                ),
-                OaebuPartner(
-                    dataset_type_id=dataset_type_info["oapen_irus_uk"].type_id,
-                    dag_id_prefix="oapen_irus_uk",
-                    gcp_project_id="project",
-                    gcp_dataset_id="dataset",
-                    gcp_table_id="oapen_irus_uk",
-                    isbn_field_name="ISBN",
-                    title_field_name="book_title",
-                    sharded=False,
-                ),
-                OaebuPartner(
-                    dataset_type_id=dataset_type_info["google_books_sales"].type_id,
-                    dag_id_prefix="google_books",
-                    gcp_project_id="project",
-                    gcp_dataset_id="dataset",
-                    gcp_table_id="google_books_sales",
-                    isbn_field_name="Primary_ISBN",
-                    title_field_name="Title",
-                    sharded=False,
-                ),
-                OaebuPartner(
-                    dataset_type_id=dataset_type_info["google_books_traffic"].type_id,
-                    dag_id_prefix="google_books",
-                    gcp_project_id="project",
-                    gcp_dataset_id="dataset",
-                    gcp_table_id="google_books_traffic",
-                    isbn_field_name="Primary_ISBN",
-                    title_field_name="Title",
-                    sharded=False,
-                ),
-                OaebuPartner(
-                    dataset_type_id=dataset_type_info["google_analytics"].type_id,
-                    dag_id_prefix="google_analytics",
-                    gcp_project_id="project",
-                    gcp_dataset_id="dataset",
-                    gcp_table_id="google_analytics",
-                    isbn_field_name="publication_id",
-                    title_field_name="title",
-                    sharded=False,
-                ),
-                OaebuPartner(
-                    dataset_type_id=dataset_type_info["onix"].type_id,
-                    dag_id_prefix="onix",
-                    gcp_project_id="project",
-                    gcp_dataset_id="dataset",
-                    gcp_table_id="onix",
-                    isbn_field_name="ISBN13",
-                    title_field_name="Title",
-                    sharded=False,
-                ),
-            ]
-
-            org_name = "ANU Press"
-            with CliRunner().isolated_filesystem():
-                wf = OnixWorkflow(
-                    org_name=org_name,
-                    gcp_project_id=self.telescope.organisation.project_id,
-                    gcp_bucket_name=self.bucket_name,
-                    data_partners=data_partners,
-                )
-                dag = wf.make_dag()
-                self.assert_dag_structure(
-                    {
-                        "google_analytics_anu_press_sensor": ["aggregate_works"],
-                        "google_books_anu_press_sensor": ["aggregate_works"],
-                        "jstor_anu_press_sensor": ["aggregate_works"],
-                        "oapen_irus_uk_anu_press_sensor": ["aggregate_works"],
-                        "onix_anu_press_sensor": ["aggregate_works"],
-                        "aggregate_works": ["upload_aggregation_tables"],
-                        "upload_aggregation_tables": ["bq_load_workid_lookup"],
-                        "bq_load_workid_lookup": ["bq_load_workid_lookup_errors"],
-                        "bq_load_workid_lookup_errors": ["bq_load_workfamilyid_lookup"],
-                        "bq_load_workfamilyid_lookup": ["create_oaebu_crossref_metadata_table"],
-                        "create_oaebu_crossref_metadata_table": ["create_oaebu_crossref_events_table"],
-                        "create_oaebu_crossref_events_table": ["create_oaebu_book_table"],
-                        "create_oaebu_book_table": [
-                            "create_oaebu_intermediate_table.dataset.google_books_sales",
-                            "create_oaebu_intermediate_table.dataset.oapen_irus_uk",
-                            "create_oaebu_intermediate_table.dataset.google_analytics",
-                            "create_oaebu_intermediate_table.dataset.google_books_traffic",
-                            "create_oaebu_intermediate_table.dataset.jstor_country",
-                        ],
-                        "create_oaebu_intermediate_table.dataset.jstor_country": ["create_oaebu_book_product_table"],
-                        "create_oaebu_intermediate_table.dataset.oapen_irus_uk": ["create_oaebu_book_product_table"],
-                        "create_oaebu_intermediate_table.dataset.google_books_sales": [
-                            "create_oaebu_book_product_table"
-                        ],
-                        "create_oaebu_intermediate_table.dataset.google_books_traffic": [
-                            "create_oaebu_book_product_table"
-                        ],
-                        "create_oaebu_intermediate_table.dataset.google_analytics": ["create_oaebu_book_product_table"],
-                        "create_oaebu_book_product_table": [
-                            "export_oaebu_table.book_product_publisher_metrics",
-                            "create_oaebu_data_qa_onix_isbn",
-                            "create_oaebu_data_qa_jstor_isbn.dataset.jstor_country",
-                            "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.jstor_country",
-                            "export_oaebu_table.book_product_metrics_country",
-                            "create_oaebu_data_qa_google_books_sales_isbn",
-                            "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.google_analytics",
-                            "export_oaebu_table.book_product_subject_year_metrics",
-                            "export_oaebu_table.book_product_subject_thema_metrics",
-                            "create_oaebu_data_qa_google_books_traffic_isbn",
-                            "export_oaebu_table.book_product_subject_bic_metrics",
-                            "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.google_books_sales",
-                            "export_oaebu_table.book_product_list",
-                            "export_oaebu_table.book_product_metrics_city",
-                            "export_oaebu_table.book_product_author_metrics",
-                            "export_oaebu_table.book_product_metrics_institution",
-                            "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.oapen_irus_uk",
-                            "create_oaebu_data_qa_google_analytics_isbn",
-                            "export_oaebu_table.book_product_year_metrics",
-                            "export_oaebu_table.book_product_subject_bisac_metrics",
-                            "create_oaebu_data_qa_onix_aggregate",
-                            "export_oaebu_table.book_product_metrics_events",
-                            "export_oaebu_table.institution_list",
-                            "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.google_books_traffic",
-                            "create_oaebu_data_qa_oapen_irus_uk_isbn",
-                            "export_oaebu_table.book_product_metrics",
-                        ],
-                        "create_oaebu_data_qa_onix_isbn": ["export_oaebu_qa_metrics"],
-                        "create_oaebu_data_qa_onix_aggregate": ["export_oaebu_qa_metrics"],
-                        "create_oaebu_data_qa_jstor_isbn.dataset.jstor_country": ["export_oaebu_qa_metrics"],
-                        "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.jstor_country": [
-                            "export_oaebu_qa_metrics"
-                        ],
-                        "create_oaebu_data_qa_oapen_irus_uk_isbn": ["export_oaebu_qa_metrics"],
-                        "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.oapen_irus_uk": [
-                            "export_oaebu_qa_metrics"
-                        ],
-                        "create_oaebu_data_qa_google_books_sales_isbn": ["export_oaebu_qa_metrics"],
-                        "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.google_books_sales": [
-                            "export_oaebu_qa_metrics"
-                        ],
-                        "create_oaebu_data_qa_google_books_traffic_isbn": ["export_oaebu_qa_metrics"],
-                        "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.google_books_traffic": [
-                            "export_oaebu_qa_metrics"
-                        ],
-                        "create_oaebu_data_qa_google_analytics_isbn": ["export_oaebu_qa_metrics"],
-                        "create_oaebu_data_qa_intermediate_unmatched_workid.dataset.google_analytics": [
-                            "export_oaebu_qa_metrics"
-                        ],
-                        "export_oaebu_table.book_product_list": ["export_oaebu_qa_metrics"],
-                        "export_oaebu_table.book_product_metrics": ["export_oaebu_qa_metrics"],
-                        "export_oaebu_table.book_product_metrics_country": ["export_oaebu_qa_metrics"],
-                        "export_oaebu_table.book_product_metrics_institution": ["export_oaebu_qa_metrics"],
-                        "export_oaebu_table.institution_list": ["export_oaebu_qa_metrics"],
-                        "export_oaebu_table.book_product_metrics_city": ["export_oaebu_qa_metrics"],
-                        "export_oaebu_table.book_product_metrics_events": ["export_oaebu_qa_metrics"],
-                        "export_oaebu_table.book_product_publisher_metrics": ["export_oaebu_qa_metrics"],
-                        "export_oaebu_table.book_product_subject_bic_metrics": ["export_oaebu_qa_metrics"],
-                        "export_oaebu_table.book_product_subject_bisac_metrics": ["export_oaebu_qa_metrics"],
-                        "export_oaebu_table.book_product_subject_thema_metrics": ["export_oaebu_qa_metrics"],
-                        "export_oaebu_table.book_product_year_metrics": ["export_oaebu_qa_metrics"],
-                        "export_oaebu_table.book_product_subject_year_metrics": ["export_oaebu_qa_metrics"],
-                        "export_oaebu_table.book_product_author_metrics": ["export_oaebu_qa_metrics"],
-                        "export_oaebu_qa_metrics": ["create_oaebu_latest_views"],
-                        "create_oaebu_latest_views": ["cleanup"],
-                        "cleanup": ["add_new_dataset_releases"],
-                        "add_new_dataset_releases": [],
-                    },
-                    dag,
-                )
-
-    @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
-    @patch("oaebu_workflows.workflows.onix_workflow.OnixWorkflow.make_release")
-    @patch("oaebu_workflows.workflows.onix_workflow.run_bigquery_query")
-    @patch("oaebu_workflows.workflows.onix_workflow.bq_load_shard")
-    @patch("oaebu_workflows.workflows.onix_workflow.upload_files_to_cloud_storage")
-    @patch("oaebu_workflows.workflows.onix_workflow.list_to_jsonl_gz")
-    @patch("observatory.platform.utils.gc_utils.select_table_shard_dates")
-    def test_create_and_upload_bq_isbn13_workid_lookup_table(
-        self,
-        mock_sel_table_suffixes,
-        mock_write_to_file,
-        mock_upload_files_from_list,
-        mock_bq_load_lookup,
-        mock_bq_query,
-        mock_mr,
-        mock_api,
-    ):
-        mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
-        mock_bq_query.return_value = TestOnixWorkflow.onix_data
-        mock_api.return_value = self.api
-
-        env = ObservatoryEnvironment(self.project_id, self.data_location, api_host=self.host, api_port=self.port)
-        with env.create():
-            self.seed_db()
-            with CliRunner().isolated_filesystem():
-                wf = OnixWorkflow(
-                    org_name=self.telescope.organisation.name,
-                    gcp_project_id=self.telescope.organisation.project_id,
-                    gcp_bucket_name=self.bucket_name,
-                    data_partners=[self.fake_onix_data_partner],
-                )
-
-                mock_mr.return_value = OnixWorkflowRelease(
-                    dag_id="onix_workflow_test",
-                    release_date=pendulum.datetime(2021, 1, 1),
-                    onix_release_date=pendulum.datetime(2021, 1, 1),
-                    crossref_metadata_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.project_id,
-                    gcp_bucket_name=self.bucket_name,
-                    onix_dataset_id="onix",
-                    onix_table_id="onix",
-                )
-
-                release = wf.make_release()
-
-                # Test works aggregation
-                wf.aggregate_works(release)
-                self.assertEqual(mock_write_to_file.call_count, 3)
-                call_args = mock_write_to_file.call_args_list
-                self.assertEqual(len(call_args[0][0][1]), 3)
-                lookup_table = {arg["isbn13"]: arg["work_id"] for arg in call_args[0][0][1]}
-
-                self.assertTrue(
-                    lookup_table["111"] == lookup_table["112"] and lookup_table["112"] != lookup_table["211"]
-                )
-
-                self.assertEqual(call_args[0][0][0], "onix_workflow_test/20210101/onix_workid_isbn.jsonl.gz")
-                self.assertEqual(
-                    call_args[1][0][1],
-                    [
-                        {
-                            "Error": "Product ISBN13:111 is a manifestation of ISBN13:113, which is not given as a product identifier in any ONIX product record."
-                        },
-                    ],
-                )
-                self.assertEqual(call_args[1][0][0], "onix_workflow_test/20210101/onix_workid_isbn_errors.jsonl.gz")
-
-                # Test upload_aggregation_tables
-                wf.upload_aggregation_tables(release)
-                self.assertEqual(mock_upload_files_from_list.call_count, 1)
-                _, call_args = mock_upload_files_from_list.call_args
-                self.assertEqual(call_args["bucket_name"], "bucket_name")
-                self.assertEqual(
-                    call_args["blob_names"],
-                    [
-                        "onix_workflow_test/20210101/onix_workid_isbn.jsonl.gz",
-                        "onix_workflow_test/20210101/onix_workid_isbn_errors.jsonl.gz",
-                        "onix_workflow_test/20210101/onix_workfamilyid_isbn.jsonl.gz",
-                    ],
-                )
-                self.assertEqual(
-                    call_args["file_paths"],
-                    [
-                        "onix_workflow_test/20210101/onix_workid_isbn.jsonl.gz",
-                        "onix_workflow_test/20210101/onix_workid_isbn_errors.jsonl.gz",
-                        "onix_workflow_test/20210101/onix_workfamilyid_isbn.jsonl.gz",
-                    ],
-                )
-
-                # Test bq_load_workid_lookup
-                wf.bq_load_workid_lookup(release)
-                self.assertEqual(mock_bq_load_lookup.call_count, 1)
-                _, call_args = mock_bq_load_lookup.call_args
-                self.assertTrue(call_args["schema_file_path"].endswith("onix_workid_isbn.json"))
-                self.assertEqual(call_args["project_id"], "project_id")
-                self.assertEqual(call_args["transform_bucket"], "bucket_name")
-                self.assertEqual(call_args["transform_blob"], "onix_workflow_test/20210101/onix_workid_isbn.jsonl.gz")
-                self.assertEqual(call_args["dataset_id"], "onix_workflow")
-                self.assertEqual(call_args["data_location"], "us")
-                self.assertEqual(call_args["table_id"], "onix_workid_isbn")
-                self.assertEqual(call_args["release_date"], pendulum.datetime(2021, 1, 1))
-                self.assertEqual(call_args["source_format"], "NEWLINE_DELIMITED_JSON")
-                self.assertEqual(call_args["dataset_description"], "ONIX workflow tables")
-
-                # Test bq_load_workid_lookup_errors
-                wf.bq_load_workid_lookup_errors(release)
-                self.assertEqual(mock_bq_load_lookup.call_count, 2)
-                _, call_args = mock_bq_load_lookup.call_args
-                self.assertTrue(call_args["schema_file_path"].endswith("onix_workid_isbn_errors.json"))
-                self.assertEqual(call_args["project_id"], "project_id")
-                self.assertEqual(call_args["transform_bucket"], "bucket_name")
-                self.assertEqual(
-                    call_args["transform_blob"], "onix_workflow_test/20210101/onix_workid_isbn_errors.jsonl.gz"
-                )
-                self.assertEqual(call_args["dataset_id"], "onix_workflow")
-                self.assertEqual(call_args["data_location"], "us")
-                self.assertEqual(call_args["table_id"], "onix_workid_isbn_errors")
-                self.assertEqual(call_args["release_date"], pendulum.datetime(2021, 1, 1))
-                self.assertEqual(call_args["source_format"], "NEWLINE_DELIMITED_JSON")
-                self.assertEqual(call_args["dataset_description"], "ONIX workflow tables")
-
-    @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
-    @patch("oaebu_workflows.workflows.onix_workflow.OnixWorkflow.make_release")
-    @patch("oaebu_workflows.workflows.onix_workflow.run_bigquery_query")
-    @patch("oaebu_workflows.workflows.onix_workflow.bq_load_shard")
-    @patch("oaebu_workflows.workflows.onix_workflow.upload_files_to_cloud_storage")
-    @patch("oaebu_workflows.workflows.onix_workflow.list_to_jsonl_gz")
-    @patch("observatory.platform.utils.gc_utils.select_table_shard_dates")
-    def test_create_and_upload_bq_isbn13_workfamilyid_lookup_table(
-        self,
-        mock_sel_table_suffixes,
-        mock_write_to_file,
-        mock_upload_files_from_list,
-        mock_bq_load_lookup,
-        mock_bq_query,
-        mock_mr,
-        mock_api,
-    ):
-        mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
-        mock_bq_query.return_value = TestOnixWorkflow.onix_data
-        mock_api.return_value = self.api
-
-        env = ObservatoryEnvironment(self.project_id, self.data_location, api_host=self.host, api_port=self.port)
-        with env.create():
-            self.seed_db()
-            with CliRunner().isolated_filesystem():
-                wf = OnixWorkflow(
-                    org_name=self.telescope.organisation.name,
-                    gcp_project_id=self.telescope.organisation.project_id,
-                    gcp_bucket_name=self.bucket_name,
-                    data_partners=[self.fake_onix_data_partner],
-                )
-
-                mock_mr.return_value = OnixWorkflowRelease(
-                    dag_id="onix_workflow_test",
-                    release_date=pendulum.datetime(2021, 1, 1),
-                    onix_release_date=pendulum.datetime(2021, 1, 1),
-                    crossref_metadata_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.project_id,
-                    gcp_bucket_name=self.bucket_name,
-                    onix_dataset_id="onix",
-                    onix_table_id="onix",
-                )
-                release = wf.make_release()
-
-                # Test works family aggregation
-                wf.aggregate_works(release)
-                self.assertEqual(mock_write_to_file.call_count, 3)
-                call_args = mock_write_to_file.call_args_list
-                lookup_table = {arg["isbn13"]: arg["work_family_id"] for arg in call_args[2][0][1]}
-                self.assertTrue(
-                    lookup_table["112"] == lookup_table["111"] and lookup_table["111"] == lookup_table["211"]
-                )
-
-                self.assertEqual(call_args[0][0][0], "onix_workflow_test/20210101/onix_workid_isbn.jsonl.gz")
-
-                # Test bq_load_workfamilyid_lookup
-                wf.upload_aggregation_tables(release)
-                wf.bq_load_workfamilyid_lookup(release)
-                self.assertEqual(mock_bq_load_lookup.call_count, 1)
-                _, call_args = mock_bq_load_lookup.call_args
-                self.assertEqual(call_args["project_id"], "project_id")
-                self.assertEqual(call_args["transform_bucket"], "bucket_name")
-                self.assertEqual(
-                    call_args["transform_blob"], "onix_workflow_test/20210101/onix_workfamilyid_isbn.jsonl.gz"
-                )
-
-    @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
-    def test_create_oaebu_intermediate_table(self, mock_api):
-        mock_api.return_value = self.api
-
-        with self.env.create():
-            self.seed_db()
-            with CliRunner().isolated_filesystem():
-                wf = OnixWorkflow(
-                    org_name=self.telescope.organisation.name,
-                    gcp_project_id=self.telescope.organisation.project_id,
-                    gcp_bucket_name=self.bucket_name,
-                    data_partners=[self.fake_onix_data_partner],
-                )
-                with patch(
-                    "oaebu_workflows.workflows.onix_workflow.create_bigquery_table_from_query", return_value=False
-                ) as _:
-                    with patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_dataset") as _:
-                        self.assertRaises(
-                            AirflowException,
-                            wf.create_oaebu_intermediate_table,
-                            release=OnixWorkflowRelease(
-                                dag_id="onix_workflow_test",
-                                release_date=pendulum.datetime(2021, 1, 1),
-                                onix_release_date=pendulum.datetime(2021, 1, 1),
-                                crossref_metadata_release_date=pendulum.datetime(2021, 1, 1),
-                                gcp_project_id=self.telescope.organisation.project_id,
-                                gcp_bucket_name=self.bucket_name,
-                                onix_dataset_id="onix",
-                                onix_table_id="onix",
-                            ),
-                            orig_project_id="project",
-                            orig_dataset="dataset",
-                            orig_table="table",
-                            orig_isbn="isbn",
-                            sharded=False,
-                        )
-
-    @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
-    @patch("oaebu_workflows.workflows.onix_workflow.OnixWorkflow.make_release")
-    @patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_table_from_query")
-    @patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_dataset")
-    @patch("oaebu_workflows.workflows.onix_workflow.select_table_shard_dates")
-    @patch("observatory.platform.utils.workflow_utils.select_table_shard_dates")
-    def test_create_oaebu_intermediate_table_tasks(
-        self,
-        mock_select_table_shard_dates,
-        mock_sel_table_suffixes,
-        mock_create_bq_ds,
-        mock_create_bq_table,
-        mock_mr,
-        mock_api,
-    ):
-        mock_api.return_value = self.api
-
-        mock_select_table_shard_dates.return_value = [pendulum.datetime(2021, 1, 1)]
-        mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
-        mock_create_bq_table.return_value = True
-
-        # Create some fake data partners to check if their intermediate tasks are created as expected
-        test_table_names = ["test_table_1", "test_table_2"]
-        fake_data_partners = []
-        for t in test_table_names:
-            fake_data_partners.append(
-                OaebuPartner(
-                    dataset_type_id="Test_type",
-                    dag_id_prefix="test_dag",
-                    gcp_project_id="test_project",
-                    gcp_dataset_id="test_dataset",
-                    gcp_table_id=t,
-                    isbn_field_name="isbn",
-                    title_field_name="title",
-                    sharded=True,
-                )
-            )
-        fake_data_partners.append(self.fake_onix_data_partner)
-
-        with self.env.create():
-            self.seed_db()
-            with CliRunner().isolated_filesystem():
-                wf = OnixWorkflow(
-                    org_name=self.telescope.organisation.name,
-                    gcp_project_id=self.telescope.organisation.project_id,
-                    gcp_bucket_name=self.bucket_name,
-                    dag_id="dagid",
-                    data_partners=fake_data_partners,
-                )
-
-                mock_mr.return_value = OnixWorkflowRelease(
-                    dag_id="onix_workflow_test",
-                    release_date=pendulum.datetime(2021, 1, 1),
-                    onix_release_date=pendulum.datetime(2021, 1, 1),
-                    crossref_metadata_release_date=pendulum.datetime(2021, 1, 1),
-                    gcp_project_id=self.telescope.organisation.project_id,
-                    gcp_bucket_name=self.bucket_name,
-                    onix_dataset_id="onix",
-                    onix_table_id="onix",
-                )
-
-                # Check that the expected intermediate tasks are there
-                oaebu_task1_op = wf.operators[9]
-                for i, t in enumerate(test_table_names):
-                    self.assertEqual(oaebu_task1_op[i].task_id, f"create_oaebu_intermediate_table.test_dataset.{t}")
-
-                # Run tasks
-                oaebu_task1_op[0].execute_callable()
-                _, call_args = mock_create_bq_ds.call_args
-                self.assertEqual(call_args["project_id"], "project_id")
-                self.assertEqual(call_args["dataset_id"], "oaebu_intermediate")
-                self.assertEqual(call_args["location"], "us")
-
-                _, call_args = mock_create_bq_table.call_args
-                self.assertEqual(call_args["project_id"], "project_id")
-                self.assertEqual(call_args["dataset_id"], "oaebu_intermediate")
-                self.assertEqual(call_args["table_id"], f"test_dataset_{test_table_names[0]}_matched20210101")
-                self.assertEqual(call_args["location"], "us")
-                sql_hash = hashlib.md5(call_args["sql"].encode("utf-8"))
-                sql_hash = sql_hash.hexdigest()
-                expected_hash = "9665831109b0ffab5216d43d7b2244d8"
-                self.assertEqual(sql_hash, expected_hash)
-
-                oaebu_task1_op[1].execute_callable()
-                _, call_args = mock_create_bq_ds.call_args
-                self.assertEqual(call_args["project_id"], "project_id")
-                self.assertEqual(call_args["dataset_id"], "oaebu_intermediate")
-                self.assertEqual(call_args["location"], "us")
-
-                _, call_args = mock_create_bq_table.call_args
-                self.assertEqual(call_args["project_id"], "project_id")
-                self.assertEqual(call_args["dataset_id"], "oaebu_intermediate")
-                self.assertEqual(call_args["table_id"], f"test_dataset_{test_table_names[1]}_matched20210101")
-                self.assertEqual(call_args["location"], "us")
-
-                sql_hash = hashlib.md5(call_args["sql"].encode("utf-8"))
-                sql_hash = sql_hash.hexdigest()
-                expected_hash = "28b7211595e7d5d6bb37dcd551efb2ea"
-                self.assertEqual(sql_hash, expected_hash)
-
-    @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
-    @patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_table_from_query")
-    @patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_dataset")
-    def test_create_oaebu_data_qa_onix_isbn(self, mock_bq_ds, mock_bq_table_query, mock_api):
-        mock_api.return_value = self.api
-
-        with CliRunner().isolated_filesystem():
-            with self.env.create():
-                self.seed_db()
-                wf = OnixWorkflow(
-                    org_name=self.telescope.organisation.name,
-                    gcp_project_id=self.telescope.organisation.project_id,
-                    gcp_bucket_name=self.bucket_name,
-                    data_partners=[self.fake_onix_data_partner],
-                )
-                mock_bq_table_query.return_value = True
-                wf.create_oaebu_data_qa_onix_isbn(
-                    OnixWorkflowRelease(
-                        dag_id="onix_workflow_test",
-                        release_date=pendulum.datetime(2021, 1, 1),
-                        onix_release_date=pendulum.datetime(2021, 1, 1),
-                        crossref_metadata_release_date=pendulum.datetime(2021, 1, 1),
-                        gcp_project_id=self.telescope.organisation.project_id,
-                        gcp_bucket_name=self.bucket_name,
-                        onix_dataset_id="onix",
-                        onix_table_id="onix",
-                    )
-                )
-
-                _, call_args = mock_bq_ds.call_args
-                self.assertEqual(call_args["dataset_id"], "oaebu_data_qa")
-
-                _, call_args = mock_bq_table_query.call_args
-                self.assertEqual(call_args["project_id"], "project_id")
-                self.assertEqual(call_args["dataset_id"], "oaebu_data_qa")
-                self.assertEqual(call_args["table_id"], "onix_invalid_isbn20210101")
-                self.assertEqual(call_args["location"], "us")
-
-                sql_hash = hashlib.md5(call_args["sql"].encode("utf-8"))
-                sql_hash = sql_hash.hexdigest()
-                expected_hash = "98d0a2b99961e9c63c3ade6faf9997f9"
-                self.assertEqual(sql_hash, expected_hash)
-
-                mock_bq_table_query.return_value = False
-                self.assertRaises(
-                    AirflowException,
-                    wf.create_oaebu_data_qa_onix_isbn,
-                    OnixWorkflowRelease(
-                        dag_id="onix_workflow_test",
-                        release_date=pendulum.datetime(2021, 1, 1),
-                        onix_release_date=pendulum.datetime(2021, 1, 1),
-                        crossref_metadata_release_date=pendulum.datetime(2021, 1, 1),
-                        gcp_project_id=self.telescope.organisation.project_id,
-                        gcp_bucket_name=self.bucket_name,
-                        onix_dataset_id="onix",
-                        onix_table_id="onix",
-                    ),
-                )
-
-    @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
-    @patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_table_from_query")
-    @patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_dataset")
-    def test_create_oaebu_data_qa_onix_aggregate(self, mock_bq_ds, mock_bq_table_query, mock_api):
-        mock_api.return_value = self.api
-
-        with CliRunner().isolated_filesystem():
-            with self.env.create():
-                self.seed_db()
-                wf = OnixWorkflow(
-                    org_name=self.telescope.organisation.name,
-                    gcp_project_id=self.telescope.organisation.project_id,
-                    gcp_bucket_name=self.bucket_name,
-                    data_partners=[self.fake_onix_data_partner],
-                )
-                mock_bq_table_query.return_value = True
-                wf.create_oaebu_data_qa_onix_aggregate(
-                    OnixWorkflowRelease(
-                        dag_id="onix_workflow_test",
-                        release_date=pendulum.datetime(2021, 1, 1),
-                        onix_release_date=pendulum.datetime(2021, 1, 1),
-                        crossref_metadata_release_date=pendulum.datetime(2021, 1, 1),
-                        gcp_project_id=self.telescope.organisation.project_id,
-                        gcp_bucket_name=self.bucket_name,
-                        onix_dataset_id="onix",
-                        onix_table_id="onix",
-                    )
-                )
-
-                _, call_args = mock_bq_ds.call_args
-                self.assertEqual(call_args["dataset_id"], "oaebu_data_qa")
-
-                _, call_args = mock_bq_table_query.call_args
-                self.assertEqual(call_args["project_id"], "project_id")
-                self.assertEqual(call_args["dataset_id"], "oaebu_data_qa")
-                self.assertEqual(call_args["table_id"], "onix_aggregate_metrics20210101")
-                self.assertEqual(call_args["location"], "us")
-
-                sql_hash = hashlib.md5(call_args["sql"].encode("utf-8"))
-                sql_hash = sql_hash.hexdigest()
-                expected_hash = "e457bc4d32a3bbb75ef215009da917b3"
-                self.assertEqual(sql_hash, expected_hash)
-
-                mock_bq_table_query.return_value = False
-                self.assertRaises(
-                    AirflowException,
-                    wf.create_oaebu_data_qa_onix_aggregate,
-                    OnixWorkflowRelease(
-                        dag_id="onix_workflow_test",
-                        release_date=pendulum.datetime(2021, 1, 1),
-                        onix_release_date=pendulum.datetime(2021, 1, 1),
-                        crossref_metadata_release_date=pendulum.datetime(2021, 1, 1),
-                        gcp_project_id=self.telescope.organisation.project_id,
-                        gcp_bucket_name=self.bucket_name,
-                        onix_dataset_id="onix",
-                        onix_table_id="onix",
-                    ),
-                )
-
-    @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
-    @patch("observatory.platform.utils.workflow_utils.select_table_shard_dates")
-    @patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_table_from_query")
-    @patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_dataset")
-    def test_create_oaebu_data_qa_jstor_isbn(self, mock_bq_ds, mock_bq_table_query, mock_sel_table_suffixes, mock_api):
-        mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
-        mock_api.return_value = self.api
-
-        with self.env.create():
-            self.seed_db()
-            dataset_type_info = get_dataset_type_info(self.api)
-            data_partners = [
-                OaebuPartner(
-                    dataset_type_id=dataset_type_info["jstor_country"].type_id,
-                    dag_id_prefix="jstor",
-                    gcp_project_id="project",
-                    gcp_dataset_id="jstor",
-                    gcp_table_id="country",
-                    isbn_field_name="ISBN",
-                    title_field_name="Book_Title",
-                    sharded=False,
-                ),
-                self.fake_onix_data_partner,
-            ]
-            with CliRunner().isolated_filesystem():
-                wf = OnixWorkflow(
-                    org_name=self.telescope.organisation.name,
-                    gcp_project_id=self.telescope.organisation.project_id,
-                    gcp_bucket_name=self.bucket_name,
-                    data_partners=data_partners,
-                )
-                mock_bq_table_query.return_value = True
-                wf.create_oaebu_data_qa_jstor_isbn(
-                    OnixWorkflowRelease(
-                        dag_id="onix_workflow_test",
-                        release_date=pendulum.datetime(2021, 1, 1),
-                        onix_release_date=pendulum.datetime(2021, 1, 1),
-                        crossref_metadata_release_date=pendulum.datetime(2021, 1, 1),
-                        gcp_project_id=self.telescope.organisation.project_id,
-                        gcp_bucket_name=self.bucket_name,
-                        onix_dataset_id="onix",
-                        onix_table_id="onix",
-                    ),
-                    project_id="project",
-                    orig_dataset_id="jstor",
-                    orig_table="country",
-                    sharded=True,
-                )
-
-                self.assertEqual(mock_sel_table_suffixes.call_count, 1)
-
-                wf.create_oaebu_data_qa_jstor_isbn(
-                    OnixWorkflowRelease(
-                        dag_id="onix_workflow_test",
-                        release_date=pendulum.datetime(2021, 1, 1),
-                        onix_release_date=pendulum.datetime(2021, 1, 1),
-                        crossref_metadata_release_date=pendulum.datetime(2021, 1, 1),
-                        gcp_project_id=self.telescope.organisation.project_id,
-                        gcp_bucket_name=self.bucket_name,
-                        onix_dataset_id="onix",
-                        onix_table_id="onix",
-                    ),
-                    project_id="project",
-                    orig_dataset_id="jstor",
-                    orig_table="country",
-                    sharded=False,
-                )
-                self.assertEqual(mock_sel_table_suffixes.call_count, 1)
-
-                _, call_args = mock_bq_table_query.call_args
-                self.assertEqual(call_args["project_id"], "project")
-                self.assertEqual(call_args["dataset_id"], "oaebu_data_qa")
-                self.assertEqual(call_args["table_id"], "jstor_invalid_eisbn20210101")
-                self.assertEqual(call_args["location"], "us")
-
-                sql_hash = hashlib.md5(call_args["sql"].encode("utf-8"))
-                sql_hash = sql_hash.hexdigest()
-                expected_hash = "7a9a66b5a0295ecdd53d245e659f3e85"
-                self.assertEqual(sql_hash, expected_hash)
-
-    @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
-    @patch("observatory.platform.utils.workflow_utils.select_table_shard_dates")
-    @patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_table_from_query")
-    @patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_dataset")
-    def test_create_oaebu_data_qa_google_books_sales_isbn(
-        self, mock_bq_ds, mock_bq_table_query, mock_sel_table_suffixes, mock_api
-    ):
-        mock_api.return_value = self.api
-
-        mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
-
-        with self.env.create():
-            self.seed_db()
-            dataset_type_info = get_dataset_type_info(self.api)
-            data_partners = [
-                OaebuPartner(
-                    dataset_type_id=dataset_type_info["google_books_sales"].type_id,
-                    dag_id_prefix="google_books",
-                    gcp_project_id="project",
-                    gcp_dataset_id="google_books",
-                    gcp_table_id="sales",
-                    isbn_field_name="Primary_ISBN",
-                    title_field_name="Title",
-                    sharded=False,
-                ),
-                self.fake_onix_data_partner,
-            ]
-            with CliRunner().isolated_filesystem():
-                wf = OnixWorkflow(
-                    org_name=self.telescope.organisation.name,
-                    gcp_project_id=self.telescope.organisation.project_id,
-                    gcp_bucket_name=self.bucket_name,
-                    data_partners=data_partners,
-                )
-                mock_bq_table_query.return_value = True
-                wf.create_oaebu_data_qa_google_books_sales_isbn(
-                    OnixWorkflowRelease(
-                        dag_id="onix_workflow_test",
-                        release_date=pendulum.datetime(2021, 1, 1),
-                        onix_release_date=pendulum.datetime(2021, 1, 1),
-                        crossref_metadata_release_date=pendulum.datetime(2021, 1, 1),
-                        gcp_project_id=self.telescope.organisation.project_id,
-                        gcp_bucket_name=self.bucket_name,
-                        onix_dataset_id="onix",
-                        onix_table_id="onix",
-                    ),
-                    project_id="project",
-                    orig_dataset_id="google_books",
-                    orig_table="sales",
-                    sharded=True,
-                )
-
-                self.assertEqual(mock_sel_table_suffixes.call_count, 1)
-
-                wf.create_oaebu_data_qa_google_books_sales_isbn(
-                    OnixWorkflowRelease(
-                        dag_id="onix_workflow_test",
-                        release_date=pendulum.datetime(2021, 1, 1),
-                        onix_release_date=pendulum.datetime(2021, 1, 1),
-                        crossref_metadata_release_date=pendulum.datetime(2021, 1, 1),
-                        gcp_project_id=self.telescope.organisation.project_id,
-                        gcp_bucket_name=self.bucket_name,
-                        onix_dataset_id="onix",
-                        onix_table_id="onix",
-                    ),
-                    project_id="project",
-                    orig_dataset_id="google_books",
-                    orig_table="sales",
-                    sharded=False,
-                )
-                self.assertEqual(mock_sel_table_suffixes.call_count, 1)
-
-                _, call_args = mock_bq_table_query.call_args
-                self.assertEqual(call_args["project_id"], "project")
-                self.assertEqual(call_args["dataset_id"], "oaebu_data_qa")
-                self.assertEqual(call_args["table_id"], "google_books_sales_invalid_isbn20210101")
-                self.assertEqual(call_args["location"], "us")
-
-                sql_hash = hashlib.md5(call_args["sql"].encode("utf-8"))
-                sql_hash = sql_hash.hexdigest()
-                expected_hash = "90bbe5c7fb00173d1a85f6ab13ab99b2"
-                self.assertEqual(sql_hash, expected_hash)
-
-    @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
-    @patch("observatory.platform.utils.workflow_utils.select_table_shard_dates")
-    @patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_table_from_query")
-    @patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_dataset")
-    def test_create_oaebu_data_qa_google_books_traffic_isbn(
-        self, mock_bq_ds, mock_bq_table_query, mock_sel_table_suffixes, mock_api
-    ):
-        mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
-        mock_api.return_value = self.api
-
-        with self.env.create():
-            self.seed_db()
-            dataset_type_info = get_dataset_type_info(self.api)
-
-            data_partners = [
-                OaebuPartner(
-                    dataset_type_id=dataset_type_info["google_books_traffic"].type_id,
-                    dag_id_prefix="google_books",
-                    gcp_project_id="project",
-                    gcp_dataset_id="google_books",
-                    gcp_table_id="traffic",
-                    isbn_field_name="Primary_ISBN",
-                    title_field_name="Title",
-                    sharded=False,
-                ),
-                self.fake_onix_data_partner,
-            ]
-            with CliRunner().isolated_filesystem():
-                wf = OnixWorkflow(
-                    org_name=self.telescope.organisation.name,
-                    gcp_project_id=self.telescope.organisation.project_id,
-                    gcp_bucket_name=self.bucket_name,
-                    data_partners=data_partners,
-                )
-                mock_bq_table_query.return_value = True
-                wf.create_oaebu_data_qa_google_books_traffic_isbn(
-                    OnixWorkflowRelease(
-                        dag_id="onix_workflow_test",
-                        release_date=pendulum.datetime(2021, 1, 1),
-                        onix_release_date=pendulum.datetime(2021, 1, 1),
-                        crossref_metadata_release_date=pendulum.datetime(2021, 1, 1),
-                        gcp_project_id=self.telescope.organisation.project_id,
-                        gcp_bucket_name=self.bucket_name,
-                        onix_dataset_id="onix",
-                        onix_table_id="onix",
-                    ),
-                    project_id="project",
-                    orig_dataset_id="google_books",
-                    orig_table="traffic",
-                    sharded=True,
-                )
-
-                self.assertEqual(mock_sel_table_suffixes.call_count, 1)
-
-                wf.create_oaebu_data_qa_google_books_traffic_isbn(
-                    OnixWorkflowRelease(
-                        dag_id="onix_workflow_test",
-                        release_date=pendulum.datetime(2021, 1, 1),
-                        onix_release_date=pendulum.datetime(2021, 1, 1),
-                        crossref_metadata_release_date=pendulum.datetime(2021, 1, 1),
-                        gcp_project_id=self.telescope.organisation.project_id,
-                        gcp_bucket_name=self.bucket_name,
-                        onix_dataset_id="onix",
-                        onix_table_id="onix",
-                    ),
-                    project_id="project",
-                    orig_dataset_id="google_books",
-                    orig_table="sales",
-                    sharded=False,
-                )
-                self.assertEqual(mock_sel_table_suffixes.call_count, 1)
-
-                _, call_args = mock_bq_table_query.call_args
-                self.assertEqual(call_args["project_id"], "project")
-                self.assertEqual(call_args["dataset_id"], "oaebu_data_qa")
-                self.assertEqual(call_args["table_id"], "google_books_traffic_invalid_isbn20210101")
-                self.assertEqual(call_args["location"], "us")
-
-                sql_hash = hashlib.md5(call_args["sql"].encode("utf-8"))
-                sql_hash = sql_hash.hexdigest()
-                expected_hash = "90bbe5c7fb00173d1a85f6ab13ab99b2"
-                self.assertEqual(sql_hash, expected_hash)
-
-    @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
-    @patch("observatory.platform.utils.workflow_utils.select_table_shard_dates")
-    @patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_table_from_query")
-    @patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_dataset")
-    def test_create_oaebu_data_qa_oapen_irus_uk_isbn(
-        self, mock_bq_ds, mock_bq_table_query, mock_sel_table_suffixes, mock_api
-    ):
-        mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
-        mock_api.return_value = self.api
-
-        with self.env.create():
-            self.seed_db()
-            dataset_type_info = get_dataset_type_info(self.api)
-            data_partners = [
-                OaebuPartner(
-                    dataset_type_id=dataset_type_info["oapen_irus_uk"].type_id,
-                    dag_id_prefix="oapen_irus_uk",
-                    gcp_project_id="project",
-                    gcp_dataset_id="irus_uk",
-                    gcp_table_id="oapen_irus_uk",
-                    isbn_field_name="ISBN",
-                    title_field_name="book_title",
-                    sharded=False,
-                ),
-                self.fake_onix_data_partner,
-            ]
-            with CliRunner().isolated_filesystem():
-                wf = OnixWorkflow(
-                    org_name=self.telescope.organisation.name,
-                    gcp_project_id=self.telescope.organisation.project_id,
-                    gcp_bucket_name=self.bucket_name,
-                    data_partners=data_partners,
-                )
-                mock_bq_table_query.return_value = True
-                wf.create_oaebu_data_qa_oapen_irus_uk_isbn(
-                    OnixWorkflowRelease(
-                        dag_id="onix_workflow_test",
-                        release_date=pendulum.datetime(2021, 1, 1),
-                        onix_release_date=pendulum.datetime(2021, 1, 1),
-                        crossref_metadata_release_date=pendulum.datetime(2021, 1, 1),
-                        gcp_project_id=self.telescope.organisation.project_id,
-                        gcp_bucket_name=self.bucket_name,
-                        onix_dataset_id="onix",
-                        onix_table_id="onix",
-                    ),
-                    project_id="project",
-                    orig_dataset_id="irus_uk",
-                    orig_table="oapen_irus_uk",
-                    sharded=True,
-                )
-
-                self.assertEqual(mock_sel_table_suffixes.call_count, 1)
-
-                wf.create_oaebu_data_qa_oapen_irus_uk_isbn(
-                    OnixWorkflowRelease(
-                        dag_id="onix_workflow_test",
-                        release_date=pendulum.datetime(2021, 1, 1),
-                        onix_release_date=pendulum.datetime(2021, 1, 1),
-                        crossref_metadata_release_date=pendulum.datetime(2021, 1, 1),
-                        gcp_project_id=self.telescope.organisation.project_id,
-                        gcp_bucket_name=self.bucket_name,
-                        onix_dataset_id="onix",
-                        onix_table_id="onix",
-                    ),
-                    project_id="project",
-                    orig_dataset_id="irus_uk",
-                    orig_table="oapen_irus_uk",
-                    sharded=False,
-                )
-                self.assertEqual(mock_sel_table_suffixes.call_count, 1)
-
-                _, call_args = mock_bq_table_query.call_args
-                self.assertEqual(call_args["project_id"], "project")
-                self.assertEqual(call_args["dataset_id"], "oaebu_data_qa")
-                self.assertEqual(call_args["table_id"], "oapen_irus_uk_invalid_isbn20210101")
-                self.assertEqual(call_args["location"], "us")
-
-                sql_hash = hashlib.md5(call_args["sql"].encode("utf-8"))
-                sql_hash = sql_hash.hexdigest()
-                expected_hash = "ae842fbf661d3a0c50b748dec8e1cd24"
-                self.assertEqual(sql_hash, expected_hash)
-
-    @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
-    @patch("observatory.platform.utils.workflow_utils.select_table_shard_dates")
-    @patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_table_from_query")
-    @patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_dataset")
-    def test_create_oaebu_data_qa_google_analytics_isbn(
-        self, mock_bq_ds, mock_bq_table_query, mock_sel_table_suffixes, mock_api
-    ):
-        mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
-        mock_api.return_value = self.api
-
-        with self.env.create():
-            self.seed_db()
-            dataset_type_info = get_dataset_type_info(self.api)
-
-            data_partners = [
-                OaebuPartner(
-                    dataset_type_id=dataset_type_info["oapen_irus_uk"].type_id,
-                    dag_id_prefix="google_analytics",
-                    gcp_project_id="project",
-                    gcp_dataset_id="google",
-                    gcp_table_id="google_analytics",
-                    isbn_field_name="publication_id",
-                    title_field_name="book_title",
-                    sharded=False,
-                ),
-                self.fake_onix_data_partner,
-            ]
-            with CliRunner().isolated_filesystem():
-                wf = OnixWorkflow(
-                    org_name=self.telescope.organisation.name,
-                    gcp_project_id=self.telescope.organisation.project_id,
-                    gcp_bucket_name=self.bucket_name,
-                    data_partners=data_partners,
-                )
-                mock_bq_table_query.return_value = True
-                wf.create_oaebu_data_qa_google_analytics_isbn(
-                    OnixWorkflowRelease(
-                        dag_id="onix_workflow_test",
-                        release_date=pendulum.datetime(2021, 1, 1),
-                        onix_release_date=pendulum.datetime(2021, 1, 1),
-                        crossref_metadata_release_date=pendulum.datetime(2021, 1, 1),
-                        gcp_project_id=self.telescope.organisation.project_id,
-                        gcp_bucket_name=self.bucket_name,
-                        onix_dataset_id="onix",
-                        onix_table_id="onix",
-                    ),
-                    project_id="project",
-                    orig_dataset_id="google",
-                    orig_table="google_analytics",
-                    sharded=True,
-                )
-
-                self.assertEqual(mock_sel_table_suffixes.call_count, 1)
-
-                wf.create_oaebu_data_qa_google_analytics_isbn(
-                    OnixWorkflowRelease(
-                        dag_id="onix_workflow_test",
-                        release_date=pendulum.datetime(2021, 1, 1),
-                        onix_release_date=pendulum.datetime(2021, 1, 1),
-                        crossref_metadata_release_date=pendulum.datetime(2021, 1, 1),
-                        gcp_project_id=self.telescope.organisation.project_id,
-                        gcp_bucket_name=self.bucket_name,
-                        onix_dataset_id="onix",
-                        onix_table_id="onix",
-                    ),
-                    project_id="project",
-                    orig_dataset_id="google",
-                    orig_table="google_analytics",
-                    sharded=False,
-                )
-                self.assertEqual(mock_sel_table_suffixes.call_count, 1)
-
-                _, call_args = mock_bq_table_query.call_args
-                self.assertEqual(call_args["project_id"], "project")
-                self.assertEqual(call_args["dataset_id"], "oaebu_data_qa")
-                self.assertEqual(call_args["table_id"], "google_analytics_invalid_isbn20210101")
-                self.assertEqual(call_args["location"], "us")
-
-                sql_hash = hashlib.md5(call_args["sql"].encode("utf-8"))
-                sql_hash = sql_hash.hexdigest()
-                expected_hash = "4302ca70501b435561f0c81d04e314cd"
-                self.assertEqual(sql_hash, expected_hash)
-
-    @patch("oaebu_workflows.workflows.onix_workflow.make_observatory_api")
-    @patch("observatory.platform.utils.gc_utils.select_table_shard_dates")
-    @patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_table_from_query")
-    @patch("oaebu_workflows.workflows.onix_workflow.create_bigquery_dataset")
-    def test_create_oaebu_data_qa_intermediate_unmatched_workid(
-        self, mock_bq_ds, mock_bq_table_query, mock_sel_table_suffixes, mock_api
-    ):
-        mock_sel_table_suffixes.return_value = [pendulum.datetime(2021, 1, 1)]
-        mock_api.return_value = self.api
-
-        with self.env.create():
-            self.seed_db()
-            dataset_type_info = get_dataset_type_info(self.api)
-            data_partners = [
-                OaebuPartner(
-                    dataset_type_id=dataset_type_info["jstor_country"].type_id,
-                    dag_id_prefix="jstor",
-                    gcp_project_id="project",
-                    gcp_dataset_id="jstor",
-                    gcp_table_id="country",
-                    isbn_field_name="ISBN",
-                    title_field_name="Book_Title",
-                    sharded=False,
-                ),
-                self.fake_onix_data_partner,
-            ]
-            with CliRunner().isolated_filesystem():
-                wf = OnixWorkflow(
-                    org_name=self.telescope.organisation.name,
-                    gcp_project_id=self.telescope.organisation.project_id,
-                    gcp_bucket_name=self.bucket_name,
-                    data_partners=data_partners,
-                )
-                mock_bq_table_query.return_value = True
-                wf.create_oaebu_data_qa_intermediate_unmatched_workid(
-                    OnixWorkflowRelease(
-                        dag_id="onix_workflow_test",
-                        release_date=pendulum.datetime(2021, 1, 1),
-                        onix_release_date=pendulum.datetime(2021, 1, 1),
-                        crossref_metadata_release_date=pendulum.datetime(2021, 1, 1),
-                        gcp_project_id=self.telescope.organisation.project_id,
-                        gcp_bucket_name=self.bucket_name,
-                        onix_dataset_id="onix",
-                        onix_table_id="onix",
-                    ),
-                    project_id="project",
-                    orig_dataset_id="jstor",
-                    orig_table="country",
-                    orig_isbn="isbn",
-                    orig_title="Book_Title",
-                )
-
-                _, call_args = mock_bq_ds.call_args
-                self.assertEqual(call_args["project_id"], "project_id")
-                self.assertEqual(call_args["dataset_id"], "oaebu_data_qa")
-
-                _, call_args = mock_bq_table_query.call_args
-                self.assertEqual(call_args["table_id"], "country_unmatched_isbn20210101")
-                self.assertEqual(call_args["location"], "us")
-
-                sql_hash = hashlib.md5(call_args["sql"].encode("utf-8"))
-                sql_hash = sql_hash.hexdigest()
-                expected_hash = "71bc329dd609017504e91bc8fd8931fe"
-                self.assertEqual(sql_hash, expected_hash)
-
-                mock_bq_table_query.return_value = False
-                self.assertRaises(
-                    AirflowException,
-                    wf.create_oaebu_data_qa_intermediate_unmatched_workid,
-                    OnixWorkflowRelease(
-                        dag_id="onix_workflow_test",
-                        release_date=pendulum.datetime(2021, 1, 1),
-                        onix_release_date=pendulum.datetime(2021, 1, 1),
-                        crossref_metadata_release_date=pendulum.datetime(2021, 1, 1),
-                        gcp_project_id=self.telescope.organisation.project_id,
-                        gcp_bucket_name=self.bucket_name,
-                        onix_dataset_id="onix",
-                        onix_table_id="onix",
-                    ),
-                    project_id="project",
-                    orig_dataset_id="jstor",
-                    orig_table="country",
-                    orig_isbn="isbn",
-                    orig_title="Book_Title",
-                )
-
-
-class TestOnixWorkflowFunctional(ObservatoryTestCase):
-    """Functionally test the workflow.  No Google Analytics."""
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        self.gcp_project_id = os.getenv("TEST_GCP_PROJECT_ID")
-        self.data_location = os.getenv("TEST_GCP_DATA_LOCATION")
-        self.timestamp = pendulum.now()
-        self.schema_path = default_schema_folder()
-        self.fake_partner_dataset = None
-        self.onix_table_id = "onix"
-        self.test_onix_folder = random_id()  # "onix_workflow_test_onix_table"
-
         # vcrpy cassettes for http request mocking
-        self.metadata_cassette = test_fixtures_folder("onix_workflow", "crossref_metadata_request.yaml")
         self.events_cassette = test_fixtures_folder("onix_workflow", "crossref_events_request.yaml")
 
-        # API environment
-        self.host = "localhost"
-        self.port = find_free_port()
-        configuration = Configuration(host=f"http://{self.host}:{self.port}")
-        api_client = ApiClient(configuration)
-        self.api = ObservatoryApi(api_client=api_client)  # noqa: E501
-        self.env = ObservatoryApiEnvironment(host=self.host, port=self.port)
-        self.org_name = "Curtin Press"
-
-    def seed_db(self):
-        table_type_info = get_table_type_info()
-        seed_table_type(table_type_info=table_type_info, api=self.api)
-
-        dataset_type_info = get_dataset_type_info(self.api)
-        seed_dataset_type(api=self.api, dataset_type_info=dataset_type_info)
-
-    def setup_api(self, orgs=None, onix_telescope=True):
-        """Creates a fake API environment for the class
-
-        :param orgs: oragnisation names
-        :param onix_telescope: whether to include the onix telescope in the API
-        """
-        onix_wf_type = WorkflowType(name="Onix Workflow", type_id=WorkflowTypeId.onix_workflow)
-        onix_telescope_type = WorkflowType(name="Onix Telescope", type_id=WorkflowTypeId.onix)
-
-        table_type = TableType(
-            type_id=TableTypeId.partitioned,
-            name="partitioned bq table",
+    @patch("oaebu_workflows.workflows.onix_workflow.bq_select_table_shard_dates")
+    def test_make_release(self, mock_sel_table_suffixes):
+        """Tests that the make_release function works as intended"""
+        # Use a different onix snapshot date for testing purposes
+        onix_snapshot_date = self.snapshot_date.add(days=1)
+        crossref_snapshot_date = self.snapshot_date
+        mock_sel_table_suffixes.side_effect = [[onix_snapshot_date], [crossref_snapshot_date]]
+        env = ObservatoryEnvironment(
+            self.gcp_project_id, self.data_location, api_host="localhost", api_port=find_free_port()
         )
-        self.api.put_table_type(table_type)
-        table_type = TableType(
-            type_id=TableTypeId.sharded,
-            name="sharded bq table",
-        )
-        self.api.put_table_type(table_type)
-
-        onix_wf_dataset_type = DatasetType(
-            type_id=DatasetTypeId.onix_workflow,
-            name="ONIX wf",
-            extra={},
-            table_type=TableType(id=1),  # partitioned
-        )
-        onix_telescope_dataset_type = DatasetType(
-            type_id=DatasetTypeId.onix,
-            name="ONIX",
-            extra={"isbn_field_name": "ISBN13", "title_field_name": "TitleDetails.TitleElements.TitleText"},
-            table_type=TableType(id=2),  # sharded
-        )
-
-        self.api.put_workflow_type(onix_wf_type)
-        self.api.put_dataset_type(onix_wf_dataset_type)
-        if onix_telescope:
-            self.api.put_workflow_type(onix_telescope_type)
-            self.api.put_dataset_type(onix_telescope_dataset_type)
-
-        if orgs is None:
-            orgs = [self.org_name]
-
-        for org in orgs:
-            # Set up organisation
-            organisation = Organisation(
-                name=org,
-                project_id="project",
-                download_bucket="download_bucket",
-                transform_bucket="transform_bucket",
+        with env.create():
+            wf = OnixWorkflow(
+                dag_id="test_make_release",
+                cloud_workspace=self.fake_cloud_workspace,
+                data_partners=[self.fake_onix_data_partner],
             )
-            organisation = self.api.put_organisation(organisation)
-
-            # Set up workflows
-            # Onix workflow
-            telescope = Workflow(
-                name=f"ONIX Workflow {org}",
-                organisation=Organisation(id=organisation.id),
-                workflow_type=WorkflowType(id=1),  # Onix workflow
-                extra={},
-            )
-            telescope = self.api.put_workflow(telescope)
-            dataset = Dataset(
-                name="Onix Workflow Example Dataset",
-                address="project.dataset.table",
-                service="google",
-                workflow=Workflow(id=telescope.id),
-                dataset_type=DatasetType(id=1),  # Onix workflow
-            )
-            self.api.put_dataset(dataset)
-
-            # Onix telescope
-            if onix_telescope:
-                telescope = Workflow(
-                    name=f"ONIX Telescope {org}",
-                    organisation=Organisation(id=organisation.id),
-                    workflow_type=WorkflowType(id=2),  # Onix telescope
-                    extra={},
-                    tags='["oaebu"]',
+            dag = wf.make_dag()
+            with env.create_dag_run(dag, self.snapshot_date.add(days=1)):
+                release = wf.make_release(
+                    data_interval_end=pendulum.parse(str(env.dag_run.data_interval_end)),
+                    run_id=env.dag_run.run_id,
                 )
-                telescope = self.api.put_workflow(telescope)
-                dataset = Dataset(
-                    name="Onix Telescope Example Dataset",
-                    address="project.onix.table",
-                    service="google",
-                    workflow=Workflow(id=telescope.id),
-                    dataset_type=DatasetType(id=2),  # Onix telescope
-                )
-                self.api.put_dataset(dataset)
+                self.assertEqual(release.dag_id, wf.dag_id)
 
-    def setup_connections(self, env):
-        # Add Observatory API connection
-        conn = Connection(conn_id=AirflowConns.OBSERVATORY_API, uri=f"http://:password@{self.host}:{self.port}")
-        env.add_connection(conn)
+                # Test release file names are as expected
+                self.assertEqual(release.workslookup_path, os.path.join(release.transform_folder, "worksid.jsonl.gz"))
+                self.assertEqual(
+                    release.workslookup_errors_path,
+                    os.path.join(release.transform_folder, "worksid_errors.jsonl.gz"),
+                )
+                self.assertEqual(
+                    release.worksfamilylookup_path, os.path.join(release.transform_folder, "workfamilyid.jsonl.gz")
+                )
+                self.assertEqual(
+                    release.crossref_metadata_path,
+                    os.path.join(release.transform_folder, "crossref_metadata.jsonl.gz"),
+                )
+                self.assertEqual(
+                    release.crossref_events_path, os.path.join(release.transform_folder, "crossref_events.jsonl.gz")
+                )
+
+                # Test that the onix and crossref snapshots are as expected
+                self.assertEqual(onix_snapshot_date, release.onix_snapshot_date)
+                self.assertEqual(crossref_snapshot_date, release.crossref_master_snapshot_date)
+
+                # Test for case - no ONIX releases found
+                mock_sel_table_suffixes.side_effect = [[]]
+                with self.assertRaisesRegex(AssertionError, "ONIX"):
+                    release = wf.make_release(
+                        data_interval_end=pendulum.parse(str(env.dag_run.data_interval_end)),
+                        run_id=env.dag_run.run_id,
+                    )
+
+                # Test for case - no Crossref releases found
+                mock_sel_table_suffixes.side_effect = [[onix_snapshot_date], []]  # No crossref releases
+                with self.assertRaisesRegex(AssertionError, "Crossref"):
+                    release = wf.make_release(
+                        data_interval_end=pendulum.parse(str(env.dag_run.data_interval_end)),
+                        run_id=env.dag_run.run_id,
+                    )
+
+    def test_cleanup(self):
+        """Tests the cleanup function of the workflow"""
+        env = ObservatoryEnvironment(
+            self.gcp_project_id,
+            self.data_location,
+            api_host="localhost",
+            api_port=find_free_port(),
+        )
+        with env.create():
+            wf = OnixWorkflow(
+                dag_id="test_cleanup",
+                cloud_workspace=self.fake_cloud_workspace,
+                data_partners=[self.fake_onix_data_partner],
+            )
+            release = OnixWorkflowRelease(
+                dag_id=wf.dag_id,
+                run_id="test_run_id",
+                snapshot_date=self.snapshot_date,
+                onix_snapshot_date=self.snapshot_date,
+                crossref_master_snapshot_date=self.snapshot_date,
+            )
+            self.assertTrue(os.path.exists(release.download_folder))
+            self.assertTrue(os.path.exists(release.extract_folder))
+            self.assertTrue(os.path.exists(release.transform_folder))
+            wf.cleanup(release, execution_date=self.snapshot_date)
+            self.assert_cleanup(release.workflow_folder)
 
     def test_dag_load(self):
-        """Test that the DAG loads for each organisation"""
+        """Test that the DAG loads"""
+        env = ObservatoryEnvironment(
+            workflows=[
+                Workflow(
+                    dag_id="onix_workflow_test_dag_load",
+                    name="Onix Workflow Test Dag Load",
+                    class_name="oaebu_workflows.workflows.onix_workflow.OnixWorkflow",
+                    cloud_workspace=self.fake_cloud_workspace,
+                    kwargs=dict(
+                        sensor_dag_ids=[
+                            "google_analytics_test",
+                            "google_books_sales_test",
+                            "google_books_traffic_test",
+                            "jstor_country_test",
+                            "jstor_institution_test",
+                            "oapen_irus_uk_test",
+                        ],
+                        data_partners=[
+                            "google_analytics",
+                            "google_books_sales",
+                            "google_books_traffic",
+                            "jstor_country",
+                            "jstor_institution",
+                            "oapen_irus_uk",
+                            "onix",
+                            "nonexistent_partner",
+                        ],
+                    ),
+                )
+            ]
+        )
 
-        dag_file = os.path.join(module_file_path("oaebu_workflows.dags"), "onix_workflow.py")
-        org_names = ["ANU Press", "UCL Press", "University of Michigan Press"]
+        with env.create() as dag_folder:
+            # This should raise one error for nonexistent partner
+            shutil.copy(
+                os.path.join(module_file_path("observatory.platform.dags"), "load_workflows.py"), "load_workflows.py"
+            )
+            dag_bag = DagBag(dag_folder=dag_folder)
+            self.assertNotEqual({}, dag_bag.import_errors)
+            self.assertEqual(len(dag_bag.import_errors), 1)
 
-        env = ObservatoryEnvironment(self.gcp_project_id, self.data_location, api_host=self.host, api_port=self.port)
+        # Remove the nonexistent partner and onix partner
+        env.workflows[0].kwargs["data_partners"] = env.workflows[0].kwargs["data_partners"][:-2]
+        with env.create() as dag_folder:
+            # This should raise once error since onix telescope is mandatory for the onix workflow to run
+            shutil.copy(
+                os.path.join(module_file_path("observatory.platform.dags"), "load_workflows.py"), "load_workflows.py"
+            )
+            dag_bag = DagBag(dag_folder=dag_folder)
+            self.assertNotEqual({}, dag_bag.import_errors)
+            self.assertEqual(len(dag_bag.import_errors), 1)
+
+        env.workflows[0].kwargs["data_partners"].append("onix")
         with env.create():
-            # Add Observatory API connection
-            self.setup_connections(env)
-            self.setup_api(orgs=org_names, onix_telescope=False)
-            self.seed_db()
-            # This should raise an error since onix telescope is mandatory for the onix workflow to run
-            dag_id = make_dag_id("onix_workflow", org_names[0])
-            with CliRunner().isolated_filesystem() as dag_folder:
-                shutil.copy(dag_file, os.path.join(dag_folder, os.path.basename(dag_file)))
-                dag_bag = DagBag(dag_folder=dag_folder)
-                self.assertNotEqual({}, dag_bag.import_errors)
-                self.assertEqual(len(dag_bag.import_errors), 1)  # Should only have one error - the airflow exception
+            # Should not raise any errors
+            self.assert_dag_load_from_config("onix_workflow_test_dag_load")
 
+    def test_dag_structure(self):
+        """Tests that the dag structure is created as expected on dag load"""
+        env = ObservatoryEnvironment(
+            self.gcp_project_id, self.data_location, api_host="localhost", api_port=find_free_port()
+        )
         with env.create():
-            # Check that all DAGs load
-            self.setup_connections(env)
-            self.setup_api(orgs=org_names)
-            self.seed_db()
-            for org_name in org_names:
-                dag_id = make_dag_id("onix_workflow", org_name)
-                self.assert_dag_load(dag_id, dag_file)
+            data_partners = [
+                "jstor_country",
+                "oapen_irus_uk",
+                "google_books_sales",
+                "google_books_traffic",
+                "onix",
+                "google_analytics",
+            ]
+            sensor_dag_ids = ["jstor", "oapen_irus_uk", "google_books", "onix", "google_analytics"]
+            dag = OnixWorkflow(
+                dag_id=self.dag_id,
+                cloud_workspace=self.fake_cloud_workspace,
+                data_partners=data_partners,
+                sensor_dag_ids=sensor_dag_ids,
+            ).make_dag()
+            expected_dag_structure = expected_dag_structure = {
+                "google_analytics_sensor": ["aggregate_works"],
+                "google_books_sensor": ["aggregate_works"],
+                "jstor_sensor": ["aggregate_works"],
+                "oapen_irus_uk_sensor": ["aggregate_works"],
+                "onix_sensor": ["aggregate_works"],
+                "aggregate_works": ["upload_aggregation_tables"],
+                "upload_aggregation_tables": ["bq_load_aggregations"],
+                "bq_load_aggregations": ["create_oaebu_crossref_metadata_table"],
+                "create_oaebu_crossref_metadata_table": ["create_oaebu_crossref_events_table"],
+                "create_oaebu_crossref_events_table": ["create_oaebu_book_table"],
+                "create_oaebu_book_table": [
+                    "create_oaebu_intermediate_table_google_books_sales",
+                    "create_oaebu_intermediate_table_oapen_irus_uk",
+                    "create_oaebu_intermediate_table_google_analytics",
+                    "create_oaebu_intermediate_table_google_books_traffic",
+                    "create_oaebu_intermediate_table_jstor_country",
+                ],
+                "create_oaebu_intermediate_table_jstor_country": ["create_oaebu_book_product_table"],
+                "create_oaebu_intermediate_table_oapen_irus_uk": ["create_oaebu_book_product_table"],
+                "create_oaebu_intermediate_table_google_books_sales": ["create_oaebu_book_product_table"],
+                "create_oaebu_intermediate_table_google_books_traffic": ["create_oaebu_book_product_table"],
+                "create_oaebu_intermediate_table_google_analytics": ["create_oaebu_book_product_table"],
+                "create_oaebu_book_product_table": [
+                    "export_oaebu_table_book_product_publisher_metrics",
+                    "create_oaebu_data_qa_isbn_onix",
+                    "create_oaebu_data_qa_isbn_jstor_country",
+                    "create_oaebu_data_qa_eisbn_jstor_country",
+                    "create_oaebu_data_qa_intermediate_unmatched_jstor_country",
+                    "export_oaebu_table_book_product_metrics_country",
+                    "create_oaebu_data_qa_isbn_google_books_sales",
+                    "create_oaebu_data_qa_intermediate_unmatched_google_analytics",
+                    "export_oaebu_table_book_product_subject_year_metrics",
+                    "export_oaebu_table_book_product_subject_thema_metrics",
+                    "create_oaebu_data_qa_isbn_google_books_traffic",
+                    "export_oaebu_table_book_product_subject_bic_metrics",
+                    "create_oaebu_data_qa_intermediate_unmatched_google_books_sales",
+                    "export_oaebu_table_book_product_list",
+                    "export_oaebu_table_book_product_metrics_city",
+                    "export_oaebu_table_book_product_author_metrics",
+                    "export_oaebu_table_book_product_metrics_institution",
+                    "create_oaebu_data_qa_intermediate_unmatched_oapen_irus_uk",
+                    "create_oaebu_data_qa_isbn_google_analytics",
+                    "export_oaebu_table_book_product_year_metrics",
+                    "export_oaebu_table_book_product_subject_bisac_metrics",
+                    "create_oaebu_data_qa_onix_aggregate",
+                    "export_oaebu_table_book_product_metrics_events",
+                    "export_oaebu_table_institution_list",
+                    "create_oaebu_data_qa_intermediate_unmatched_google_books_traffic",
+                    "create_oaebu_data_qa_isbn_oapen_irus_uk",
+                    "export_oaebu_table_book_product_metrics",
+                ],
+                "create_oaebu_data_qa_isbn_onix": ["export_oaebu_qa_metrics"],
+                "create_oaebu_data_qa_onix_aggregate": ["export_oaebu_qa_metrics"],
+                "create_oaebu_data_qa_isbn_jstor_country": ["export_oaebu_qa_metrics"],
+                "create_oaebu_data_qa_eisbn_jstor_country": ["export_oaebu_qa_metrics"],
+                "create_oaebu_data_qa_intermediate_unmatched_jstor_country": ["export_oaebu_qa_metrics"],
+                "create_oaebu_data_qa_isbn_oapen_irus_uk": ["export_oaebu_qa_metrics"],
+                "create_oaebu_data_qa_intermediate_unmatched_oapen_irus_uk": ["export_oaebu_qa_metrics"],
+                "create_oaebu_data_qa_isbn_google_books_sales": ["export_oaebu_qa_metrics"],
+                "create_oaebu_data_qa_intermediate_unmatched_google_books_sales": ["export_oaebu_qa_metrics"],
+                "create_oaebu_data_qa_isbn_google_books_traffic": ["export_oaebu_qa_metrics"],
+                "create_oaebu_data_qa_intermediate_unmatched_google_books_traffic": ["export_oaebu_qa_metrics"],
+                "create_oaebu_data_qa_isbn_google_analytics": ["export_oaebu_qa_metrics"],
+                "create_oaebu_data_qa_intermediate_unmatched_google_analytics": ["export_oaebu_qa_metrics"],
+                "export_oaebu_table_book_product_list": ["export_oaebu_qa_metrics"],
+                "export_oaebu_table_book_product_metrics": ["export_oaebu_qa_metrics"],
+                "export_oaebu_table_book_product_metrics_country": ["export_oaebu_qa_metrics"],
+                "export_oaebu_table_book_product_metrics_institution": ["export_oaebu_qa_metrics"],
+                "export_oaebu_table_institution_list": ["export_oaebu_qa_metrics"],
+                "export_oaebu_table_book_product_metrics_city": ["export_oaebu_qa_metrics"],
+                "export_oaebu_table_book_product_metrics_events": ["export_oaebu_qa_metrics"],
+                "export_oaebu_table_book_product_publisher_metrics": ["export_oaebu_qa_metrics"],
+                "export_oaebu_table_book_product_subject_bic_metrics": ["export_oaebu_qa_metrics"],
+                "export_oaebu_table_book_product_subject_bisac_metrics": ["export_oaebu_qa_metrics"],
+                "export_oaebu_table_book_product_subject_thema_metrics": ["export_oaebu_qa_metrics"],
+                "export_oaebu_table_book_product_year_metrics": ["export_oaebu_qa_metrics"],
+                "export_oaebu_table_book_product_subject_year_metrics": ["export_oaebu_qa_metrics"],
+                "export_oaebu_table_book_product_author_metrics": ["export_oaebu_qa_metrics"],
+                "export_oaebu_qa_metrics": ["create_oaebu_latest_views"],
+                "create_oaebu_latest_views": ["add_new_dataset_releases"],
+                "add_new_dataset_releases": ["cleanup"],
+                "cleanup": [],
+            }
+            self.assert_dag_structure(expected_dag_structure, dag)
+
+    @patch("oaebu_workflows.workflows.onix_workflow.bq_run_query")
+    def test_create_and_load_aggregate_works_table(self, mock_bq_query):
+        mock_bq_query.return_value = TestOnixWorkflow.onix_data
+        workslookup_expected = [
+            {"isbn13": "112", "work_id": "111"},
+            {"isbn13": "111", "work_id": "111"},
+            {"isbn13": "211", "work_id": "211"},
+        ]
+        workslookup_errors_expected = [
+            {
+                "Error": "Product ISBN13:111 is a manifestation of ISBN13:113, which is not given as a product identifier in any ONIX product record."
+            }
+        ]
+        worksfamilylookup_expected = [
+            {"isbn13": "112", "work_family_id": "111"},
+            {"isbn13": "111", "work_family_id": "111"},
+            {"isbn13": "211", "work_family_id": "111"},
+        ]
+        env = ObservatoryEnvironment(
+            self.gcp_project_id, self.data_location, api_host="localhost", api_port=find_free_port()
+        )
+        with env.create():
+            wf = OnixWorkflow(
+                dag_id=self.dag_id,
+                cloud_workspace=env.cloud_workspace,
+                data_partners=[self.fake_onix_data_partner],
+                bq_onix_workflow_dataset=env.add_dataset(),
+            )
+            dag = wf.make_dag()
+            with env.create_dag_run(dag, self.snapshot_date.add(days=1)):
+                release = OnixWorkflowRelease(
+                    dag_id="aggregation_test",
+                    run_id=env.dag_run.run_id,
+                    snapshot_date=self.snapshot_date,
+                    onix_snapshot_date=self.snapshot_date,
+                    crossref_master_snapshot_date=self.snapshot_date,
+                )
+                wf.aggregate_works(release)  # Test works aggregation
+                wf.upload_aggregation_tables(release)  # Test upload_aggregation_tables
+                wf.bq_load_aggregations(release, ti=MagicMock(task_id=""))  # Test bq_load_workid_lookup
+
+                ### Make Assertions ###
+                self.assertTrue(os.path.exists(release.workslookup_path))
+                self.assertTrue(os.path.exists(release.workslookup_errors_path))
+                self.assertTrue(os.path.exists(release.worksfamilylookup_path))
+
+                self.assert_blob_integrity(
+                    env.transform_bucket,
+                    gcs_blob_name_from_path(release.workslookup_path),
+                    release.workslookup_path,
+                )
+                self.assert_blob_integrity(
+                    env.transform_bucket,
+                    gcs_blob_name_from_path(release.workslookup_errors_path),
+                    release.workslookup_errors_path,
+                )
+                self.assert_blob_integrity(
+                    env.transform_bucket,
+                    gcs_blob_name_from_path(release.worksfamilylookup_path),
+                    release.worksfamilylookup_path,
+                )
+
+                table_id = bq_sharded_table_id(
+                    wf.cloud_workspace.project_id,
+                    wf.bq_onix_workflow_dataset,
+                    wf.bq_worksid_table_name,
+                    release.snapshot_date,
+                )
+                self.assert_table_integrity(table_id, len(workslookup_expected))
+                self.assert_table_content(table_id, load_jsonl(release.workslookup_path), primary_key="isbn13")
+                self.assert_table_content(table_id, workslookup_expected, primary_key="isbn13")
+
+                table_id = bq_sharded_table_id(
+                    wf.cloud_workspace.project_id,
+                    wf.bq_onix_workflow_dataset,
+                    wf.bq_worksid_error_table_name,
+                    release.snapshot_date,
+                )
+                self.assert_table_integrity(table_id, len(workslookup_errors_expected))
+                self.assert_table_content(table_id, load_jsonl(release.workslookup_errors_path), primary_key="Error")
+                self.assert_table_content(table_id, workslookup_errors_expected, primary_key="Error")
+
+                table_id = bq_sharded_table_id(
+                    wf.cloud_workspace.project_id,
+                    wf.bq_onix_workflow_dataset,
+                    wf.bq_workfamilyid_table_name,
+                    release.snapshot_date,
+                )
+                self.assert_table_integrity(table_id, len(worksfamilylookup_expected))
+                self.assert_table_content(table_id, load_jsonl(release.worksfamilylookup_path), primary_key="isbn13")
+                self.assert_table_content(table_id, worksfamilylookup_expected, primary_key="isbn13")
 
     def test_crossref_API_calls(self):
         """
@@ -2045,306 +580,233 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
         """
         Test the standalone functions in the Onix workflow that aren't specifially tested in other classes
         """
-        # Test Onix querying
-        env = ObservatoryEnvironment(self.gcp_project_id, self.data_location, api_host=self.host, api_port=self.port)
-        bucket_name = env.transform_bucket
-        fake_onix_dataset_id = env.add_dataset(prefix="onix")
+
+        ############################
+        ### Test dois_from_table ###
+        ############################
+
+        env = ObservatoryEnvironment(
+            self.gcp_project_id, self.data_location, api_host="localhost", api_port=find_free_port()
+        )
+        fake_doi_isbn_dataset_id = env.add_dataset(prefix="doi_isbn_test")
         fake_sharded_dataset = env.add_dataset(prefix="sharded_data")
         fake_view_dataset = env.add_dataset(prefix="views")
         with env.create():
-            onix_table_file = test_fixtures_folder("onix_workflow", "onix_query_test.jsonl")
-            blob = os.path.join(self.test_onix_folder, os.path.basename(onix_table_file))
-            upload_file_to_cloud_storage(bucket_name=bucket_name, blob_name=blob, file_path=onix_table_file)
+            doi_table_file = test_fixtures_folder("onix_workflow", "doi_isbn_query_test.jsonl")
+            # blob = os.path.join(self.test_onix_folder, os.path.basename(doi_table_file))
+            # gcs_upload_file(bucket_name=env.transform_bucket, blob_name=blob, file_path=doi_table_file)
 
-            fake_onix = load_jsonl(onix_table_file)
-            tables = [
-                Table(
-                    "onix",
-                    False,
-                    fake_onix_dataset_id,
-                    fake_onix,
-                    find_schema(self.schema_path, "onix"),
-                ),
-            ]
-            release_date = pendulum.datetime(2022, 6, 13)
-            bucket_name = env.transform_bucket
-            bq_load_tables(
-                tables=tables,
-                bucket_name=bucket_name,
-                release_date=release_date,
-                data_location=self.data_location,
-                project_id=self.gcp_project_id,
+            fake_doi_isbn_table = load_jsonl(doi_table_file)
+            test_table = Table(
+                "doi_isbn_test",
+                False,
+                fake_doi_isbn_dataset_id,
+                fake_doi_isbn_table,
+                bq_find_schema(path=self.schema_path, table_name="onix"),  # use onix schema just for ease uploading
             )
 
-            actual_dois = dois_from_onix(self.gcp_project_id, fake_onix_dataset_id, "onix")
-            fake_dois = [entry["DOI"] for entry in fake_onix]
+            release_date = pendulum.datetime(2022, 6, 13)
+            bq_load_tables(
+                tables=[test_table],
+                bucket_name=env.transform_bucket,
+                snapshot_date=release_date,
+                project_id=self.gcp_project_id,
+            )
+            table_id = bq_table_id(self.gcp_project_id, fake_doi_isbn_dataset_id, "doi_isbn_test")
+            actual_dois = dois_from_table(table_id, doi_column_name="DOI", distinct=True)
+            fake_doi_isbns = [entry["DOI"] for entry in fake_doi_isbn_table]
 
             # Check there are no duplicates and the contents are the same
-            assert len(actual_dois) == len(set(fake_dois))
-            assert set(actual_dois) == set(fake_dois)
+            assert len(actual_dois) == len(set(fake_doi_isbns))
+            assert set(actual_dois) == set(fake_doi_isbns)
 
-            # Test the creation of latest data views. We will use the onix.jsonl fixture for testing.
+            # Do the same but allow duplicates
+            actual_dois = dois_from_table(table_id, doi_column_name="DOI", distinct=False)
+            fake_doi_isbns = [entry["DOI"] for entry in fake_doi_isbn_table]
+            assert len(actual_dois) == len(fake_doi_isbns)
+            assert sorted(actual_dois) == sorted(fake_doi_isbns)
+
+            #############################################
+            ### Test create_latest_views_from_dataset ###
+            #############################################
+
+            # We will use the onix.jsonl fixture for testing.
             previous_release_date = pendulum.datetime(2022, 6, 6)  # Add another release date
-            data = [fake_onix, fake_onix[:2]]
+            data = [fake_doi_isbn_table, fake_doi_isbn_table[:2]]
             for release, table in zip([release_date, previous_release_date], data):
                 test_table = Table(
                     "data_export",
                     True,
                     fake_sharded_dataset,
                     table,
-                    find_schema(self.schema_path, "onix"),
+                    bq_find_schema(path=self.schema_path, table_name="onix"),
                 )
                 bq_load_tables(
                     tables=[test_table],
-                    bucket_name=bucket_name,
-                    release_date=release,
-                    data_location=self.data_location,
+                    bucket_name=env.transform_bucket,
+                    snapshot_date=release,
                     project_id=self.gcp_project_id,
                 )
 
             # Now make the views from this dataset
-            date_string = release_date.strftime("%Y%m%d")
             create_latest_views_from_dataset(
                 project_id=self.gcp_project_id,
                 from_dataset=fake_sharded_dataset,
                 to_dataset=fake_view_dataset,
-                date_match=date_string,
+                date_match=release_date.strftime("%Y%m%d"),
                 data_location=self.data_location,
             )
 
             # Grab the data from the view and make assertions
-            view_data = run_bigquery_query(f"SELECT * FROM {self.gcp_project_id}.{fake_view_dataset}.data_export")
+            view_data = bq_run_query(f"SELECT * FROM {self.gcp_project_id}.{fake_view_dataset}.data_export")
             view_isbns = [entry["ISBN13"] for entry in view_data]
             view_dois = [entry["DOI"] for entry in view_data]
-            actual_isbns = [entry["ISBN13"] for entry in fake_onix]
-            actual_dois = [entry["DOI"] for entry in fake_onix]
+            actual_isbns = [entry["ISBN13"] for entry in fake_doi_isbn_table]
+            actual_dois = [entry["DOI"] for entry in fake_doi_isbn_table]
 
-            assert len(view_data) == len(fake_onix)
+            assert len(view_data) == len(fake_doi_isbn_table)
             assert len(actual_isbns) == len(view_isbns)
-            assert set(actual_isbns) == set(view_isbns)
+            assert sorted(actual_isbns) == sorted(view_isbns)
             assert len(actual_dois) == len(view_dois)
-            assert set(actual_dois) == set(view_dois)
+            assert sorted(actual_dois) == sorted(view_dois)
 
-    def setup_fake_data_tables(
-        self,
-        dataset_id: str,
-        settings_dataset_id: str,
-        fixtures_dataset_id: str,
-        release_date: pendulum.DateTime,
-        crossref_release_date: pendulum.DateTime,
+    def setup_fake_lookup_tables(
+        self, settings_dataset_id: str, fixtures_dataset_id: str, release_date: pendulum.DateTime, bucket_name: str
     ):
-        """Create a new onix and subject lookup data tables with their own dataset and table ids. Populate them with some fake data."""
+        """Create a new onix and subject lookup and country tables with their own dataset and table ids.
+        Populate them with some fake data.
 
-        # Upload fixture to bucket
+        :param settings_dataset_id: The dataset to store the country table
+        :param fixtures_dataset_id: The dataset to store the lookup tables
+        :param release_date: The release/snapshot date
+        :param bucket_name: The GCP bucket name to load the data to
+        """
 
-        files = [
-            test_fixtures_folder("onix_workflow", "bic_lookup.jsonl"),
-            test_fixtures_folder("onix_workflow", "bisac_lookup.jsonl"),
-            test_fixtures_folder("onix_workflow", "thema_lookup.jsonl"),
+        table_and_dataset = [
+            ("bic_lookup", fixtures_dataset_id),
+            ("bisac_lookup", fixtures_dataset_id),
+            ("thema_lookup", fixtures_dataset_id),
+            ("country", settings_dataset_id),
         ]
-        blobs = [os.path.join(self.test_onix_folder, os.path.basename(file)) for file in files]
-        upload_files_to_cloud_storage(bucket_name=self.gcp_bucket_name, blob_names=blobs, file_paths=files)
-
-        # Load into bigquery
-        table_ids = [
-            table_ids_from_path("bic_lookup.jsonl")[0],
-            table_ids_from_path("bisac_lookup.jsonl")[0],
-            table_ids_from_path("thema_lookup.jsonl")[0],
-        ]
-        onix_test_schema_folder = test_fixtures_folder("onix_workflow", "schema")
-        schema_file_paths = [
-            find_schema(onix_test_schema_folder, "bic_lookup"),
-            find_schema(onix_test_schema_folder, "bisac_lookup"),
-            find_schema(onix_test_schema_folder, "thema_lookup"),
-        ]
-        for blob, id, schema_file_path in zip(blobs, table_ids, schema_file_paths):
-            bq_load_shard(
-                schema_file_path=schema_file_path,
-                project_id=self.gcp_project_id,
-                transform_bucket=self.gcp_bucket_name,
-                transform_blob=blob,
-                dataset_id=dataset_id,
-                data_location=self.data_location,
-                table_id=id,
-                release_date=release_date,
-                source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
-                **{},
-            )
 
         # Create the table objects
-        country = load_jsonl(test_fixtures_folder("onix_workflow", "country.jsonl"))
-        bic_lookup = load_jsonl(test_fixtures_folder("onix_workflow", "bic_lookup.jsonl"))
-        bisac_lookup = load_jsonl(test_fixtures_folder("onix_workflow", "bisac_lookup.jsonl"))
-        thema_lookup = load_jsonl(test_fixtures_folder("onix_workflow", "thema_lookup.jsonl"))
-        crossref_metadata = load_jsonl(test_fixtures_folder("onix_workflow", "crossref_metadata_master.jsonl"))
-        tables = [
-            Table(
-                "country",
-                False,
-                settings_dataset_id,
-                country,
-                find_schema(onix_test_schema_folder, "country", release_date=release_date),
-            ),
-            Table(
-                "bic_lookup",
-                False,
-                fixtures_dataset_id,
-                bic_lookup,
-                find_schema(onix_test_schema_folder, "bic_lookup"),
-            ),
-            Table(
-                "bisac_lookup",
-                False,
-                fixtures_dataset_id,
-                bisac_lookup,
-                find_schema(onix_test_schema_folder, "bisac_lookup"),
-            ),
-            Table(
-                "thema_lookup",
-                False,
-                fixtures_dataset_id,
-                thema_lookup,
-                find_schema(onix_test_schema_folder, "thema_lookup"),
-            ),
-        ]
-
-        # Load tables into bigquery
-        bq_load_tables(
-            tables=tables,
-            bucket_name=self.gcp_bucket_name,
-            release_date=release_date,
-            data_location=self.data_location,
-            project_id=self.gcp_project_id,
-        )
-
-        # Load crossref metadata master table into bigquery
-        table = Table(
-            "crossref_metadata",
-            True,
-            fixtures_dataset_id,
-            crossref_metadata,
-            find_schema(onix_test_schema_folder, "crossref_metadata_master"),
-        )
-        bq_load_tables(
-            tables=[table],
-            bucket_name=self.gcp_bucket_name,
-            release_date=crossref_release_date,
-            data_location=self.data_location,
-            project_id=self.gcp_project_id,
-        )
-
-    def setup_fake_partner_data(self, env, release_date: pendulum.DateTime):
-        if not self.fake_partner_dataset:
-            self.fake_partner_dataset = env.add_dataset()
-
-        # Upload fixture to bucket
-        path = test_fixtures_folder("onix_workflow")
-        files = [
-            os.path.join(path, "jstor_country.jsonl"),
-            os.path.join(path, "jstor_institution.jsonl"),
-            os.path.join(path, "google_books_sales.jsonl"),
-            os.path.join(path, "google_books_traffic.jsonl"),
-            os.path.join(path, "oapen_irus_uk.jsonl"),
-            os.path.join(path, "google_analytics.jsonl"),
-        ]
-        blobs = [os.path.join(self.test_onix_folder, os.path.basename(file)) for file in files]
-        upload_files_to_cloud_storage(bucket_name=self.gcp_bucket_name, blob_names=blobs, file_paths=files)
-
-        # Load into bigquery
-        table_ids = []
-        for file_name, blob in zip(files, blobs):
-            table_id, _ = table_ids_from_path(file_name)
-
-            # set schema prefix to 'anu_press' for ANU press, custom dimensions are added in this schema.
-            schema_prefix = "anu_press_" if table_id == "google_analytics" else ""
-
-            schema_file_path = find_schema(self.schema_path, table_id, prefix=schema_prefix)
-            bq_load_partition(
-                schema_file_path=schema_file_path,
-                project_id=self.gcp_project_id,
-                transform_bucket=self.gcp_bucket_name,
-                transform_blob=blob,
-                dataset_id=self.fake_partner_dataset,
-                data_location=self.data_location,
-                table_id=table_id,
-                release_date=release_date,
-                source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
-                partition_type=bigquery.table.TimePartitioningType.MONTH,
-                dataset_description="Test Onix data for the workflow",
-                partition_field="release_date",
-                **{},
-            )
-            table_ids.append(table_id)
-
-        self.seed_db()
-        dataset_type_info = get_dataset_type_info(self.api)
-
-        # Make partners
-        partners = []
-        for (dataset_type_id, isbn_field_name, title_field_name, dag_id_prefix), table_id in zip(
-            [
-                (dataset_type_info["jstor_country"].type_id, "ISBN", "Book_Title", "jstor"),
-                (dataset_type_info["jstor_institution"].type_id, "ISBN", "Book_Title", "jstor"),
-                (dataset_type_info["google_books_sales"].type_id, "Primary_ISBN", "Title", "google_books"),
-                (dataset_type_info["google_books_traffic"].type_id, "Primary_ISBN", "Title", "google_books"),
-                (dataset_type_info["oapen_irus_uk"].type_id, "ISBN", "book_title", "oapen_irus_uk"),
-                (dataset_type_info["google_analytics"].type_id, "publication_id", "title", "google_analytics"),
-            ],
-            table_ids,
-        ):
-            partners.append(
-                OaebuPartner(
-                    dataset_type_id=dataset_type_id,
-                    dag_id_prefix=dag_id_prefix,
-                    gcp_project_id=self.gcp_project_id,
-                    gcp_dataset_id=self.fake_partner_dataset,
-                    gcp_table_id=table_id,
-                    isbn_field_name=isbn_field_name,
-                    title_field_name=title_field_name,
-                    sharded=False,
+        onix_test_schema_folder = test_fixtures_folder("onix_workflow", "schema")
+        tables = []
+        for table_name, dataset in table_and_dataset:
+            tables.append(
+                Table(
+                    table_name,
+                    False,
+                    dataset,
+                    load_jsonl(test_fixtures_folder("onix_workflow", "e2e_inputs", f"{table_name}.jsonl")),
+                    bq_find_schema(path=onix_test_schema_folder, table_name=table_name),
                 )
             )
 
+        # Load tables into bigquery
+        bq_load_tables(
+            tables=tables, bucket_name=bucket_name, snapshot_date=release_date, project_id=self.gcp_project_id
+        )
+
+    def setup_input_data(
+        self,
+        settings_dataset_id: str,
+        fixtures_dataset_id: str,
+        crossref_master_dataset_id: str,
+        partner_dataset: str,
+        onix_dataset_id: str,
+        release_date: pendulum.DateTime,
+        bucket_name: str,
+        include_google_analytics: bool,
+    ) -> List[OaebuPartner]:
+        """Uploads the data partner fixtures to their respective GCP bucket and bigquery tables.
+        Creates the partners based on the originals - but changes the dataset ids for tests.
+        Create a new onix and subject lookup and country tables with their own dataset and table ids.
+
+        :param settings_dataset_id: The dataset to store the country table
+        :param fixtures_dataset_id: The dataset to store the lookup tables
+        :param partner_dataset: The bigquery dataset ID to load the data partner tables to
+        :param crossref_master_dataset_id: The bigquery dataset ID of the master crossref table
+        :param onix_dataaset: The Bigquery dataset ID to load the onix partner table to
+        :param release_date: The release/snapshot date of sharded tables
+        :param bucket_name: The name of the bucket to upload the jsonl files to
+        :param include_google_analytics: Whether to include google analytics as a partner
+        :return: The resulting OaebuPartners
+        """
+
+        ############################################
+        ### Upload lookups, country and crossref ###
+        ############################################
+
+        table_and_dataset = [
+            ("bic_lookup", fixtures_dataset_id, False, "bic_lookup"),
+            ("bisac_lookup", fixtures_dataset_id, False, "bisac_lookup"),
+            ("thema_lookup", fixtures_dataset_id, False, "thema_lookup"),
+            ("country", settings_dataset_id, False, "country"),
+            ("crossref_metadata_master", crossref_master_dataset_id, True, "crossref_metadata_master"),
+        ]
+
+        # Create the table objects
+        onix_test_schema_folder = test_fixtures_folder("onix_workflow", "schema")
+        tables = []
+        for table_name, dataset, sharded, schema_name in table_and_dataset:
+            tables.append(
+                Table(
+                    table_name,
+                    sharded,
+                    dataset,
+                    load_jsonl(test_fixtures_folder("onix_workflow", "e2e_inputs", f"{table_name}.jsonl")),
+                    bq_find_schema(path=onix_test_schema_folder, table_name=table_name),
+                )
+            )
+
+        # Load tables into bigquery
+        bq_load_tables(
+            tables=tables, bucket_name=bucket_name, snapshot_date=release_date, project_id=self.gcp_project_id
+        )
+
+        ###########################
+        ### Upload partner data ###
+        ###########################
+
+        table_dataset_sharded_schema = [
+            ("onix", onix_dataset_id, True, "onix"),
+            ("jstor_country", partner_dataset, False, "jstor_country"),
+            ("jstor_institution", partner_dataset, False, "jstor_institution"),
+            ("google_books_sales", partner_dataset, False, "google_books_sales"),
+            ("google_books_traffic", partner_dataset, False, "google_books_traffic"),
+            ("oapen_irus_uk", partner_dataset, False, "oapen_irus_uk"),
+            ("fulcrum", partner_dataset, False, "fulcrum"),
+        ]
+        if include_google_analytics:
+            table_dataset_sharded_schema.append(
+                ("google_analytics", partner_dataset, False, "anu_press_google_analytics")
+            )
+
+        # Create partner objects define tables
+        tables = []
+        partners = []
+        for table_name, dataset, sharded, schema_name in table_dataset_sharded_schema:
+            partner = OAEBU_DATA_PARTNER_DATASETS[table_name]
+            partner.bq_dataset_id = dataset
+            partners.append(partner)
+            tables.append(
+                Table(
+                    table_name,
+                    sharded,
+                    dataset,
+                    load_jsonl(test_fixtures_folder("onix_workflow", "e2e_inputs", f"{table_name}.jsonl")),
+                    bq_find_schema(path=default_schema_folder(), table_name=schema_name),
+                )
+            )
+
+        # Load tables into bigquery
+        bq_load_tables(
+            tables=tables, bucket_name=bucket_name, snapshot_date=release_date, project_id=self.gcp_project_id
+        )
         return partners
 
-    def setup_fake_onix_data(self, onix_dataset_id, release_date: pendulum.DateTime):
-        # Upload fixture to bucket
-        onix_data_path = os.path.join(test_fixtures_folder("onix_workflow"), "onix.jsonl")
-        blob = os.path.join(self.test_onix_folder, os.path.basename(onix_data_path))
-        upload_file_to_cloud_storage(bucket_name=self.gcp_bucket_name, blob_name=blob, file_path=onix_data_path)
-
-        # Load into bigquery
-        table_id, _ = table_ids_from_path(onix_data_path)
-        schema_file_path = find_schema(self.schema_path, table_id)
-        bq_load_shard(
-            schema_file_path=schema_file_path,
-            project_id=self.gcp_project_id,
-            transform_bucket=self.gcp_bucket_name,
-            transform_blob=blob,
-            dataset_id=onix_dataset_id,
-            data_location=self.data_location,
-            table_id=table_id,
-            release_date=release_date,
-            source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
-            partition_type=bigquery.table.TimePartitioningType.MONTH,
-            dataset_description="Test Onix data for the workflow",
-            **{},
-        )
-        self.seed_db()
-        dataset_type_info = get_dataset_type_info(self.api)
-        onix_partner = OaebuPartner(
-            dataset_type_id=dataset_type_info["onix"].type_id,
-            dag_id_prefix="onix",
-            gcp_project_id=self.gcp_project_id,
-            gcp_dataset_id=self.fake_partner_dataset,
-            gcp_table_id=table_id,
-            isbn_field_name="ISBN13",
-            title_field_name="TitleDetails.TitleElements.TitleText",
-            sharded=True,
-        )
-        return onix_partner
-
-    def run_telescope_tests(self, *, org_name: str, include_google_analytics: bool = False):
+    def run_telescope_tests(self, *, include_google_analytics: bool = False):
         """Functional test of the ONIX workflow"""
 
         def vcr_ignore_condition(request):
@@ -2357,15 +819,15 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
             return request
 
         # Setup Observatory environment
-        env = ObservatoryEnvironment(self.gcp_project_id, self.data_location, api_host=self.host, api_port=self.port)
+        env = ObservatoryEnvironment(
+            self.gcp_project_id, self.data_location, api_host="localhost", api_port=find_free_port()
+        )
 
-        # Create datasets
-        partner_release_date = pendulum.datetime(2022, 6, 13)
-        crossref_release_date = pendulum.datetime(2022, 6, 6)
-        onix_dataset_id = env.add_dataset(prefix="onix")
+        # Create workflow datasets
+        onix_workflow_dataset_id = env.add_dataset(prefix="onix_workflow")
+        master_crossref_dataset_id = env.add_dataset(prefix="crossref_master")
         oaebu_data_qa_dataset_id = env.add_dataset(prefix="oaebu_data_qa")
         oaebu_latest_data_qa_dataset_id = env.add_dataset(prefix="oaebu_data_qa_latest")
-        onix_workflow_dataset_id = env.add_dataset(prefix="onix_workflow")
         oaebu_intermediate_dataset_id = env.add_dataset(prefix="oaebu_intermediate")
         oaebu_output_dataset_id = env.add_dataset(prefix="oaebu_output")
         oaebu_export_dataset_id = env.add_dataset(prefix="oaebu_export")
@@ -2374,131 +836,124 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
         oaebu_fixtures_dataset_id = env.add_dataset(prefix="fixtures")
         oaebu_crossref_dataset_id = env.add_dataset(prefix="crossref")
 
+        # Fake partner datasets
+        onix_dataset_id = env.add_dataset(prefix="onix")
+        fake_partner_dataset_id = env.add_dataset(prefix="partner")
+
         # Create the Observatory environment and run tests
         with env.create(task_logging=True):
-            self.gcp_bucket_name = env.transform_bucket
-            self.setup_connections(env)
-            self.setup_api(orgs=[org_name])
-            # self.seed_db()
-
             # Setup data partners, remove Google Analytics (the last partner) from these tests
-            data_partners = self.setup_fake_partner_data(env, partner_release_date)
-            if not include_google_analytics:
-                data_partners = data_partners[:-1]
-
-            onix_partner = self.setup_fake_onix_data(onix_dataset_id, partner_release_date)
-            data_partners.append(onix_partner)
-
-            # Create fake data tables. There's no guarantee the data was deleted so clean it again just in case.
-            self.setup_fake_data_tables(
-                onix_dataset_id,
-                oaebu_settings_dataset_id,
-                oaebu_fixtures_dataset_id,
-                partner_release_date,
-                crossref_release_date,
+            partner_release_date = pendulum.datetime(2021, 5, 15)
+            data_partners = self.setup_input_data(
+                settings_dataset_id=oaebu_settings_dataset_id,
+                fixtures_dataset_id=oaebu_fixtures_dataset_id,
+                crossref_master_dataset_id=master_crossref_dataset_id,
+                partner_dataset=fake_partner_dataset_id,
+                onix_dataset_id=onix_dataset_id,
+                release_date=partner_release_date,
+                bucket_name=env.transform_bucket,
+                include_google_analytics=include_google_analytics,
             )
 
-            # Pull info from Observatory API
-            gcp_bucket_name = env.transform_bucket
-            gcp_project_id = self.gcp_project_id
-
             # Expected sensor dag_ids
-            sensor_dag_ids = list(set([partner.dag_id_prefix for partner in data_partners]))
-            sensor_dag_ids.sort()
+            sensor_dag_ids = [
+                "jstor",
+                "google_books",
+                "google_analytics",
+                "oapen_irus_uk",
+                "fulcrum",
+                "onix",
+                "ucl_discovery",
+            ]
 
             # Setup telescope
-            start_date = pendulum.datetime(year=2021, month=5, day=9)
-            crossref_start_date = pendulum.datetime(year=2018, month=5, day=14)
             telescope = OnixWorkflow(
-                org_name=org_name,
-                gcp_project_id=gcp_project_id,
-                gcp_bucket_name=gcp_bucket_name,
-                crossref_project_id=gcp_project_id,
-                crossref_master_dataset_id=oaebu_fixtures_dataset_id,
-                crossref_oaebu_dataset_id=oaebu_crossref_dataset_id,
-                country_project_id=gcp_project_id,
-                country_dataset_id=oaebu_settings_dataset_id,
-                onix_dataset_id=onix_dataset_id,
-                onix_table_id=self.onix_table_id,
-                subject_project_id=gcp_project_id,
-                subject_dataset_id=oaebu_fixtures_dataset_id,
+                dag_id=f"onix_workflow_test",
+                cloud_workspace=env.cloud_workspace,
+                bq_master_crossref_project_id=env.cloud_workspace.project_id,
+                bq_master_crossref_dataset_id=master_crossref_dataset_id,
+                bq_oaebu_crossref_dataset_id=oaebu_crossref_dataset_id,
+                bq_master_crossref_metadata_table_name="crossref_metadata_master",  # Set in setup_input_data()
+                bq_country_project_id=env.cloud_workspace.project_id,
+                bq_country_dataset_id=oaebu_settings_dataset_id,
+                bq_onix_dataset_id=onix_dataset_id,
+                bq_subject_project_id=env.cloud_workspace.project_id,
+                bq_subject_dataset_id=oaebu_fixtures_dataset_id,
+                bq_oaebu_data_qa_dataset=oaebu_data_qa_dataset_id,
+                bq_oaebu_latest_data_qa_dataset=oaebu_latest_data_qa_dataset_id,
+                bq_onix_workflow_dataset=onix_workflow_dataset_id,
+                bq_oaebu_intermediate_dataset=oaebu_intermediate_dataset_id,
+                bq_oaebu_dataset=oaebu_output_dataset_id,
+                bq_oaebu_export_dataset=oaebu_export_dataset_id,
+                bq_oaebu_latest_export_dataset=oaebu_latest_export_dataset_id,
                 data_partners=data_partners,
-                start_date=start_date,
-                crossref_start_date=crossref_start_date,
-                mailto="agent@observatory.academy",
-                workflow_id=1,  # Onix Workflow
-                max_threads=1,
+                sensor_dag_ids=sensor_dag_ids,
+                start_date=pendulum.datetime(year=2021, month=5, day=9),
+                crossref_start_date=pendulum.datetime(year=2018, month=5, day=14),
+                max_threads=1,  # Use 1 thread for tests
             )
 
             # Skip dag existence check in sensor.
             for sensor in telescope.operators[0]:
                 sensor.check_exists = False
                 sensor.grace_period = timedelta(seconds=1)
-
-            # Make DAG
             workflow_dag = telescope.make_dag()
 
             # If there is no dag run in the search interval, sensor will return success.
             expected_state = "success"
-            with env.create_dag_run(workflow_dag, start_date):
-                for task_id in sensor_dag_ids:
-                    ti = env.run_task(f"{make_dag_id(task_id, org_name)}_sensor")
-                    self.assertEqual(expected_state, ti.state)
+            with env.create_dag_run(workflow_dag, telescope.start_date):
+                for sensor_id in sensor_dag_ids:
+                    ti = env.run_task(f"{sensor_id}_sensor")
+                    self.assertEqual(ti.state, State.SUCCESS)
 
             # Run Dummy Dags
-            expected_state = "success"
             execution_date = pendulum.datetime(year=2021, month=5, day=16)
-            release_date = pendulum.datetime(year=2021, month=5, day=22)
             for dag_id in sensor_dag_ids:
-                dag = make_dummy_dag(make_dag_id(dag_id, org_name), execution_date)
+                dag = make_dummy_dag(dag_id, execution_date)
                 with env.create_dag_run(dag, execution_date):
                     # Running all of a DAGs tasks sets the DAG to finished
                     ti = env.run_task("dummy_task")
-                    self.assertEqual(expected_state, ti.state)
+                    self.assertEqual(ti.state, State.SUCCESS)
 
             # Run end to end tests for DOI DAG
             with env.create_dag_run(workflow_dag, execution_date):
                 # Test that sensors go into 'success' state as the DAGs that they are waiting for have finished
-                for task_id in sensor_dag_ids:
-                    ti = env.run_task(f"{make_dag_id(task_id, org_name)}_sensor")
-                    self.assertEqual(expected_state, ti.state)
+                for dag_id in sensor_dag_ids:
+                    ti = env.run_task(f"{dag_id}_sensor")
+                    self.assertEqual(ti.state, State.SUCCESS)
 
                 # Mock make_release
+                release_date = pendulum.datetime(year=2021, month=5, day=22)
                 telescope.make_release = MagicMock(
                     return_value=OnixWorkflowRelease(
-                        dag_id=make_dag_id(OnixWorkflow.DAG_ID_PREFIX, org_name),
-                        release_date=release_date,
-                        onix_release_date=partner_release_date,
-                        crossref_metadata_release_date=crossref_release_date,
-                        gcp_project_id=self.gcp_project_id,
-                        gcp_bucket_name=self.gcp_bucket_name,
-                        onix_dataset_id=onix_dataset_id,
-                        onix_table_id=self.onix_table_id,
-                        oaebu_data_qa_dataset=oaebu_data_qa_dataset_id,
-                        oaebu_latest_data_qa_dataset=oaebu_latest_data_qa_dataset_id,
-                        workflow_dataset=onix_workflow_dataset_id,
-                        oaebu_intermediate_dataset=oaebu_intermediate_dataset_id,
-                        oaebu_dataset=oaebu_output_dataset_id,
-                        oaebu_export_dataset=oaebu_export_dataset_id,
-                        oaebu_latest_export_dataset=oaebu_latest_export_dataset_id,
+                        dag_id=telescope.dag_id,
+                        run_id=env.dag_run.run_id,
+                        snapshot_date=release_date,
+                        onix_snapshot_date=partner_release_date,
+                        crossref_master_snapshot_date=partner_release_date,
                     )
                 )
-
-                release_suffix = release_date.strftime("%Y%m%d")
+                release = telescope.make_release()
 
                 # Make the SQL queries for data QA
+                release_suffix = release.snapshot_date.strftime("%Y%m%d")
                 data_qa_sql = {
                     "onix_invalid_isbn": f"SELECT ISBN13 from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.onix_invalid_isbn{release_suffix}",
                     "onix_aggregate_metrics": f"SELECT * from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.onix_aggregate_metrics{release_suffix}",
-                    "jstor_invalid_isbn": f"SELECT * from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.jstor_invalid_isbn{release_suffix}",
-                    "jstor_invalid_eisbn": f"SELECT * from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.jstor_invalid_eisbn{release_suffix}",
+                    "jstor_country_invalid_isbn": f"SELECT * from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.jstor_invalid_isbn{release_suffix}",
+                    "jstor_country_invalid_eisbn": f"SELECT * from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.jstor_invalid_eisbn{release_suffix}",
                     "jstor_country_unmatched_ISBN": f"SELECT ISBN from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.jstor_country_unmatched_ISBN{release_suffix}",
+                    "jstor_institution_invalid_isbn": f"SELECT * from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.jstor_invalid_isbn{release_suffix}",
+                    "jstor_institution_invalid_eisbn": f"SELECT * from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.jstor_invalid_eisbn{release_suffix}",
+                    "jstor_institution_unmatched_ISBN": f"SELECT ISBN from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.jstor_country_unmatched_ISBN{release_suffix}",
                     "google_books_sales_invalid_isbn": f"SELECT * from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.google_books_sales_invalid_isbn{release_suffix}",
                     "google_books_sales_unmatched_Primary_ISBN": f"SELECT Primary_ISBN from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.google_books_sales_unmatched_Primary_ISBN{release_suffix}",
                     "google_books_traffic_invalid_isbn": f"SELECT * from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.google_books_traffic_invalid_isbn{release_suffix}",
                     "google_books_traffic_unmatched_Primary_ISBN": f"SELECT Primary_ISBN from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.google_books_traffic_unmatched_Primary_ISBN{release_suffix}",
                     "oapen_irus_uk_invalid_isbn": f"SELECT * from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.oapen_irus_uk_invalid_isbn{release_suffix}",
                     "oapen_irus_uk_unmatched_ISBN": f"SELECT ISBN from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.oapen_irus_uk_unmatched_ISBN{release_suffix}",
+                    "fulcrum_invalid_isbn": f"SELECT * from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.fulcrum_invalid_isbn{release_suffix}",
+                    "fulcrum_unmatched_ISBN": f"SELECT ISBN from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.fulcrum_unmatched_ISBN{release_suffix}",
                 }
                 if include_google_analytics:
                     data_qa_sql[
@@ -2518,43 +973,59 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
 
                 # Aggregate works
                 ti = env.run_task(telescope.aggregate_works.__name__)
-                self.assertEqual(expected_state, ti.state)
+                self.assertEqual(ti.state, State.SUCCESS)
 
                 # Upload aggregation tables
                 ti = env.run_task(telescope.upload_aggregation_tables.__name__)
-                self.assertEqual(expected_state, ti.state)
+                self.assertEqual(ti.state, State.SUCCESS)
 
-                # Load work id table into bigquery
-                ti = env.run_task(telescope.bq_load_workid_lookup.__name__)
-                self.assertEqual(expected_state, ti.state)
-                self.assert_table_content(
-                    f"{self.gcp_project_id}.{onix_workflow_dataset_id}.onix_workid_isbn{release_suffix}",
-                    load_jsonl(test_fixtures_folder("onix_workflow", "onix_workid_isbn.jsonl")),
+                # Load work id, work id errors and work family id tables into bigquery
+                ti = env.run_task(telescope.bq_load_aggregations.__name__)
+                self.assertEqual(ti.state, State.SUCCESS)
+                table_id = bq_sharded_table_id(
+                    self.gcp_project_id, onix_workflow_dataset_id, telescope.bq_worksid_table_name, release_date
                 )
-
-                # Load work id errors table into bigquery
-                ti = env.run_task(telescope.bq_load_workid_lookup_errors.__name__)
-                self.assertEqual(expected_state, ti.state)
                 self.assert_table_content(
-                    f"{self.gcp_project_id}.{onix_workflow_dataset_id}.onix_workid_isbn_errors{release_suffix}",
-                    load_jsonl(test_fixtures_folder("onix_workflow", "onix_workid_isbn_errors.jsonl")),
+                    table_id,
+                    load_and_parse_json(test_fixtures_folder("onix_workflow", "e2e_outputs", "onix_workid_isbn.json")),
+                    primary_key="isbn13",
                 )
-
-                # Load work family id table into bigquery
-                ti = env.run_task(telescope.bq_load_workfamilyid_lookup.__name__)
-                self.assertEqual(expected_state, ti.state)
+                table_id = bq_sharded_table_id(
+                    self.gcp_project_id, onix_workflow_dataset_id, telescope.bq_worksid_error_table_name, release_date
+                )
                 self.assert_table_content(
-                    f"{self.gcp_project_id}.{onix_workflow_dataset_id}.onix_workfamilyid_isbn{release_suffix}",
-                    load_jsonl(test_fixtures_folder("onix_workflow", "onix_workfamilyid_isbn.jsonl")),
+                    table_id,
+                    load_and_parse_json(
+                        test_fixtures_folder("onix_workflow", "e2e_outputs", "onix_workid_isbn_errors.json")
+                    ),
+                    primary_key="Error",
+                )
+                table_id = bq_sharded_table_id(
+                    self.gcp_project_id, onix_workflow_dataset_id, telescope.bq_workfamilyid_table_name, release_date
+                )
+                self.assert_table_content(
+                    table_id,
+                    load_and_parse_json(
+                        test_fixtures_folder("onix_workflow", "e2e_outputs", "onix_workfamilyid_isbn.json")
+                    ),
+                    primary_key="isbn13",
                 )
 
                 # Load crossref metadata table into bigquery
                 ti = env.run_task(telescope.create_oaebu_crossref_metadata_table.__name__)
+                self.assertEqual(ti.state, State.SUCCESS)
+
                 # Assertions
-                self.assertEqual(expected_state, ti.state)
+                table_id = bq_sharded_table_id(
+                    self.gcp_project_id,
+                    oaebu_crossref_dataset_id,
+                    telescope.bq_oaebu_crossref_metadata_table_name,
+                    release_date,
+                )
                 self.assert_table_content(
-                    f"{gcp_project_id}.{oaebu_crossref_dataset_id}.crossref_metadata{release_suffix}",
-                    load_jsonl(test_fixtures_folder("onix_workflow", "crossref_metadata.jsonl")),
+                    table_id,
+                    load_and_parse_json(test_fixtures_folder("onix_workflow", "e2e_outputs", "crossref_metadata.json")),
+                    primary_key="DOI",
                 )
 
                 # Load crossref event table into bigquery
@@ -2562,93 +1033,68 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                     self.events_cassette, record_mode="none", before_record_request=vcr_ignore_condition
                 ):
                     ti = env.run_task(telescope.create_oaebu_crossref_events_table.__name__)
-                self.assertEqual(expected_state, ti.state)
-                self.assert_table_content(
-                    f"{gcp_project_id}.{oaebu_crossref_dataset_id}.crossref_events{release_suffix}",
-                    load_jsonl(test_fixtures_folder("onix_workflow", "crossref_events.jsonl")),
+                self.assertEqual(ti.state, State.SUCCESS)
+                table_id = bq_sharded_table_id(
+                    self.gcp_project_id,
+                    oaebu_crossref_dataset_id,
+                    telescope.bq_crossref_events_table_name,
+                    release_date,
                 )
+                crossref_fixture_table = load_and_parse_json(
+                    test_fixtures_folder("onix_workflow", "e2e_outputs", "crossref_events.json"),
+                    date_fields=["timestamp", "occurred_at", "updated_date", "issued", "dateModified"],
+                )
+                self.assert_table_content(table_id, crossref_fixture_table, primary_key="id")
 
                 # Create book table in bigquery
                 ti = env.run_task(telescope.create_oaebu_book_table.__name__)
-                self.assertEqual(expected_state, ti.state)
-                table_id = f"{gcp_project_id}.{oaebu_output_dataset_id}.book{release_suffix}"
-                expected_content = load_jsonl(test_fixtures_folder("onix_workflow", "book.jsonl"))
-                rows = self.bigquery_client.list_rows(table_id)
-                actual_content = json.loads(json.dumps([dict(row) for row in rows], default=str))
-                for row in actual_content:
-                    if "crossref_objects" in row:  # TODO: remove this necessity
-                        row["crossref_objects"] = sorted(
-                            row["crossref_objects"], key=lambda x: x["published_year_month"]
-                        )
-                self.assertIsNotNone(rows)
-                if expected_content is not None:
-                    for row in expected_content:
-                        if "crossref_objects" in row:  # TODO: remove this necessity
-                            row["crossref_objects"] = sorted(
-                                row["crossref_objects"], key=lambda x: x["published_year_month"]
-                            )
-                        self.assertIn(row, actual_content)
-                        actual_content.remove(row)
-                    self.assertListEqual(
-                        [],
-                        actual_content,
-                        msg=f"Rows in actual content that are not in expected content: {actual_content}",
-                    )
+                self.assertEqual(ti.state, State.SUCCESS)
+                table_id = bq_sharded_table_id(
+                    self.gcp_project_id, oaebu_output_dataset_id, telescope.bq_book_table_name, release_date
+                )
+                self.assert_table_content(
+                    table_id,
+                    load_and_parse_json(test_fixtures_folder("onix_workflow", "e2e_outputs", "book.json")),
+                    primary_key="isbn",
+                )
 
                 # Create oaebu intermediate tables - onix doesn't have an intermediate table so skip it
-                for data_partner in data_partners[:-1]:
-                    oaebu_dataset = data_partner.gcp_dataset_id
-                    oaebu_table = data_partner.gcp_table_id
-
-                    ti = env.run_task(
-                        f"{telescope.create_oaebu_intermediate_table.__name__}.{oaebu_dataset}.{oaebu_table}"
-                    )
-                    self.assertEqual(expected_state, ti.state)
+                for data_partner in data_partners[1:]:
+                    ti = env.run_task(f"create_oaebu_intermediate_table_{data_partner.bq_table_name}")
+                    self.assertEqual(ti.state, State.SUCCESS)
 
                 # Create oaebu output tables
                 ti = env.run_task(telescope.create_oaebu_book_product_table.__name__)
-                fixture_name = "book_product_ga.jsonl" if include_google_analytics else "book_product.jsonl"
-                self.assertEqual(expected_state, ti.state)
-                table_id = f"{gcp_project_id}.{oaebu_output_dataset_id}.book_product{release_suffix}"
-                expected_content = load_jsonl(test_fixtures_folder("onix_workflow", fixture_name))
-                rows = self.bigquery_client.list_rows(table_id)
-                actual_content = json.loads(json.dumps([dict(row) for row in rows], default=str))
-                for row in actual_content:
-                    if "metadata" in row:  # TODO: remove this necessity
-                        row["metadata"]["crossref_objects"] = sorted(
-                            row["metadata"]["crossref_objects"], key=lambda x: x["published_year_month"]
-                        )
-                self.assertIsNotNone(rows)
-                if expected_content is not None:
-                    for row in expected_content:
-                        if "metadata" in row:  # TODO: remove this necessity
-                            row["metadata"]["crossref_objects"] = sorted(
-                                row["metadata"]["crossref_objects"], key=lambda x: x["published_year_month"]
-                            )
-                        self.assertIn(row, actual_content)
-                        actual_content.remove(row)
-                    self.assertListEqual(
-                        [],
-                        actual_content,
-                        msg=f"Rows in actual content that are not in expected content: {actual_content}",
-                    )
+                self.assertEqual(ti.state, State.SUCCESS)
+                fixture_name = "book_product_ga.json" if include_google_analytics else "book_product.json"
+                self.assertEqual(ti.state, State.SUCCESS)
+                table_id = bq_sharded_table_id(
+                    self.gcp_project_id, oaebu_output_dataset_id, telescope.bq_book_product_table_name, release_date
+                )
+                self.assert_table_content(
+                    table_id,
+                    load_and_parse_json(
+                        test_fixtures_folder("onix_workflow", "e2e_outputs", fixture_name), date_fields="month"
+                    ),
+                    primary_key="ISBN13",
+                )
 
-                # ONIX isbn check
-                ti = env.run_task(telescope.create_oaebu_data_qa_onix_isbn.__name__)
-                self.assertEqual(expected_state, ti.state)
+                ############################################################
+                ### Check the QA + unmatched tasks for each data partner ###
+                ############################################################
 
-                # Check invalid ISBN13s picked up in ONIX
-                records = run_bigquery_query(data_qa_sql["onix_invalid_isbn"])
+                # Check ONIX invalid ISBN13s picked up in ONIX
+                ti = env.run_task(telescope.create_oaebu_data_qa_isbn_onix.__name__)
+                self.assertEqual(ti.state, State.SUCCESS)
+                records = bq_run_query(data_qa_sql["onix_invalid_isbn"])
                 isbns = set([record["ISBN13"] for record in records])
                 self.assertEqual(len(isbns), 1)
-                self.assertTrue("112" in isbns)
+                self.assertIn("1111111111111", isbns)
 
-                # ONIX aggregate metrics
+                # ONIX aggregate metrics and check aggregate metrics are correct
                 ti = env.run_task(telescope.create_oaebu_data_qa_onix_aggregate.__name__)
-                self.assertEqual(expected_state, ti.state)
-
-                # Check ONIX aggregate metrics are correct
-                records = run_bigquery_query(data_qa_sql["onix_aggregate_metrics"])
+                self.assertEqual(ti.state, State.SUCCESS)
+                records = bq_run_query(data_qa_sql["onix_aggregate_metrics"])
                 self.assertEqual(len(records), 1)
                 self.assertEqual(records[0]["table_size"], 4)
                 self.assertEqual(records[0]["no_isbns"], 0)
@@ -2660,161 +1106,59 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                 self.assertEqual(records[0]["no_titledetails"], 4)
                 self.assertEqual(records[0]["no_publisher_urls"], 4)
 
-                # JSTOR country isbn check
-                ti = env.run_task(
-                    f"{telescope.create_oaebu_data_qa_jstor_isbn.__name__}.{data_partners[0].gcp_dataset_id}.{data_partners[0].gcp_table_id}"
-                )
-                self.assertEqual(expected_state, ti.state)
-                # Check JSTOR ISBN are valid
+                task_id_qa_isbn_fmt = "create_oaebu_data_qa_isbn_{data_partner_table_name}"
+                task_id_qa_eisbn_fmt = "create_oaebu_data_qa_eisbn_{data_partner_table_name}"
+                task_id_qa_unmatched_fmt = "create_oaebu_data_qa_intermediate_unmatched_{data_partner_table_name}"
+                invalid_isbns_expected = set(sorted(["111", "1111111111111", "113", "211"]))
+                invalid_eisbns_expected = set(
+                    sorted(["111", "1111111111111", "113", None], key=lambda x: x or "0")
+                )  # lamnda method allows sorting a None
+                unmatched_isbns_expected = set(sorted(["111", "113", "211"]))
 
-                records = run_bigquery_query(data_qa_sql["jstor_invalid_isbn"])
-                isbns = set([record["ISBN"] for record in records])
-                self.assertEqual(len(isbns), 4)
-                self.assertTrue("111" in isbns)
-                self.assertTrue("211" in isbns)
-                self.assertTrue("113" in isbns)
-                self.assertTrue("112" in isbns)
+                for partner in data_partners[1:]:
+                    # Run ISBN QA task
+                    ti = env.run_task(task_id_qa_isbn_fmt.format(data_partner_table_name=partner.bq_table_name))
+                    self.assertEqual(ti.state, State.SUCCESS)
+                    # Run unatched QA task
+                    ti = env.run_task(task_id_qa_unmatched_fmt.format(data_partner_table_name=partner.bq_table_name))
+                    self.assertEqual(ti.state, State.SUCCESS)
 
-                # Check JSTOR eISBN are valid
-                records = run_bigquery_query(data_qa_sql["jstor_invalid_eisbn"])
-                isbns = set([record["eISBN"] for record in records])
-                self.assertEqual(len(isbns), 4)
-                self.assertTrue("111" in isbns)
-                self.assertTrue("113" in isbns)
-                self.assertTrue("112" in isbns)
-                self.assertTrue(None in isbns)
+                    if partner.type_id.startswith("google_analytics"):  # GA is a special case
+                        # Check ISBNs are valid
+                        records = bq_run_query(data_qa_sql["google_analytics_invalid_isbn"])
+                        isbns = set([record["publication_id"] for record in records])
+                        self.assertEqual(len(isbns), 1)
+                        self.assertTrue("(none)" in isbns)
+                        # Check unmatched ISBNs picked up
+                        records = bq_run_query(data_qa_sql["google_analytics_unmatched_publication_id"])
+                        isbns = set([record["publication_id"] for record in records])
+                        self.assertEqual(len(isbns), 1)
+                        self.assertTrue("(none)" in isbns)
+                    else:
+                        # Check ISBNs are valid
+                        records = bq_run_query(data_qa_sql[f"{partner.type_id}_invalid_isbn"])
+                        isbns = set(sorted([record[partner.isbn_field_name] for record in records]))
+                        self.assertEqual(isbns, invalid_isbns_expected)
+                        # Check unmatched ISBNs picked up
+                        records = bq_run_query(
+                            data_qa_sql[f"{partner.bq_table_name}_unmatched_{partner.isbn_field_name}"]
+                        )
+                        isbns = set(sorted([record[partner.isbn_field_name] for record in records]))
+                        self.assertEqual(isbns, unmatched_isbns_expected)
 
-                # JSTOR country intermediate unmatched isbns
-                ti = env.run_task(
-                    f"{telescope.create_oaebu_data_qa_intermediate_unmatched_workid.__name__}.{data_partners[0].gcp_dataset_id}.{data_partners[0].gcp_table_id}"
-                )
-                self.assertEqual(expected_state, ti.state)
+                    if partner.type_id.startswith("jstor"):
+                        # Run eISBN task - JSTOR is the only partner that uses eISBN
+                        ti = env.run_task(task_id_qa_eisbn_fmt.format(data_partner_table_name=partner.bq_table_name))
+                        self.assertEqual(ti.state, State.SUCCESS)
+                        # Check eISBNs are valid
+                        records = bq_run_query(data_qa_sql[f"{partner.type_id}_invalid_eisbn"])
+                        eisbns = set(sorted([record["eISBN"] for record in records], key=lambda x: x or "0"))
+                        self.assertEqual(eisbns, invalid_eisbns_expected)
 
-                # Check JSTOR unmatched ISBN picked up
-                records = run_bigquery_query(data_qa_sql["jstor_country_unmatched_ISBN"])
-                isbns = set([record["ISBN"] for record in records])
-                self.assertEqual(len(isbns), 3)
-                self.assertTrue("111" in isbns)
-                self.assertTrue("113" in isbns)
-                self.assertTrue("211" in isbns)
+                ##########################
+                ### Export OAEBU Tables ##
+                ##########################
 
-                # JSTOR institution isbn check
-                ti = env.run_task(
-                    f"{telescope.create_oaebu_data_qa_jstor_isbn.__name__}.{data_partners[1].gcp_dataset_id}.{data_partners[1].gcp_table_id}"
-                )
-                self.assertEqual(expected_state, ti.state)
-
-                # JSTOR institution intermediate unmatched isbns
-                ti = env.run_task(
-                    f"{telescope.create_oaebu_data_qa_intermediate_unmatched_workid.__name__}.{data_partners[1].gcp_dataset_id}.{data_partners[1].gcp_table_id}"
-                )
-                self.assertEqual(expected_state, ti.state)
-
-                # Google Books Sales isbn check
-                ti = env.run_task(telescope.create_oaebu_data_qa_google_books_sales_isbn.__name__)
-                self.assertEqual(expected_state, ti.state)
-
-                # Check Google Books Sales ISBN are valid
-                records = run_bigquery_query(data_qa_sql["google_books_sales_invalid_isbn"])
-                isbns = set([record["Primary_ISBN"] for record in records])
-                self.assertEqual(len(isbns), 4)
-                self.assertTrue("111" in isbns)
-                self.assertTrue("211" in isbns)
-                self.assertTrue("113" in isbns)
-                self.assertTrue("112" in isbns)
-
-                # Google Books Sales intermediate unmatched isbns
-                ti = env.run_task(
-                    f"{telescope.create_oaebu_data_qa_intermediate_unmatched_workid.__name__}.{data_partners[2].gcp_dataset_id}.{data_partners[2].gcp_table_id}"
-                )
-                self.assertEqual(expected_state, ti.state)
-
-                # Check Google Books Sales unmatched ISBN picked up
-                records = run_bigquery_query(data_qa_sql["google_books_sales_unmatched_Primary_ISBN"])
-                isbns = set([record["Primary_ISBN"] for record in records])
-                self.assertEqual(len(isbns), 3)
-                self.assertTrue("111" in isbns)
-                self.assertTrue("113" in isbns)
-                self.assertTrue("211" in isbns)
-
-                # Google Books Traffic isbn check
-                ti = env.run_task(telescope.create_oaebu_data_qa_google_books_traffic_isbn.__name__)
-                self.assertEqual(expected_state, ti.state)
-                # Check Google Books Traffic ISBN are valid
-                records = run_bigquery_query(data_qa_sql["google_books_traffic_invalid_isbn"])
-                isbns = set([record["Primary_ISBN"] for record in records])
-                self.assertEqual(len(isbns), 4)
-                self.assertTrue("111" in isbns)
-                self.assertTrue("211" in isbns)
-                self.assertTrue("113" in isbns)
-                self.assertTrue("112" in isbns)
-
-                # Google Books Traffic intermediate unmatched isbns
-                ti = env.run_task(
-                    f"{telescope.create_oaebu_data_qa_intermediate_unmatched_workid.__name__}.{data_partners[3].gcp_dataset_id}.{data_partners[3].gcp_table_id}"
-                )
-                self.assertEqual(expected_state, ti.state)
-
-                # Check Google Books Traffic unmatched ISBN picked up
-                records = run_bigquery_query(data_qa_sql["google_books_traffic_unmatched_Primary_ISBN"])
-                isbns = set([record["Primary_ISBN"] for record in records])
-                self.assertEqual(len(isbns), 3)
-                self.assertTrue("111" in isbns)
-                self.assertTrue("113" in isbns)
-                self.assertTrue("211" in isbns)
-
-                # OAPEN IRUS UK isbn check
-                ti = env.run_task(telescope.create_oaebu_data_qa_oapen_irus_uk_isbn.__name__)
-                self.assertEqual(expected_state, ti.state)
-
-                # Check OAPEN IRUS UK ISBN are valid
-                records = run_bigquery_query(data_qa_sql["oapen_irus_uk_invalid_isbn"])
-                isbns = set([record["ISBN"] for record in records])
-                self.assertEqual(len(isbns), 4)
-                self.assertTrue("111" in isbns)
-                self.assertTrue("113" in isbns)
-                self.assertTrue("112" in isbns)
-                self.assertTrue("211" in isbns)
-
-                # OAPEN IRUS UK intermediate unmatched isbns
-                ti = env.run_task(
-                    f"{telescope.create_oaebu_data_qa_intermediate_unmatched_workid.__name__}.{data_partners[4].gcp_dataset_id}.{data_partners[4].gcp_table_id}"
-                )
-                self.assertEqual(expected_state, ti.state)
-
-                # Check OAPEN IRUS UK unmatched ISBN picked up
-                records = run_bigquery_query(data_qa_sql["oapen_irus_uk_unmatched_ISBN"])
-                isbns = set([record["ISBN"] for record in records])
-                self.assertEqual(len(isbns), 3)
-                self.assertTrue("111" in isbns)
-                self.assertTrue("113" in isbns)
-                self.assertTrue("211" in isbns)
-
-                if include_google_analytics:
-                    # Google Analytics isbn check
-                    env.run_task(telescope.create_oaebu_data_qa_google_analytics_isbn.__name__)
-
-                    # Check Google Analytics ISBN are valid
-                    records = run_bigquery_query(data_qa_sql["google_analytics_invalid_isbn"])
-                    isbns = set([record["publication_id"] for record in records])
-                    self.assertEqual(len(isbns), 1)
-                    self.assertTrue("(none)" in isbns)
-
-                    # Google Books Analytics unmatched isbns
-                    print("---------------------------------------")
-                    print(f"{data_partners[5].gcp_dataset_id}.{data_partners[5].gcp_table_id}")
-                    print("---------------------------------------")
-                    env.run_task(
-                        f"{telescope.create_oaebu_data_qa_intermediate_unmatched_workid.__name__}.{data_partners[5].gcp_dataset_id}.{data_partners[5].gcp_table_id}"
-                    )
-
-                    # Check Google Analytics unmatched ISBN picked up
-                    records = run_bigquery_query(data_qa_sql["google_analytics_unmatched_publication_id"])
-                    isbns = set([record["publication_id"] for record in records])
-                    self.assertEqual(len(isbns), 1)
-                    self.assertTrue("(none)" in isbns)
-
-                # Export oaebu elastic tables
                 export_tables = [
                     ("book_product_list", 4),
                     ("book_product_metrics", 5),
@@ -2832,98 +1176,126 @@ class TestOnixWorkflowFunctional(ObservatoryTestCase):
                     ("book_product_author_metrics", 0),
                 ]
 
+                export_prefix = self.gcp_project_id.replace("-", "_")
                 for table, exp_rows in export_tables:
-                    ti = env.run_task(f"{telescope.export_oaebu_table.__name__}.{table}")
+                    ti = env.run_task(f"export_oaebu_table_{table}")
+                    self.assertEqual(ti.state, State.SUCCESS)
                     self.assertEqual(expected_state, ti.state, msg=f"table: {table}")
                     # Check that the data_export tables tables exist and have the correct number of rows
-                    table_id = f"{self.gcp_project_id}.{oaebu_export_dataset_id}.{self.gcp_project_id.replace('-', '_')}_{table}{release_suffix}"
+                    table_id = bq_sharded_table_id(
+                        self.gcp_project_id, oaebu_export_dataset_id, f"{export_prefix}_{table}", release_date
+                    )
                     self.assert_table_integrity(table_id, expected_rows=exp_rows)
 
                 # Book product list content assertion
-                self.assert_table_content(
-                    f"{gcp_project_id}.{oaebu_export_dataset_id}.{self.gcp_project_id.replace('-', '_')}_book_product_list{release_suffix}",
-                    load_jsonl(test_fixtures_folder("onix_workflow", "book_product_list.jsonl")),
+                table_id = bq_sharded_table_id(
+                    self.gcp_project_id, oaebu_export_dataset_id, f"{export_prefix}_book_product_list", release_date
                 )
+                fixture_table = load_and_parse_json(
+                    test_fixtures_folder("onix_workflow", "e2e_outputs", "book_product_list.json"),
+                    date_fields=["time_field"],
+                )
+                self.assert_table_content(table_id, fixture_table, primary_key="product_id")
 
                 # Export oaebu elastic qa table
                 ti = env.run_task(telescope.export_oaebu_qa_metrics.__name__)
-                self.assertEqual(expected_state, ti.state)
+                self.assertEqual(ti.state, State.SUCCESS)
 
-                # Validate the joins worked
+                ################################
+                ### Validate the joins worked ##
+                ################################
+
                 # JSTOR
-                sql = f"SELECT ISBN, work_id, work_family_id from {self.gcp_project_id}.{oaebu_intermediate_dataset_id}.{self.fake_partner_dataset}_jstor_country_matched{release_suffix}"
-                records = run_bigquery_query(sql)
+                sql = f"SELECT ISBN, work_id, work_family_id from {self.gcp_project_id}.{oaebu_intermediate_dataset_id}.jstor_country_matched{release_suffix}"
+                records = bq_run_query(sql)
                 oaebu_works = {record["ISBN"]: record["work_id"] for record in records}
                 oaebu_wfam = {record["ISBN"]: record["work_family_id"] for record in records}
 
                 self.assertTrue(
-                    oaebu_works["112"] == oaebu_works["2222222222222"]
+                    oaebu_works["1111111111111"] == oaebu_works["2222222222222"]
                     and oaebu_works["113"] is None
                     and oaebu_works["111"] is None
                     and oaebu_works["211"] is None
                 )
 
                 self.assertTrue(
-                    oaebu_wfam["112"] == oaebu_wfam["2222222222222"]
+                    oaebu_wfam["1111111111111"] == oaebu_wfam["2222222222222"]
                     and oaebu_wfam["113"] is None
                     and oaebu_wfam["111"] is None
                     and oaebu_wfam["211"] is None
                 )
 
                 # OAPEN IRUS UK
-                sql = f"SELECT ISBN, work_id, work_family_id from {self.gcp_project_id}.{oaebu_intermediate_dataset_id}.{self.fake_partner_dataset}_oapen_irus_uk_matched{release_suffix}"
-                records = run_bigquery_query(sql)
+                sql = f"SELECT ISBN, work_id, work_family_id from {self.gcp_project_id}.{oaebu_intermediate_dataset_id}.oapen_irus_uk_matched{release_suffix}"
+                records = bq_run_query(sql)
                 oaebu_works = {record["ISBN"]: record["work_id"] for record in records}
                 oaebu_wfam = {record["ISBN"]: record["work_family_id"] for record in records}
 
                 self.assertTrue(
-                    oaebu_works["112"] == oaebu_works["2222222222222"]
+                    oaebu_works["1111111111111"] == oaebu_works["2222222222222"]
                     and oaebu_works["113"] is None
                     and oaebu_works["111"] is None
                     and oaebu_works["211"] is None
                 )
 
                 self.assertTrue(
-                    oaebu_wfam["112"] == oaebu_wfam["2222222222222"]
+                    oaebu_wfam["1111111111111"] == oaebu_wfam["2222222222222"]
                     and oaebu_wfam["113"] is None
                     and oaebu_wfam["111"] is None
                     and oaebu_wfam["211"] is None
                 )
 
-                # Create the views from the export and data QA tables
-                env.run_task(telescope.create_oaebu_latest_views.__name__)
+                #################################
+                ### Create and validate views ###
+                #################################
+
+                ti = env.run_task(telescope.create_oaebu_latest_views.__name__)
+                self.assertEqual(ti.state, State.SUCCESS)
 
                 # Check data QA views are the same as the tables
                 for k in data_qa_sql.keys():
-                    table_data = run_bigquery_query(data_qa_sql[k])
-                    view_data = run_bigquery_query(latest_data_qa_sql[k])
+                    table_data = bq_run_query(data_qa_sql[k])
+                    view_data = bq_run_query(latest_data_qa_sql[k])
                     self.assertEqual(table_data, view_data)
 
                 for export_table, exp_rows in export_tables:
-                    export_view = run_bigquery_query(
+                    export_view = bq_run_query(
                         f"SELECT * FROM {self.gcp_project_id}.{oaebu_latest_export_dataset_id}.{self.gcp_project_id.replace('-', '_')}_{export_table}"
                     )
                     self.assertEqual(expected_state, ti.state, msg=f"table: {table}")
                     # Check that the data_export tables (views) has the correct number of rows
                     self.assertEqual(len(export_view), exp_rows)
 
-                # Cleanup
-                env.run_task(telescope.cleanup.__name__)
+                ################################
+                ### Add releases and Cleanup ###
+                ################################
 
-                # add_dataset_release_task
-                dataset_releases = get_dataset_releases(dataset_id=1)
+                # Add_dataset_release_task
+                dataset_releases = get_dataset_releases(dag_id=telescope.dag_id, dataset_id=telescope.api_dataset_id)
                 self.assertEqual(len(dataset_releases), 0)
-                ti = env.run_task("add_new_dataset_releases")
+                ti = env.run_task(telescope.add_new_dataset_releases.__name__)
                 self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = get_dataset_releases(dataset_id=1)
+                dataset_releases = get_dataset_releases(dag_id=telescope.dag_id, dataset_id=telescope.api_dataset_id)
                 self.assertEqual(len(dataset_releases), 1)
+
+                # Test cleanup
+                ti = env.run_task(telescope.cleanup.__name__)
+                self.assertEqual(ti.state, State.SUCCESS)
+                self.assert_cleanup(release.workflow_folder)
 
     def test_telescope(self):
         """Test that ONIX Workflow runs when Google Analytics is not included"""
 
-        self.run_telescope_tests(org_name="Curtin Press", include_google_analytics=False)
+        self.run_telescope_tests(include_google_analytics=False)
 
     def test_telescope_with_google_analytics(self):
         """Test that ONIX Workflow runs when Google Analytics is included"""
 
-        self.run_telescope_tests(org_name="ANU Press", include_google_analytics=True)
+        self.run_telescope_tests(include_google_analytics=True)
+
+    @patch("oaebu_workflows.workflows.onix_workflow.bq_run_query")
+    def test_get_onix_records(self, mock_bq_query):
+        mock_bq_query.return_value = TestOnixWorkflow.onix_data
+        records = get_onix_records("test_table_id")
+        self.assertEqual(len(records), 3)
+        self.assertEqual(records[0]["ISBN13"], "111")

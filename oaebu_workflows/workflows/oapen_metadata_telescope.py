@@ -30,121 +30,110 @@ import pendulum
 from airflow.exceptions import AirflowException
 from onixcheck import validate as validate_onix
 from tenacity import retry, stop_after_attempt, wait_chain, wait_fixed, retry_if_exception_type
+from google.cloud.bigquery import SourceFormat
 
-from oaebu_workflows.api_type_ids import DatasetTypeId
-from oaebu_workflows.config import schema_folder as default_schema_folder
 from oaebu_workflows.workflows.onix_telescope import parse_onix
-from observatory.platform.utils.airflow_utils import AirflowConns, AirflowVars
+from oaebu_workflows.config import schema_folder as default_schema_folder
+from observatory.api.client.model.dataset_release import DatasetRelease
+from observatory.platform.api import make_observatory_api
+from observatory.platform.airflow import AirflowConns
+from observatory.platform.files import save_jsonl_gz, load_jsonl
 from observatory.platform.utils.url_utils import get_user_agent
-from observatory.platform.utils.file_utils import list_to_jsonl_gz, load_jsonl, blob_name_from_path, list_files
-from observatory.platform.utils.workflow_utils import make_release_date, table_ids_from_path, bq_load_shard
-from observatory.platform.utils.config_utils import find_schema
-from observatory.platform.utils.gc_utils import upload_files_to_cloud_storage
-from observatory.platform.workflows.snapshot_telescope import SnapshotTelescope, SnapshotRelease
-from oaebu_workflows.dag_tag import Tag
+from observatory.platform.gcs import gcs_upload_files, gcs_blob_uri, gcs_blob_name_from_path
+from observatory.platform.bigquery import bq_load_table, bq_sharded_table_id, bq_find_schema, bq_create_dataset
+from observatory.platform.observatory_config import CloudWorkspace
+from observatory.platform.workflows.workflow import (
+    SnapshotRelease,
+    Workflow,
+    make_snapshot_date,
+    cleanup,
+    set_task_state,
+    check_workflow_inputs,
+)
+
 
 # Download job will wait 120 seconds between first 2 attempts, then 30 minutes for the following 3
 DOWNLOAD_RETRY_CHAIN = wait_chain(*[wait_fixed(120) for _ in range(2)] + [wait_fixed(1800) for _ in range(3)])
 
 
 class OapenMetadataRelease(SnapshotRelease):
-    def __init__(self, dag_id: str, release_date: pendulum.DateTime):
+    def __init__(self, dag_id: str, run_id: str, snapshot_date: pendulum.DateTime):
         """Construct a OapenMetadataRelease instance
-        :param dag_id: the id of the DAG.
-        :param start_date: the start_date of the release.
-        :param end_date: the end_date of the release.
+
+        :param dag_id: The ID of the DAG
+        :param run_id: The Airflow run ID
+        :param snapshot_date: The date of the snapshot_date/release
         """
-        super().__init__(dag_id, release_date)
-
-    @property
-    def download_path(self) -> str:
-        """Path to store the original oapen metadata XML file"""
-        return os.path.join(self.download_folder, f"oapen_metadata_{self.release_date.format('YYYYMMDD')}.xml")
-
-    @property
-    def transform_path(self) -> str:
-        """Path to store the fully transformed oapen ONIX jsonl file"""
-        return os.path.join(self.transform_folder, f"oapen_onix_{self.release_date.format('YYYYMMDD')}.jsonl")
-
-    @property
-    def invalid_products_path(self) -> str:
-        """Path to store the transformed oapen ONIX file"""
-        return os.path.join(
-            self.transform_folder, f"oapen_onix_invalid_products_{self.release_date.format('YYYYMMDD')}.xml"
+        super().__init__(dag_id=dag_id, run_id=run_id, snapshot_date=snapshot_date)
+        self.download_path = os.path.join(
+            self.download_folder, f"oapen_metadata_{snapshot_date.format('YYYYMMDD')}.xml"
         )
+        self.transform_path = os.path.join(
+            self.transform_folder, f"oapen_onix_{snapshot_date.format('YYYYMMDD')}.jsonl.gz"
+        )
+        self.invalid_products_path = os.path.join(
+            self.transform_folder, f"oapen_onix_invalid_products_{snapshot_date.format('YYYYMMDD')}.xml"
+        )
+        self.post_parse_onix = os.path.join(self.transform_folder, "full.jsonl")  # The result of the java parser
 
 
-class OapenMetadataTelescope(SnapshotTelescope):
+class OapenMetadataTelescope(Workflow):
     """Oapen Metadata Telescope"""
 
     METADATA_URL = "https://library.oapen.org/download-export?format=onix"
-    SFTP_UPLOAD_DIR = "/telescopes/onix/oapen_press/upload"
-    DAG_ID = "oapen_metadata"
 
     def __init__(
         self,
-        workflow_id: int,
-        data_location: str,
-        project_id: str,
-        download_bucket: str,
-        transform_bucket: str,
-        dag_id: str = DAG_ID,
+        dag_id: str,
+        cloud_workspace: CloudWorkspace,
+        bq_dataset_id: str = "onix",
+        bq_table_name: str = "onix",
+        bq_dataset_description: str = "OAPEN Metadata Feed",
+        bq_table_description: str = None,
+        api_dataset_id: str = "oapen",
+        schema_folder: str = default_schema_folder(),
+        observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
+        catchup=False,
         start_date: pendulum.DateTime = pendulum.datetime(2018, 5, 14),
         schedule_interval: str = "@weekly",
-        dataset_id: str = "oapen",
-        schema_folder: str = default_schema_folder(),
-        airflow_vars: List = None,
-        airflow_conns: List = None,
-        dataset_type_id: str = DatasetTypeId.oapen_metadata,
     ):
         """Construct a OapenMetadataTelescope instance.
-
-        :param workflow_id: api workflow id.
-        :param data_location: the location for the BigQuery dataset.
-        :param project_id: The google cloud project ID
-        :param download_bucket: The google download bucket
-        :param transform_bucket: The google transform bucket
-        :param dag_id: the id of the DAG.
-        :param start_date: the start date of the DAG.
-        :param schedule_interval: the schedule interval of the DAG.
-        :param dataset_id: the dataset id.
-        :param schema_folder: the SQL schema path.
-        :param schema_prefix: the prefix used to find the schema path
-        :param airflow_vars: list of airflow variable keys, for each variable it is checked if it exists in airflow
-        :param sftp_upload_dir: The directory on the SFTP server to upload the parsed file to
+        :param dag_id: The ID of the DAG
+        :param cloud_workspace: The CloudWorkspace object for this DAG
+        :param bq_dataset_id: The BigQuery dataset ID
+        :param bq_table_name: The BigQuery table name
+        :param bq_dataset_description: Description for the BigQuery dataset
+        :param bq_table_description: Description for the biguery table
+        :param api_dataset_id: The ID to store the dataset release in the API
+        :param schema_folder: The path to the SQL schema folder
+        :param observatory_api_conn_id: Airflow connection ID for the overvatory API
+        :param catchup: Whether to catchup the DAG or not
+        :param start_date: The start date of the DAG
+        :param schedule_interval: The schedule interval of the DAG
         """
-
-        if airflow_vars is None:
-            airflow_vars = [
-                AirflowVars.DATA_PATH,
-                AirflowVars.PROJECT_ID,
-                AirflowVars.DATA_LOCATION,
-                AirflowVars.DOWNLOAD_BUCKET,
-                AirflowVars.TRANSFORM_BUCKET,
-            ]
-
-        if airflow_conns is None:
-            airflow_conns = [AirflowConns.SFTP_SERVICE]
-
         super().__init__(
             dag_id,
             start_date,
             schedule_interval,
-            dataset_id,
-            schema_folder=schema_folder,
-            airflow_conns=airflow_conns,
-            airflow_vars=airflow_vars,
-            workflow_id=workflow_id,
-            dataset_type_id=dataset_type_id,
-            tags=[Tag.oaebu],
+            airflow_conns=[observatory_api_conn_id],
+            catchup=catchup,
+            tags=["oaebu"],
         )
+        self.dag_id = dag_id
+        self.cloud_workspace = cloud_workspace
+        self.bq_dataset_id = bq_dataset_id
+        self.bq_table_name = bq_table_name
+        self.bq_dataset_description = bq_dataset_description
+        self.bq_table_description = bq_table_description
+        self.api_dataset_id = api_dataset_id
+        self.schema_folder = schema_folder
+        self.observatory_api_conn_id = observatory_api_conn_id
 
-        self.data_location = data_location
-        self.project_id = project_id
-        self.download_bucket = download_bucket
-        self.transform_bucket = transform_bucket
+        # Fixture file paths
         self.onix_product_fields_file = os.path.join(self.schema_folder, "OAPEN_ONIX_product_fields.json")
         self.onix_header_fields_file = os.path.join(self.schema_folder, "OAPEN_ONIX_header_fields.json")
+
+        check_workflow_inputs(self)
 
         self.add_setup_task(self.check_dependencies)
         self.add_task(self.download)
@@ -152,46 +141,42 @@ class OapenMetadataTelescope(SnapshotTelescope):
         self.add_task(self.transform)
         self.add_task(self.upload_transformed)
         self.add_task(self.bq_load)
+        self.add_task(self.add_new_dataset_releases)
         self.add_task(self.cleanup)
 
     def make_release(self, **kwargs) -> OapenMetadataRelease:
-        # Make Release instance
-        release_date = make_release_date(**kwargs)
-        release = OapenMetadataRelease(self.dag_id, release_date)
+        """Make release instances. The release is passed as an argument to the function (TelescopeFunction) that is
+        called in 'task_callable'.
+
+        :param kwargs: the context passed from the PythonOperator.
+        See https://airflow.apache.org/docs/stable/macros-ref.html for the keyword arguments that can be passed
+        :return: The Oapen metadata release instance"""
+        snapshot_date = make_snapshot_date(**kwargs)
+        release = OapenMetadataRelease(self.dag_id, kwargs["run_id"], snapshot_date)
         return release
 
-    def download(self, release: OapenMetadataRelease, **kwargs):
+    def download(self, release: OapenMetadataRelease, **kwargs) -> None:
         """Task to download the OapenMetadataRelease release.
 
+        :param kwargs: the context passed from the PythonOperator.
         :param release: an OapenMetadataRelease instance.
         """
         logging.info(f"Downloading metadata XML from url: {OapenMetadataTelescope.METADATA_URL}")
-        download_oapen_metadata(release.download_path)
+        download_oapen_metadata(release.download_path, metadata_url=OapenMetadataTelescope.METADATA_URL)
 
-    def upload_downloaded(self, release: OapenMetadataRelease, **kwargs):
-        """Task to upload the downloaded OAPEN metadata
-
-        :param release: an OapenMetadataRelease instance.
-        """
-        download_files = list_files(release.download_folder)
-        if len(download_files) != 1:
-            raise AirflowException(
-                f"Unexpected number of files in download folder. Expected 1, found {len(download_files)}"
-            )
-
-        blob = blob_name_from_path(download_files[0])
-        success = upload_files_to_cloud_storage(self.download_bucket, [blob], download_files)
+    def upload_downloaded(self, release: OapenMetadataRelease, **kwargs) -> None:
+        """Task to upload the downloaded OAPEN metadata"""
+        success = gcs_upload_files(bucket_name=self.cloud_workspace.download_bucket, file_paths=[release.download_path])
+        set_task_state(success, kwargs["ti"].task_id, release=release)
         if not success:
             raise AirflowException("Blob could not be uploaded to cloud storage")
 
-    def transform(self, release: OapenMetadataRelease, **kwargs):
+    def transform(self, release: OapenMetadataRelease, **kwargs) -> None:
         """Transform the oapen metadata XML file into a valid ONIX file
         This involves several steps
         1) Parse the XML metadata to keep our desired fields and remove invalid products
         2) Parse the validated ONIX file through the java parser to return .jsonl format
         3) Update the contributor.personname field
-
-        :param release: an OapenMetadataRelease instance.
         """
         with open(self.onix_product_fields_file) as f:
             onix_product_fields = json.load(f)
@@ -209,57 +194,60 @@ class OapenMetadataTelescope(SnapshotTelescope):
             # Assert that the new onix file is valid
             if validate_onix(validated_onix):
                 raise AirflowException("Errors found in processed OAPEN ONIX file. Cannot proceed without valid ONIX.")
-            # Parse the onix file through the Java parser
+            # Parse the onix file through the Java parser - should result in release.post_parse_onix file
             parse_onix(tmp_dir, release.transform_folder)
 
         # Add the Contributors.PersonName field
-        onix = create_personname_field(load_jsonl(os.path.join(release.transform_folder, "full.jsonl")))
-        list_to_jsonl_gz(release.transform_path, onix)
+        onix = create_personname_field(load_jsonl(release.post_parse_onix))
+        save_jsonl_gz(release.transform_path, onix)
 
-    def upload_transformed(self, release: OapenMetadataRelease, **kwargs):
-        """Task to upload the transformed OAPEN metadata
+    def upload_transformed(self, release: OapenMetadataRelease, **kwargs) -> None:
+        """Task to upload the transformed OAPEN metadata"""
+        transform_files = [release.transform_path, release.invalid_products_path, release.post_parse_onix]
+        for expected_file in transform_files:
+            if not os.path.exists(expected_file):
+                raise AirflowException(f"Expected file not present: {expected_file}")
+        success = gcs_upload_files(bucket_name=self.cloud_workspace.transform_bucket, file_paths=transform_files)
+        set_task_state(success, kwargs["ti"].task_id, release=release)
 
-        :param release: an OapenMetadataRelease instance
-        """
-        transform_files = list_files(release.transform_folder)
-        if len(transform_files) != 5:
-            raise AirflowException(
-                f"Unexpected number of files in download folder. Expected 5, found {len(transform_files)}"
-            )
-        blobs = []
-        for file in transform_files:
-            blobs.append(blob_name_from_path(file))
-        success = upload_files_to_cloud_storage(self.transform_bucket, blobs, transform_files)
-        if not success:
-            raise AirflowException("Blob could not be uploaded to cloud storage")
-
-    def bq_load(self, release: OapenMetadataRelease, **kwargs):
-        """Load the transformed ONIX file into bigquery
-
-        :param release: an OapenMetadataRelease instance
-        """
-        transform_blob = blob_name_from_path(release.transform_path)
-        table_id, _ = table_ids_from_path(release.transform_path)
-        schema_file_path = find_schema(path=self.schema_folder, table_name="onix")
-        bq_load_shard(
-            schema_file_path=schema_file_path,
-            project_id=self.project_id,
-            transform_bucket=self.transform_bucket,
-            transform_blob=transform_blob,
-            dataset_id=self.dataset_id,
-            data_location=self.data_location,
-            table_id=table_id,
-            release_date=release.release_date,
-            source_format=self.source_format,
-            dataset_description=self.dataset_description,
+    def bq_load(self, release: OapenMetadataRelease, **kwargs) -> None:
+        """Load the transformed ONIX file into bigquery"""
+        bq_create_dataset(
+            project_id=self.cloud_workspace.project_id,
+            dataset_id=self.bq_dataset_id,
+            location=self.cloud_workspace.data_location,
+            description=self.bq_dataset_description,
         )
+        schema_file_path = bq_find_schema(path=self.schema_folder, table_name=self.bq_table_name)
+        uri = gcs_blob_uri(self.cloud_workspace.transform_bucket, gcs_blob_name_from_path(release.transform_path))
+        table_id = bq_sharded_table_id(
+            self.cloud_workspace.project_id, self.bq_dataset_id, self.bq_table_name, release.snapshot_date
+        )
+        state = bq_load_table(
+            uri=uri,
+            table_id=table_id,
+            schema_file_path=schema_file_path,
+            source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
+            table_description=self.bq_table_description,
+        )
+        set_task_state(state, kwargs["ti"].task_id, release=release)
 
-    def cleanup(self, release: OapenMetadataRelease, **kwargs):
-        """Deletes downloaded and transformed release files.
+    def add_new_dataset_releases(self, release: OapenMetadataRelease, **kwargs) -> None:
+        """Adds release information to API."""
+        api = make_observatory_api(observatory_api_conn_id=self.observatory_api_conn_id)
+        dataset_release = DatasetRelease(
+            dag_id=self.dag_id,
+            dataset_id=self.api_dataset_id,
+            dag_run_id=release.run_id,
+            snapshot_date=release.snapshot_date,
+            data_interval_start=kwargs["data_interval_start"],
+            data_interval_end=kwargs["data_interval_end"],
+        )
+        api.post_dataset_release(dataset_release)
 
-        :param release: an OapenMetadataRelease instance.
-        """
-        super().cleanup([release], **kwargs)
+    def cleanup(self, release: OapenMetadataRelease, **kwargs) -> None:
+        """Delete all files, folders and XComs associated with this release."""
+        cleanup(dag_id=self.dag_id, execution_date=kwargs["execution_date"], workflow_folder=release.workflow_folder)
 
 
 @retry(
@@ -348,7 +336,7 @@ def remove_invalid_products(input_xml: str, output_xml: str, invalid_products_fi
 
     :param input_xml: The filepath of the xml file to validate
     :param output_xml: The output filepath
-    :param invalid_prouducts_file: The filepath to write the invalid products to. Ignored if unsupplied.
+    :param invalid_products_file: The filepath to write the invalid products to. Ignored if unsupplied.
     """
     errors = validate_onix(input_xml)
     error_lines = [int(e.location.split(":")[-2]) for e in errors]  # Get the line numbers of the errors

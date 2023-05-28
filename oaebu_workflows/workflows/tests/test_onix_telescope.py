@@ -24,31 +24,17 @@ from airflow.models import Connection
 from airflow.utils.state import State
 
 from oaebu_workflows.config import test_fixtures_folder
-from oaebu_workflows.workflows.onix_telescope import OnixTelescope, parse_onix, onix_collapse_subjects
-from observatory.api.client import ApiClient, Configuration
-from observatory.api.client.api.observatory_api import ObservatoryApi  # noqa: E501
-from observatory.api.client.model.dataset import Dataset
-from observatory.api.client.model.dataset_type import DatasetType
-from observatory.api.client.model.organisation import Organisation
-from observatory.api.client.model.table_type import TableType
-from observatory.api.client.model.workflow import Workflow
-from observatory.api.client.model.workflow_type import WorkflowType
-from observatory.api.testing import ObservatoryApiEnvironment
-from observatory.platform.utils.airflow_utils import AirflowConns
-from observatory.platform.utils.gc_utils import bigquery_sharded_table_id
-from observatory.platform.utils.release_utils import get_dataset_releases
-from observatory.platform.utils.test_utils import (
+from oaebu_workflows.workflows.onix_telescope import OnixTelescope, OnixRelease, parse_onix, onix_collapse_subjects
+from observatory.platform.api import get_dataset_releases
+from observatory.platform.bigquery import bq_sharded_table_id
+from observatory.platform.gcs import gcs_blob_name_from_path
+from observatory.platform.sftp import SftpFolders
+from observatory.platform.observatory_config import Workflow
+from observatory.platform.observatory_environment import (
     ObservatoryEnvironment,
     ObservatoryTestCase,
     SftpServer,
-    module_file_path,
     find_free_port,
-)
-from observatory.platform.utils.workflow_utils import (
-    SftpFolders,
-    SubFolder,
-    blob_name,
-    workflow_path,
 )
 
 
@@ -63,91 +49,21 @@ class TestOnixTelescope(ObservatoryTestCase):
         """
 
         super(TestOnixTelescope, self).__init__(*args, **kwargs)
-        self.host = "localhost"
-        self.api_port = find_free_port()
-        self.sftp_port = find_free_port()
         self.project_id = os.getenv("TEST_GCP_PROJECT_ID")
         self.data_location = os.getenv("TEST_GCP_DATA_LOCATION")
-        self.organisation_name = "Curtin Press"
-        self.organisation_folder = "curtin_press"
-        self.data_location = "us"
+        self.sftp_root = "/telescopes/oinx/test"
         self.date_regex = "\\d{8}"
-
-        # API environment
-        self.host = "localhost"
-        self.port = find_free_port()
-        configuration = Configuration(host=f"http://{self.host}:{self.port}")
-        api_client = ApiClient(configuration)
-        self.api = ObservatoryApi(api_client=api_client)  # noqa: E501
-        self.env = ObservatoryApiEnvironment(host=self.host, port=self.port)
-        self.org_name = "Curtin Press"
+        self.sftp_port = find_free_port()
 
         # Test file
         self.onix_test_path = test_fixtures_folder("onix", "20210330_CURTINPRESS_ONIX.xml")
 
-    def setup_api(self):
-        dt = pendulum.now("UTC")
-
-        name = "Ucl Discovery Telescope"
-        workflow_type = WorkflowType(name=name, type_id=OnixTelescope.DAG_ID_PREFIX)
-        self.api.put_workflow_type(workflow_type)
-
-        organisation = Organisation(
-            name=self.org_name,
-            project_id="project",
-            download_bucket="download_bucket",
-            transform_bucket="transform_bucket",
-        )
-        self.api.put_organisation(organisation)
-
-        telescope = Workflow(
-            name=name,
-            workflow_type=WorkflowType(id=1),
-            organisation=Organisation(id=1),
-            extra={},
-        )
-        self.api.put_workflow(telescope)
-
-        table_type = TableType(
-            type_id="partitioned",
-            name="partitioned bq table",
-        )
-        self.api.put_table_type(table_type)
-
-        dataset_type = DatasetType(
-            type_id=OnixTelescope.DAG_ID_PREFIX,
-            name="ds type",
-            extra={},
-            table_type=TableType(id=1),
-        )
-        self.api.put_dataset_type(dataset_type)
-
-        dataset = Dataset(
-            name="Ucl Discovery Dataset",
-            address="project.dataset.table",
-            service="bigquery",
-            workflow=Workflow(id=1),
-            dataset_type=DatasetType(id=1),
-        )
-        self.api.put_dataset(dataset)
-
-    def setup_connections(self, env):
-        # Add Observatory API connection
-        conn = Connection(conn_id=AirflowConns.OBSERVATORY_API, uri=f"http://:password@{self.host}:{self.port}")
-        env.add_connection(conn)
-
     def test_dag_structure(self):
-        """Test that the ONIX DAG has the correct structure.
-
-        :return: None
-        """
-
+        """Test that the ONIX DAG has the correct structure."""
         dag = OnixTelescope(
-            organisation_name=self.organisation_name,
-            project_id="my-project",
-            download_bucket="download_bucket",
-            transform_bucket="transform_bucket",
-            data_location=self.data_location,
+            dag_id="onix_telescope",
+            cloud_workspace=self.fake_cloud_workspace,
+            sftp_root=self.sftp_root,
             date_regex=self.date_regex,
         ).make_dag()
         self.assert_dag_structure(
@@ -160,189 +76,162 @@ class TestOnixTelescope(ObservatoryTestCase):
                 "transform": ["upload_transformed"],
                 "upload_transformed": ["bq_load"],
                 "bq_load": ["move_files_to_finished"],
-                "move_files_to_finished": ["cleanup"],
-                "cleanup": ["add_new_dataset_releases"],
-                "add_new_dataset_releases": [],
-            },
-            dag,
-        )
-        # Test with sensor
-        dag = OnixTelescope(
-            organisation_name=self.organisation_name,
-            project_id="my-project",
-            download_bucket="download_bucket",
-            transform_bucket="transform_bucket",
-            data_location=self.data_location,
-            date_regex=self.date_regex,
-            sensor_dag_ids=["test_dag"],
-        ).make_dag()
-        self.assert_dag_structure(
-            {
-                "test_dag_sensor": ["check_dependencies"],
-                "check_dependencies": ["list_release_info"],
-                "list_release_info": ["move_files_to_in_progress"],
-                "move_files_to_in_progress": ["download"],
-                "download": ["upload_downloaded"],
-                "upload_downloaded": ["transform"],
-                "transform": ["upload_transformed"],
-                "upload_transformed": ["bq_load"],
-                "bq_load": ["move_files_to_finished"],
-                "move_files_to_finished": ["cleanup"],
-                "cleanup": ["add_new_dataset_releases"],
-                "add_new_dataset_releases": [],
+                "move_files_to_finished": ["add_new_dataset_releases"],
+                "add_new_dataset_releases": ["cleanup"],
+                "cleanup": [],
             },
             dag,
         )
 
     def test_dag_load(self):
-        """Test that the Geonames DAG can be loaded from a DAG bag.
-
-        :return: None
-        """
-
-        env = ObservatoryEnvironment(self.project_id, self.data_location, api_host=self.host, api_port=self.port)
+        """Test that the Geonames DAG can be loaded from a DAG bag."""
+        env = ObservatoryEnvironment(
+            workflows=[
+                Workflow(
+                    dag_id="onix",
+                    name="ONIX Telescope",
+                    class_name="oaebu_workflows.workflows.onix_telescope.OnixTelescope",
+                    cloud_workspace=self.fake_cloud_workspace,
+                    kwargs=dict(date_regex=self.date_regex, sftp_root=self.sftp_root),
+                )
+            ],
+        )
         with env.create():
-            self.setup_connections(env)
-            self.setup_api()
-            dag_file = os.path.join(module_file_path("oaebu_workflows.dags"), "onix_telescope.py")
-            self.assert_dag_load("onix_curtin_press", dag_file)
+            self.assert_dag_load_from_config("onix")
+
+        # Errors should be raised if kwargs dict not supplied
+        env.workflows[0].kwargs = {}
+        with env.create():
+            with self.assertRaises(AssertionError) as cm:
+                self.assert_dag_load_from_config("onix")
+            msg = cm.exception.args[0]
+            self.assertTrue("missing 2 required keyword-only arguments" in msg)
+            self.assertTrue("date_regex" in msg)
+            self.assertTrue("sftp_root" in msg)
 
     def test_telescope(self):
-        """Test the ONIX telescope end to end.
-
-        :return: None.
-        """
-
+        """Test the ONIX telescope end to end."""
         # Setup Observatory environment
-        env = ObservatoryEnvironment(self.project_id, self.data_location, api_host=self.host, api_port=self.port)
-        sftp_server = SftpServer(host=self.host, port=self.sftp_port)
+        env = ObservatoryEnvironment(
+            self.project_id, self.data_location, api_host="localhost", api_port=find_free_port()
+        )
+        sftp_server = SftpServer(host="localhost", port=self.sftp_port)
         dataset_id = env.add_dataset()
 
         # Create the Observatory environment and run tests
 
-        with env.create():
-            self.setup_connections(env)
-            self.setup_api()
-            with sftp_server.create() as sftp_root:
-                # Setup Telescope
-                execution_date = pendulum.datetime(year=2021, month=3, day=31)
-                telescope = OnixTelescope(
-                    organisation_name=self.organisation_name,
-                    project_id=self.project_id,
-                    download_bucket=env.download_bucket,
-                    transform_bucket=env.transform_bucket,
-                    data_location=self.data_location,
-                    date_regex=self.date_regex,
-                    dataset_id=dataset_id,
-                    workflow_id=1,
+        with env.create(), sftp_server.create() as sftp_root:
+            # Setup Telescope
+            execution_date = pendulum.datetime(year=2021, month=3, day=31)
+            telescope = OnixTelescope(
+                dag_id="onix_telescope_test",
+                cloud_workspace=env.cloud_workspace,
+                sftp_root="/",
+                date_regex=self.date_regex,
+                bq_dataset_id=dataset_id,
+            )
+            dag = telescope.make_dag()
+
+            # Release settings
+            release_date = pendulum.datetime(year=2021, month=3, day=30)
+
+            # Add SFTP connection
+            conn = Connection(conn_id=telescope.sftp_service_conn_id, uri=f"ssh://:password@localhost:{self.sftp_port}")
+            env.add_connection(conn)
+            with env.create_dag_run(dag, execution_date):
+                # Test that all dependencies are specified: no error should be thrown
+                ti = env.run_task(telescope.check_dependencies.__name__)
+                self.assertEqual(ti.state, State.SUCCESS)
+
+                # Add ONIX file to SFTP server
+                local_sftp_folders = SftpFolders(telescope.dag_id, telescope.sftp_service_conn_id, sftp_root)
+                os.makedirs(local_sftp_folders.upload, exist_ok=True)
+                onix_file_name = os.path.basename(self.onix_test_path)
+                onix_file_dst = os.path.join(local_sftp_folders.upload, onix_file_name)
+                shutil.copy(self.onix_test_path, onix_file_dst)
+
+                # Get release info from SFTP server and check that the correct release info is returned via Xcom
+                ti = env.run_task(telescope.list_release_info.__name__)
+                self.assertEqual(ti.state, State.SUCCESS)
+                expected_release_info = [{"release_date": release_date, "file_name": onix_file_name}]
+                release_info = ti.xcom_pull(
+                    key=OnixTelescope.RELEASE_INFO,
+                    task_ids=telescope.list_release_info.__name__,
+                    include_prior_dates=False,
                 )
-                dag = telescope.make_dag()
+                for release in release_info:
+                    rdate = release["release_date"]
+                    release["release_date"] = pendulum.parse(rdate)
+                self.assertEqual(expected_release_info, release_info)
 
-                # Release settings
-                release_date = pendulum.datetime(year=2021, month=3, day=30)
-                release_id = f'{telescope.dag_id}_{release_date.strftime("%Y_%m_%d")}'
-                download_folder = workflow_path(SubFolder.downloaded, telescope.dag_id, release_id)
-                extract_folder = workflow_path(SubFolder.extracted, telescope.dag_id, release_id)
-                transform_folder = workflow_path(SubFolder.transformed, telescope.dag_id, release_id)
-
-                # Add SFTP connection
-                conn = Connection(
-                    conn_id=AirflowConns.SFTP_SERVICE, uri=f"ssh://:password@{self.host}:{self.sftp_port}"
+                release = OnixRelease(
+                    dag_id=telescope.dag_id,
+                    run_id=env.dag_run.run_id,
+                    snapshot_date=release_date,
+                    onix_file_name=onix_file_name,
                 )
-                env.add_connection(conn)
-                with env.create_dag_run(dag, execution_date):
-                    # Test that all dependencies are specified: no error should be thrown
-                    ti = env.run_task(telescope.check_dependencies.__name__)
-                    self.assertEqual(ti.state, State.SUCCESS)
 
-                    # Add ONIX file to SFTP server
-                    onix_file_name = os.path.basename(self.onix_test_path)
-                    # Create SftpFolders instance with local sftp_root path as root
-                    local_sftp_folders = SftpFolders(telescope.dag_id, self.organisation_name, sftp_root)
-                    os.makedirs(local_sftp_folders.upload, exist_ok=True)
-                    onix_file_dst = os.path.join(local_sftp_folders.upload, onix_file_name)
-                    shutil.copy(self.onix_test_path, onix_file_dst)
+                # Test move file to in progress
+                ti = env.run_task(telescope.move_files_to_in_progress.__name__)
+                self.assertEqual(ti.state, State.SUCCESS)
+                in_progress_path = os.path.join(local_sftp_folders.in_progress, release.onix_file_name)
+                self.assertFalse(os.path.isfile(onix_file_dst))
+                self.assertTrue(os.path.isfile(in_progress_path))
 
-                    # Get release info from SFTP server and check that the correct release info is returned via Xcom
-                    ti = env.run_task(telescope.list_release_info.__name__)
-                    self.assertEqual(ti.state, State.SUCCESS)
-                    expected_release_info = [{"release_date": release_date, "file_name": onix_file_name}]
-                    release_info = ti.xcom_pull(
-                        key=OnixTelescope.RELEASE_INFO,
-                        task_ids=telescope.list_release_info.__name__,
-                        include_prior_dates=False,
-                    )
+                # Test download
+                ti = env.run_task(telescope.download.__name__)
+                self.assertEqual(ti.state, State.SUCCESS)
+                self.assert_file_integrity(release.download_path, "28f85c488ab01b0cff769d9da6b4be24", "md5")
 
-                    for release in release_info:
-                        rdate = release["release_date"]
-                        release["release_date"] = pendulum.parse(rdate)
+                # Test upload downloaded
+                ti = env.run_task(telescope.upload_downloaded.__name__)
+                self.assertEqual(ti.state, State.SUCCESS)
+                self.assert_blob_integrity(
+                    env.download_bucket, gcs_blob_name_from_path(release.download_path), release.download_path
+                )
 
-                    self.assertEqual(expected_release_info, release_info)
+                # Test transform
+                ti = env.run_task(telescope.transform.__name__)
+                self.assertEqual(ti.state, State.SUCCESS)
+                self.assert_file_integrity(release.transform_path, "2164a300", "gzip_crc")
 
-                    # Test move file to in progress
-                    ti = env.run_task(telescope.move_files_to_in_progress.__name__)
-                    self.assertEqual(ti.state, State.SUCCESS)
+                # Test upload to cloud storage
+                ti = env.run_task(telescope.upload_transformed.__name__)
+                self.assertEqual(ti.state, State.SUCCESS)
+                self.assert_blob_integrity(
+                    env.transform_bucket, gcs_blob_name_from_path(release.transform_path), release.transform_path
+                )
 
-                    in_progress_path = os.path.join(local_sftp_folders.in_progress, onix_file_name)
-                    self.assertFalse(os.path.isfile(onix_file_dst))
-                    self.assertTrue(os.path.isfile(in_progress_path))
+                # Test load into BigQuery
+                ti = env.run_task(telescope.bq_load.__name__)
+                self.assertEqual(ti.state, State.SUCCESS)
+                table_id = bq_sharded_table_id(
+                    telescope.cloud_workspace.project_id,
+                    telescope.bq_dataset_id,
+                    telescope.bq_table_name,
+                    release.snapshot_date,
+                )
+                self.assert_table_integrity(table_id, expected_rows=1)
 
-                    # Test download
-                    ti = env.run_task(telescope.download.__name__)
-                    self.assertEqual(ti.state, State.SUCCESS)
+                # Test move files to finished
+                ti = env.run_task(telescope.move_files_to_finished.__name__)
+                self.assertEqual(ti.state, State.SUCCESS)
+                finished_path = os.path.join(local_sftp_folders.finished, onix_file_name)
+                self.assertFalse(os.path.isfile(local_sftp_folders.in_progress))
+                self.assertTrue(os.path.isfile(finished_path))
 
-                    download_file_path = os.path.join(download_folder, onix_file_name)
-                    self.assert_file_integrity(download_file_path, "28f85c488ab01b0cff769d9da6b4be24", "md5")
+                # Add_dataset_release_task
+                dataset_releases = get_dataset_releases(dag_id=telescope.dag_id, dataset_id=telescope.api_dataset_id)
+                self.assertEqual(len(dataset_releases), 0)
+                ti = env.run_task(telescope.add_new_dataset_releases.__name__)
+                self.assertEqual(ti.state, State.SUCCESS)
+                dataset_releases = get_dataset_releases(dag_id=telescope.dag_id, dataset_id=telescope.api_dataset_id)
+                self.assertEqual(len(dataset_releases), 1)
 
-                    # Test upload downloaded
-                    ti = env.run_task(telescope.upload_downloaded.__name__)
-                    self.assertEqual(ti.state, State.SUCCESS)
-
-                    self.assert_blob_integrity(env.download_bucket, blob_name(download_file_path), download_file_path)
-
-                    # Test transform
-                    ti = env.run_task(telescope.transform.__name__)
-                    self.assertEqual(ti.state, State.SUCCESS)
-
-                    transform_file_path = os.path.join(transform_folder, "onix.jsonl")
-                    self.assert_file_integrity(transform_file_path, "5656547cee6a3a24ff22280ae69cd351", "md5")
-
-                    # Test upload to cloud storage
-                    ti = env.run_task(telescope.upload_transformed.__name__)
-                    self.assertEqual(ti.state, State.SUCCESS)
-
-                    self.assert_blob_integrity(
-                        env.transform_bucket, blob_name(transform_file_path), transform_file_path
-                    )
-
-                    # Test load into BigQuery
-                    ti = env.run_task(telescope.bq_load.__name__)
-                    self.assertEqual(ti.state, State.SUCCESS)
-
-                    table_id = f"{self.project_id}.{dataset_id}.{bigquery_sharded_table_id(telescope.DAG_ID_PREFIX, release_date)}"
-                    expected_rows = 1
-                    self.assert_table_integrity(table_id, expected_rows)
-
-                    # Test move files to finished
-                    ti = env.run_task(telescope.move_files_to_finished.__name__)
-                    self.assertEqual(ti.state, State.SUCCESS)
-                    finished_path = os.path.join(local_sftp_folders.finished, onix_file_name)
-                    self.assertFalse(os.path.isfile(local_sftp_folders.in_progress))
-                    self.assertTrue(os.path.isfile(finished_path))
-
-                    # Test cleanup
-                    ti = env.run_task(telescope.cleanup.__name__)
-                    self.assertEqual(ti.state, State.SUCCESS)
-
-                    self.assert_cleanup(download_folder, extract_folder, transform_folder)
-
-                    # add_dataset_release_task
-                    dataset_releases = get_dataset_releases(dataset_id=1)
-                    self.assertEqual(len(dataset_releases), 0)
-                    ti = env.run_task("add_new_dataset_releases")
-                    self.assertEqual(ti.state, State.SUCCESS)
-                    dataset_releases = get_dataset_releases(dataset_id=1)
-                    self.assertEqual(len(dataset_releases), 1)
+                # Test cleanup
+                ti = env.run_task(telescope.cleanup.__name__)
+                self.assertEqual(ti.state, State.SUCCESS)
+                self.assert_cleanup(release.workflow_folder)
 
     def test_onix_parser(self):
         """Tests the parse_onix function"""

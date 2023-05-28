@@ -19,39 +19,45 @@ import csv
 import logging
 import os
 from datetime import timedelta
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
 import pendulum
-from airflow.exceptions import AirflowException, AirflowSkipException
-from google.cloud import bigquery
+from airflow.exceptions import AirflowSkipException
+from google.cloud.bigquery import SourceFormat, TimePartitioningType
 
 from oaebu_workflows.config import schema_folder as default_schema_folder
-from observatory.api.client.model.organisation import Organisation
-from observatory.platform.utils.airflow_utils import AirflowVars
-from observatory.platform.utils.file_utils import list_to_jsonl_gz
+from observatory.api.client.model.dataset_release import DatasetRelease
+from observatory.platform.api import make_observatory_api
+from observatory.platform.airflow import AirflowConns
+from observatory.platform.files import save_jsonl_gz
+from observatory.platform.gcs import gcs_blob_uri, gcs_upload_files, gcs_blob_name_from_path
+from observatory.platform.bigquery import bq_find_schema, bq_load_table, bq_table_id, bq_create_dataset
 from observatory.platform.utils.url_utils import retry_get_url
-from observatory.platform.utils.workflow_utils import add_partition_date, make_dag_id
-from observatory.platform.workflows.organisation_telescope import OrganisationRelease, OrganisationTelescope
-from oaebu_workflows.dag_tag import Tag
+from observatory.platform.observatory_config import CloudWorkspace
+from observatory.platform.files import add_partition_date
+from observatory.platform.workflows.workflow import (
+    Workflow,
+    PartitionRelease,
+    cleanup,
+    set_task_state,
+    check_workflow_inputs,
+)
 
 
-class UclDiscoveryRelease(OrganisationRelease):
-    def __init__(
-        self, dag_id: str, start_date: pendulum.DateTime, end_date: pendulum.DateTime, organisation: Organisation
-    ):
+class UclDiscoveryRelease(PartitionRelease):
+    def __init__(self, dag_id: str, run_id: str, start_date: pendulum.DateTime, end_date: pendulum.DateTime):
         """Construct a UclDiscoveryRelease instance.
-        :param dag_id: the id of the DAG.
-        :param start_date: the start date of the download period.
+
+        :param dag_id: The ID of the DAG
+        :param run_id: The Airflow run ID.
+        :param start_date: The start date of the DAG the start date of the download period.
         :param end_date: the end date of the download period, also used as release date for BigQuery table and
         file paths.
-        :param organisation: the Organisation of which data is processed.
         """
-        super().__init__(dag_id, end_date, organisation)
+        super().__init__(dag_id=dag_id, run_id=run_id, partition_date=end_date)
 
-        self.dag_id_prefix = UclDiscoveryTelescope.DAG_ID_PREFIX
         self.start_date = start_date
         self.end_date = end_date
-
         self.eprint_metadata_url = (
             "https://discovery.ucl.ac.uk/cgi/search/archive/advanced/export_discovery_CSV.csv?"
             "screen=Search&dataset=archive&_action_export=1&output=CSV"
@@ -66,245 +72,286 @@ class UclDiscoveryRelease(OrganisationRelease):
             f'{self.end_date.strftime("%Y%m%d")}&irs2report=eprint&datatype=countries&top=countries'
             f"&view=Table&limit=all&set_name=eprint&export=CSV&set_value="
         )
-
-    @property
-    def download_path(self) -> str:
-        """Creates path to store the downloaded UCL discovery data
-        :return: Full path to the download file
-        """
-        return os.path.join(self.download_folder, f"{self.dag_id_prefix}.txt")
-
-    @property
-    def transform_path(self) -> str:
-        """Creates path to store the transformed and gzipped UCL discovery data
-        :return: Full path to the transform file
-        """
-        return os.path.join(self.transform_folder, f"{self.dag_id_prefix}.jsonl.gz")
-
-    def download(self):
-        """Download metadata for all eprints that are published before a specific date
-
-        :return: None.
-        """
-        logging.info(f"Downloading metadata from {self.eprint_metadata_url}")
-        response = retry_get_url(self.eprint_metadata_url, num_retries=5)
-        if response.status_code == 200:
-            response_content = response.content.decode("utf-8")
-            csv_reader = csv.DictReader(response_content.splitlines())
-            try:
-                next(csv_reader)
-            except StopIteration:
-                raise AirflowSkipException("No metadata available for the year of this release date.")
-            logging.info(f"Saving metadata to file: {self.download_path}")
-            with open(self.download_path, "w") as f:
-                f.write(response_content)
-        else:
-            raise AirflowException(
-                f"Could not download metadata, response status code: {response.status_code} "
-                f"reason: {response.reason}"
-            )
-
-    def transform(self):
-        """Parse the csv file and for each eprint id store the relevant metadata in a dictionary and get the downloads
-        per country (between begin_date and end_date). The list of dictionaries is stored in a gzipped json lines file.
-        There might be multiple rows for 1 eprint id. Some columns only have a value in the first row, some columns
-        have values in multiple rows.
-
-        :return: None.
-        """
-        begin_date = self.start_date.strftime("%Y-%m-%d")
-        end_date = self.end_date.strftime("%Y-%m-%d")
-        total_downloads = 0
-        downloads_per_country = []
-        single_row_columns = {}
-        with open(self.download_path, "r") as f:
-            csv_reader = csv.DictReader(f)
-
-            previous_id = None
-            results = []
-            multi_row_columns = {
-                "creators_name_family": [],
-                "creators_name_given": [],
-                "subjects": [],
-                "divisions": [],
-                "lyricists_name_family": [],
-                "lyricists_name_given": [],
-                "editors_name_family": [],
-                "editors_name_given": [],
-            }
-            for row in csv_reader:
-                eprintid = row["eprintid"]
-                # row with a new eprint id
-                if previous_id != eprintid:
-                    # add results of previous eprint id
-                    if previous_id:
-                        result = create_result_dict(
-                            begin_date,
-                            end_date,
-                            total_downloads,
-                            downloads_per_country,
-                            multi_row_columns,
-                            single_row_columns,
-                        )
-                        results.append(result)
-                        for column in multi_row_columns:
-                            multi_row_columns[column] = []
-
-                    # store results of current eprint id
-                    single_row_columns = {
-                        "eprintid": row["eprintid"],
-                        "book_title": row["title"],
-                        "ispublished": row["ispublished"],
-                        "keywords": row["keywords"].split(", "),
-                        "abstract": row["abstract"],
-                        "date": row["date"],
-                        "publisher": row["publisher"],
-                        "official_url": row["official_url"],
-                        "oa_status": row["oa_status"],
-                        "language": row["language"],
-                        "doi": row["doi"],
-                        "isbn": row["isbn_13"],
-                        "isbn10": row["isbn"],
-                        "language_elements": row["language_elements"],
-                        "series": row["series"],
-                        "pagerange": row["pagerange"],
-                        "pages": row["pages"],
-                    }
-
-                    downloads_per_country, total_downloads = get_downloads_per_country(self.countries_url + eprintid)
-
-                # append results of current eprint id
-                for column in multi_row_columns:
-                    # For 'name' type columns, don't add empty strings as a name, but make sure that  a value is added
-                    # for both family and given, even if only 1 of the columns has a value.
-                    start_column_name = column.split("_")[0]  # 'creators' when column = 'creators_name_family'
-                    if start_column_name in ["creators", "lyricists", "editors"]:
-                        name_family = row[start_column_name + "_name.family"]
-                        name_given = row[start_column_name + "_name.given"]
-
-                        name = name_family + name_given
-                        if name:
-                            column_name = ".".join(column.rsplit("_", 1))  # 'creators_name.family' when column =
-                            # 'creators_name_family'
-                            multi_row_columns[column].append(row[column_name])
-                    else:
-                        if row[column]:
-                            multi_row_columns[column].append(row[column])
-
-                previous_id = eprintid
-
-            # append results of last rows/eprint id
-            result = create_result_dict(
-                begin_date, end_date, total_downloads, downloads_per_country, multi_row_columns, single_row_columns
-            )
-            results.append(result)
-
-        results = add_partition_date(results, self.release_date, bigquery.TimePartitioningType.MONTH)
-        # Write list into gzipped JSON Lines file
-        list_to_jsonl_gz(self.transform_path, results)
+        self.download_path = os.path.join(self.download_folder, "ucl_discovery.txt")
+        self.transform_path = os.path.join(self.download_folder, "ucl_discovery.jsonl.gz")
 
 
-class UclDiscoveryTelescope(OrganisationTelescope):
+class UclDiscoveryTelescope(Workflow):
     """The UCL Discovery telescope."""
-
-    DAG_ID_PREFIX = "ucl_discovery"
 
     def __init__(
         self,
-        organisation: Organisation,
-        dag_id: Optional[str] = None,
-        start_date: pendulum.DateTime = pendulum.datetime(2008, 1, 1),
-        schedule_interval: str = "@monthly",
-        dataset_id: str = "ucl",
+        dag_id: str,
+        cloud_workspace: CloudWorkspace,
+        bq_dataset_id: str = "ucl",
+        bq_table_name: str = "ucl_discovery",
+        bq_dataset_description: str = "UCL Discovery dataset",
+        bq_table_description: str = None,
+        api_dataset_id: str = "ucl",
         schema_folder: str = default_schema_folder(),
+        observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
+        schedule_interval: str = "@monthly",
+        start_date: pendulum.DateTime = pendulum.datetime(2008, 1, 1),
         catchup: bool = True,
-        airflow_vars: list = None,
         max_active_runs: int = 10,
-        workflow_id: int = None,
     ):
         """Construct a UclDiscoveryTelescope instance.
-        :param organisation: the Organisation of which data is processed.
-        :param dag_id: the id of the DAG.
-        :param start_date: the start date of the DAG.
-        :param schedule_interval: the schedule interval of the DAG.
-        :param dataset_id: the name of the dataset in BigQuery.
-        :param schema_folder: the SQL schema path.
-        :param airflow_vars: list of airflow variable keys, for each variable it is checked if it exists in airflow.
-        :param max_active_runs: the maximum number of DAG runs to execute in parallel.
-        :param workflow_id: api workflow id.
+        :param dag_id: The ID of the DAG
+        :param cloud_workspace: The CloudWorkspace object for this DAG
+        :param bq_dataset_id: The BigQuery dataset ID
+        :param bq_table_name: The BigQuery table name
+        :param bq_dataset_description: Description for the BigQuery dataset
+        :param bq_table_description: Description for the biguery table
+        :param api_dataset_id: The ID to store the dataset release in the API
+        :param schema_folder: The path to the SQL schema folder
+        :param observatory_api_conn_id: Airflow connection ID for the overvatory API
+        :param schedule_interval: The schedule interval of the DAG
+        :param start_date: The start date of the DAG
+        :param catchup: Whether to catchup the DAG or not
+        :param max_active_runs: The maximum number of concurrent DAG runs
         """
-
-        if airflow_vars is None:
-            airflow_vars = [
-                AirflowVars.DATA_PATH,
-                AirflowVars.PROJECT_ID,
-                AirflowVars.DATA_LOCATION,
-                AirflowVars.DOWNLOAD_BUCKET,
-                AirflowVars.TRANSFORM_BUCKET,
-            ]
-        if dag_id is None:
-            dag_id = make_dag_id(self.DAG_ID_PREFIX, organisation.name)
-
         super().__init__(
-            organisation,
             dag_id,
             start_date,
             schedule_interval,
-            dataset_id,
-            schema_folder,
             catchup=catchup,
-            airflow_vars=airflow_vars,
             max_active_runs=max_active_runs,
-            workflow_id=workflow_id,
-            tags=[Tag.oaebu],
+            airflow_conns=[observatory_api_conn_id],
+            tags=["oaebu"],
         )
+
+        self.dag_id = dag_id
+        self.cloud_workspace = cloud_workspace
+        self.bq_dataset_id = bq_dataset_id
+        self.bq_table_name = bq_table_name
+        self.bq_dataset_description = bq_dataset_description
+        self.bq_table_description = bq_table_description
+        self.api_dataset_id = api_dataset_id
+        self.schema_folder = schema_folder
+        self.observatory_api_conn_id = observatory_api_conn_id
+
+        check_workflow_inputs(self)
+
         self.add_setup_task(self.check_dependencies)
-        self.add_task_chain(
-            [
-                self.download,
-                self.upload_downloaded,
-                self.transform,
-                self.upload_transformed,
-                self.bq_load_partition,
-                self.cleanup,
-                self.add_new_dataset_releases,
-            ]
-        )
+        self.add_task(self.download)
+        self.add_task(self.upload_downloaded)
+        self.add_task(self.transform)
+        self.add_task(self.upload_transformed)
+        self.add_task(self.bq_load)
+        self.add_task(self.add_new_dataset_releases)
+        self.add_task(self.cleanup)
 
     def make_release(self, **kwargs) -> List[UclDiscoveryRelease]:
         """Make release instances. The release is passed as an argument to the function (TelescopeFunction) that is
         called in 'task_callable'. There will only be 1 release, but it is passed on as a list so the
         SnapshotTelescope template methods can be used.
 
-        :param kwargs: the context passed from the PythonOperator. See
-        https://airflow.apache.org/docs/stable/macros-ref.html for a list of the keyword arguments that are
-        passed to this argument.
+        :param kwargs: the context passed from the PythonOperator.
+        See https://airflow.apache.org/docs/stable/macros-ref.html for the keyword arguments that can be passed
         :return: A list with one ucldiscovery release instance.
         """
-
-        # Get start and end date (end_date = release_date)
+        # Get start and end date (end_date = partition_date)
         start_date = kwargs["execution_date"]
         end_date = kwargs["next_execution_date"] - timedelta(days=1)
+        run_id = kwargs["run_id"]
 
-        logging.info(f"Start date: {start_date}, end date:{end_date}, release date: {end_date}")
-        releases = [UclDiscoveryRelease(self.dag_id, start_date, end_date, self.organisation)]
+        logging.info(f"Start date: {start_date}, end date:{end_date}, run_id: {run_id}")
+        releases = [UclDiscoveryRelease(dag_id=self.dag_id, run_id=run_id, start_date=start_date, end_date=end_date)]
         return releases
 
     def download(self, releases: List[UclDiscoveryRelease], **kwargs):
         """Task to download the ucldiscovery release for a given month.
         :param releases: a list with the ucldiscovery release.
-        :return: None.
         """
-        # Download each release
-        releases[0].download()
+        for release in releases:
+            logging.info(f"Downloading metadata from {release.eprint_metadata_url}")
+            response = retry_get_url(release.eprint_metadata_url, num_retries=5)
+            response_content = response.content.decode("utf-8")
+            csv_reader = csv.DictReader(response_content.splitlines())
+            try:
+                next(csv_reader)
+            except StopIteration:
+                raise AirflowSkipException("No metadata available for the year of this release date.")
+            logging.info(f"Saving metadata to file: {release.download_path}")
+            with open(release.download_path, "w") as f:
+                f.write(response_content)
+
+    def upload_downloaded(self, releases: List[UclDiscoveryRelease], **kwargs):
+        """Uploads the downloaded onix file to GCS"""
+        for release in releases:
+            success = gcs_upload_files(
+                bucket_name=self.cloud_workspace.download_bucket, file_paths=[release.download_path]
+            )
+            set_task_state(success, kwargs["ti"].task_id, release=release)
 
     def transform(self, releases: List[UclDiscoveryRelease], **kwargs):
-        """Task to transform the ucldiscovery release for a given month.
-        :param releases: a list with the ucldiscovery release.
-        :return: None.
-        """
-        # Transform each release
-        releases[0].transform()
+        """Task to transform the ucldiscovery release for a given month."""
+        for release in releases:
+            results = ucl_dicovery_transform(
+                release.start_date, release.end_date, release.download_path, release.countries_url
+            )
+            results = add_partition_date(
+                results, release.partition_date, TimePartitioningType.MONTH, partition_field="release_date"
+            )
+            save_jsonl_gz(release.transform_path, results)
+
+    def upload_transformed(self, releases: List[UclDiscoveryRelease], **kwargs):
+        """Uploads the transformed file to GCS"""
+        for release in releases:
+            success = gcs_upload_files(
+                bucket_name=self.cloud_workspace.transform_bucket, file_paths=[release.transform_path]
+            )
+            set_task_state(success, kwargs["ti"].task_id, release=release)
+
+    def bq_load(self, releases: List[UclDiscoveryRelease], **kwargs) -> None:
+        """Loads the sales and traffic data into BigQuery"""
+        bq_create_dataset(
+            project_id=self.cloud_workspace.project_id,
+            dataset_id=self.bq_dataset_id,
+            location=self.cloud_workspace.data_location,
+            description=self.bq_dataset_description,
+        )
+
+        for release in releases:
+            uri = gcs_blob_uri(self.cloud_workspace.transform_bucket, gcs_blob_name_from_path(release.transform_path))
+            table_id = bq_table_id(self.cloud_workspace.project_id, self.bq_dataset_id, self.bq_table_name)
+            state = bq_load_table(
+                uri=uri,
+                table_id=table_id,
+                schema_file_path=bq_find_schema(path=self.schema_folder, table_name=self.bq_table_name),
+                source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
+                partition_type=TimePartitioningType.MONTH,
+                partition=True,
+                partition_field="release_date",
+                table_description=self.bq_table_description,
+                ignore_unknown_values=True,
+            )
+            set_task_state(state, kwargs["ti"].task_id, release=release)
+
+    def add_new_dataset_releases(self, releases: List[UclDiscoveryRelease], **kwargs) -> None:
+        """Adds release information to API."""
+        api = make_observatory_api(observatory_api_conn_id=self.observatory_api_conn_id)
+        for release in releases:
+            dataset_release = DatasetRelease(
+                dag_id=self.dag_id,
+                dataset_id=self.api_dataset_id,
+                dag_run_id=release.run_id,
+                data_interval_start=kwargs["data_interval_start"],
+                data_interval_end=kwargs["data_interval_end"],
+                partition_date=release.partition_date,
+            )
+            api.post_dataset_release(dataset_release)
+
+    def cleanup(self, releases: List[UclDiscoveryRelease], **kwargs) -> None:
+        """Delete all files, folders and XComs associated with this release."""
+        for release in releases:
+            cleanup(
+                dag_id=self.dag_id, execution_date=kwargs["execution_date"], workflow_folder=release.workflow_folder
+            )
+
+
+def ucl_dicovery_transform(
+    start_date: pendulum.DateTime, end_date: pendulum.DateTime, csv_path: str, country_url: str
+) -> List[dict]:
+    """Parse the csv file and for each eprint id store the relevant metadata in a dictionary and get the downloads
+    per country (between begin_date and end_date). The list of dictionaries is stored in a gzipped json lines file.
+    There might be multiple rows for 1 eprint id. Some columns only have a value in the first row, some columns
+    have values in multiple rows.
+
+    :param start_date: The start date of the DAG The begin date of download period
+    :param end_date: The end date of download period
+    :param csv_path: The path to the downloaded CSV file
+    :param country_url: The UCL Discovery country URL
+    :return: The transformed data
+    """
+
+    begin_date = start_date.strftime("%Y-%m-%d")
+    end_date = end_date.strftime("%Y-%m-%d")
+    total_downloads = 0
+    downloads_per_country = []
+    single_row_columns = {}
+    with open(csv_path, "r") as f:
+        csv_reader = csv.DictReader(f)
+
+        previous_id = None
+        results = []
+        multi_row_columns = {
+            "creators_name_family": [],
+            "creators_name_given": [],
+            "subjects": [],
+            "divisions": [],
+            "lyricists_name_family": [],
+            "lyricists_name_given": [],
+            "editors_name_family": [],
+            "editors_name_given": [],
+        }
+        for row in csv_reader:
+            eprintid = row["eprintid"]
+            # row with a new eprint id
+            if previous_id != eprintid:
+                # add results of previous eprint id
+                if previous_id:
+                    result = create_result_dict(
+                        begin_date,
+                        end_date,
+                        total_downloads,
+                        downloads_per_country,
+                        multi_row_columns,
+                        single_row_columns,
+                    )
+                    results.append(result)
+                    for column in multi_row_columns:
+                        multi_row_columns[column] = []
+
+                # store results of current eprint id
+                single_row_columns = {
+                    "eprintid": row["eprintid"],
+                    "book_title": row["title"],
+                    "ispublished": row["ispublished"],
+                    "keywords": row["keywords"].split(", "),
+                    "abstract": row["abstract"],
+                    "date": row["date"],
+                    "publisher": row["publisher"],
+                    "official_url": row["official_url"],
+                    "oa_status": row["oa_status"],
+                    "language": row["language"],
+                    "doi": row["doi"],
+                    "isbn": row["isbn_13"],
+                    "isbn10": row["isbn"],
+                    "language_elements": row["language_elements"],
+                    "series": row["series"],
+                    "pagerange": row["pagerange"],
+                    "pages": row["pages"],
+                }
+
+                downloads_per_country, total_downloads = get_downloads_per_country(country_url + eprintid)
+
+            # append results of current eprint id
+            for column in multi_row_columns:
+                # For 'name' type columns, don't add empty strings as a name, but make sure that  a value is added
+                # for both family and given, even if only 1 of the columns has a value.
+                start_column_name = column.split("_")[0]  # 'creators' when column = 'creators_name_family'
+                if start_column_name in ["creators", "lyricists", "editors"]:
+                    name_family = row[start_column_name + "_name.family"]
+                    name_given = row[start_column_name + "_name.given"]
+
+                    name = name_family + name_given
+                    if name:
+                        column_name = ".".join(column.rsplit("_", 1))  # 'creators_name.family' when column =
+                        # 'creators_name_family'
+                        multi_row_columns[column].append(row[column_name])
+                else:
+                    if row[column]:
+                        multi_row_columns[column].append(row[column])
+
+            previous_id = eprintid
+
+        # append results of last rows/eprint id
+        result = create_result_dict(
+            begin_date, end_date, total_downloads, downloads_per_country, multi_row_columns, single_row_columns
+        )
+        results.append(result)
+    return results
 
 
 def get_downloads_per_country(countries_url: str) -> Tuple[List[dict], int]:

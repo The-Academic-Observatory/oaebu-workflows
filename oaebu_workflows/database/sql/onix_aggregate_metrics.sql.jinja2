@@ -43,4 +43,4 @@ SELECT
   SUM(CASE WHEN ARRAY_LENGTH(TitleDetails) = 0 THEN 1 ELSE 0 END) no_titledetails,
   SUM(CASE WHEN no_publisher_url(Publishers) = true THEN 1 ELSE 0 END) no_publisher_urls,
 FROM
-  `{{ project_id }}.{{ dataset_id }}.{{ table_id }}`
+  `{{ table_id }}`

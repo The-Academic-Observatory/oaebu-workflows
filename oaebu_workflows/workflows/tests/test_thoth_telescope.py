@@ -16,43 +16,28 @@
 
 import os
 from tempfile import TemporaryDirectory
-from unittest.mock import patch
 
 import pendulum
 import vcr
-from airflow.models import Connection
 from airflow.utils.state import State
 
-from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.workflows.thoth_telescope import (
     ThothTelescope,
+    ThothRelease,
     thoth_download_onix,
-    blob_name_from_path,
     DEFAULT_FORMAT_SPECIFICATION,
     DEFAULT_HOST_NAME,
 )
-from observatory.api.client import ApiClient, Configuration
-from observatory.api.client.api.observatory_api import ObservatoryApi
-from observatory.api.client.model.dataset import Dataset
-from observatory.api.client.model.dataset_type import DatasetType
-from observatory.api.client.model.organisation import Organisation
-from observatory.api.client.model.table_type import TableType
-from observatory.api.client.model.workflow import Workflow
-from observatory.api.client.model.workflow_type import WorkflowType
-from observatory.api.testing import ObservatoryApiEnvironment
-from observatory.platform.utils.airflow_utils import AirflowConns
-from observatory.platform.utils.file_utils import load_jsonl
-from observatory.platform.utils.gc_utils import bigquery_sharded_table_id
-from observatory.platform.utils.release_utils import get_dataset_releases
+from oaebu_workflows.config import test_fixtures_folder
+from observatory.platform.api import get_dataset_releases
+from observatory.platform.files import load_jsonl
+from observatory.platform.bigquery import bq_sharded_table_id
+from observatory.platform.gcs import gcs_blob_name_from_path
 from observatory.platform.utils.url_utils import retry_get_url
-from observatory.platform.utils.test_utils import (
-    ObservatoryEnvironment,
-    ObservatoryTestCase,
-    module_file_path,
-    find_free_port,
-)
+from observatory.platform.observatory_config import Workflow
+from observatory.platform.observatory_environment import ObservatoryEnvironment, ObservatoryTestCase, find_free_port
 
-FAKE_ORG_NAME = "fake_org_name"
+
 FAKE_PUBLISHER_ID = "fake_publisher_id"
 
 
@@ -66,83 +51,20 @@ class TestThothTelescope(ObservatoryTestCase):
         :param kwargs: keyword arguments.
         """
         super(TestThothTelescope, self).__init__(*args, **kwargs)
-        self.host = "localhost"
-        self.api_port = find_free_port()
         self.project_id = os.getenv("TEST_GCP_PROJECT_ID")
         self.data_location = os.getenv("TEST_GCP_DATA_LOCATION")
-        self.data_location = "us"
-
-        # API environment
-        self.host = "localhost"
-        self.port = find_free_port()
-        configuration = Configuration(host=f"http://{self.host}:{self.port}")
-        api_client = ApiClient(configuration)
-        self.api = ObservatoryApi(api_client=api_client)
-        self.env = ObservatoryApiEnvironment(host=self.host, port=self.port)
 
         # Fixtures
         self.download_cassette = os.path.join(test_fixtures_folder("thoth"), "thoth_download_cassette.yaml")
         self.test_table = os.path.join(test_fixtures_folder("thoth"), "test_table.jsonl")
 
-    def setup_api(self):
-        name = "Thoth Telescope"
-        workflow_type = WorkflowType(name=name, type_id=ThothTelescope.DAG_ID_PREFIX)
-        self.api.put_workflow_type(workflow_type)
-
-        organisation = Organisation(
-            name="Open Book Publishers",
-            project_id="project",
-            download_bucket="download_bucket",
-            transform_bucket="transform_bucket",
-        )
-        self.api.put_organisation(organisation)
-
-        telescope = Workflow(
-            name=name,
-            workflow_type=WorkflowType(id=1),
-            organisation=Organisation(id=1),
-            extra={},
-        )
-        self.api.put_workflow(telescope)
-
-        table_type = TableType(
-            type_id="partitioned",
-            name="partitioned bq table",
-        )
-        self.api.put_table_type(table_type)
-
-        dataset_type = DatasetType(
-            type_id="onix",
-            name="ds type",
-            extra={},
-            table_type=TableType(id=1),
-        )
-        self.api.put_dataset_type(dataset_type)
-
-        dataset = Dataset(
-            name="ONIX",
-            address="project.dataset.table",
-            service="bigquery",
-            workflow=Workflow(id=1),
-            dataset_type=DatasetType(id=1),
-        )
-        self.api.put_dataset(dataset)
-
-    def setup_connections(self, env):
-        # Add Observatory API connection
-        conn = Connection(conn_id=AirflowConns.OBSERVATORY_API, uri=f"http://:password@{self.host}:{self.port}")
-        env.add_connection(conn)
-
     def test_dag_structure(self):
         """Test that the ONIX DAG has the correct structure."""
 
         dag = ThothTelescope(
-            dag_id=f"{ThothTelescope.DAG_ID_PREFIX}_test",
+            dag_id="thoth_telescope_test",
+            cloud_workspace=self.fake_cloud_workspace,
             publisher_id=FAKE_PUBLISHER_ID,
-            project_id="my-project",
-            download_bucket="download_bucket",
-            transform_bucket="transform_bucket",
-            data_location=self.data_location,
         ).make_dag()
 
         self.assert_dag_structure(
@@ -152,112 +74,118 @@ class TestThothTelescope(ObservatoryTestCase):
                 "upload_downloaded": ["transform"],
                 "transform": ["upload_transformed"],
                 "upload_transformed": ["bq_load"],
-                "bq_load": ["cleanup"],
-                "cleanup": ["add_new_dataset_releases"],
-                "add_new_dataset_releases": [],
+                "bq_load": ["add_new_dataset_releases"],
+                "add_new_dataset_releases": ["cleanup"],
+                "cleanup": [],
             },
             dag,
         )
 
     def test_dag_load(self):
         """Test that the DAG can be loaded from a DAG bag."""
-        env = ObservatoryEnvironment(self.project_id, self.data_location, api_host=self.host, api_port=self.port)
+        env = ObservatoryEnvironment(
+            workflows=[
+                Workflow(
+                    dag_id="thoth_telescope_test",
+                    name="Thoth Telescope",
+                    class_name="oaebu_workflows.workflows.thoth_telescope.ThothTelescope",
+                    cloud_workspace=self.fake_cloud_workspace,
+                    kwargs=dict(publisher_id=FAKE_PUBLISHER_ID),
+                )
+            ],
+        )
         with env.create():
-            self.setup_connections(env)
-            self.setup_api()
-            dag_file = os.path.join(module_file_path("oaebu_workflows.dags"), "thoth_telescope.py")
-            self.assert_dag_load(f"thoth_onix_open_book_publishers", dag_file)
+            self.assert_dag_load_from_config("thoth_telescope_test")
+
+        # Error should be raised for no publisher_id
+        env.workflows[0].kwargs = {}
+        with env.create():
+            with self.assertRaises(AssertionError) as cm:
+                self.assert_dag_load_from_config("onix_workflow_test_dag_load")
+            msg = cm.exception.args[0]
+            self.assertTrue("missing 1 required keyword-only argument" in msg)
+            self.assertTrue("publisher_id" in msg)
 
     def test_telescope(self):
         """Test the Thoth telescope end to end."""
-        # Setup Observatory environment
-        env = ObservatoryEnvironment(self.project_id, self.data_location, api_host=self.host, api_port=self.port)
+        env = ObservatoryEnvironment(
+            self.project_id, self.data_location, api_host="localhost", api_port=find_free_port()
+        )
         dataset_id = env.add_dataset()
 
         # Create the Observatory environment and run tests
         with env.create():
-            self.setup_connections(env)
-            self.setup_api()
-
             # Setup Telescope
             execution_date = pendulum.datetime(year=2022, month=12, day=1)
-            release_date = pendulum.datetime(year=2022, month=12, day=3)
             telescope = ThothTelescope(
-                dag_id=f"{ThothTelescope.DAG_ID_PREFIX}_test",
-                publisher_id="fake_publisher_id",
-                project_id=self.project_id,
-                download_bucket=env.download_bucket,
-                transform_bucket=env.transform_bucket,
-                data_location=self.data_location,
-                dataset_id=dataset_id,
-                workflow_id=1,
+                dag_id="thoth_telescope_test",
+                cloud_workspace=env.cloud_workspace,
+                publisher_id=FAKE_PUBLISHER_ID,
+                bq_dataset_id=dataset_id,
             )
             dag = telescope.make_dag()
 
             with env.create_dag_run(dag, execution_date):
-                # Test that all dependencies are specified: no error should be thrown
                 ti = env.run_task(telescope.check_dependencies.__name__)
                 self.assertEqual(ti.state, State.SUCCESS)
-
-                # Test download
                 thoth_vcr = vcr.VCR(record_mode="none")
                 with thoth_vcr.use_cassette(self.download_cassette):
                     ti = env.run_task(telescope.download.__name__)
-                self.assertEqual(ti.state, State.SUCCESS)
-
-                # Test upload downloaded
+                    self.assertEqual(ti.state, State.SUCCESS)
                 ti = env.run_task(telescope.upload_downloaded.__name__)
                 self.assertEqual(ti.state, State.SUCCESS)
-
-                # Test transform
                 ti = env.run_task(telescope.transform.__name__)
                 self.assertEqual(ti.state, State.SUCCESS)
-
-                # Test upload to cloud storage
                 ti = env.run_task(telescope.upload_transformed.__name__)
                 self.assertEqual(ti.state, State.SUCCESS)
-
-                # Test load into BigQuery
                 ti = env.run_task(telescope.bq_load.__name__)
                 self.assertEqual(ti.state, State.SUCCESS)
 
-                # Make assertions
-                download_file_path = os.path.join(telescope.download_folder, telescope.download_file_name)
-                transform_file_path = os.path.join(telescope.transform_folder, telescope.transform_file_name)
-                download_blob = blob_name_from_path(download_file_path)
-                transform_blob = blob_name_from_path(transform_file_path)
-                test_table_id = f"{self.project_id}.{dataset_id}.{bigquery_sharded_table_id('onix', release_date)}"
+                ### Make assertions ###
+
+                # Make the release
+                release = telescope.make_release(
+                    run_id=env.dag_run.run_id, data_interval_end=pendulum.parse(str(env.dag_run.data_interval_end))
+                )
 
                 # Downloaded file
-                self.assert_file_integrity(download_file_path, "78b8c27c9c63fb0f2d721b7d856f4e3c", "md5")
+                self.assert_file_integrity(release.download_path, "78b8c27c9c63fb0f2d721b7d856f4e3c", "md5")
 
                 # Uploaded download blob
-                self.assert_blob_integrity(env.download_bucket, download_blob, download_file_path)
+                self.assert_blob_integrity(
+                    env.download_bucket, gcs_blob_name_from_path(release.download_path), release.download_path
+                )
 
                 # Transformed file
-                self.assert_file_integrity(transform_file_path, "bda19178", "gzip_crc")
+                self.assert_file_integrity(release.transform_path, "bda19178", "gzip_crc")
 
                 # Uploaded transform blob
-                self.assert_blob_integrity(env.transform_bucket, transform_blob, transform_file_path)
+                self.assert_blob_integrity(
+                    env.transform_bucket, gcs_blob_name_from_path(release.transform_path), release.transform_path
+                )
 
                 # Uploaded table
-                self.assert_table_integrity(test_table_id, expected_rows=2)
-                self.assert_table_content(test_table_id, load_jsonl(self.test_table))
+                table_id = bq_sharded_table_id(
+                    telescope.cloud_workspace.project_id,
+                    telescope.bq_dataset_id,
+                    telescope.bq_table_name,
+                    release.snapshot_date,
+                )
+                self.assert_table_integrity(table_id, expected_rows=2)
+                self.assert_table_content(table_id, load_jsonl(self.test_table), primary_key="DOI")
+
+                # add_dataset_release_task
+                dataset_releases = get_dataset_releases(dag_id=telescope.dag_id, dataset_id=telescope.api_dataset_id)
+                self.assertEqual(len(dataset_releases), 0)
+                ti = env.run_task(telescope.add_new_dataset_releases.__name__)
+                self.assertEqual(ti.state, State.SUCCESS)
+                dataset_releases = get_dataset_releases(dag_id=telescope.dag_id, dataset_id=telescope.api_dataset_id)
+                self.assertEqual(len(dataset_releases), 1)
 
                 # Test cleanup
                 ti = env.run_task(telescope.cleanup.__name__)
                 self.assertEqual(ti.state, State.SUCCESS)
-                self.assertFalse(os.path.exists(telescope.workflow_folder))
-                self.assertFalse(os.path.exists(telescope.download_folder))
-                self.assertFalse(os.path.exists(telescope.transform_folder))
-
-                # add_dataset_release_task
-                dataset_releases = get_dataset_releases(dataset_id=1)
-                self.assertEqual(len(dataset_releases), 0)
-                ti = env.run_task("add_new_dataset_releases")
-                self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = get_dataset_releases(dataset_id=1)
-                self.assertEqual(len(dataset_releases), 1)
+                self.assert_cleanup(release.workflow_folder)
 
     # Function tests
     def test_download_onix(self):
@@ -268,7 +196,9 @@ class TestThothTelescope(ObservatoryTestCase):
         with TemporaryDirectory() as tempdir:
             thoth_vcr = vcr.VCR(record_mode="none")
             with thoth_vcr.use_cassette(self.download_cassette):
-                thoth_download_onix(FAKE_PUBLISHER_ID, tempdir, download_filename="fake_download.xml", num_retries=0)
+                thoth_download_onix(
+                    FAKE_PUBLISHER_ID, download_path=os.path.join(tempdir, "fake_download.xml"), num_retries=0
+                )
             self.assert_file_integrity(
                 os.path.join(tempdir, "fake_download.xml"), "78b8c27c9c63fb0f2d721b7d856f4e3c", "md5"
             )

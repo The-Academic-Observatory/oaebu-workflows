@@ -398,6 +398,32 @@
         "name": "oapen_irus_uk_metadata",
         "type": "RECORD",
         "description": "Metadata derived from IRUS_UK"
+      },
+      {
+        "fields": [
+          {
+            "mode": "NULLABLE",
+            "name": "ISBN13",
+            "type": "STRING",
+            "description": "ISBN of the book"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "book_title",
+            "type": "STRING",
+            "description": "Title of the book"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "publisher",
+            "type": "STRING",
+            "description": "The publisher"
+          }
+        ],
+        "mode": "NULLABLE",
+        "name": "fulcrum_metadata",
+        "type": "RECORD",
+        "description": "Metadata derived from Fulcrum"
       }
     ],
     "mode": "NULLABLE",
@@ -920,6 +946,82 @@
         "name": "oapen_irus_uk",
         "type": "RECORD",
         "description": "Metrics derived from IRUS-UK"
+      },
+      {
+        "fields": [
+          {
+            "mode": "NULLABLE",
+            "name": "total_item_investigations",
+            "type": "INTEGER",
+            "description": "The total number of item investigations"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "total_item_requests",
+            "type": "INTEGER",
+            "description": "The total number of item requests"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "unique_item_investigations",
+            "type": "INTEGER",
+            "description": "The number of unique item investigations"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "unique_item_requests",
+            "type": "INTEGER",
+            "description": "The number of unique item requests"
+          },
+          {
+            "fields": [
+              {
+                "mode": "NULLABLE",
+                "name": "name",
+                "type": "STRING",
+                "description": "The country name of the client"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "code",
+                "type": "STRING",
+                "description": "The country code of the client"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "total_item_investigations",
+                "type": "INTEGER",
+                "description": "The total number of item investigations"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "total_item_requests",
+                "type": "INTEGER",
+                "description": "The total number of item requests"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "unique_item_investigations",
+                "type": "INTEGER",
+                "description": "The number of unique item investigations"
+              },
+              {
+                "mode": "NULLABLE",
+                "name": "unique_item_requests",
+                "type": "INTEGER",
+                "description": "The number of unique item requests"
+              }
+            ],
+            "mode": "REPEATED",
+            "name": "country",
+            "type": "RECORD",
+            "description": "Record to store statistics on the country level"
+          }
+        ],
+        "mode": "NULLABLE",
+        "name": "fulcrum",
+        "type": "RECORD",
+        "description": "Metrics derived from Fulcrum"
       },
       {
         "fields": [

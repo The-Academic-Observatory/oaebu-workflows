@@ -15,237 +15,144 @@
 # Author: Aniek Roelofs
 
 import csv
-import logging
 import os
 import re
 from collections import OrderedDict, defaultdict
-from typing import List, Optional
+from typing import List, Tuple
 
 import pendulum
 from airflow.exceptions import AirflowException
 from airflow.models.taskinstance import TaskInstance
-from google.cloud import bigquery
+from google.cloud.bigquery import TimePartitioningType, SourceFormat
 
 from oaebu_workflows.config import schema_folder as default_schema_folder
-from observatory.api.client.model.organisation import Organisation
-from observatory.platform.utils.airflow_utils import AirflowConns, AirflowVars
-from observatory.platform.utils.file_utils import list_to_jsonl_gz
-from observatory.platform.utils.workflow_utils import (
-    SftpFolders,
-    add_partition_date,
-    convert,
-    make_dag_id,
-    make_sftp_connection,
+from observatory.api.client.model.dataset_release import DatasetRelease
+from observatory.platform.api import make_observatory_api
+from observatory.platform.airflow import AirflowConns
+from observatory.platform.files import save_jsonl_gz
+from observatory.platform.files import convert, add_partition_date
+from observatory.platform.gcs import gcs_upload_files, gcs_blob_uri, gcs_blob_name_from_path
+from observatory.platform.observatory_config import CloudWorkspace
+from observatory.platform.bigquery import bq_load_table, bq_table_id, bq_find_schema, bq_create_dataset
+from observatory.platform.sftp import SftpFolders, make_sftp_connection
+from observatory.platform.workflows.workflow import (
+    PartitionRelease,
+    Workflow,
+    cleanup,
+    set_task_state,
+    check_workflow_inputs,
 )
-from observatory.platform.workflows.organisation_telescope import OrganisationRelease, OrganisationTelescope
-from oaebu_workflows.dag_tag import Tag
 
 
-class GoogleBooksRelease(OrganisationRelease):
+class GoogleBooksRelease(PartitionRelease):
     def __init__(
         self,
         dag_id: str,
-        release_date: pendulum.DateTime,
+        run_id: str,
+        partition_date: pendulum.DateTime,
         sftp_files: List[str],
-        sftp_regex: str,
-        organisation: Organisation,
     ):
         """Construct a GoogleBooksRelease.
 
-        :param dag_id: the DAG id.
-        :param release_date: the release date, corresponds to the last day of the month being processed.
+        :param dag_id: The ID of the DAG
+        :param run_id: The Airflow run ID
+        :param partition_date: the partition date, corresponds to the last day of the month being processed.
         :param sftp_files: List of full filepaths to download from sftp service (incl. in_progress folder)
-        :param organisation: the Organisation.
         """
-        self.dag_id = dag_id
-        self.release_date = release_date
-
-        download_files_regex = sftp_regex
-        transform_files_regex = r"^google_books_(sales|traffic).jsonl.gz$"
-        super().__init__(
-            self.dag_id,
-            release_date,
-            organisation,
-            download_files_regex=download_files_regex,
-            transform_files_regex=transform_files_regex,
-        )
+        super().__init__(dag_id=dag_id, run_id=run_id, partition_date=partition_date)
+        self.download_sales_path = os.path.join(self.download_folder, "google_books_sales.csv")
+        self.download_traffic_path = os.path.join(self.download_folder, "google_books_traffic.csv")
+        self.transform_sales_path = os.path.join(self.transform_folder, "google_books_sales.jsonl.gz")
+        self.transform_traffic_path = os.path.join(self.transform_folder, "google_books_traffic.jsonl.gz")
         self.sftp_files = sftp_files
 
-    def download_path(self, path: str) -> str:
-        """Creates full download path
 
-        :param path: filepath of remote sftp file
-        :return: Download path
-        """
-        file_name = os.path.basename(path)
-        return os.path.join(self.download_folder, file_name)
-
-    def transform_path(self, report_type: str) -> str:
-        """Creates full transform path
-
-        :param report_type: Type of report, either 'sales' or 'traffic'
-        :return: Transform path
-        """
-        return os.path.join(self.transform_folder, f"google_books_{report_type}.jsonl.gz")
-
-    def download(self):
-        """Downloads Google Books reports.
-
-        :return: the paths on the system of the downloaded files.
-        """
-        with make_sftp_connection() as sftp:
-            for file in self.sftp_files:
-                sftp.get(file, localpath=self.download_path(file))
-
-    def transform(self):
-        """Transforms sales and traffic reports. For both reports it transforms the csv into a jsonl file and
-        replaces spaces in the keys with underscores.
-        If there are multiple reports of the same type (in case there are multiple accounts used), the results are
-        combined in one list.
-
-        :return: None
-        """
-        # Sort files to get same hash for unit tests
-        download_files = self.download_files
-        download_files.sort()
-
-        results = defaultdict(list)
-        for file in download_files:
-            report_type = "sales" if "Sales" in file else "traffic"
-            with open(file, encoding="utf-16") as csv_file:
-                csv_reader = csv.DictReader(csv_file, delimiter="\t")
-                for row in csv_reader:
-                    transformed_row = OrderedDict((convert(k.replace("%", "Perc")), v) for k, v in row.items())
-                    # Sales transaction report
-                    if report_type == "sales":
-                        transaction_date = pendulum.from_format(transformed_row["Transaction_Date"], "MM/DD/YY")
-
-                        # Sanity check that transaction date is in month of release date
-                        if self.release_date.start_of("month") <= transaction_date <= self.release_date.end_of("month"):
-                            pass
-                        else:
-                            raise AirflowException(
-                                "Transaction date does not fall within release month. "
-                                f"Transaction date: {transaction_date.strftime('%Y-%m-%d')}, "
-                                f"release month: {self.release_date.strftime('%Y-%m')}"
-                            )
-
-                        # Transform to valid date format
-                        transformed_row["Transaction_Date"] = transaction_date.strftime("%Y-%m-%d")
-
-                        # Remove percentage sign
-                        transformed_row["Publisher_Revenue_Perc"] = transformed_row["Publisher_Revenue_Perc"].strip("%")
-                        # This field is not present for some publishers (UCL Press), for ANU Press the field value is
-                        # “E-Book”
-                        try:
-                            transformed_row["Line_of_Business"]
-                        except KeyError:
-                            transformed_row["Line_of_Business"] = None
-                    # Traffic report
-                    else:
-                        # Remove percentage sign
-                        transformed_row["Buy_Link_CTR"] = transformed_row["Buy_Link_CTR"].strip("%")
-
-                    # Append results
-                    results[report_type].append(transformed_row)
-
-        for report_type, report_results in results.items():
-            report_results = add_partition_date(report_results, self.release_date, bigquery.TimePartitioningType.MONTH)
-            list_to_jsonl_gz(self.transform_path(report_type), report_results)
-
-
-class GoogleBooksTelescope(OrganisationTelescope):
+class GoogleBooksTelescope(Workflow):
     """The Google Books telescope."""
-
-    DAG_ID_PREFIX = "google_books"
 
     def __init__(
         self,
-        organisation: Organisation,
-        accounts: Optional[List[str]],
-        dag_id: Optional[str] = None,
-        start_date: pendulum.DateTime = pendulum.datetime(2018, 1, 1),
-        schedule_interval: str = "@weekly",
-        dataset_id: str = "google",
+        dag_id: str,
+        cloud_workspace: CloudWorkspace,
+        sftp_root: str,
+        bq_dataset_id: str = "google",
+        bq_dataset_description: str = "Data from Google sources",
+        bq_sales_table_name: str = "google_books_sales",
+        bq_sales_table_description: str = None,
+        bq_traffic_table_name: str = "google_books_traffic",
+        bq_traffic_table_description: str = None,
         schema_folder: str = default_schema_folder(),
+        api_dataset_id: str = "google_books",
+        sftp_service_conn_id: str = "sftp_service",
+        observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
         catchup: bool = False,
-        airflow_vars=None,
-        airflow_conns=None,
-        workflow_id: int = None,
+        schedule_interval: str = "@weekly",
+        start_date: pendulum.DateTime = pendulum.datetime(2018, 1, 1),
     ):
         """Construct a GoogleBooksTelescope instance.
-
-        :param organisation: the Organisation the DAG will process.
-        :param accounts: the file suffixes of the Google Books accounts that are linked to the Organisation.
-        :param dag_id: the id of the DAG.
-        :param start_date: the start date of the DAG.
-        :param schedule_interval: the schedule interval of the DAG.
-        :param schema_folder: the SQL schema path.
-        :param catchup: whether to catchup the DAG or not.
-        :param airflow_vars: list of airflow variable keys, for each variable it is checked if it exists in airflow
-        :param airflow_conns: list of airflow connection keys, for each connection it is checked if it exists in airflow
-        :param workflow_id: api workflow id.
+        :param dag_id: The ID of the DAG
+        :param cloud_workspace: The CloudWorkspace object for this DAG
+        :param sftp_root: The root of the SFTP filesystem to work with
+        :param bq_dataset_id: The BigQuery dataset ID
+        :param bq_dataset_description: Description for the BigQuery dataset
+        :param bq_sales_table_name: The name of the BigQuery Google Books Sales table
+        :param bq_sales_table_description: Description for the BigQuery Google Books Sales table
+        :param bq_traffic_table_name: The name of the BigQuery Google Books Traffic table
+        :param bq_traffic_table_description: Description for the BigQuery Google Books Traffic table
+        :param schema_folder: The path to the SQL schema folder
+        :param api_dataset_id: The ID to store the dataset release in the API
+        :param sftp_service_conn_id: Airflow connection ID for the SFTP service
+        :param observatory_api_conn_id: Airflow connection ID for the overvatory API
+        :param catchup: Whether to catchup the DAG or not
+        :param schedule_interval: The schedule interval of the DAG
+        :param start_date: The start date of the DAG
         """
-        if airflow_vars is None:
-            airflow_vars = [
-                AirflowVars.DATA_PATH,
-                AirflowVars.PROJECT_ID,
-                AirflowVars.DATA_LOCATION,
-                AirflowVars.DOWNLOAD_BUCKET,
-                AirflowVars.TRANSFORM_BUCKET,
-            ]
-        if airflow_conns is None:
-            airflow_conns = [AirflowConns.SFTP_SERVICE]
-
-        if dag_id is None:
-            dag_id = make_dag_id(self.DAG_ID_PREFIX, organisation.name)
-
         super().__init__(
-            organisation,
             dag_id,
             start_date,
             schedule_interval,
-            dataset_id,
-            schema_folder,
             catchup=catchup,
-            airflow_vars=airflow_vars,
-            airflow_conns=airflow_conns,
-            workflow_id=workflow_id,
-            tags=[Tag.oaebu],
+            airflow_conns=[sftp_service_conn_id, observatory_api_conn_id],
+            tags=["oaebu"],
         )
-        self.sftp_folders = SftpFolders(dag_id, organisation.name)
-        self.sftp_regex = r"^Google(SalesTransaction|BooksTraffic)Report_\d{4}_\d{2}.csv$"
-        self.no_accounts = 1
-        # Change sftp regex and file count if file suffixes are given. This can happen when there are multiple Google
-        # Books accounts for 1 organisation. Each account has it's own file suffix
-        if accounts:
-            self.sftp_regex = (
-                r"^Google(SalesTransaction|BooksTraffic)Report_(" + r"|".join(accounts) + r")\d{4}_\d{2}.csv$"
-            )
-            self.no_accounts = len(accounts)
+        self.dag_id = dag_id
+        self.cloud_workspace = cloud_workspace
+        self.sftp_root = sftp_root
+        self.bq_dataset_id = bq_dataset_id
+        self.bq_dataset_description = bq_dataset_description
+        self.bq_sales_table_name = bq_sales_table_name
+        self.bq_sales_table_description = bq_sales_table_description
+        self.bq_traffic_table_name = bq_traffic_table_name
+        self.bq_traffic_table_description = bq_traffic_table_description
+        self.schema_folder = schema_folder
+        self.api_dataset_id = api_dataset_id
+        self.sftp_service_conn_id = sftp_service_conn_id
+        self.observatory_api_conn_id = observatory_api_conn_id
 
-        self.add_setup_task_chain([self.check_dependencies, self.list_release_info])
-        self.add_task_chain(
-            [
-                self.move_files_to_in_progress,
-                self.download,
-                self.upload_downloaded,
-                self.transform,
-                self.upload_transformed,
-                self.bq_load_partition,
-                self.move_files_to_finished,
-                self.cleanup,
-                self.add_new_dataset_releases,
-            ]
-        )
+        # Extra SFTP parameters
+        self.sftp_folders = SftpFolders(dag_id, sftp_conn_id=sftp_service_conn_id, sftp_root=sftp_root)
+        self.sftp_regex = r"^Google(SalesTransaction|BooksTraffic)Report_\d{4}_\d{2}.csv$"
+
+        check_workflow_inputs(self)
+
+        self.add_setup_task(self.check_dependencies)
+        self.add_setup_task(self.list_release_info)
+        self.add_task(self.move_files_to_in_progress)
+        self.add_task(self.download)
+        self.add_task(self.upload_downloaded)
+        self.add_task(self.transform)
+        self.add_task(self.upload_transformed)
+        self.add_task(self.bq_load)
+        self.add_task(self.move_files_to_finished)
+        self.add_task(self.add_new_dataset_releases)
+        self.add_task(self.cleanup)
 
     def make_release(self, **kwargs) -> List[GoogleBooksRelease]:
         """Make release instances. The release is passed as an argument to the function (TelescopeFunction) that is
         called in 'task_callable'.
 
-        :param kwargs: the context passed from the PythonOperator. See
-        https://airflow.apache.org/docs/stable/macros-ref.html for a list of the keyword arguments that are
-        passed to this argument.
+        :param kwargs: the context passed from the PythonOperator.
+        See https://airflow.apache.org/docs/stable/macros-ref.html for the keyword arguments that can be passed
         :return: A list of google books release instances
         """
         ti: TaskInstance = kwargs["ti"]
@@ -253,30 +160,25 @@ class GoogleBooksTelescope(OrganisationTelescope):
             key=GoogleBooksTelescope.RELEASE_INFO, task_ids=self.list_release_info.__name__, include_prior_dates=False
         )
         releases = []
-        for release_date, sftp_files in reports_info.items():
+        run_id = kwargs["run_id"]
+        for partition_date, sftp_files in reports_info.items():
             releases.append(
                 GoogleBooksRelease(
-                    self.dag_id, pendulum.parse(release_date), sftp_files, self.sftp_regex, self.organisation
+                    self.dag_id, run_id=run_id, partition_date=pendulum.parse(partition_date), sftp_files=sftp_files
                 )
             )
         return releases
 
-    def list_release_info(self, **kwargs):
+    def list_release_info(self, **kwargs) -> bool:
         """Lists all Google Books releases available on the SFTP server and publishes sftp file paths and
         release_date's as an XCom.
-        When an organisation has multiple Google Books accounts, it will check if reports are available for all
-        accounts for the specific report type and month. Only if this is the case all reports are processed in this
-        release.
 
-        :param kwargs: the context passed from the BranchPythonOperator. See
-        https://airflow.apache.org/docs/stable/macros-ref.html
-        for a list of the keyword arguments that are passed to this argument.
         :return: the identifier of the task to execute next.
         """
 
         reports = defaultdict(list)
         # List all reports in the 'upload' folder of the organisation
-        with make_sftp_connection() as sftp:
+        with make_sftp_connection(self.sftp_service_conn_id) as sftp:
             files = sftp.listdir(self.sftp_folders.upload)
             for file_name in files:
                 match = re.match(self.sftp_regex, file_name)
@@ -295,20 +197,13 @@ class GoogleBooksTelescope(OrganisationTelescope):
                     # Append report
                     reports[report_type + release_date].append(sftp_file)
 
-        # Check that for each report type + date combination there is a report available for each Google Books account
+        # Check that for each report type + date combination there is a report available
         release_info = defaultdict(list)
         for report, sftp_files in reports.items():
             release_date = report[-8:]
-            if len(sftp_files) == self.no_accounts:
-                release_info[release_date] += sftp_files
-            else:
-                logging.warning(
-                    f"Reports are missing for some Google Books accounts for the month of: {release_date}. "
-                    f"There are {len(sftp_files)} {report} reports available, but {self.no_accounts} "
-                    f"accounts. Reports that are available: {sftp_files}"
-                )
+            release_info[release_date] += sftp_files
 
-        continue_dag = len(release_info)
+        continue_dag = bool(release_info)
         if continue_dag:
             # Push messages
             ti: TaskInstance = kwargs["ti"]
@@ -316,42 +211,170 @@ class GoogleBooksTelescope(OrganisationTelescope):
 
         return continue_dag
 
-    def move_files_to_in_progress(self, releases: List[GoogleBooksRelease], **kwargs):
-        """Move Google Books files to SFTP in-progress folder.
-
-        :param releases: a list of Google Books releases.
-        :return: None.
-        """
+    def move_files_to_in_progress(self, releases: List[GoogleBooksRelease], **kwargs) -> None:
+        """Move Google Books files to SFTP in-progress folder."""
 
         for release in releases:
             self.sftp_folders.move_files_to_in_progress(release.sftp_files)
 
     def download(self, releases: List[GoogleBooksRelease], **kwargs):
-        """Task to download the Google Books releases for a given month.
-
-        :param releases: a list of Google Books releases.
-        :return: None.
-        """
-        # Download each release
+        """Task to download the Google Books releases for a given month."""
         for release in releases:
-            release.download()
+            with make_sftp_connection(self.sftp_service_conn_id) as sftp:
+                for file in release.sftp_files:
+                    if "Traffic" in file:
+                        sftp.get(file, localpath=release.download_traffic_path)
+                    elif "Transaction" in file:
+                        sftp.get(file, localpath=release.download_sales_path)
+            assert os.path.exists(release.download_traffic_path) and os.path.exists(release.download_sales_path)
 
-    def transform(self, releases: List[GoogleBooksRelease], **kwargs):
-        """Task to transform the Google Books releases for a given month.
-
-        :param releases: a list of Google Books releases.
-        :return: None.
-        """
-        # Transform each release
+    def upload_downloaded(self, releases: List[GoogleBooksRelease], **kwargs) -> None:
+        """Uploads the downloaded files to GCS for each release"""
         for release in releases:
-            release.transform()
+            success = gcs_upload_files(
+                bucket_name=self.cloud_workspace.download_bucket,
+                file_paths=[release.download_sales_path, release.download_traffic_path],
+            )
+            if not success:
+                raise AirflowException(f"Files could not be uploaded to cloud storage bucket: {self.transform_bucket}")
 
-    def move_files_to_finished(self, releases: List[GoogleBooksRelease], **kwargs):
-        """Move Google Books files to SFTP finished folder.
+    def transform(self, releases: List[GoogleBooksRelease], **kwargs) -> None:
+        """Task to transform the Google Books releases for a given month."""
+        for release in releases:
+            gb_transform(
+                download_files=(release.download_sales_path, release.download_traffic_path),
+                sales_path=release.transform_sales_path,
+                traffic_path=release.transform_traffic_path,
+                release_date=release.partition_date,
+            )
 
-        :param releases: a list of Google Books releases.
-        :return: None.
-        """
+    def upload_transformed(self, releases: List[GoogleBooksRelease], **kwargs) -> None:
+        """Uploads the transformed files to GCS for each release"""
+        for release in releases:
+            success = gcs_upload_files(
+                bucket_name=self.cloud_workspace.transform_bucket,
+                file_paths=[release.transform_sales_path, release.transform_traffic_path],
+            )
+            if not success:
+                raise AirflowException(f"Files could not be uploaded to cloud storage bucket: {self.transform_bucket}")
+
+    def move_files_to_finished(self, releases: List[GoogleBooksRelease], **kwargs) -> None:
+        """Move Google Books files to SFTP finished folder."""
 
         for release in releases:
             self.sftp_folders.move_files_to_finished(release.sftp_files)
+
+    def bq_load(self, releases: List[GoogleBooksRelease], **kwargs) -> None:
+        """Loads the sales and traffic data into BigQuery"""
+        bq_create_dataset(
+            project_id=self.cloud_workspace.project_id,
+            dataset_id=self.bq_dataset_id,
+            location=self.cloud_workspace.data_location,
+            description=self.bq_dataset_description,
+        )
+        for release in releases:
+            for table_name, table_description, file_path in zip(
+                [self.bq_sales_table_name, self.bq_traffic_table_name],
+                [self.bq_sales_table_description, self.bq_traffic_table_description],
+                [release.transform_sales_path, release.transform_traffic_path],
+            ):
+                uri = gcs_blob_uri(self.cloud_workspace.transform_bucket, gcs_blob_name_from_path(file_path))
+                table_id = bq_table_id(self.cloud_workspace.project_id, self.bq_dataset_id, table_name)
+                success = bq_load_table(
+                    uri=uri,
+                    table_id=table_id,
+                    schema_file_path=bq_find_schema(path=self.schema_folder, table_name=table_name),
+                    source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
+                    partition_type=TimePartitioningType.MONTH,
+                    partition=True,
+                    partition_field="release_date",
+                    table_description=table_description,
+                    ignore_unknown_values=True,
+                )
+                set_task_state(success, kwargs["ti"].task_id, release=release)
+
+    def add_new_dataset_releases(self, releases: List[GoogleBooksRelease], **kwargs) -> None:
+        """Adds release information to API."""
+
+        api = make_observatory_api(observatory_api_conn_id=self.observatory_api_conn_id)
+        for release in releases:
+            dataset_release = DatasetRelease(
+                dag_id=self.dag_id,
+                dataset_id=self.api_dataset_id,
+                dag_run_id=release.run_id,
+                data_interval_start=kwargs["data_interval_start"],
+                data_interval_end=kwargs["data_interval_end"],
+                partition_date=release.partition_date,
+            )
+            api.post_dataset_release(dataset_release)
+
+    def cleanup(self, releases: List[GoogleBooksRelease], **kwargs) -> None:
+        """Delete all files, folders and XComs associated with this release."""
+        for release in releases:
+            cleanup(
+                dag_id=self.dag_id, execution_date=kwargs["execution_date"], workflow_folder=release.workflow_folder
+            )
+
+
+def gb_transform(
+    download_files: Tuple[str, str], sales_path: str, traffic_path: str, release_date: pendulum.DateTime
+) -> None:
+    """Transforms sales and traffic reports. For both reports it transforms the csv into a jsonl file and
+    replaces spaces in the keys with underscores.
+
+    :param download_files: The Google Books Sales and Traffic files
+    :param sales_path: The file path to save the transformed sales data to
+    :param traffic_path: The file path to save the transformed traffic data to
+    :param release_date: The release date to use as a partitioning date
+    """
+    # Sort files to get same hash for unit tests
+
+    results = defaultdict(list)
+    for file in download_files:
+        report_type = "sales" if "sales" in file else "traffic"
+        with open(file, encoding="utf-16") as csv_file:
+            csv_reader = csv.DictReader(csv_file, delimiter="\t")
+            for row in csv_reader:
+                transformed_row = OrderedDict((convert(k.replace("%", "Perc")), v) for k, v in row.items())
+                # Sales transaction report
+                if report_type == "sales":
+                    transaction_date = pendulum.from_format(transformed_row["Transaction_Date"], "MM/DD/YY")
+
+                    # Sanity check that transaction date is in month of release date
+                    if release_date.start_of("month") <= transaction_date <= release_date.end_of("month"):
+                        pass
+                    else:
+                        raise AirflowException(
+                            "Transaction date does not fall within release month. "
+                            f"Transaction date: {transaction_date.strftime('%Y-%m-%d')}, "
+                            f"release month: {release_date.strftime('%Y-%m')}"
+                        )
+
+                    # Transform to valid date format
+                    transformed_row["Transaction_Date"] = transaction_date.strftime("%Y-%m-%d")
+
+                    # Remove percentage sign
+                    transformed_row["Publisher_Revenue_Perc"] = transformed_row["Publisher_Revenue_Perc"].strip("%")
+                    # This field is not present for some publishers (UCL Press), for ANU Press the field value is
+                    # “E-Book”
+                    try:
+                        transformed_row["Line_of_Business"]
+                    except KeyError:
+                        transformed_row["Line_of_Business"] = None
+                # Traffic report
+                else:
+                    # Remove percentage sign
+                    transformed_row["Buy_Link_CTR"] = transformed_row["Buy_Link_CTR"].strip("%")
+
+                # Append results
+                results[report_type].append(transformed_row)
+
+    for report_type, report_results in results.items():
+        report_results = add_partition_date(
+            report_results,
+            partition_date=release_date,
+            partition_type=TimePartitioningType.MONTH,
+            partition_field="release_date",
+        )
+        save_path = sales_path if report_type == "sales" else traffic_path
+        save_jsonl_gz(save_path, report_results)

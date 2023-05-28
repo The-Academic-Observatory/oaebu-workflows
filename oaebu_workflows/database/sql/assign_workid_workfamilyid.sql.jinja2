@@ -19,9 +19,9 @@ WITH orig_wid AS (
 SELECT
     orig.*, wid.work_id
 FROM
-    `{{ project_id }}.{{ orig_dataset }}.{{ orig_table }}` orig
+    `{{ orig_table_id }}` orig
 LEFT JOIN
-    `{{ project_id }}.{{ onix_workflow_dataset }}.{{ wid_table }}` wid
+    `{{  wid_table_id }}` wid
 ON
     orig.{{ orig_isbn }} = wid.isbn13
 )
@@ -31,6 +31,6 @@ SELECT
 FROM
     orig_wid
 LEFT JOIN
-    `{{ project_id }}.{{ onix_workflow_dataset }}.{{ wfam_table }}` wfam
+    `{{ wfam_table_id }}` wfam
 ON
     orig_wid.{{ orig_isbn }} = wfam.isbn13

@@ -126,7 +126,7 @@ FROM (
     safe.FORMAT_TIMESTAMP('%Y-%m', occurred_at) as month,
     source_id as source,
     COUNT(id) as count
-  FROM `{{ project_id }}.{{ crossref_dataset_id }}.{{ crossref_events_table_id }}`
+  FROM `{{ crossref_events_table_id }}`
   WHERE safe.FORMAT_TIMESTAMP('%Y-%m', occurred_at) is not null
   GROUP BY
   doi, source_id, month)
@@ -149,7 +149,7 @@ FROM
             is_referenced_by_count, subject, published_print, license, volume, funder, page, author, link, clinical_trial_number, alternative_id
     ) as crossref,
     (SELECT as STRUCT * from temp_intermediate_crossref_events as events WHERE events.doi = UPPER(TRIM(ref.doi))) as events
-  FROM `{{ project_id }}.{{ crossref_dataset_id }}.{{ crossref_metadata_table_id }}` as ref
+  FROM `{{ crossref_metadata_table_id }}` as ref
   WHERE ARRAY_LENGTH(issued.date_parts) > 0)),
 
 
