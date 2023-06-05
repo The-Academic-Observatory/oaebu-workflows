@@ -30,12 +30,16 @@ from oaebu_workflows.workflows.thoth_telescope import (
 )
 from oaebu_workflows.config import test_fixtures_folder
 from observatory.platform.api import get_dataset_releases
-from observatory.platform.files import load_jsonl
 from observatory.platform.bigquery import bq_sharded_table_id
 from observatory.platform.gcs import gcs_blob_name_from_path
 from observatory.platform.utils.url_utils import retry_get_url
 from observatory.platform.observatory_config import Workflow
-from observatory.platform.observatory_environment import ObservatoryEnvironment, ObservatoryTestCase, find_free_port
+from observatory.platform.observatory_environment import (
+    ObservatoryEnvironment,
+    ObservatoryTestCase,
+    find_free_port,
+    load_and_parse_json,
+)
 
 
 FAKE_PUBLISHER_ID = "fake_publisher_id"
@@ -149,7 +153,7 @@ class TestThothTelescope(ObservatoryTestCase):
                 )
 
                 # Downloaded file
-                self.assert_file_integrity(release.download_path, "78b8c27c9c63fb0f2d721b7d856f4e3c", "md5")
+                self.assert_file_integrity(release.download_path, "6d0f31c315dab144054e2fde9ad7f8ab", "md5")
 
                 # Uploaded download blob
                 self.assert_blob_integrity(
@@ -157,7 +161,7 @@ class TestThothTelescope(ObservatoryTestCase):
                 )
 
                 # Transformed file
-                self.assert_file_integrity(release.transform_path, "bda19178", "gzip_crc")
+                self.assert_file_integrity(release.transform_path, "f384ecd8", "gzip_crc")
 
                 # Uploaded transform blob
                 self.assert_blob_integrity(
@@ -172,7 +176,7 @@ class TestThothTelescope(ObservatoryTestCase):
                     release.snapshot_date,
                 )
                 self.assert_table_integrity(table_id, expected_rows=2)
-                self.assert_table_content(table_id, load_jsonl(self.test_table), primary_key="DOI")
+                self.assert_table_content(table_id, load_and_parse_json(self.test_table), primary_key="DOI")
 
                 # add_dataset_release_task
                 dataset_releases = get_dataset_releases(dag_id=telescope.dag_id, dataset_id=telescope.api_dataset_id)
@@ -200,7 +204,7 @@ class TestThothTelescope(ObservatoryTestCase):
                     FAKE_PUBLISHER_ID, download_path=os.path.join(tempdir, "fake_download.xml"), num_retries=0
                 )
             self.assert_file_integrity(
-                os.path.join(tempdir, "fake_download.xml"), "78b8c27c9c63fb0f2d721b7d856f4e3c", "md5"
+                os.path.join(tempdir, "fake_download.xml"), "6d0f31c315dab144054e2fde9ad7f8ab", "md5"
             )
 
     def test_thoth_api(self):

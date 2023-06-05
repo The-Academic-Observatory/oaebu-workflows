@@ -24,6 +24,7 @@ from google.cloud.bigquery import SourceFormat
 
 from oaebu_workflows.config import schema_folder as default_schema_folder
 from oaebu_workflows.workflows.onix_telescope import parse_onix, onix_collapse_subjects
+from oaebu_workflows.workflows.oapen_metadata_telescope import create_personname_field
 from observatory.api.client.model.dataset_release import DatasetRelease
 from observatory.platform.api import make_observatory_api
 from observatory.platform.airflow import AirflowConns
@@ -173,6 +174,7 @@ class ThothTelescope(Workflow):
         parse_onix(release.download_folder, release.transform_folder)
         logging.info("Transforming onix feed - collapsing keywords")
         transformed = onix_collapse_subjects(load_jsonl(os.path.join(release.transform_folder, "full.jsonl")))
+        transformed = create_personname_field(transformed)
         save_jsonl_gz(release.transform_path, transformed)
 
     def upload_transformed(self, release: ThothRelease, **kwargs) -> None:
