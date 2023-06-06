@@ -442,8 +442,6 @@ onix_ebook_titles_raw as (
             ) as authors
         ) as onix
     FROM `{{ onix_table_id }}` as onix
-
-    WHERE ProductForm = "Digital download and online" OR ProductForm = "Digital (delivered electronically)" OR ProductForm = "Digital download"
 ),
 
 {#
