@@ -15,16 +15,19 @@
 # Author: Keegan Smith
 
 import os
-from typing import List
 import logging
 
 import pendulum
 from airflow.exceptions import AirflowException
 from google.cloud.bigquery import SourceFormat
 
+from oaebu_workflows.onix import (
+    onix_parser_download,
+    onix_parser_execute,
+    onix_collapse_subjects,
+    onix_create_personname_field,
+)
 from oaebu_workflows.config import schema_folder as default_schema_folder
-from oaebu_workflows.workflows.onix_telescope import parse_onix, onix_collapse_subjects
-from oaebu_workflows.workflows.oapen_metadata_telescope import create_personname_field
 from observatory.api.client.model.dataset_release import DatasetRelease
 from observatory.platform.api import make_observatory_api
 from observatory.platform.airflow import AirflowConns
@@ -49,7 +52,6 @@ from observatory.platform.workflows.workflow import (
 
 
 THOTH_URL = "{host_name}/specifications/{format_specification}/publisher/{publisher_id}"
-DEFAULT_FORMAT_SPECIFICATION = "onix_3.0::oapen"
 DEFAULT_HOST_NAME = "https://export.thoth.pub"
 
 
@@ -78,13 +80,13 @@ class ThothTelescope(Workflow):
         dag_id: str,
         cloud_workspace: CloudWorkspace,
         publisher_id: str,
+        format_specification: str,
         bq_dataset_id: str = "onix",
         bq_table_name: str = "onix",
         bq_dataset_description: str = "Thoth ONIX Feed",
         bq_table_description: str = None,
         api_dataset_id: str = "onix",
         host_name: str = "https://export.thoth.pub",
-        format_specification: str = DEFAULT_FORMAT_SPECIFICATION,
         schema_folder: str = default_schema_folder(),
         observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
         catchup: bool = False,
@@ -94,14 +96,14 @@ class ThothTelescope(Workflow):
         """Construct an ThothOnixTelescope instance.
         :param dag_id: The ID of the DAG
         :param cloud_workspace: The CloudWorkspace object for this DAG
-        :param publisher_id: The Thoth ID for this piublisher
+        :param publisher_id: The Thoth ID for this publisher
+        :param format_specification: The Thoth ONIX/metadata format specification. e.g. "onix_3.0::oapen"
         :param bq_dataset_id: The BigQuery dataset ID
         :param bq_table_name: The BigQuery table name
         :param bq_dataset_description: Description for the BigQuery dataset
         :param bq_table_description: Description for the biguery table
         :param api_dataset_id: The ID to store the dataset release in the API
         :param host_name: The Thoth host name
-        :param format_specification: The Thoth ONIX/metadata format specification
         :param schema_folder: The path to the SQL schema folder
         :param observatory_api_conn_id: Airflow connection ID for the overvatory API
         :param catchup: Whether to catchup the DAG or not
@@ -170,11 +172,15 @@ class ThothTelescope(Workflow):
 
     def transform(self, release: ThothRelease, **kwargs) -> None:
         """Task to transform the Thoth ONIX data"""
-        logging.info("Parsing onix feed through onix parser")
-        parse_onix(release.download_folder, release.transform_folder)
+        success, parser_path = onix_parser_download()
+        set_task_state(success, task_id=kwargs["ti"].task_id, release=release)
+        success = onix_parser_execute(
+            parser_path, input_dir=release.download_folder, output_dir=release.transform_folder
+        )
+        set_task_state(success, task_id=kwargs["ti"].task_id, release=release)
         logging.info("Transforming onix feed - collapsing keywords")
         transformed = onix_collapse_subjects(load_jsonl(os.path.join(release.transform_folder, "full.jsonl")))
-        transformed = create_personname_field(transformed)
+        transformed = onix_create_personname_field(transformed)
         save_jsonl_gz(release.transform_path, transformed)
 
     def upload_transformed(self, release: ThothRelease, **kwargs) -> None:
@@ -226,18 +232,17 @@ class ThothTelescope(Workflow):
 def thoth_download_onix(
     publisher_id: str,
     download_path: str,
+    format_spec: str,
     host_name: str = DEFAULT_HOST_NAME,
-    format_spec: str = "onix_3.0::oapen",
     num_retries: int = 3,
 ) -> None:
     """Hits the Thoth API and requests the ONIX feed for a particular publisher.
     Creates a file called onix.xml at the specified location
 
     :param publisher_id: The ID of the publisher. Can be found using Thoth GraphiQL API
-    :param download_folder: The path of the download folder
-    :param download_filename: The name of the downloaded file
+    :param download_path: The path to download ONIX the file to
+    :param format_spec: The ONIX format specification to use. Options can be found with the /formats endpoint of the API
     :param host_name: The Thoth host URL
-    :param format_spec: The ONIX format to use. Options can be found with the /formats endpoint of the API
     :param num_retries: The number of times to retry the download, given an unsuccessful return code
     """
     url = THOTH_URL.format(host_name=host_name, format_specification=format_spec, publisher_id=publisher_id)

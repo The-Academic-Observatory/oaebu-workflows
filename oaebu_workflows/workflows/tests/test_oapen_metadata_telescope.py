@@ -27,14 +27,12 @@ from airflow.utils.state import State
 
 from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.workflows.oapen_metadata_telescope import (
-    OapenMetadataRelease,
     OapenMetadataTelescope,
     download_oapen_metadata,
     oapen_metadata_parse,
     remove_invalid_products,
     find_onix_product,
     process_xml_element,
-    create_personname_field,
 )
 from observatory.platform.api import get_dataset_releases
 from observatory.platform.observatory_config import Workflow
@@ -372,24 +370,3 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
         assert (
             expected_xml == test_xml
         ), f"Processed XML is not equal to expected XML. Expected {expected_xml}, got {test_xml}"
-
-    def test_create_personname_field(self):
-        """Tests the function that creates the personname field"""
-        input_onix = [
-            {"Contributors": [{"PersonName": "John Doe", "KeyNames": None, "NamesBeforeKey": None}]},
-            {"Contributors": [{"PersonName": None, "KeyNames": "Doe", "NamesBeforeKey": "John"}]},
-            {"Contributors": [{"PersonName": None, "KeyNames": "Doe", "NamesBeforeKey": None}]},
-            {"Contributors": [{"PersonName": None, "KeyNames": None, "NamesBeforeKey": None}]},
-            {"empty": "empty"},
-        ]
-        expected_out = [
-            {"Contributors": [{"PersonName": "John Doe", "KeyNames": None, "NamesBeforeKey": None}]},
-            {"Contributors": [{"PersonName": "John Doe", "KeyNames": "Doe", "NamesBeforeKey": "John"}]},
-            {"Contributors": [{"PersonName": None, "KeyNames": "Doe", "NamesBeforeKey": None}]},
-            {"Contributors": [{"PersonName": None, "KeyNames": None, "NamesBeforeKey": None}]},
-            {"empty": "empty"},
-        ]
-        output_onix = create_personname_field(input_onix)
-        self.assertEqual(len(output_onix), len(expected_out))
-        for actual, expected in zip(output_onix, expected_out):
-            self.assertDictEqual(actual, expected)
