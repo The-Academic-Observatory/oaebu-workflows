@@ -90,7 +90,6 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
                     name="My Google Books Telescope",
                     class_name="oaebu_workflows.workflows.google_books_telescope.GoogleBooksTelescope",
                     cloud_workspace=self.fake_cloud_workspace,
-                    kwargs=dict(sftp_root="/telescopes/google_books/test"),
                 )
             ]
         )
@@ -301,7 +300,7 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
             telescope = GoogleBooksTelescope(
                 dag_id="google_books_test",
                 cloud_workspace=self.fake_cloud_workspace,
-                sftp_root=os.getcwd(),
+                sftp_root="/",
                 bq_dataset_id="dataset_id",
             )
             sales_file_path = test_fixtures_folder("google_books", "GoogleSalesTransactionReport_2020_02.csv")

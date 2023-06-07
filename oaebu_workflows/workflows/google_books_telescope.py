@@ -74,7 +74,7 @@ class GoogleBooksTelescope(Workflow):
         self,
         dag_id: str,
         cloud_workspace: CloudWorkspace,
-        sftp_root: str,
+        sftp_root: str = "/",
         bq_dataset_id: str = "google",
         bq_dataset_description: str = "Data from Google sources",
         bq_sales_table_name: str = "google_books_sales",
