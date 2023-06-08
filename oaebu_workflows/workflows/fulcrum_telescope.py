@@ -20,7 +20,7 @@ from typing import List, Tuple
 
 import pendulum
 from airflow.hooks.base import BaseHook
-from google.cloud.bigquery import SourceFormat
+from google.cloud.bigquery import SourceFormat, WriteDisposition
 from google.cloud.bigquery.table import TimePartitioningType
 
 from oaebu_workflows.config import schema_folder as default_schema_folder
@@ -219,7 +219,9 @@ class FulcrumTelescope(Workflow):
             schema_file_path=schema_file_path,
             source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
             table_description=self.bq_table_description,
+            partition=True,
             partition_type=TimePartitioningType.MONTH,
+            write_disposition=WriteDisposition.WRITE_APPEND,
             partition_field="release_date",
             ignore_unknown_values=True,
         )

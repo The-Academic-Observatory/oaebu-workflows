@@ -23,7 +23,7 @@ from typing import Dict, List, Tuple
 import pendulum
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.hooks.base import BaseHook
-from google.cloud.bigquery import TimePartitioningType, SourceFormat
+from google.cloud.bigquery import TimePartitioningType, SourceFormat, WriteDisposition
 from googleapiclient.discovery import Resource, build
 from oauth2client.service_account import ServiceAccountCredentials
 
@@ -244,6 +244,7 @@ class GoogleAnalyticsTelescope(Workflow):
                 partition_type=TimePartitioningType.MONTH,
                 partition=True,
                 partition_field="release_date",
+                write_disposition=WriteDisposition.WRITE_APPEND,
                 table_description=self.bq_table_description,
                 ignore_unknown_values=True,
             )
