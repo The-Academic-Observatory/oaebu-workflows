@@ -23,7 +23,7 @@ from typing import List, Tuple
 
 import pendulum
 from airflow.exceptions import AirflowSkipException
-from google.cloud.bigquery import SourceFormat, TimePartitioningType
+from google.cloud.bigquery import SourceFormat, TimePartitioningType, WriteDisposition
 
 from oaebu_workflows.config import schema_folder as default_schema_folder
 from observatory.api.client.model.dataset_release import DatasetRelease
@@ -223,6 +223,7 @@ class UclDiscoveryTelescope(Workflow):
                 partition_type=TimePartitioningType.MONTH,
                 partition=True,
                 partition_field="release_date",
+                write_disposition=WriteDisposition.WRITE_APPEND,
                 table_description=self.bq_table_description,
                 ignore_unknown_values=True,
             )

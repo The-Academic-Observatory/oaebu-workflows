@@ -27,7 +27,7 @@ from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.hooks.base import BaseHook
 from google.auth import environment_vars
 from google.auth.transport.requests import AuthorizedSession
-from google.cloud.bigquery import TimePartitioningType, SourceFormat
+from google.cloud.bigquery import TimePartitioningType, SourceFormat, WriteDisposition
 from google.oauth2.service_account import IDTokenCredentials
 from googleapiclient.discovery import Resource, build
 from googleapiclient.errors import HttpError
@@ -372,6 +372,7 @@ class OapenIrusUkTelescope(Workflow):
                 partition_type=TimePartitioningType.MONTH,
                 partition=True,
                 partition_field="release_date",
+                write_disposition=WriteDisposition.WRITE_APPEND,
                 table_description=self.bq_table_description,
                 ignore_unknown_values=True,
             )
