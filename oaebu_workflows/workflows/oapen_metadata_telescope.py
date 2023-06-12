@@ -32,7 +32,7 @@ from onixcheck import validate as validate_onix
 from tenacity import retry, stop_after_attempt, wait_chain, wait_fixed, retry_if_exception_type
 from google.cloud.bigquery import SourceFormat
 
-from oaebu_workflows.workflows.onix_telescope import parse_onix
+from oaebu_workflows.onix import onix_parser_download, onix_parser_execute, onix_create_personname_field
 from oaebu_workflows.config import schema_folder as default_schema_folder
 from observatory.api.client.model.dataset_release import DatasetRelease
 from observatory.platform.api import make_observatory_api
@@ -195,10 +195,13 @@ class OapenMetadataTelescope(Workflow):
             if validate_onix(validated_onix):
                 raise AirflowException("Errors found in processed OAPEN ONIX file. Cannot proceed without valid ONIX.")
             # Parse the onix file through the Java parser - should result in release.post_parse_onix file
-            parse_onix(tmp_dir, release.transform_folder)
+            success, parser_path = onix_parser_download()
+            set_task_state(success, task_id=kwargs["ti"].task_id, release=release)
+            success = onix_parser_execute(parser_path, input_dir=tmp_dir, output_dir=release.transform_folder)
+            set_task_state(success, task_id=kwargs["ti"].task_id, release=release)
 
         # Add the Contributors.PersonName field
-        onix = create_personname_field(load_jsonl(release.post_parse_onix))
+        onix = onix_create_personname_field(load_jsonl(release.post_parse_onix))
         save_jsonl_gz(release.transform_path, onix)
 
     def upload_transformed(self, release: OapenMetadataRelease, **kwargs) -> None:
@@ -456,21 +459,3 @@ def process_xml_element(xml_elem: ElementTree.Element, viable_fields: dict, xml_
             if e.tag.endswith(field_key):
                 child = ElementTree.SubElement(xml_parent, field_key)
                 process_xml_element(e, viable_fields[field_key], child)
-
-
-def create_personname_field(onix: List[dict]) -> List[dict]:
-    """Given an ONIX feed, attempts to populate the Contributors.PersonName field by concatenating the
-    Contributors.NamesBeforeKey and Contributors.KeyNames fields where possible
-
-    :param onix: The input onix feed
-    :return: The onix feed with the PersonName field populated where possible
-    """
-
-    def _can_make_personname(contributor: dict) -> bool:
-        return contributor.get("KeyNames") and contributor.get("NamesBeforeKey") and not contributor.get("PersonName")
-
-    for entry in [i for i in onix if i.get("Contributors")]:
-        for c in entry["Contributors"]:
-            if _can_make_personname(c) and not c.get("PersonName"):
-                c["PersonName"] = f"{c['NamesBeforeKey']} {c['KeyNames']}"
-    return onix

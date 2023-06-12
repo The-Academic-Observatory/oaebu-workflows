@@ -17,8 +17,7 @@
 import logging
 import os
 import re
-import subprocess
-from typing import Dict, List
+from typing import List
 
 import pendulum
 from airflow.exceptions import AirflowException
@@ -26,16 +25,14 @@ from airflow.models.taskinstance import TaskInstance
 from google.cloud.bigquery import SourceFormat
 
 from oaebu_workflows.config import schema_folder as default_schema_folder
+from oaebu_workflows.onix import onix_collapse_subjects, onix_parser_download, onix_parser_execute
 from observatory.api.client.model.dataset_release import DatasetRelease
 from observatory.platform.api import make_observatory_api
 from observatory.platform.airflow import AirflowConns
 from observatory.platform.files import load_jsonl, save_jsonl_gz
 from observatory.platform.gcs import gcs_blob_uri, gcs_upload_files, gcs_blob_name_from_path
 from observatory.platform.bigquery import bq_find_schema, bq_load_table, bq_sharded_table_id, bq_create_dataset
-from observatory.platform.utils.http_download import download_file
-from observatory.platform.utils.proc_utils import wait_for_process
 from observatory.platform.observatory_config import CloudWorkspace
-from observatory.platform.config import observatory_home
 from observatory.platform.sftp import SftpFolders, make_sftp_connection
 from observatory.platform.workflows.workflow import (
     SnapshotRelease,
@@ -44,9 +41,6 @@ from observatory.platform.workflows.workflow import (
     set_task_state,
     check_workflow_inputs,
 )
-
-ONIX_PARSER_NAME = "coki-onix-parser.jar"
-ONIX_PARSER_URL = "https://github.com/The-Academic-Observatory/onix-parser/releases/download/v1.3.0/coki-onix-parser-1.2-SNAPSHOT-shaded.jar"
 
 
 class OnixRelease(SnapshotRelease):
@@ -68,6 +62,7 @@ class OnixRelease(SnapshotRelease):
         super().__init__(dag_id=dag_id, run_id=run_id, snapshot_date=snapshot_date)
         self.onix_file_name = onix_file_name
         self.download_path = os.path.join(self.download_folder, self.onix_file_name)
+        self.parsed_path = os.path.join(self.transform_folder, "full.jsonl")
         self.transform_path = os.path.join(self.transform_folder, "onix.jsonl.gz")
 
 
@@ -77,8 +72,8 @@ class OnixTelescope(Workflow):
         *,
         dag_id: str,
         cloud_workspace: CloudWorkspace,
-        sftp_root: str,
         date_regex: str,
+        sftp_root: str = "/",
         bq_dataset_id: str = "onix",
         bq_table_name: str = "onix",
         bq_dataset_description: str = "ONIX data provided by Org",
@@ -94,7 +89,7 @@ class OnixTelescope(Workflow):
         """Construct an OnixTelescope instance.
         :param dag_id: The ID of the DAG
         :param cloud_workspace: The CloudWorkspace object for this DAG
-        :param sftp_root: The working root of the SFTP server
+        :param sftp_root: The working root of the SFTP server, passed to the SftoFolders class
         :param date_regex: Regular expression for extracting a date string from an ONIX file name
         :param bq_dataset_id: The BigQuery dataset ID
         :param bq_table_name: The BigQuery table name
@@ -222,11 +217,13 @@ class OnixTelescope(Workflow):
 
     def transform(self, releases: List[OnixRelease], **kwargs):
         """Task to transform the ONIX releases."""
-
-        # Transform each release
+        success, parser_path = onix_parser_download()
+        set_task_state(success, kwargs["ti"].task_id)
         for release in releases:
-            parse_onix(release.download_folder, release.transform_folder)
-            onix = onix_collapse_subjects(load_jsonl(os.path.join(release.transform_folder, "full.jsonl")))
+            onix_parser_execute(
+                parser_path=parser_path, input_dir=release.download_folder, output_dir=release.transform_folder
+            )
+            onix = onix_collapse_subjects(load_jsonl(release.parsed_path))
             save_jsonl_gz(release.transform_path, onix)
 
     def upload_transformed(self, releases: List[OnixRelease], **kwargs):
@@ -284,73 +281,3 @@ class OnixTelescope(Workflow):
             cleanup(
                 dag_id=self.dag_id, execution_date=kwargs["execution_date"], workflow_folder=release.workflow_folder
             )
-
-
-def parse_onix(input_dir: str, output_dir: str) -> None:
-    """Runs the onix parser on an onix file/files
-
-    :param input_dir: The directory containing the onix input
-    :param output_dir: The directory to output the parsed onix file
-    :raises AirflowException: Raised if the subprocess fails for any reason
-    """
-
-    # Download ONIX Parser
-    bin_path = observatory_home("bin")
-    filename = os.path.join(bin_path, ONIX_PARSER_NAME)
-    download_file(
-        url=ONIX_PARSER_URL,
-        filename=filename,
-    )
-
-    cmd = f"java -jar {ONIX_PARSER_NAME} {input_dir} {output_dir}"
-    p = subprocess.Popen(
-        cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, executable="/bin/bash", cwd=bin_path
-    )
-    stdout, stderr = wait_for_process(p)
-
-    if stdout:
-        logging.info(stdout)
-
-    if p.returncode != 0:
-        raise AirflowException(f"bash command failed `{cmd}`: {stderr}")
-
-
-def onix_collapse_subjects(onix: List[dict]) -> List[dict]:
-    """The book product table creation requires the keywords (under Subjects.SubjectHeadingText) to occur only once
-    Some ONIX feeds return all keywords as separate entires. This function finds and collapses each keyword into a
-    semi-colon separated string. Other common separators will be replaced with semi-colons.
-
-    :param onix: The onix feed
-    :return: The onix feed after collapsing the keywords of each row
-    """
-    for row in onix:
-        # Create the joined keywords in this row
-        keywords = []
-        for subject in row["Subjects"]:
-            if subject["SubjectSchemeIdentifier"] != "Keywords":
-                continue
-            subject_heading_text = [i for i in subject["SubjectHeadingText"] if i is not None]  # Remove Nones
-            if not subject_heading_text:  # Empty list
-                continue
-            keywords.append("; ".join(subject_heading_text))
-        # Enforce a split by semicolon
-        keywords = "; ".join(keywords)
-        keywords = keywords.replace(",", ";")
-        keywords = keywords.replace(":", ";")
-
-        # Replace one of the subrows with the new keywords string
-        keywords_replaced = False
-        remove_indexes = []
-        for i, subject in enumerate(row["Subjects"]):
-            if subject["SubjectSchemeIdentifier"] == "Keywords":
-                if not keywords_replaced:
-                    subject["SubjectHeadingText"] = [keywords]
-                    keywords_replaced = True
-                else:
-                    remove_indexes.append(i)
-
-        # Remove additional "keywords" subrows
-        for i in sorted(remove_indexes, reverse=True):
-            del row["Subjects"][i]
-
-    return onix

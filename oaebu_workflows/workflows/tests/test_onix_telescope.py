@@ -16,15 +16,13 @@
 
 import os
 import shutil
-from tempfile import TemporaryDirectory
-import json
 
 import pendulum
 from airflow.models import Connection
 from airflow.utils.state import State
 
+from oaebu_workflows.workflows.onix_telescope import OnixTelescope, OnixRelease
 from oaebu_workflows.config import test_fixtures_folder
-from oaebu_workflows.workflows.onix_telescope import OnixTelescope, OnixRelease, parse_onix, onix_collapse_subjects
 from observatory.platform.api import get_dataset_releases
 from observatory.platform.bigquery import bq_sharded_table_id
 from observatory.platform.gcs import gcs_blob_name_from_path
@@ -51,7 +49,7 @@ class TestOnixTelescope(ObservatoryTestCase):
         super(TestOnixTelescope, self).__init__(*args, **kwargs)
         self.project_id = os.getenv("TEST_GCP_PROJECT_ID")
         self.data_location = os.getenv("TEST_GCP_DATA_LOCATION")
-        self.sftp_root = "/telescopes/oinx/test"
+        self.sftp_root = "/"
         self.date_regex = "\\d{8}"
         self.sftp_port = find_free_port()
 
@@ -92,7 +90,7 @@ class TestOnixTelescope(ObservatoryTestCase):
                     name="ONIX Telescope",
                     class_name="oaebu_workflows.workflows.onix_telescope.OnixTelescope",
                     cloud_workspace=self.fake_cloud_workspace,
-                    kwargs=dict(date_regex=self.date_regex, sftp_root=self.sftp_root),
+                    kwargs=dict(date_regex=self.date_regex),
                 )
             ],
         )
@@ -105,9 +103,8 @@ class TestOnixTelescope(ObservatoryTestCase):
             with self.assertRaises(AssertionError) as cm:
                 self.assert_dag_load_from_config("onix")
             msg = cm.exception.args[0]
-            self.assertTrue("missing 2 required keyword-only arguments" in msg)
+            self.assertTrue("missing 1 required keyword-only argument" in msg)
             self.assertTrue("date_regex" in msg)
-            self.assertTrue("sftp_root" in msg)
 
     def test_telescope(self):
         """Test the ONIX telescope end to end."""
@@ -232,29 +229,3 @@ class TestOnixTelescope(ObservatoryTestCase):
                 ti = env.run_task(telescope.cleanup.__name__)
                 self.assertEqual(ti.state, State.SUCCESS)
                 self.assert_cleanup(release.workflow_folder)
-
-    def test_onix_parser(self):
-        """Tests the parse_onix function"""
-        with TemporaryDirectory() as tempdir:
-            input_dir = os.path.join(tempdir, "input")
-            output_dir = os.path.join(tempdir, "output")
-            os.mkdir(input_dir)
-            os.mkdir(output_dir)
-            shutil.copy(self.onix_test_path, input_dir)
-            parse_onix(input_dir, output_dir)
-            output_file = os.path.join(output_dir, "full.jsonl")
-            self.assertTrue(os.path.exists(output_file))
-            self.assert_file_integrity(output_file, "84d46e2942df615f18d270e18e0ebb26", "md5")
-
-    def test_onix_collapse_subjects(self):
-        """Tests the thoth_collapse_subjects function"""
-        test_subjects_input = os.path.join(test_fixtures_folder("onix"), "test_subjects_input.json")
-        test_subjects_expected = os.path.join(test_fixtures_folder("onix"), "test_subjects_expected.json")
-        with open(test_subjects_input, "r") as f:
-            onix = json.load(f)
-        actual_onix = onix_collapse_subjects(onix)
-        with open(test_subjects_expected, "r") as f:
-            expected_onix = json.load(f)
-
-        self.assertEqual(len(actual_onix), len(expected_onix))
-        self.assertEqual(json.dumps(actual_onix, sort_keys=True), json.dumps(expected_onix, sort_keys=True))

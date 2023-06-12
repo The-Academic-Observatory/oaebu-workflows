@@ -23,9 +23,7 @@ from airflow.utils.state import State
 
 from oaebu_workflows.workflows.thoth_telescope import (
     ThothTelescope,
-    ThothRelease,
     thoth_download_onix,
-    DEFAULT_FORMAT_SPECIFICATION,
     DEFAULT_HOST_NAME,
 )
 from oaebu_workflows.config import test_fixtures_folder
@@ -69,6 +67,7 @@ class TestThothTelescope(ObservatoryTestCase):
             dag_id="thoth_telescope_test",
             cloud_workspace=self.fake_cloud_workspace,
             publisher_id=FAKE_PUBLISHER_ID,
+            format_specification="onix_3.0::jstor",
         ).make_dag()
 
         self.assert_dag_structure(
@@ -94,7 +93,7 @@ class TestThothTelescope(ObservatoryTestCase):
                     name="Thoth Telescope",
                     class_name="oaebu_workflows.workflows.thoth_telescope.ThothTelescope",
                     cloud_workspace=self.fake_cloud_workspace,
-                    kwargs=dict(publisher_id=FAKE_PUBLISHER_ID),
+                    kwargs=dict(publisher_id=FAKE_PUBLISHER_ID, format_specification="onix::oapen"),
                 )
             ],
         )
@@ -107,8 +106,9 @@ class TestThothTelescope(ObservatoryTestCase):
             with self.assertRaises(AssertionError) as cm:
                 self.assert_dag_load_from_config("onix_workflow_test_dag_load")
             msg = cm.exception.args[0]
-            self.assertTrue("missing 1 required keyword-only argument" in msg)
-            self.assertTrue("publisher_id" in msg)
+            self.assertIn("missing 2 required keyword-only arguments", msg)
+            self.assertIn("publisher_id", msg)
+            self.assertIn("format_specification", msg)
 
     def test_telescope(self):
         """Test the Thoth telescope end to end."""
@@ -124,6 +124,7 @@ class TestThothTelescope(ObservatoryTestCase):
             telescope = ThothTelescope(
                 dag_id="thoth_telescope_test",
                 cloud_workspace=env.cloud_workspace,
+                format_specification="onix_3.0::oapen",
                 publisher_id=FAKE_PUBLISHER_ID,
                 bq_dataset_id=dataset_id,
             )
@@ -201,7 +202,10 @@ class TestThothTelescope(ObservatoryTestCase):
             thoth_vcr = vcr.VCR(record_mode="none")
             with thoth_vcr.use_cassette(self.download_cassette):
                 thoth_download_onix(
-                    FAKE_PUBLISHER_ID, download_path=os.path.join(tempdir, "fake_download.xml"), num_retries=0
+                    FAKE_PUBLISHER_ID,
+                    download_path=os.path.join(tempdir, "fake_download.xml"),
+                    num_retries=0,
+                    format_spec="onix_3.0::oapen",
                 )
             self.assert_file_integrity(
                 os.path.join(tempdir, "fake_download.xml"), "6d0f31c315dab144054e2fde9ad7f8ab", "md5"
@@ -210,8 +214,6 @@ class TestThothTelescope(ObservatoryTestCase):
     def test_thoth_api(self):
         """Tests that HTTP requests to the thoth API are successful"""
         base_response = retry_get_url(DEFAULT_HOST_NAME, num_retries=2)
-        format_response = retry_get_url(
-            f"{DEFAULT_HOST_NAME}/specifications/{DEFAULT_FORMAT_SPECIFICATION}", num_retries=2
-        )
+        format_response = retry_get_url(f"{DEFAULT_HOST_NAME}/specifications/onix_3.0::oapen", num_retries=2)
         self.assertEqual(base_response.status_code, 200)
         self.assertEqual(format_response.status_code, 200)
