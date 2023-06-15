@@ -331,8 +331,10 @@ def gb_transform(
     # Sort files to get same hash for unit tests
 
     results = defaultdict(list)
+    results["sales"] = []
+    results["traffic"] = []
     for file in download_files:
-        report_type = "sales" if "sales" in file else "traffic"
+        report_type = "sales" if "sales" in os.path.basename(file).lower() else "traffic"
         with open(file, encoding="utf-16") as csv_file:
             csv_reader = csv.DictReader(csv_file, delimiter="\t")
             for row in csv_reader:
@@ -378,4 +380,5 @@ def gb_transform(
             partition_field="release_date",
         )
         save_path = sales_path if report_type == "sales" else traffic_path
+        print(f"SAVING REPORT '{report_type}' to {save_path}")
         save_jsonl_gz(save_path, report_results)
