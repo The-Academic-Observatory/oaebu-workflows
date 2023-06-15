@@ -38,7 +38,12 @@ from observatory.platform.api import get_dataset_releases
 from observatory.platform.observatory_config import Workflow
 from observatory.platform.gcs import gcs_blob_name_from_path
 from observatory.platform.bigquery import bq_sharded_table_id
-from observatory.platform.observatory_environment import ObservatoryEnvironment, ObservatoryTestCase, find_free_port
+from observatory.platform.observatory_environment import (
+    ObservatoryEnvironment,
+    ObservatoryTestCase,
+    find_free_port,
+    load_and_parse_json,
+)
 
 
 class TestOapenMetadataTelescope(ObservatoryTestCase):
@@ -63,7 +68,7 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
             "oapen_metadata", "oapen_metadata_cassette_header_only.yaml"
         )
 
-        # XML files for testing
+        # Files for testing
         self.valid_download_xml = test_fixtures_folder("oapen_metadata", "oapen_metadata_download_valid.xml")
         self.invalid_download_xml = test_fixtures_folder("oapen_metadata", "oapen_metadata_download_invalid.xml")
         self.empty_xml = test_fixtures_folder("oapen_metadata", "oapen_metadata_download_empty.xml")
@@ -73,6 +78,7 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
         self.processing_test_before = test_fixtures_folder("oapen_metadata", "processing_test_before.xml")
         self.processing_test_after = test_fixtures_folder("oapen_metadata", "processing_test_after.xml")
         self.invalid_products_xml = test_fixtures_folder("oapen_metadata", "oapen_metadata_invalid_products.xml")
+        self.parsed_json = test_fixtures_folder("oapen_metadata", "oapen_metadata_parsed.json")
         # Valid fields json for the xml processing test
         self.processing_test_fields = test_fixtures_folder("oapen_metadata", "processing_test_valid_fields.json")
 
@@ -204,6 +210,7 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
                     release.snapshot_date,
                 )
                 self.assert_table_integrity(table_id, expected_rows=2)
+                self.assert_table_content(table_id, load_and_parse_json(self.parsed_json), primary_key="ISBN13")
 
                 # Add_dataset_release_task
                 dataset_releases = get_dataset_releases(dag_id=telescope.dag_id, dataset_id=telescope.api_dataset_id)

@@ -58,7 +58,7 @@ class TestThothTelescope(ObservatoryTestCase):
 
         # Fixtures
         self.download_cassette = os.path.join(test_fixtures_folder("thoth"), "thoth_download_cassette.yaml")
-        self.test_table = os.path.join(test_fixtures_folder("thoth"), "test_table.jsonl")
+        self.test_table = os.path.join(test_fixtures_folder("thoth"), "test_table.json")
 
     def test_dag_structure(self):
         """Test that the ONIX DAG has the correct structure."""
@@ -177,7 +177,7 @@ class TestThothTelescope(ObservatoryTestCase):
                     release.snapshot_date,
                 )
                 self.assert_table_integrity(table_id, expected_rows=2)
-                self.assert_table_content(table_id, load_and_parse_json(self.test_table), primary_key="DOI")
+                self.assert_table_content(table_id, load_and_parse_json(self.test_table), primary_key="ISBN13")
 
                 # add_dataset_release_task
                 dataset_releases = get_dataset_releases(dag_id=telescope.dag_id, dataset_id=telescope.api_dataset_id)
