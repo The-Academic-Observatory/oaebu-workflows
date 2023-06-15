@@ -17,24 +17,19 @@
 import gzip
 import json
 import os
-from datetime import datetime, timedelta
 from unittest.mock import patch
 
 import pendulum
 from airflow.models import Connection
 from airflow.utils.state import State
-from croniter import croniter
 from googleapiclient.discovery import build
 from googleapiclient.http import HttpMockSequence
 
-from oaebu_workflows.workflows.google_analytics_telescope import (
-    GoogleAnalyticsRelease,
-    GoogleAnalyticsTelescope,
-)
+from oaebu_workflows.workflows.google_analytics_telescope import GoogleAnalyticsTelescope
 from observatory.platform.api import get_dataset_releases
 from observatory.platform.observatory_config import Workflow
 from observatory.platform.gcs import gcs_blob_name_from_path
-from observatory.platform.bigquery import bq_table_id
+from observatory.platform.bigquery import bq_table_id, bq_find_schema
 from observatory.platform.observatory_environment import (
     ObservatoryEnvironment,
     ObservatoryTestCase,
@@ -161,7 +156,11 @@ class TestGoogleAnalyticsTelescope(ObservatoryTestCase):
                 self.assertEqual(ti.state, State.SUCCESS)
 
                 # Test that data loaded into BigQuery
-                ti = env.run_task(telescope.bq_load.__name__)
+                with patch("oaebu_workflows.workflows.google_analytics_telescope.bq_find_schema") as mock_schema:
+                    mock_schema.return_value = bq_find_schema(
+                        path=telescope.schema_folder, table_name=telescope.bq_table_name
+                    )
+                    ti = env.run_task(telescope.bq_load.__name__)
                 self.assertEqual(ti.state, State.SUCCESS)
 
                 ### Make Assertions ###

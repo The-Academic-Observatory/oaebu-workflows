@@ -236,10 +236,13 @@ class GoogleAnalyticsTelescope(Workflow):
         for release in releases:
             uri = gcs_blob_uri(self.cloud_workspace.transform_bucket, gcs_blob_name_from_path(release.transform_path))
             table_id = bq_table_id(self.cloud_workspace.project_id, self.bq_dataset_id, self.bq_table_name)
+            schema_prefix = self.organisation_name.lower().replace(" ", "_") + "_"
+            schema = bq_find_schema(path=self.schema_folder, table_name=self.bq_table_name, prefix=schema_prefix)
+            assert schema, "No schema found. Cannot proceed."
             state = bq_load_table(
                 uri=uri,
                 table_id=table_id,
-                schema_file_path=bq_find_schema(path=self.schema_folder, table_name=self.bq_table_name),
+                schema_file_path=schema,
                 source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
                 partition_type=TimePartitioningType.MONTH,
                 partition=True,
