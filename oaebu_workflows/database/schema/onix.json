@@ -18,6 +18,12 @@
     "description": "An ONIX description which indicates the type of source which has issued the ONIX record. Optional and non-\nrepeating, independently of the occurrence of any other field."
   },
   {
+    "mode": "NULLABLE",
+    "name": "LCCN",
+    "type": "STRING",
+    "description": "Library of Congress Control Number"
+  },
+  {
     "fields": [
       {
         "fields": [

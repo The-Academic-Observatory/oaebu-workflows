@@ -33,6 +33,7 @@ from observatory.platform.observatory_environment import (
     ObservatoryTestCase,
     SftpServer,
     find_free_port,
+    load_and_parse_json,
 )
 
 
@@ -54,7 +55,8 @@ class TestOnixTelescope(ObservatoryTestCase):
         self.sftp_port = find_free_port()
 
         # Test file
-        self.onix_test_path = test_fixtures_folder("onix", "20210330_CURTINPRESS_ONIX.xml")
+        self.onix_xml_path = test_fixtures_folder("onix", "20210330_CURTINPRESS_ONIX.xml")
+        self.onix_json_path = test_fixtures_folder("onix", "20210330_CURTINPRESS_ONIX.json")
 
     def test_dag_structure(self):
         """Test that the ONIX DAG has the correct structure."""
@@ -143,9 +145,9 @@ class TestOnixTelescope(ObservatoryTestCase):
                 # Add ONIX file to SFTP server
                 local_sftp_folders = SftpFolders(telescope.dag_id, telescope.sftp_service_conn_id, sftp_root)
                 os.makedirs(local_sftp_folders.upload, exist_ok=True)
-                onix_file_name = os.path.basename(self.onix_test_path)
+                onix_file_name = os.path.basename(self.onix_xml_path)
                 onix_file_dst = os.path.join(local_sftp_folders.upload, onix_file_name)
-                shutil.copy(self.onix_test_path, onix_file_dst)
+                shutil.copy(self.onix_xml_path, onix_file_dst)
 
                 # Get release info from SFTP server and check that the correct release info is returned via Xcom
                 ti = env.run_task(telescope.list_release_info.__name__)
@@ -209,6 +211,7 @@ class TestOnixTelescope(ObservatoryTestCase):
                     release.snapshot_date,
                 )
                 self.assert_table_integrity(table_id, expected_rows=1)
+                self.assert_table_content(table_id, load_and_parse_json(self.onix_json_path), primary_key="ISBN13")
 
                 # Test move files to finished
                 ti = env.run_task(telescope.move_files_to_finished.__name__)
