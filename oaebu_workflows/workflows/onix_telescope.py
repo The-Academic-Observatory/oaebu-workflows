@@ -153,7 +153,7 @@ class OnixTelescope(Workflow):
         with make_sftp_connection(self.sftp_service_conn_id) as sftp:
             files = sftp.listdir(self.sftp_folders.upload)
             for file_name in files:
-                if re.match(self.date_regex, file_name):
+                if re.match(r"^.*\.(onx|xml)$", file_name):
                     try:
                         date_str = re.search(self.date_regex, file_name).group(0)
                     except AttributeError:
