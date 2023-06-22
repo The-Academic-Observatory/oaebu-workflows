@@ -126,7 +126,7 @@ class OnixWorkflow(Workflow):
         cloud_workspace: CloudWorkspace,
         # Bigquery parameters
         bq_master_crossref_project_id: str = "academic-observatory",
-        bq_master_crossref_dataset_id: str = "crossref",
+        bq_master_crossref_dataset_id: str = "crossref_metadata",
         bq_oaebu_crossref_dataset_id: str = "crossref",
         bq_master_crossref_metadata_table_name: str = "crossref_metadata",
         bq_oaebu_crossref_metadata_table_name: str = "crossref_metadata",
