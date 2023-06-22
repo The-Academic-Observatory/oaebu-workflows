@@ -32,7 +32,7 @@
   {
     "description": "The investigated month.",
     "mode": "NULLABLE",
-    "name": "month",
+    "name": "event_month",
     "type": "DATE"
   },
   {

@@ -13,15 +13,14 @@
 # limitations under the License.
 #
 #
-# Author: Tuan Chien & Richard Hosking
+# Author: Tuan Chien, Richard Hosking, Keegan Smith
 
 import os
 from datetime import timedelta
 from typing import List, Optional, Tuple, Union
-import json
 import re
-
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
 import pendulum
 from airflow.exceptions import AirflowException
 from google.cloud.bigquery import SourceFormat, Client
