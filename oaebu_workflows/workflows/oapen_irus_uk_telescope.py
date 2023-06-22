@@ -21,6 +21,8 @@ import os
 import time
 from typing import Dict, List, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor
+from random import randint
+from time import sleep
 
 import pendulum
 import requests
@@ -124,12 +126,13 @@ class OapenIrusUkTelescope(Workflow):
         "https://github.com/The-Academic-Observatory/oapen-irus-uk-cloud-function/releases/"
         "download/v1.2.0-alpha/oapen-irus-uk-cloud-function.zip"
     )  # URL to the zipped source code of the cloud function
-    FUNCTION_MD5_HASH = "5e22fb664721e9a34d50bb25e56a5592"  # MD5 hash of the zipped source code
+    FUNCTION_MD5_HASH = "db2179ff45ed7e96ad5914915599a88c"  # MD5 hash of the zipped source code
     FUNCTION_BLOB_NAME = "cloud_function_source_code.zip"  # blob name of zipped source code
-    FUNCTION_TIMEOUT = 1800  # Timeout of cloud function in seconds. Maximum of 30 minutes
+    FUNCTION_TIMEOUT = 3600  # Timeout of cloud function in seconds. Maximum of 30 minutes
     # see https://cloud.google.com/functions/docs/2nd-gen/overview#enhanced_infrastructure
-    COUNTER_4_START_DATE = pendulum.datetime(2023, 5, 1)  # pendulum.datetime(2015, 6, 1)
-    COUNTER_5_START_DATE = pendulum.datetime(2020, 4, 1)
+    COUNTER_4_START_DATE = pendulum.datetime(2015, 6, 1)  # pendulum.datetime(2015, 6, 1)
+    # COUNTER_5_START_DATE = pendulum.datetime(2020, 4, 1)
+    COUNTER_5_START_DATE = pendulum.datetime(2016, 6, 1)
 
     def __init__(
         self,
@@ -142,7 +145,7 @@ class OapenIrusUkTelescope(Workflow):
         bq_table_description: str = None,
         schema_folder: str = default_schema_folder(),
         api_dataset_id: str = "oapen_irus_uk_master",
-        max_cloud_function_instances: int = 100,
+        max_cloud_function_instances: int = 12,
         observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
         geoip_license_conn_id: str = "geoip_license_key",
         oapen_irus_api_conn_id: str = "oapen_irus_uk_api",
@@ -150,7 +153,7 @@ class OapenIrusUkTelescope(Workflow):
         catchup: bool = False,
         start_date: pendulum.DateTime = COUNTER_4_START_DATE,
         schedule_interval: str = "0 0 4 * *",  # 4th of every month
-        max_threads=100,  # os.cpu_count() * 2,
+        max_threads=12,  # os.cpu_count() * 2,
     ):
         """The OAPEN irus uk telescope.
         TODO: docs
@@ -258,7 +261,9 @@ class OapenIrusUkTelescope(Workflow):
             # prev_end_date = prev_release.changefile_end_date
 
         # End date is always the data_interval_end, although it is not inclusive
-        end_date = kwargs["data_interval_end"]
+        # end_date = kwargs["data_interval_end"]
+        # TODO: change back end date
+        end_date = OapenIrusUkTelescope.COUNTER_5_START_DATE
 
         # prev_release = get_latest_dataset_release(releases, "changefile_end_date")
 
@@ -430,8 +435,7 @@ class OapenIrusUkTelescope(Workflow):
                 )
                 futures.append(future)
             for future in futures:
-                success = future.result()
-                set_task_state(success, kwargs["ti"].task_id, release=release)
+                future.result()
 
     def upload_transformed(self, release: OapenIrusUkRelease, **kwargs) -> None:
         """Uploads the transformed files to GCS for each release month"""
@@ -445,13 +449,13 @@ class OapenIrusUkTelescope(Workflow):
     def bq_load(self, release: OapenIrusUkRelease, **kwargs) -> None:
         """Loads the data into BigQuery"""
         table_id = bq_table_id(self.cloud_workspace.project_id, self.bq_dataset_id, self.bq_table_name)
+        bq_create_dataset(
+            project_id=self.cloud_workspace.project_id,
+            dataset_id=self.bq_dataset_id,
+            location=self.cloud_workspace.data_location,
+            description=self.bq_dataset_description,
+        )
         if not release.is_first_run:
-            bq_create_dataset(
-                project_id=self.cloud_workspace.project_id,
-                dataset_id=self.bq_dataset_id,
-                location=self.cloud_workspace.data_location,
-                description=self.bq_dataset_description,
-            )
             bq_backup_table_id = f"{table_id}_backup"
             logging.info(f"Creating backup: '{bq_backup_table_id}' from table: '{table_id}'")
             bq_copy_table(src_table_id=table_id, dst_table_id=bq_backup_table_id)
@@ -645,6 +649,7 @@ def call_cloud_function(
     :param publisher_name_v4: URL encoded name of the publisher (used for counter version 4)
     :param publisher_uuid_v5: UUID of the publisher (used for counter version 5)
     """
+    sleep(randint(1, 60))
     creds = IDTokenCredentials.from_service_account_file(
         os.environ.get(environment_vars.CREDENTIALS), target_audience=function_uri
     )
@@ -684,6 +689,7 @@ def transform_month(download_path, transform_path, release_date):
     :param transform_path: The save location of the transformed output
     :param release_date: The release date of the data
     """
+    print(f"Transforming month: {release_date}")
     with gzip.open(download_path, "r") as f:
         results = [json.loads(line) for line in f]
     results = add_partition_date(results, release_date, TimePartitioningType.MONTH, partition_field="release_date")
