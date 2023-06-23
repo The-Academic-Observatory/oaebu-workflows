@@ -32,7 +32,7 @@ from airflow.exceptions import AirflowException
 from airflow.hooks.base import BaseHook
 from airflow.models.taskinstance import TaskInstance
 from bs4 import BeautifulSoup, SoupStrainer
-from google.cloud.bigquery import TimePartitioningType, SourceFormat
+from google.cloud.bigquery import TimePartitioningType, SourceFormat, WriteDisposition
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import Resource, build
 from tenacity import retry, stop_after_attempt, wait_exponential, wait_fixed
@@ -340,6 +340,7 @@ class JstorTelescope(Workflow):
                     partition_type=TimePartitioningType.MONTH,
                     partition=True,
                     partition_field="release_date",
+                    write_disposition=WriteDisposition.WRITE_APPEND,
                     table_description=table_description,
                     ignore_unknown_values=True,
                 )
