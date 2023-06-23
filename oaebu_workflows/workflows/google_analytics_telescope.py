@@ -202,7 +202,7 @@ class GoogleAnalyticsTelescope(Workflow):
                 ),  # Subtract 1 day because GA uses inclusive dates, Airlfow data intervals are not
             )
             results = add_partition_date(
-                results, release.data_interval_end, TimePartitioningType.MONTH, partition_field="release_date"
+                results, release.partition_date, TimePartitioningType.MONTH, partition_field="release_date"
             )
             if results:
                 save_jsonl_gz(release.transform_path, results)

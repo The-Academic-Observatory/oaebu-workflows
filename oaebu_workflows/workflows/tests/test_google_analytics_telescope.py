@@ -26,6 +26,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import HttpMockSequence
 
 from oaebu_workflows.workflows.google_analytics_telescope import GoogleAnalyticsTelescope
+from oaebu_workflows.config import test_fixtures_folder
 from observatory.platform.api import get_dataset_releases
 from observatory.platform.observatory_config import Workflow
 from observatory.platform.gcs import gcs_blob_name_from_path
@@ -34,6 +35,7 @@ from observatory.platform.observatory_environment import (
     ObservatoryEnvironment,
     ObservatoryTestCase,
     find_free_port,
+    load_and_parse_json,
 )
 
 
@@ -51,6 +53,8 @@ class TestGoogleAnalyticsTelescope(ObservatoryTestCase):
         self.view_id = "11235141"
         self.pagepath_regex = r".*regex$"
         self.organisation_name = "UCL Press"
+        self.test_table = os.path.join(test_fixtures_folder("google_analytics"), "test_table.json")
+        self.test_table_anu = os.path.join(test_fixtures_folder("google_analytics"), "test_table_anu.json")
 
     def test_dag_structure(self):
         """Test that the Google Analytics DAG has the correct structure.
@@ -253,6 +257,11 @@ class TestGoogleAnalyticsTelescope(ObservatoryTestCase):
                     telescope.cloud_workspace.project_id, telescope.bq_dataset_id, telescope.bq_table_name
                 )
                 self.assert_table_integrity(table_id, expected_rows=3)
+                self.assert_table_content(
+                    table_id,
+                    load_and_parse_json(self.test_table, date_fields=["release_date", "start_date", "end_date"]),
+                    primary_key="url",
+                )
 
                 # Add_dataset_release_task
                 dataset_releases = get_dataset_releases(dag_id=telescope.dag_id, dataset_id=telescope.api_dataset_id)
@@ -429,6 +438,11 @@ class TestGoogleAnalyticsTelescope(ObservatoryTestCase):
                     telescope.cloud_workspace.project_id, telescope.bq_dataset_id, telescope.bq_table_name
                 )
                 self.assert_table_integrity(table_id, expected_rows=3)
+                self.assert_table_content(
+                    table_id,
+                    load_and_parse_json(self.test_table_anu, date_fields=["release_date", "start_date", "end_date"]),
+                    primary_key="url",
+                )
 
                 # add_dataset_release_task
                 dataset_releases = get_dataset_releases(dag_id=telescope.dag_id, dataset_id=telescope.api_dataset_id)
