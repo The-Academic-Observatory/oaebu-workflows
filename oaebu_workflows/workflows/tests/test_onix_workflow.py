@@ -811,8 +811,8 @@ class TestOnixWorkflow(ObservatoryTestCase):
 
         def vcr_ignore_condition(request):
             """This function is used by vcrpy to allow requests to sources not in the cassette file.
-            At time of writing, the only mocked requests are the ones to crossref events and metadata."""
-            allowed_domains = ["https://api.crossref.org", "https://api.eventdata.crossref.org"]
+            At time of writing, the only mocked requests are the ones to crossref events."""
+            allowed_domains = ["https://api.eventdata.crossref.org"]
             allow_request = any([request.url.startswith(i) for i in allowed_domains])
             if not allow_request:
                 return None

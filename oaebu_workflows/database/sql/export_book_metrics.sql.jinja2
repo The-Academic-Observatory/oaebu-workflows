@@ -48,6 +48,12 @@ SELECT
         month.oapen_irus_uk.unique_item_investigations,
         month.oapen_irus_uk.unique_item_requests
     ) as oapen_irus_uk,
+    STRUCT(
+        month.fulcrum.total_item_investigations,
+        month.fulcrum.total_item_requests,
+        month.fulcrum.unique_item_investigations,
+        month.fulcrum.unique_item_requests
+    ) as fulcrum,
     STRUCT(month.ucl_discovery.total_downloads) as ucl_discovery
 FROM `{{ book_product_table_id }}`, UNNEST(months) as month
-WHERE month.oapen_irus_uk IS NOT NULL OR month.google_books_traffic IS NOT NULL OR month.google_books_sales IS NOT NULL OR month.google_analytics IS NOT NULL OR month.ucl_discovery IS NOT NULL OR ARRAY_LENGTH(month.jstor_country) > 0 OR ARRAY_LENGTH(month.crossref_events) > 0
+WHERE month.fulcrum IS NOT NULL OR month.oapen_irus_uk IS NOT NULL OR month.google_books_traffic IS NOT NULL OR month.google_books_sales IS NOT NULL OR month.google_analytics IS NOT NULL OR month.ucl_discovery IS NOT NULL OR ARRAY_LENGTH(month.jstor_country) > 0 OR ARRAY_LENGTH(month.crossref_events) > 0

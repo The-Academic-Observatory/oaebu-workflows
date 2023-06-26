@@ -36,43 +36,43 @@
         "name": "downloads",
         "type": "INTEGER",
         "description": "Number of total downloads"
-      },  
+      },
       {
         "mode": "NULLABLE",
         "name": "downloads_pdf_book",
         "type": "INTEGER",
         "description": "Number of PDF book downloads"
-      }, 
+      },
       {
         "mode": "NULLABLE",
         "name": "downloads_pdf_chapter",
         "type": "INTEGER",
         "description": "Number of PDF chapter downloads"
-      }, 
+      },
       {
         "mode": "NULLABLE",
         "name": "downloads_html_chapter",
         "type": "INTEGER",
         "description": "Number of HTML chapter downloads"
-      }, 
+      },
       {
         "mode": "NULLABLE",
         "name": "downloads_epub_book",
         "type": "INTEGER",
         "description": "Number of ePUB book downloads"
-      }, 
+      },
       {
         "mode": "NULLABLE",
         "name": "downloads_epub_chapter",
         "type": "INTEGER",
         "description": "Number of ePUB chapter downloads"
-      }, 
+      },
       {
         "mode": "NULLABLE",
         "name": "downloads_mobi_book",
         "type": "INTEGER",
         "description": "Number of MOBI book downloads"
-      }, 
+      },
       {
         "mode": "NULLABLE",
         "name": "downloads_mobi_chapter",
@@ -208,5 +208,37 @@
     "name": "oapen_irus_uk",
     "type": "RECORD",
     "description": "Metrics from IRUS-UK"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "total_item_investigations",
+        "type": "INTEGER",
+        "description": "The total number of item investigations."
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "total_item_requests",
+        "type": "INTEGER",
+        "description": "The total number of item requests."
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "unique_item_investigations",
+        "type": "INTEGER",
+        "description": "The number of unique item investigations."
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "unique_item_requests",
+        "type": "INTEGER",
+        "description": "The number of unique item requests."
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "fulcrum",
+    "type": "RECORD",
+    "description": "Metrics from Fulcrum"
   }
 ]

@@ -32,8 +32,8 @@
   {
     "description": "The investigated month.",
     "mode": "NULLABLE",
-    "name": "month",
-    "type": "DATE"
+    "name": "event_month",
+    "type": "STRING"
   },
   {
     "description": "The total number of item investigations.",

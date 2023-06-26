@@ -49,6 +49,12 @@ SELECT
         SUM(oapen_irus_uk.unique_item_investigations) as unique_item_investigations,
         SUM(oapen_irus_uk.unique_item_requests) as unique_item_requests
     ) as oapen_irus_uk,
+    STRUCT(
+        SUM(fulcrum.total_item_investigations) as total_item_investigations,
+        SUM(fulcrum.total_item_requests) as total_item_requests,
+        SUM(fulcrum.unique_item_investigations) as unique_item_investigations,
+        SUM(fulcrum.unique_item_requests) as unique_item_requests
+    ) as fulcrum,
 FROM (
     SELECT
         ISBN13,
@@ -75,7 +81,13 @@ FROM (
             month.oapen_irus_uk.unique_item_investigations,
             month.oapen_irus_uk.unique_item_requests
         ) as oapen_irus_uk,
+        STRUCT(
+            month.fulcrum.total_item_investigations,
+            month.fulcrum.total_item_requests,
+            month.fulcrum.unique_item_investigations,
+            month.fulcrum.unique_item_requests
+        ) as fulcrum,
     FROM `{{ book_product_table_id }}`, UNNEST(months) as month
-    WHERE month.oapen_irus_uk IS NOT NULL OR month.google_books_traffic IS NOT NULL OR month.google_books_sales IS NOT NULL)
+    WHERE month.fulcrum IS NOT NULL OR month.oapen_irus_uk IS NOT NULL OR month.google_books_traffic IS NOT NULL OR month.google_books_sales IS NOT NULL)
 GROUP BY month
 ORDER BY month DESC
