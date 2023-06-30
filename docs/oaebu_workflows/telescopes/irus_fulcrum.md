@@ -1,8 +1,11 @@
 # IRUS Fulcrum
 
-The Fulcrum telescope collects usage statistics for titles accessed via the [Fulcrum Platform](https://www.fulcrum.org/). Usage data is accessible through [IRUS](https://irus.jisc.ac.uk/r5/) in much the same way as the [OAPEN_IRUS_UK](./irus_oapen.md) telescope. Unlike OAPEN IRUS UK, Fulcrum does not record sensitive IP address information. This makes dealing with the data much simpler.
+The IRUS Fulcrum telescope collects usage statistics for titles accessed via the [Fulcrum Platform](https://www.fulcrum.org/). Usage data is accessible through [IRUS](https://irus.jisc.ac.uk/r5/) in much the same way as the [IRUS OAPEN](./oapen_irus_uk.md) telescope. Unlike IRUS OAPEN, IRUS Fulcrum does not record sensitive IP address information. This makes dealing with the data much simpler.
 
-The earliest avaialable data for the Fulcrum platform is April 2022. It follows that all data is of [COUNTER](https://www.projectcounter.org/) 5 standard.
+The earliest available data for the Fulcrum platform is April 2022. It follows that all data is of [COUNTER](https://www.projectcounter.org/) 5 standard.
+
+The corresponding table created in BigQuery is `irus.irus_fulcrumYYYYMMDD`.
+
 
 ```eval_rst
 +------------------------------+--------------+
@@ -77,8 +80,10 @@ The transformed data is loaded from the Google Cloud bucket into a partitioned B
 ## Latest schema
 
 ```eval_rst
+.. tabularcolumns:: |l|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/irus_fulcrum.csv
    :width: 100%
    :header-rows: 1
+   :class: longtable
 ```

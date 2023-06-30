@@ -45,8 +45,10 @@ The Thoth telescope does not require any airflow connections to run, as the Thot
 ## Latest schema
 
 ```eval_rst
+.. tabularcolumns:: |p{6cm}|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/onix_latest.csv
    :width: 100%
    :header-rows: 1
+   :class: longtable
 ```

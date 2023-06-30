@@ -15,8 +15,10 @@ The output is the book_product table, containing one row per unique book, with a
 [Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/create_book_products.sql.jinja2)
 
 ``` eval_rst
+.. tabularcolumns:: |l|l|l|p{6cm}| 
 .. csv-table::
-   :file: ../../schemas/book_product_latest.csv
+   :file:  ../../schemas/book_product_latest.csv
    :width: 100%
    :header-rows: 1
+   :class: longtable
 ```

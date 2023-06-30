@@ -59,8 +59,10 @@ sftp_service: ssh://user-name:password@host-name:port?host_key=host-key
 
 ## Latest schema
 ``` eval_rst
+.. tabularcolumns:: |l|l|l|p{6cm}|
 .. csv-table::
    :file: ../../schemas/onix_latest.csv
    :width: 100%
    :header-rows: 1
+   :class: longtable
 ```

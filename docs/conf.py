@@ -21,10 +21,30 @@ from recommonmark.transform import AutoStructify
 
 from generate_schema_csv import generate_csv, generate_latest_files
 
+# -- Formatting --------------------------------------------------------------
+
+latex_elements = {
+    'sphinxsetup': "verbatimforcewraps, verbatimmaxunderfull=0",
+    'preamble': r'''
+        \usepackage[none]{hyphenat}
+        \usepackage{makeidx}
+        \usepackage{ragged2e}
+        \RaggedRight
+        \makeindex
+        \makeatletter
+        \renewenvironment{theindex}
+        {\setlength{\parindent}{0pt}\raggedright\small\let\item\@idxitem}
+        {\makeatother}
+        \usepackage{etoolbox}
+        \patchcmd{\sphinxverbatimintable}{\sphinxsetup{VerbatimColor=\sphinxbaseblack\sphinxtightlistings}}{\sphinxsetup{VerbatimColor=\sphinxbaseblack\sphinxtightlistings\raggedright\scriptsize}}{}{}
+    '''
+}
+
+
 # -- Project information -----------------------------------------------------
 
 project = "Book Usage Data Workflows"
-copyright = "2020-2022 Curtin University"
+copyright = "2022-2025 Curtin University"
 author = "Curtin University"
 
 # -- General configuration ---------------------------------------------------

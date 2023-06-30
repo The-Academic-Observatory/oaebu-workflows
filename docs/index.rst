@@ -1,13 +1,13 @@
 
-Developing a Pilot Data Trust for Open Access Ebook Usage (2020-2022) Project
+Book Analytics Dashboard Project (2022-2025)
 ##############################
 
-This project documentation includes how the pilot project works, information on the data sources used, and user guides for the dashboards.
+This project documentation includes how the BAD project works and information on the data sources used.
 
 .. toctree::
     :maxdepth: 2
 
-    oaebu_project/index
+    bad_project/index
 
 
 

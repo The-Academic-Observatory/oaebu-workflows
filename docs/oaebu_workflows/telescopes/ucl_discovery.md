@@ -37,8 +37,10 @@ Additionally for each eprint the total downloads and downloads per country is ga
 
 ## Latest schema
 ``` eval_rst
+.. tabularcolumns:: |l|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/ucl_discovery_latest.csv
    :width: 100%
    :header-rows: 1
+   :class: longtable
 ```

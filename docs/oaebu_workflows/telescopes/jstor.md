@@ -352,17 +352,21 @@ gmail_api: google-cloud-platform://?token=<token>&refresh_token=<refresh_token>&
 ### JSTOR Institution
 
 ``` eval_rst
+.. tabularcolumns:: |l|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/jstor_institution_latest.csv
    :width: 100%
    :header-rows: 1
+   :class: longtable
 ```
 
 ### JSTOR Country
 
 ``` eval_rst
+.. tabularcolumns:: |l|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/jstor_country_latest.csv
    :width: 100%
    :header-rows: 1
+   :class: longtable
 ```

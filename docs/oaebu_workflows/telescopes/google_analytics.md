@@ -108,8 +108,10 @@ oaebu_service_account: google-cloud-platform://?type=service_account&private_key
 
 ## Latest schema
 ``` eval_rst
+.. tabularcolumns:: |l|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/google_analytics_latest.csv
    :width: 100%
    :header-rows: 1
+   :class: longtable
 ```
