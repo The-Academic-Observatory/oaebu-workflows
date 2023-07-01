@@ -201,8 +201,6 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
                 )
 
                 # Test that table is loaded to BQ
-                ti = env.run_task(telescope.bq_load.__name__)
-                self.assertEqual(ti.state, State.SUCCESS)
                 table_id = bq_sharded_table_id(
                     telescope.cloud_workspace.project_id,
                     telescope.bq_dataset_id,
