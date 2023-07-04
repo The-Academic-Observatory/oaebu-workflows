@@ -65,20 +65,20 @@ FROM(
         ) as google_books_sales,
         STRUCT(group_counts(ARRAY_CONCAT_AGG(month.jstor_country)) as Total_Item_Requests) as jstor,
         STRUCT(
-            SUM(month.oapen_irus_uk.title_requests) as title_requests,
-            SUM(month.oapen_irus_uk.total_item_investigations) as total_item_investigations,
-            SUM(month.oapen_irus_uk.total_item_requests) as total_item_requests,
-            SUM(month.oapen_irus_uk.unique_item_investigations) as unique_item_investigations,
-            SUM(month.oapen_irus_uk.unique_item_requests) as unique_item_requests
-        ) as oapen_irus_uk,
+            SUM(month.irus_oapen.title_requests) as title_requests,
+            SUM(month.irus_oapen.total_item_investigations) as total_item_investigations,
+            SUM(month.irus_oapen.total_item_requests) as total_item_requests,
+            SUM(month.irus_oapen.unique_item_investigations) as unique_item_investigations,
+            SUM(month.irus_oapen.unique_item_requests) as unique_item_requests
+        ) as irus_oapen,
         STRUCT(
-            SUM(month.fulcrum.total_item_investigations) as total_item_investigations,
-            SUM(month.fulcrum.total_item_requests) as total_item_requests,
-            SUM(month.fulcrum.unique_item_investigations) as unique_item_investigations,
-            SUM(month.fulcrum.unique_item_requests) as unique_item_requests
-        ) as fulcrum,
+            SUM(month.irus_fulcrum.total_item_investigations) as total_item_investigations,
+            SUM(month.irus_fulcrum.total_item_requests) as total_item_requests,
+            SUM(month.irus_fulcrum.unique_item_investigations) as unique_item_investigations,
+            SUM(month.irus_fulcrum.unique_item_requests) as unique_item_requests
+        ) as irus_fulcrum,
     FROM `{{ book_product_table_id }}`, UNNEST(top_level_subjects(onix.thema_subjects)) as subject, UNNEST(months) as month
-    WHERE month.fulcrum IS NOT NULL OR month.oapen_irus_uk IS NOT NULL OR month.google_books_traffic IS NOT NULL OR month.google_books_sales IS NOT NULL
+    WHERE month.irus_fulcrum IS NOT NULL OR month.irus_oapen IS NOT NULL OR month.google_books_traffic IS NOT NULL OR month.google_books_sales IS NOT NULL
     GROUP BY subject, month
     ORDER BY subject ASC, month DESC) as metrics
 LEFT JOIN `{{ thema_table_id }}` as thema on thema.code = subject

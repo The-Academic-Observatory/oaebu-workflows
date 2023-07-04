@@ -31,9 +31,9 @@ from googleapiclient.discovery import build
 from googleapiclient.http import RequestMockBuilder
 
 from oaebu_workflows.config import test_fixtures_folder
-from oaebu_workflows.workflows.oapen_irus_uk_telescope import (
-    OapenIrusUkRelease,
-    OapenIrusUkTelescope,
+from oaebu_workflows.workflows.irus_oapen_telescope import (
+    IrusOapenRelease,
+    IrusOapenTelescope,
     call_cloud_function,
     cloud_function_exists,
     create_cloud_function,
@@ -51,7 +51,7 @@ from observatory.platform.observatory_environment import (
 )
 
 
-class TestOapenIrusUkTelescope(ObservatoryTestCase):
+class TestIrusOapenTelescope(ObservatoryTestCase):
     """Tests for the Oapen Irus Uk telescope"""
 
     def __init__(self, *args, **kwargs):
@@ -59,17 +59,17 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
         :param args: arguments.
         :param kwargs: keyword arguments.
         """
-        super(TestOapenIrusUkTelescope, self).__init__(*args, **kwargs)
+        super(TestIrusOapenTelescope, self).__init__(*args, **kwargs)
         self.project_id = os.getenv("TEST_GCP_PROJECT_ID")
         self.data_location = os.getenv("TEST_GCP_DATA_LOCATION")
         self.publisher_name_v4 = (quote("UCL Press"),)
         self.publisher_uuid_v5 = ("df73bf94-b818-494c-a8dd-6775b0573bc2",)
-        self.download_path = test_fixtures_folder("oapen_irus_uk", "download.jsonl.gz")
+        self.download_path = test_fixtures_folder("irus_oapen", "download.jsonl.gz")
 
     def test_dag_structure(self):
         """Test that the Oapen Irus Uk DAG has the correct structure."""
-        dag = OapenIrusUkTelescope(
-            dag_id="oapen_irus_uk_test_dag",
+        dag = IrusOapenTelescope(
+            dag_id="irus_oapen_test_dag",
             cloud_workspace=self.fake_cloud_workspace,
             publisher_name_v4=self.publisher_name_v4,
             publisher_uuid_v5=self.publisher_uuid_v5,
@@ -95,20 +95,20 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
         env = ObservatoryEnvironment(
             workflows=[
                 Workflow(
-                    dag_id="oapen_irus_uk_test",
+                    dag_id="irus_oapen_test",
                     name="My Oapen Irus UK Workflow",
-                    class_name="oaebu_workflows.workflows.oapen_irus_uk_telescope.OapenIrusUkTelescope",
+                    class_name="oaebu_workflows.workflows.irus_oapen_telescope.IrusOapenTelescope",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(publisher_name_v4=self.publisher_name_v4, publisher_uuid_v5=self.publisher_uuid_v5),
                 )
             ],
         )
         with env.create():
-            self.assert_dag_load_from_config("oapen_irus_uk_test")
+            self.assert_dag_load_from_config("irus_oapen_test")
 
-    @patch("oaebu_workflows.workflows.oapen_irus_uk_telescope.build")
-    @patch("oaebu_workflows.workflows.oapen_irus_uk_telescope.ServiceAccountCredentials")
-    @patch("oaebu_workflows.workflows.oapen_irus_uk_telescope.AuthorizedSession.post")
+    @patch("oaebu_workflows.workflows.irus_oapen_telescope.build")
+    @patch("oaebu_workflows.workflows.irus_oapen_telescope.ServiceAccountCredentials")
+    @patch("oaebu_workflows.workflows.irus_oapen_telescope.AuthorizedSession.post")
     def test_telescope(self, mock_authorized_session, mock_account_credentials, mock_build):
         """Test the Oapen Irus Uk telescope end to end."""
         # Setup Observatory environment
@@ -119,16 +119,16 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
 
         # Setup Telescope
         execution_date = pendulum.datetime(year=2021, month=2, day=14)
-        telescope = OapenIrusUkTelescope(
-            dag_id="oapen_irus_uk_test",
+        telescope = IrusOapenTelescope(
+            dag_id="irus_oapen_test",
             cloud_workspace=env.cloud_workspace,
             publisher_name_v4=self.publisher_name_v4,
             publisher_uuid_v5=self.publisher_uuid_v5,
             bq_dataset_id=dataset_id,
         )
         # Fake oapen project and bucket
-        OapenIrusUkTelescope.OAPEN_PROJECT_ID = env.project_id
-        OapenIrusUkTelescope.OAPEN_BUCKET = random_id()
+        IrusOapenTelescope.OAPEN_PROJECT_ID = env.project_id
+        IrusOapenTelescope.OAPEN_BUCKET = random_id()
 
         # Mock the Google Cloud Functions API service
         mock_account_credentials.from_json_keyfile_dict.return_value = ""
@@ -170,7 +170,7 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
         with env.create(task_logging=True):
             with env.create_dag_run(dag, execution_date):
                 # Use release to check results from tasks
-                # release = OapenIrusUkRelease(
+                # release = IrusOapenRelease(
                 #     dag_id=telescope.dag_id, run_id=env.dag_run.run_id, partition_date=execution_date.end_of("month")
                 # )
                 release = telescope.make_release(
@@ -214,7 +214,7 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
 
                 # Test transfer task
                 gcs_upload_file(
-                    bucket_name=OapenIrusUkTelescope.OAPEN_BUCKET,
+                    bucket_name=IrusOapenTelescope.OAPEN_BUCKET,
                     blob_name=release.blob_name,
                     file_path=self.download_path,
                 )
@@ -246,7 +246,7 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
                 self.assert_table_integrity(table_id, 2)
 
                 # Delete oapen bucket
-                env._delete_bucket(OapenIrusUkTelescope.OAPEN_BUCKET)
+                env._delete_bucket(IrusOapenTelescope.OAPEN_BUCKET)
 
                 # Add_dataset_release_task
                 dataset_releases = get_dataset_releases(dag_id=telescope.dag_id, dataset_id=telescope.api_dataset_id)
@@ -262,11 +262,11 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
                 self.assert_cleanup(release.workflow_folder)
 
     @patch("observatory.platform.airflow.Variable.get")
-    @patch("oaebu_workflows.workflows.oapen_irus_uk_telescope.upload_source_code_to_bucket")
-    @patch("oaebu_workflows.workflows.oapen_irus_uk_telescope.cloud_function_exists")
-    @patch("oaebu_workflows.workflows.oapen_irus_uk_telescope.create_cloud_function")
+    @patch("oaebu_workflows.workflows.irus_oapen_telescope.upload_source_code_to_bucket")
+    @patch("oaebu_workflows.workflows.irus_oapen_telescope.cloud_function_exists")
+    @patch("oaebu_workflows.workflows.irus_oapen_telescope.create_cloud_function")
     def test_create_cloud_function(self, mock_create_function, mock_function_exists, mock_upload, mock_variable_get):
-        """Test the create_cloud_function method of the OapenIrusUkRelease
+        """Test the create_cloud_function method of the IrusOapenRelease
 
         :param mock_variable_get: Mock Airflow Variable 'data'
         """
@@ -307,14 +307,14 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
                 transform_bucket="transform_bucket",
                 data_location="us",
             )
-            telescope = OapenIrusUkTelescope(
-                dag_id="oapen_irus_uk_test",
+            telescope = IrusOapenTelescope(
+                dag_id="irus_oapen_test",
                 cloud_workspace=cloud_workspace,
                 publisher_name_v4="publisher",
                 publisher_uuid_v5="publisherUUID",
                 bq_dataset_id="dataset_id",
             )
-            release = OapenIrusUkRelease(
+            release = IrusOapenRelease(
                 dag_id=telescope.dag_id, run_id=random_id(), partition_date=pendulum.parse("2020-02-01")
             )
             location = f"projects/{telescope.OAPEN_PROJECT_ID}/locations/{telescope.FUNCTION_REGION}"
@@ -359,18 +359,18 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
                 telescope.create_cloud_function(releases=[release], ti=task_instance)
 
     @patch("observatory.platform.airflow.Variable.get")
-    @patch("oaebu_workflows.workflows.oapen_irus_uk_telescope.BaseHook.get_connection")
-    @patch("oaebu_workflows.workflows.oapen_irus_uk_telescope.call_cloud_function")
-    @patch("oaebu_workflows.workflows.oapen_irus_uk_telescope.cloud_function_exists")
+    @patch("oaebu_workflows.workflows.irus_oapen_telescope.BaseHook.get_connection")
+    @patch("oaebu_workflows.workflows.irus_oapen_telescope.call_cloud_function")
+    @patch("oaebu_workflows.workflows.irus_oapen_telescope.cloud_function_exists")
     def test_call_cloud_function(self, mock_function_exists, mock_call_function, mock_conn_get, mock_variable_get):
-        """Test the call_cloud_function method of the OapenIrusUkRelease
+        """Test the call_cloud_function method of the IrusOapenRelease
 
         :param mock_variable_get: Mock Airflow Variable 'data'
         """
         connections = {
             "geoip_license_key": Connection("geoip_license_key", uri="http://user_id:key@"),
-            "oapen_irus_uk_api": Connection("oapen_irus_uk_api", uri="http://requestor_id:api_key@"),
-            "oapen_irus_uk_login": Connection("oapen_irus_uk_login", uri="http://email:password@"),
+            "irus_oapen_api": Connection("irus_oapen_api", uri="http://requestor_id:api_key@"),
+            "irus_oapen_login": Connection("irus_oapen_login", uri="http://email:password@"),
         }
         mock_conn_get.side_effect = lambda x: connections[x]
 
@@ -393,14 +393,14 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
                 for publisher in [("publisher", "uuid1"), ("oapen", "uuid2")]:
                     mock_call_function.reset_mock()
 
-                    telescope = OapenIrusUkTelescope(
-                        dag_id="oapen_irus_uk_test",
+                    telescope = IrusOapenTelescope(
+                        dag_id="irus_oapen_test",
                         cloud_workspace=cloud_workspace,
                         publisher_name_v4=publisher[0],
                         publisher_uuid_v5=publisher[1],
                         bq_dataset_id="dataset_id",
                     )
-                    release = OapenIrusUkRelease(
+                    release = IrusOapenRelease(
                         dag_id=telescope.dag_id, run_id=random_id(), partition_date=pendulum.parse(date + "-01")
                     )
                     telescope.call_cloud_function(releases=[release])
@@ -424,8 +424,8 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
                         release.blob_name,
                     )
 
-    @patch("oaebu_workflows.workflows.oapen_irus_uk_telescope.gcs_upload_file")
-    @patch("oaebu_workflows.workflows.oapen_irus_uk_telescope.gcs_create_bucket")
+    @patch("oaebu_workflows.workflows.irus_oapen_telescope.gcs_upload_file")
+    @patch("oaebu_workflows.workflows.irus_oapen_telescope.gcs_create_bucket")
     def test_upload_source_code_to_bucket(self, mock_create_bucket, mock_upload_to_bucket):
         """Test getting source code from oapen irus uk release and uploading to storage bucket.
         Test expected results both when md5 hashes match and when they don't."""
@@ -434,22 +434,22 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             cloud_function_path = os.path.join(os.getcwd(), "cloud_function.zip")
             success, upload = upload_source_code_to_bucket(
-                OapenIrusUkTelescope.FUNCTION_SOURCE_URL,
-                OapenIrusUkTelescope.OAPEN_PROJECT_ID,
-                OapenIrusUkTelescope.OAPEN_BUCKET,
-                OapenIrusUkTelescope.FUNCTION_BLOB_NAME,
+                IrusOapenTelescope.FUNCTION_SOURCE_URL,
+                IrusOapenTelescope.OAPEN_PROJECT_ID,
+                IrusOapenTelescope.OAPEN_BUCKET,
+                IrusOapenTelescope.FUNCTION_BLOB_NAME,
                 cloud_function_path,
             )
             self.assertEqual(success, True)
             self.assertEqual(upload, True)
 
-            OapenIrusUkTelescope.FUNCTION_MD5_HASH = "different"
+            IrusOapenTelescope.FUNCTION_MD5_HASH = "different"
             with self.assertRaises(AirflowException):
                 upload_source_code_to_bucket(
-                    OapenIrusUkTelescope.FUNCTION_SOURCE_URL,
-                    OapenIrusUkTelescope.OAPEN_PROJECT_ID,
-                    OapenIrusUkTelescope.OAPEN_BUCKET,
-                    OapenIrusUkTelescope.FUNCTION_BLOB_NAME,
+                    IrusOapenTelescope.FUNCTION_SOURCE_URL,
+                    IrusOapenTelescope.OAPEN_PROJECT_ID,
+                    IrusOapenTelescope.OAPEN_BUCKET,
+                    IrusOapenTelescope.FUNCTION_BLOB_NAME,
                     cloud_function_path,
                 )
 
@@ -583,7 +583,7 @@ class TestOapenIrusUkTelescope(ObservatoryTestCase):
                 self.assertEqual(request["success"], success)
                 self.assertDictEqual(request["msg"], msg)
 
-    @patch("oaebu_workflows.workflows.oapen_irus_uk_telescope.AuthorizedSession.post")
+    @patch("oaebu_workflows.workflows.irus_oapen_telescope.AuthorizedSession.post")
     def test_call_cloud_function(self, mock_authorized_session):
         """Test the function that calls the cloud function"""
 

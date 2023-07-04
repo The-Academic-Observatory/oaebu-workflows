@@ -69,20 +69,20 @@ jstor as (
     {% endif %}
 ),
 
-oapen as (
-    {% if oapen_irus_uk_unmatched_table_id %}
+irus_oapen as (
+    {% if irus_oapen_unmatched_table_id %}
     SELECT
-        {{ oapen_irus_uk_isbn }} as ISBN,
+        {{ irus_oapen_isbn }} as ISBN,
         title,
         release_date,
-        "oapen" as source
-    FROM `{{ oapen_irus_uk_unmatched_table_id }}`
+        "irus_oapen" as source
+    FROM `{{ irus_oapen_unmatched_table_id }}`
     {% else %}
     SELECT
         CAST(NULL as STRING) as ISBN,
         CAST(NULL as STRING) as title,
         CAST(NULL as DATE) as release_date,
-        "oapen" as source
+        "irus_oapen" as source
     {% endif %}
 ),
 
@@ -103,20 +103,20 @@ ucl_discovery as (
     {% endif %}
 ),
 
-fulcrum as (
-    {% if fulcrum_unmatched_table_id %}
+irus_fulcrum as (
+    {% if irus_fulcrum_unmatched_table_id %}
     SELECT
-        {{ fulcrum_isbn }} as ISBN,
+        {{ irus_fulcrum_isbn }} as ISBN,
         title,
         release_date,
-        "fulcrum" as source
-    FROM `{{ fulcrum_unmatched_table_id }}`
+        "irus_fulcrum" as source
+    FROM `{{ irus_fulcrum_unmatched_table_id }}`
     {% else %}
     SELECT
         CAST(NULL as STRING) as ISBN,
         CAST(NULL as STRING) as title,
         CAST(NULL as DATE) as release_date,
-        "fulcrum" as source
+        "irus_fulcrum" as source
     {% endif %}
 ),
 
@@ -127,7 +127,9 @@ SELECT * FROM google_books
     UNION ALL
 SELECT * FROM jstor
     UNION ALL
-SELECT * FROM oapen
+SELECT * FROM irus_oapen
+    UNION ALL
+SELECT * FROM irus_fulcrum
     UNION ALL
 SELECT * FROM ucl_discovery
 )
@@ -138,15 +140,15 @@ SELECT
     ARRAY_AGG(DISTINCT IF(source = "google_analytics", title, NULL) IGNORE NULLS LIMIT 1)[SAFE_OFFSET(0)] as google_analytics_title,
     ARRAY_AGG(DISTINCT IF(source = "google_books", title, NULL) IGNORE NULLS LIMIT 1)[SAFE_OFFSET(0)] as google_books_title,
     ARRAY_AGG(DISTINCT IF(source = "jstor", title, NULL) IGNORE NULLS LIMIT 1)[SAFE_OFFSET(0)] as jstor_title,
-    ARRAY_AGG(DISTINCT IF(source = "oapen", title, NULL) IGNORE NULLS LIMIT 1)[SAFE_OFFSET(0)] as oapen_title,
+    ARRAY_AGG(DISTINCT IF(source = "irus_oapen", title, NULL) IGNORE NULLS LIMIT 1)[SAFE_OFFSET(0)] as irus_oapen_title,
     ARRAY_AGG(DISTINCT IF(source = "ucl_discovery", title, NULL) IGNORE NULLS LIMIT 1)[SAFE_OFFSET(0)] as ucl_discovery_title,
-    ARRAY_AGG(DISTINCT IF(source = "fulcrum", title, NULL) IGNORE NULLS LIMIT 1)[SAFE_OFFSET(0)] as fulcrum_title,
+    ARRAY_AGG(DISTINCT IF(source = "irus_fulcrum", title, NULL) IGNORE NULLS LIMIT 1)[SAFE_OFFSET(0)] as irus_fulcrum_title,
     "google_analytics" in UNNEST(ARRAY_AGG(source)) as in_google_analytics,
     "google_books" in UNNEST(ARRAY_AGG(source)) as in_google_books,
     "jstor" in UNNEST(ARRAY_AGG(source)) as in_jstor,
-    "oapen" in UNNEST(ARRAY_AGG(source)) as in_oapen,
+    "irus_oapen" in UNNEST(ARRAY_AGG(source)) as in_irus_oapen,
     "ucl_discovery" in UNNEST(ARRAY_AGG(source)) as in_ucl_discovery,
-    "fulcrum" in UNNEST(ARRAY_AGG(source)) as in_fulcrum,
+    "irus_fulcrum" in UNNEST(ARRAY_AGG(source)) as in_irus_fulcrum,
 FROM all_un_matched
 WHERE ISBN IS NOT NULL
 GROUP BY ISBN, release_date

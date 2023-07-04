@@ -114,7 +114,7 @@ total_item_requests             INTEGER   NULLABLE
 unique_item_investigations      INTEGER   NULLABLE
 unique_item_requests            INTEGER   NULLABLE
 #}
-CREATE TEMP FUNCTION group_items_fulcrum_country(items ARRAY<STRUCT<name STRING, code STRING, total_item_investigations INT64, total_item_requests INT64, unique_item_investigations INT64, unique_item_requests INT64>>) as (
+CREATE TEMP FUNCTION group_items_irus_fulcrum_country(items ARRAY<STRUCT<name STRING, code STRING, total_item_investigations INT64, total_item_requests INT64, unique_item_investigations INT64, unique_item_requests INT64>>) as (
   ARRAY(
     (SELECT AS STRUCT
       name,
@@ -195,12 +195,12 @@ CREATE TEMP FUNCTION custom_split(str STRING, sep STRING) AS (
 {#
 The purpose of this block of SQL is to create an empty row of data, which comforms to the OAPEN raw data.
 
-Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'oapen_table_id'.
-This will either point to 'empty_oapen' (the name of this SQL block) or the name of the real data table in bigquery.
+Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'irus_oapen_table_id'.
+This will either point to 'empty_irus_oapen' (the name of this SQL block) or the name of the real data table in bigquery.
 The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
 Providng an empty row enable simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
 #}
-WITH empty_oapen as (
+WITH empty_irus_oapen as (
     SELECT
         CAST(null as STRING) as ISBN,
         CAST(null as DATE) as release_date,
@@ -224,14 +224,14 @@ WITH empty_oapen as (
 ),
 
 {#
-The purpose of this block of SQL is to create an empty row of data, which comforms to the Fulcrum raw data.
+The purpose of this block of SQL is to create an empty row of data, which comforms to the IRUS Fulcrum raw data.
 
-Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'fulcrum_table_id'.
-This will either point to 'empty_fulcrum' (the name of this SQL block) or the name of the real data table in bigquery.
+Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'irus_fulcrum_table_id'.
+This will either point to 'empty_irus_fulcrum' (the name of this SQL block) or the name of the real data table in bigquery.
 The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
 Providng an empty row enable simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
 #}
-empty_fulcrum as (
+empty_irus_fulcrum as (
     SELECT
         CAST(null as STRING) as ISBN,
         CAST(null as DATE) as release_date,
@@ -357,7 +357,7 @@ empty_google_analytics as (
 {#
 The purpose of this block of SQL is to create an empty row of data, which comforms to the UCL Discovery raw data.
 
-Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'ucl_table_id'.
+Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'ucl_discovery_table_id'.
 This will either point to 'empty_ucl_discovery' (the name of this SQL block) or the name of the real data table in bigquery.
 The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
 Providng an empty row enable simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
@@ -691,16 +691,16 @@ jstor_institution_metadata as (
     GROUP BY eISBN
 ),
 
-# OAPEN IRUS-UK Metrics
+# IRUS OPAEN Metrics
 {#
-The purpose of this block of SQL is to organise the metrics from OAPEN IRUS-UK for easier consumption of downstream queries.
+The purpose of this block of SQL is to organise the metrics from IRUS OAPEN for easier consumption of downstream queries.
 
 Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'oapen_table_id'.
-This will either point to 'empty_oapen' (defined above as an empty row) or the name of the real data table in bigquery.
+This will either point to 'empty_irus_oapen' (defined above as an empty row) or the name of the real data table in bigquery.
 The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
 Providng an empty row enable simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
 #}
-oapen_irus_uk_metrics as (
+irus_oapen_metrics as (
     SELECT
         ISBN as ISBN13,
         release_date,
@@ -710,69 +710,69 @@ oapen_irus_uk_metrics as (
             SUM(unique_item_requests) as unique_item_requests, group_items_irus_country(ARRAY_CONCAT_AGG(country)) as country,
             group_items_irus_location(ARRAY_CONCAT_AGG(locations)) as locations
         ) as metrics
-    FROM `{{ oapen_table_id }}`
+    FROM `{{ irus_oapen_table_id }}`
     GROUP BY ISBN, release_date
 ),
 
-# OAPEN IRUS-UK Metadata
+# IRUS OAPEN Metadata
 {#
-The purpose of this block of SQL is to organise the Metadata from OAPEN IRUS-UK for easier consumption of downstream queries.
+The purpose of this block of SQL is to organise the Metadata from IRUS OAPEN for easier consumption of downstream queries.
 
-Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'oapen_table_id'.
-This will either point to 'empty_oapen' (defined above as an empty row) or the name of the real data table in bigquery.
+Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'irus_oapen_table_id'.
+This will either point to 'empty_irus_oapen' (defined above as an empty row) or the name of the real data table in bigquery.
 The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
 Providng an empty row enable simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
 #}
-oapen_irus_uk_metadata as (
+irus_oapen_metadata as (
     SELECT
         ISBN as ISBN13, MAX(book_title) as book_title, MAX(publisher) as publisher
-    FROM `{{ oapen_table_id }}`
+    FROM `{{ irus_oapen_table_id }}`
     GROUP BY ISBN
 ),
 
-# Fulcrum Metrics
+# IRUS Fulcrum Metrics
 {#
-The purpose of this block of SQL is to organise the metrics from Fulcrum for easier consumption of downstream queries.
+The purpose of this block of SQL is to organise the metrics from IRUS Fulcrum for easier consumption of downstream queries.
 
-Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'fulcrum_table_id'.
-This will either point to 'empty_fulcrum' (defined above as an empty row) or the name of the real data table in bigquery.
+Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'irus_fulcrum_table_id'.
+This will either point to 'empty_irus_fulcrum' (defined above as an empty row) or the name of the real data table in bigquery.
 The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
 Providng an empty row enable simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
 #}
-fulcrum_metrics as (
+irus_fulcrum_metrics as (
     SELECT
         ISBN as ISBN13,
         release_date,
         STRUCT(
             SUM(total_item_investigations) as total_item_investigations,
             SUM(total_item_requests) as total_item_requests, SUM(unique_item_investigations) as unique_item_investigations,
-            SUM(unique_item_requests) as unique_item_requests, group_items_fulcrum_country(ARRAY_CONCAT_AGG(country)) as country
+            SUM(unique_item_requests) as unique_item_requests, group_items_irus_fulcrum_country(ARRAY_CONCAT_AGG(country)) as country
         ) as metrics
-    FROM `{{ fulcrum_table_id }}`
+    FROM `{{ irus_fulcrum_table_id }}`
     GROUP BY ISBN, release_date
 ),
 
-# Fulcrum Metadata
+# IRUS Fulcrum Metadata
 {#
-The purpose of this block of SQL is to organise the Metadata from OAPEN IRUS-UK for easier consumption of downstream queries.
+The purpose of this block of SQL is to organise the Metadata from IRUS OAPEN for easier consumption of downstream queries.
 
-Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'oapen_table_id'.
-This will either point to 'empty_oapen' (defined above as an empty row) or the name of the real data table in bigquery.
+Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'irus_fulcrum_table_id'.
+This will either point to 'empty_irus_oapen' (defined above as an empty row) or the name of the real data table in bigquery.
 The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
 Providng an empty row enable simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
 #}
-fulcrum_metadata as (
+irus_fulcrum_metadata as (
     SELECT
         ISBN as ISBN13, MAX(book_title) as book_title, MAX(publisher) as publisher
-    FROM `{{ fulcrum_table_id }}`
+    FROM `{{ irus_fulcrum_table_id }}`
     GROUP BY ISBN
 ),
 
 # UCL Discovery Metrics
 {#
-The purpose of this block of SQL is to organise the metrics from OAPEN IRUS-UK for easier consumption of downstream queries.
+The purpose of this block of SQL is to organise the metrics from IRUS OAPEN for easier consumption of downstream queries.
 
-Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'ucl_table_id'.
+Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'ucl_discovery_table_id'.
 This will either point to 'empty_ucl_discovery' (defined above as an empty row) or the name of the real data table in bigquery.
 The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
 Providng an empty row enable simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
@@ -784,7 +784,7 @@ ucl_discovery_metrics as (
         STRUCT(
             SUM(total_downloads) as total_downloads, group_items_ucl_country(ARRAY_CONCAT_AGG(downloads_per_country)) as downloads_per_country
         ) as metrics
-    FROM `{{ ucl_table_id }}`
+    FROM `{{ ucl_discovery_table_id }}`
     WHERE isbn IS NOT NULL
     GROUP BY isbn, release_date
 ),
@@ -819,8 +819,8 @@ unique_releases as (
             ARRAY(SELECT DISTINCT(release_date) FROM google_books_traffic_metrics),
             ARRAY(SELECT DISTINCT(release_date) FROM jstor_country_metrics),
             ARRAY(SELECT DISTINCT(release_date) FROM jstor_institution_metrics),
-            ARRAY(SELECT DISTINCT(release_date) FROM oapen_irus_uk_metrics),
-            ARRAY(SELECT DISTINCT(release_date) FROM fulcrum_metrics)
+            ARRAY(SELECT DISTINCT(release_date) FROM irus_oapen_metrics),
+            ARRAY(SELECT DISTINCT(release_date) FROM irus_fulcrum_metrics)
         )
     ) as release_date
     ORDER BY release_date DESC
@@ -857,8 +857,8 @@ metrics as (
             google_books_traffic.metrics as google_books_traffic,
             jstor_country.metrics as jstor_country,
             jstor_institution.metrics as jstor_institution,
-            oapen_irus_uk.metrics as oapen_irus_uk,
-            fulcrum.metrics as fulcrum,
+            irus_oapen.metrics as irus_oapen,
+            irus_fulcrum.metrics as irus_fulcrum,
             ucl_discovery.metrics as ucl_discovery
         ) ORDER BY ebook_months.release_date DESC) as months
     FROM ebook_months
@@ -867,8 +867,8 @@ metrics as (
     LEFT JOIN google_books_traffic_metrics as google_books_traffic ON ebook_months.ISBN13 = google_books_traffic.ISBN13 AND ebook_months.release_date = google_books_traffic.release_date
     LEFT JOIN jstor_country_metrics as jstor_country ON ebook_months.ISBN13 = jstor_country.ISBN13 AND ebook_months.release_date = jstor_country.release_date
     LEFT JOIN jstor_institution_metrics as jstor_institution ON ebook_months.ISBN13 = jstor_institution.ISBN13 AND ebook_months.release_date = jstor_institution.release_date
-    LEFT JOIN oapen_irus_uk_metrics as oapen_irus_uk ON ebook_months.ISBN13 = oapen_irus_uk.ISBN13 AND ebook_months.release_date = oapen_irus_uk.release_date
-    LEFT JOIN fulcrum_metrics as fulcrum ON ebook_months.ISBN13 = fulcrum.ISBN13 AND ebook_months.release_date = fulcrum.release_date
+    LEFT JOIN irus_oapen_metrics as irus_oapen ON ebook_months.ISBN13 = irus_oapen.ISBN13 AND ebook_months.release_date = irus_oapen.release_date
+    LEFT JOIN irus_fulcrum_metrics as irus_fulcrum ON ebook_months.ISBN13 = irus_fulcrum.ISBN13 AND ebook_months.release_date = irus_fulcrum.release_date
     LEFT JOIN ucl_discovery_metrics as ucl_discovery ON ebook_months.ISBN13 = ucl_discovery.ISBN13 AND ebook_months.release_date = ucl_discovery.release_date
     LEFT JOIN crossref_events as crossref_events ON ebook_months.ISBN13 = crossref_events.ISBN13 AND ebook_months.release_date = crossref_events.release_date
     WHERE google_analytics.metrics IS NOT NULL 
@@ -876,8 +876,8 @@ metrics as (
     OR google_books_traffic.metrics IS NOT NULL 
     OR jstor_country.metrics IS NOT NULL 
     OR jstor_institution.metrics IS NOT NULL
-    OR oapen_irus_uk.metrics IS NOT NULL 
-    OR fulcrum.metrics IS NOT NULL 
+    OR irus_oapen.metrics IS NOT NULL 
+    OR irus_fulcrum.metrics IS NOT NULL 
     OR ucl_discovery.metrics IS NOT NULL
     OR crossref_events.metrics IS NOT NULL 
     GROUP BY ebook_months.ISBN13
@@ -897,8 +897,8 @@ SELECT
     STRUCT(
         crossref_objects, chapters, events.overall as events, google_books_sales_metadata as google_books_sales,
         google_books_traffic_metadata as google_books_traffic, jstor_country_metadata as jstor_metadata,
-        jstor_institution_metadata as jstor_institution_metadata, oapen_irus_uk_metadata as oapen_irus_uk_metadata,
-        fulcrum_metadata as fulcrum_metadata
+        jstor_institution_metadata as jstor_institution_metadata, irus_oapen_metadata as irus_oapen_metadata,
+        irus_fulcrum_metadata as irus_fulcrum_metadata
     ) as metadata,
     metrics.months
 FROM onix_ebook_titles
@@ -909,6 +909,6 @@ LEFT JOIN google_books_sales_metadata on google_books_sales_metadata.ISBN13  = o
 LEFT JOIN google_books_traffic_metadata on google_books_traffic_metadata.ISBN13  = onix_ebook_titles.ISBN13
 LEFT JOIN jstor_country_metadata on jstor_country_metadata.ISBN13 = onix_ebook_titles.ISBN13
 LEFT JOIN jstor_institution_metadata on jstor_institution_metadata.ISBN13 = onix_ebook_titles.ISBN13
-LEFT JOIN oapen_irus_uk_metadata on oapen_irus_uk_metadata.ISBN13 = onix_ebook_titles.ISBN13
-LEFT JOIN fulcrum_metadata on fulcrum_metadata.ISBN13 = onix_ebook_titles.ISBN13
+LEFT JOIN irus_oapen_metadata on irus_oapen_metadata.ISBN13 = onix_ebook_titles.ISBN13
+LEFT JOIN irus_fulcrum_metadata on irus_fulcrum_metadata.ISBN13 = onix_ebook_titles.ISBN13
 LEFT JOIN `{{ book_table_id }}` as public_data on public_data.isbn = onix_ebook_titles.ISBN13

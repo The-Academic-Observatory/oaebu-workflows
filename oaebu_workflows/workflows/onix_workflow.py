@@ -648,9 +648,9 @@ class OnixWorkflow(Workflow):
         google_analytics_dataset = data_partner_datasets.get("google_analytics")
         google_books_dataset = data_partner_datasets.get("google_books_traffic")
         jstor_dataset = data_partner_datasets.get("jstor_country")
-        oapen_dataset = data_partner_datasets.get("oapen_irus_uk")
-        ucl_dataset = data_partner_datasets.get("ucl_discovery")
-        fulcrum_dataset = data_partner_datasets.get("fulcrum")
+        irus_oapen_dataset = data_partner_datasets.get("irus_oapen")
+        irus_fulcrum_dataset = data_partner_datasets.get("irus_fulcrum")
+        ucl_discovery_dataset = data_partner_datasets.get("ucl_discovery")
 
         # Create matched tables for supplied data partners
         google_analytics_table_id = "empty_google_analytics"
@@ -658,9 +658,9 @@ class OnixWorkflow(Workflow):
         google_books_traffic_table_id = "empty_google_books_traffic"
         jstor_country_table_id = "empty_jstor_country"
         jstor_institution_table_id = "empty_jstor_institution"
-        oapen_table_id = "empty_oapen"
-        ucl_table_id = "empty_ucl_discovery"
-        fulcrum_table_id = "empty_fulcrum"
+        irus_oapen_table_id = "empty_oapen"
+        irus_fulcrum_table_id = "empty_fulcrum"
+        ucl_discovery_table_id = "empty_ucl_discovery"
         if google_analytics_dataset:
             google_analytics_table_id = bq_sharded_table_id(
                 self.cloud_workspace.project_id,
@@ -694,25 +694,25 @@ class OnixWorkflow(Workflow):
                 "jstor_institution_matched",
                 release.snapshot_date,
             )
-        if oapen_dataset:
-            oapen_table_id = bq_sharded_table_id(
+        if irus_oapen_dataset:
+            irus_oapen_table_id = bq_sharded_table_id(
                 self.cloud_workspace.project_id,
                 self.bq_oaebu_intermediate_dataset,
-                "oapen_irus_uk_matched",
+                "irus_oapen_matched",
                 release.snapshot_date,
             )
-        if ucl_dataset:
-            ucl_table_id = bq_sharded_table_id(
+        if ucl_discovery_dataset:
+            ucl_discovery_table_id = bq_sharded_table_id(
                 self.cloud_workspace.project_id,
                 self.bq_oaebu_intermediate_dataset,
                 "ucl_discovery_matched",
                 release.snapshot_date,
             )
-        if fulcrum_dataset:
-            fulcrum_table_id = bq_sharded_table_id(
+        if irus_fulcrum_dataset:
+            irus_fulcrum_table_id = bq_sharded_table_id(
                 self.cloud_workspace.project_id,
                 self.bq_oaebu_intermediate_dataset,
-                "fulcrum_matched",
+                "irus_fulcrum_matched",
                 release.snapshot_date,
             )
         workid_table_id = bq_sharded_table_id(
@@ -745,9 +745,9 @@ class OnixWorkflow(Workflow):
             google_books_traffic_table_id=google_books_traffic_table_id,
             jstor_country_table_id=jstor_country_table_id,
             jstor_institution_table_id=jstor_institution_table_id,
-            oapen_table_id=oapen_table_id,
-            ucl_table_id=ucl_table_id,
-            fulcrum_table_id=fulcrum_table_id,
+            irus_oapen_table_id=irus_oapen_table_id,
+            irus_fulcrum_table_id=irus_fulcrum_table_id,
+            ucl_discovery_table_id=ucl_discovery_table_id,
             book_table_id=book_table_id,
             workid_table_id=workid_table_id,
             workfamilyid_table_id=workfamilyid_table_id,
@@ -823,9 +823,9 @@ class OnixWorkflow(Workflow):
         google_analytics_table = data_partner_tables.get("google_analytics")
         google_books_table = data_partner_tables.get("google_books_traffic")
         jstor_table = data_partner_tables.get("jstor_country")
-        oapen_irus_uk_table = data_partner_tables.get("oapen_irus_uk")
+        irus_oapen_table = data_partner_tables.get("irus_oapen")
         ucl_table = data_partner_tables.get("ucl_discovery")
-        fulcrum_table = data_partner_tables.get("fulcrum")
+        fulcrum_table = data_partner_tables.get("irus_fulcrum")
 
         google_analytics_unmatched_table_id = (
             bq_sharded_table_id(
@@ -857,14 +857,14 @@ class OnixWorkflow(Workflow):
             if jstor_table
             else None
         )
-        oapen_irus_uk_unmatched_table_id = (
+        irus_oapen_unmatched_table_id = (
             bq_sharded_table_id(
                 self.cloud_workspace.project_id,
                 self.bq_oaebu_data_qa_dataset,
-                f"{oapen_irus_uk_table}_unmatched_{data_partner_isbns['oapen_irus_uk']}",
+                f"{irus_oapen_table}_unmatched_{data_partner_isbns['irus_oapen']}",
                 release.snapshot_date,
             )
-            if oapen_irus_uk_table
+            if irus_oapen_table
             else None
         )
         ucl_discovery_unmatched_table_id = (
@@ -881,7 +881,7 @@ class OnixWorkflow(Workflow):
             bq_sharded_table_id(
                 self.cloud_workspace.project_id,
                 self.bq_oaebu_data_qa_dataset,
-                f"{fulcrum_table}_unmatched_{data_partner_isbns['fulcrum']}",
+                f"{fulcrum_table}_unmatched_{data_partner_isbns['irus_fulcrum']}",
                 release.snapshot_date,
             )
             if fulcrum_table
@@ -905,15 +905,15 @@ class OnixWorkflow(Workflow):
             google_analytics_unmatched_table_id=google_analytics_unmatched_table_id,
             google_books_unmatched_table_id=google_books_unmatched_table_id,
             jstor_unmatched_table_id=jstor_unmatched_table_id,
-            oapen_irus_uk_unmatched_table_id=oapen_irus_uk_unmatched_table_id,
+            irus_oapen_unmatched_table_id=irus_oapen_unmatched_table_id,
             ucl_discovery_unmatched_table_id=ucl_discovery_unmatched_table_id,
             fulcrum_unmatched_table_id=fulcrum_unmatched_table_id,
             google_analytics_isbn=data_partner_isbns.get("google_analytics"),
             google_books_isbn=data_partner_isbns.get("google_books_traffic"),
             jstor_isbn=data_partner_isbns.get("jstor_country"),
-            oapen_irus_uk_isbn=data_partner_isbns.get("oapen_irus_uk"),
+            irus_oapen_isbn=data_partner_isbns.get("irus_oapen"),
             ucl_discovery_isbn=data_partner_isbns.get("ucl_discovery"),
-            fulcrum_isbn=data_partner_isbns.get("fulcrum"),
+            fulcrum_isbn=data_partner_isbns.get("irus_fulcrum"),
         )
         status = bq_create_table_from_query(sql=sql, table_id=table_id)
         set_task_state(status, kwargs["ti"].task_id, release=release)

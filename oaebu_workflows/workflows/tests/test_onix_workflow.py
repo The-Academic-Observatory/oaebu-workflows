@@ -237,7 +237,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                             "google_books_traffic_test",
                             "jstor_country_test",
                             "jstor_institution_test",
-                            "oapen_irus_uk_test",
+                            "irus_oapen_test",
                         ],
                         data_partners=[
                             "google_analytics",
@@ -245,7 +245,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                             "google_books_traffic",
                             "jstor_country",
                             "jstor_institution",
-                            "oapen_irus_uk",
+                            "irus_oapen",
                             "onix",
                             "nonexistent_partner",
                         ],
@@ -287,13 +287,13 @@ class TestOnixWorkflow(ObservatoryTestCase):
         with env.create():
             data_partners = [
                 "jstor_country",
-                "oapen_irus_uk",
+                "irus_oapen",
                 "google_books_sales",
                 "google_books_traffic",
                 "onix",
                 "google_analytics",
             ]
-            sensor_dag_ids = ["jstor", "oapen_irus_uk", "google_books", "onix", "google_analytics"]
+            sensor_dag_ids = ["jstor", "irus_oapen", "google_books", "onix", "google_analytics"]
             dag = OnixWorkflow(
                 dag_id=self.dag_id,
                 cloud_workspace=self.fake_cloud_workspace,
@@ -304,7 +304,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 "google_analytics_sensor": ["aggregate_works"],
                 "google_books_sensor": ["aggregate_works"],
                 "jstor_sensor": ["aggregate_works"],
-                "oapen_irus_uk_sensor": ["aggregate_works"],
+                "irus_oapen_sensor": ["aggregate_works"],
                 "onix_sensor": ["aggregate_works"],
                 "aggregate_works": ["upload_aggregation_tables"],
                 "upload_aggregation_tables": ["bq_load_aggregations"],
@@ -313,13 +313,13 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 "create_oaebu_crossref_events_table": ["create_oaebu_book_table"],
                 "create_oaebu_book_table": [
                     "create_oaebu_intermediate_table_google_books_sales",
-                    "create_oaebu_intermediate_table_oapen_irus_uk",
+                    "create_oaebu_intermediate_table_irus_oapen",
                     "create_oaebu_intermediate_table_google_analytics",
                     "create_oaebu_intermediate_table_google_books_traffic",
                     "create_oaebu_intermediate_table_jstor_country",
                 ],
                 "create_oaebu_intermediate_table_jstor_country": ["create_oaebu_book_product_table"],
-                "create_oaebu_intermediate_table_oapen_irus_uk": ["create_oaebu_book_product_table"],
+                "create_oaebu_intermediate_table_irus_oapen": ["create_oaebu_book_product_table"],
                 "create_oaebu_intermediate_table_google_books_sales": ["create_oaebu_book_product_table"],
                 "create_oaebu_intermediate_table_google_books_traffic": ["create_oaebu_book_product_table"],
                 "create_oaebu_intermediate_table_google_analytics": ["create_oaebu_book_product_table"],
@@ -341,7 +341,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     "export_oaebu_table_book_product_metrics_city",
                     "export_oaebu_table_book_product_author_metrics",
                     "export_oaebu_table_book_product_metrics_institution",
-                    "create_oaebu_data_qa_intermediate_unmatched_oapen_irus_uk",
+                    "create_oaebu_data_qa_intermediate_unmatched_irus_oapen",
                     "create_oaebu_data_qa_isbn_google_analytics",
                     "export_oaebu_table_book_product_year_metrics",
                     "export_oaebu_table_book_product_subject_bisac_metrics",
@@ -349,7 +349,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     "export_oaebu_table_book_product_metrics_events",
                     "export_oaebu_table_institution_list",
                     "create_oaebu_data_qa_intermediate_unmatched_google_books_traffic",
-                    "create_oaebu_data_qa_isbn_oapen_irus_uk",
+                    "create_oaebu_data_qa_isbn_irus_oapen",
                     "export_oaebu_table_book_product_metrics",
                 ],
                 "create_oaebu_data_qa_isbn_onix": ["export_oaebu_qa_metrics"],
@@ -357,8 +357,8 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 "create_oaebu_data_qa_isbn_jstor_country": ["export_oaebu_qa_metrics"],
                 "create_oaebu_data_qa_eisbn_jstor_country": ["export_oaebu_qa_metrics"],
                 "create_oaebu_data_qa_intermediate_unmatched_jstor_country": ["export_oaebu_qa_metrics"],
-                "create_oaebu_data_qa_isbn_oapen_irus_uk": ["export_oaebu_qa_metrics"],
-                "create_oaebu_data_qa_intermediate_unmatched_oapen_irus_uk": ["export_oaebu_qa_metrics"],
+                "create_oaebu_data_qa_isbn_irus_oapen": ["export_oaebu_qa_metrics"],
+                "create_oaebu_data_qa_intermediate_unmatched_irus_oapen": ["export_oaebu_qa_metrics"],
                 "create_oaebu_data_qa_isbn_google_books_sales": ["export_oaebu_qa_metrics"],
                 "create_oaebu_data_qa_intermediate_unmatched_google_books_sales": ["export_oaebu_qa_metrics"],
                 "create_oaebu_data_qa_isbn_google_books_traffic": ["export_oaebu_qa_metrics"],
@@ -775,8 +775,8 @@ class TestOnixWorkflow(ObservatoryTestCase):
             ("jstor_institution", partner_dataset, False, "jstor_institution"),
             ("google_books_sales", partner_dataset, False, "google_books_sales"),
             ("google_books_traffic", partner_dataset, False, "google_books_traffic"),
-            ("oapen_irus_uk", partner_dataset, False, "oapen_irus_uk"),
-            ("fulcrum", partner_dataset, False, "fulcrum"),
+            ("irus_oapen", partner_dataset, False, "irus_oapen"),
+            ("irus_fulcrum", partner_dataset, False, "irus_fulcrum"),
         ]
         if include_google_analytics:
             table_dataset_sharded_schema.append(
@@ -860,8 +860,8 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 "jstor",
                 "google_books",
                 "google_analytics",
-                "oapen_irus_uk",
-                "fulcrum",
+                "irus_oapen",
+                "irus_fulcrum",
                 "onix",
                 "ucl_discovery",
             ]
@@ -950,10 +950,10 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     "google_books_sales_unmatched_Primary_ISBN": f"SELECT Primary_ISBN from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.google_books_sales_unmatched_Primary_ISBN{release_suffix}",
                     "google_books_traffic_invalid_isbn": f"SELECT * from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.google_books_traffic_invalid_isbn{release_suffix}",
                     "google_books_traffic_unmatched_Primary_ISBN": f"SELECT Primary_ISBN from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.google_books_traffic_unmatched_Primary_ISBN{release_suffix}",
-                    "oapen_irus_uk_invalid_isbn": f"SELECT * from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.oapen_irus_uk_invalid_isbn{release_suffix}",
-                    "oapen_irus_uk_unmatched_ISBN": f"SELECT ISBN from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.oapen_irus_uk_unmatched_ISBN{release_suffix}",
-                    "fulcrum_invalid_isbn": f"SELECT * from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.fulcrum_invalid_isbn{release_suffix}",
-                    "fulcrum_unmatched_ISBN": f"SELECT ISBN from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.fulcrum_unmatched_ISBN{release_suffix}",
+                    "irus_oapen_invalid_isbn": f"SELECT * from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.irus_oapen_invalid_isbn{release_suffix}",
+                    "irus_oapen_unmatched_ISBN": f"SELECT ISBN from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.irus_oapen_unmatched_ISBN{release_suffix}",
+                    "irus_fulcrum_invalid_isbn": f"SELECT * from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.irus_fulcrum_invalid_isbn{release_suffix}",
+                    "irus_fulcrum_unmatched_ISBN": f"SELECT ISBN from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.irus_fulcrum_unmatched_ISBN{release_suffix}",
                 }
                 if include_google_analytics:
                     data_qa_sql[
@@ -1225,8 +1225,8 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     and oaebu_wfam["211"] is None
                 )
 
-                # OAPEN IRUS UK
-                sql = f"SELECT ISBN, work_id, work_family_id from {self.gcp_project_id}.{oaebu_intermediate_dataset_id}.oapen_irus_uk_matched{release_suffix}"
+                # IRUS OAPEN
+                sql = f"SELECT ISBN, work_id, work_family_id from {self.gcp_project_id}.{oaebu_intermediate_dataset_id}.irus_oapen_matched{release_suffix}"
                 records = bq_run_query(sql)
                 oaebu_works = {record["ISBN"]: record["work_id"] for record in records}
                 oaebu_wfam = {record["ISBN"]: record["work_family_id"] for record in records}

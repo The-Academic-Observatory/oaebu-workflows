@@ -81,8 +81,8 @@
       }
     ],
     "mode": "NULLABLE",
-    "name": "oapen_irus_uk",
+    "name": "irus_oapen",
     "type": "RECORD",
-    "description": "Metrics from IRUS-UK"
+    "description": "Metrics from OAPEN. Recorded with the IRUS-UK platform"
   }
 ]

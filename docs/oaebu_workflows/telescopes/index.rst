@@ -9,8 +9,8 @@ output data to other places. Workflows are built on top of Apache Airflow's DAGs
     google_books
     jstor
     oapen_metadata
-    oapen_irus_uk
-    fulcrum
+    irus_oapen
+    irus_fulcrum
     onix
     thoth
     ucl_discovery
