@@ -118,7 +118,7 @@ class OapenIrusUkTelescope(Workflow):
         oapen_irus_login_conn_id: str = "oapen_irus_uk_login",
         catchup: bool = True,
         start_date: pendulum.DateTime = pendulum.datetime(2015, 6, 1),
-        schedule_interval: str = "0 0 14 * *",
+        schedule_interval: str = "0 0 4 * *", # Run on the 4th of every month
         max_active_runs: int = 5,
     ):
         """The OAPEN irus uk telescope.
