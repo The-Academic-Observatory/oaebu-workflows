@@ -18,7 +18,7 @@ This table is a list of each Book Product. It is primarily used for drop-down fi
 [Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_book_list.sql.jinja2)
 
 ```eval_rst
-.. tabularcolumns:: |l|l|l|p{6cm}| 
+.. tabularcolumns:: |p{4.5cm}|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/oaebu_publisher_book_product_list_latest.csv
    :width: 100%
@@ -33,7 +33,7 @@ This table contains metrics, organised by month, that are linked to each book. T
 [Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_book_metrics.sql.jinja2)
 
 ```eval_rst
-.. tabularcolumns:: |l|l|l|p{6cm}| 
+.. tabularcolumns:: |p{4.5cm}|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/oaebu_publisher_book_product_metrics_latest.csv
    :width: 100%
@@ -48,7 +48,7 @@ This table contains metrics, organised by month and author, that are linked to e
 [Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_book_author_metrics.sql.jinja2)
 
 ```eval_rst
-.. tabularcolumns:: |l|l|l|p{6cm}| 
+.. tabularcolumns:: |p{4.5cm}|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/oaebu_publisher_book_product_author_metrics_latest.csv
    :width: 100%
@@ -63,7 +63,7 @@ This table contains metrics, organised by published year and month, that are lin
 [Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_book_year_metrics.sql.jinja2)
 
 ```eval_rst
-.. tabularcolumns:: |l|l|l|p{6cm}|
+.. tabularcolumns:: |p{4.5cm}|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/oaebu_publisher_book_product_year_metrics_latest.csv
    :width: 100%
@@ -78,7 +78,7 @@ This table contains metrics, organised by month and crossref event type, that ar
 [Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_book_metrics_event.sql.jinja2)
 
 ```eval_rst
-.. tabularcolumns:: |l|l|l|p{6cm}|
+.. tabularcolumns:: |p{4.5cm}|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/oaebu_publisher_book_product_metrics_events_latest.csv
    :width: 100%
@@ -93,7 +93,7 @@ This table contains metrics, organised by month and city of measured usage, that
 [Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_book_metrics_city.sql.jinja2)
 
 ```eval_rst
-.. tabularcolumns:: |l|l|l|p{6cm}|
+.. tabularcolumns:: |p{4.5cm}|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/oaebu_publisher_book_product_metrics_city_latest.csv
    :width: 100%
@@ -108,22 +108,9 @@ This table contains metrics, organised by month and country of measured usage, t
 [Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_book_metrics_country.sql.jinja2)
 
 ```eval_rst
-.. tabularcolumns:: |l|l|l|p{6cm}|
+.. tabularcolumns:: |p{4.5cm}|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/oaebu_publisher_book_product_metrics_country_latest.csv
-   :width: 100%
-   :header-rows: 1
-   :class: longtable
-```
-
-### Country List Schema
-
-This table is a list of each unique Country or Territory. It is primarily used for drop-down fields.
-
-```eval_rst
-.. tabularcolumns:: |l|l|l|p{6cm}|
-.. csv-table::
-   :file: ../../schemas/oaebu_public_data_country_list_latest.csv
    :width: 100%
    :header-rows: 1
    :class: longtable
@@ -136,7 +123,7 @@ This table contains metrics, organised by month and crossref event type, that ar
 [Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_book_metrics_event.sql.jinja2)
 
 ```eval_rst
-.. tabularcolumns:: |l|l|l|p{6cm}|
+.. tabularcolumns:: |p{4.5cm}|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/oaebu_publisher_book_product_metrics_events_latest.csv
    :width: 100%
@@ -151,7 +138,7 @@ This table is a list of each unique Institution where metrics are linked too. It
 [Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_book_metrics_institution.sql.jinja2)
 
 ```eval_rst
-.. tabularcolumns:: |l|l|l|p{6cm}|
+.. tabularcolumns:: |p{4.5cm}|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/oaebu_publisher_institution_list_latest.csv
    :width: 100%
@@ -166,7 +153,7 @@ This table contains metrics, organised by month and institution for which there 
 [Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_institution_list.sql.jinja2)
 
 ```eval_rst
-.. tabularcolumns:: |l|l|l|p{6cm}|
+.. tabularcolumns:: |p{4.5cm}|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/oaebu_publisher_book_product_metrics_institution_latest.csv
    :width: 100%
@@ -181,7 +168,7 @@ This index contains a summary of metrics, organised by month that are linked to 
 [Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_book_publisher_metrics.sql.jinja2)
 
 ```eval_rst
-.. tabularcolumns:: |l|l|l|p{6cm}|
+.. tabularcolumns:: |p{4.5cm}|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/oaebu_publisher_book_product_publisher_metrics_latest.csv
    :width: 100%
@@ -196,7 +183,7 @@ This table contains metrics, organised by month and BIC subject type, that are l
 [Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_book_subject_bic_metrics.sql.jinja2)
 
 ```eval_rst
-.. tabularcolumns:: |l|l|l|p{6cm}|
+.. tabularcolumns:: |p{4.5cm}|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/oaebu_publisher_book_product_subject_bic_metrics_latest.csv
    :width: 100%
@@ -211,7 +198,7 @@ This table contains metrics, organised by month and BISAC subject type, that are
 [Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_book_subject_bisac_metrics.sql.jinja2)
 
 ```eval_rst
-.. tabularcolumns:: |l|l|l|p{6cm}|
+.. tabularcolumns:: |p{4.5cm}|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/oaebu_publisher_book_product_subject_bisac_metrics_latest.csv
    :width: 100%
@@ -226,7 +213,7 @@ This table contains metrics, organised by month and THEMA subject type, that are
 [Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_book_subject_thema_metrics.sql.jinja2)
 
 ```eval_rst
-.. tabularcolumns:: |l|l|l|p{6cm}|
+.. tabularcolumns:: |p{4.5cm}|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/oaebu_publisher_book_product_subject_thema_metrics_latest.csv
    :width: 100%
@@ -241,7 +228,7 @@ This table contains metrics, organised by published year and month and currently
 [Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_book_subject_year_metrics.sql.jinja2)
 
 ```eval_rst
-.. tabularcolumns:: |l|l|l|p{6cm}|
+.. tabularcolumns:: |p{4.5cm}|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/oaebu_publisher_book_product_subject_year_metrics_latest.csv
    :width: 100%
@@ -258,7 +245,7 @@ This dataset is helpful for understanding where metrics and books defined in the
 [Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/export_unmatched_metrics.sql.jinja2)
 
 ```eval_rst
-.. tabularcolumns:: |l|l|l|p{6cm}|
+.. tabularcolumns:: |p{4.5cm}|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/oaebu_publisher_unmatched_book_metrics_latest.csv
    :width: 100%

@@ -6,6 +6,8 @@ Thoth is a free, open metadata service that publishers can choose to utilise as 
 
 The Thoth telescope downloads the ONIX metadata files and then transforms the data into a format suitable for loading into BigQuery with the [ONIX parser](https://github.com/The-Academic-Observatory/onix-parser) Java command line tool. This is a near-identical process to how the [ONIX telescope's](onix.md) data-transformation step is executed. The transformed data is loaded into BigQuery, where it can be picked up and used by the [ONIX Workflow](../workflows/onix_workflow_intro.md).
 
+The corresponding table in BigQuery is `onix.onixYYYYMMDD`. 
+
 ```eval_rst
 +------------------------------+--------------+
 | Summary                      |              |
@@ -45,10 +47,10 @@ The Thoth telescope does not require any airflow connections to run, as the Thot
 ## Latest schema
 
 ```eval_rst
-.. tabularcolumns:: |p{6cm}|l|l|p{6cm}| 
+.. tabularcolumns:: |p{4.5cm}|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/onix_latest.csv
    :width: 100%
    :header-rows: 1
-   :class: longtable
+   :class: longtable 
 ```

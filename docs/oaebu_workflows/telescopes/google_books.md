@@ -246,7 +246,7 @@ sftp_service: ssh://<username>:<password>@<host>:<port>?host_key=<host_key>
 ### Google Books Sales
 
 ``` eval_rst
-.. tabularcolumns:: |l|l|l|p{6cm}|
+.. tabularcolumns:: |p{4.5cm}|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/google_books_sales_latest.csv
    :width: 100%
@@ -257,7 +257,7 @@ sftp_service: ssh://<username>:<password>@<host>:<port>?host_key=<host_key>
 ### Google Books Traffic
 
 ``` eval_rst
-.. tabularcolumns:: |l|l|l|p{6cm}| 
+.. tabularcolumns:: |p{4.5cm}|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/google_books_traffic_latest.csv
    :width: 100%

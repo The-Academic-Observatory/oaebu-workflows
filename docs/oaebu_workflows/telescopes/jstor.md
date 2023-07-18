@@ -13,7 +13,7 @@ In the telescope the Gmail of the G-suite account is parsed for messages with a 
 
 The production server of the observatory-platform has been white listed by JSTOR to avoid bot detection.
 
-The corresponding tables created in BigQuery are `jstor_countryYYYYMMDD` and `jstor_institutionYYYYMMDD`.
+The corresponding tables created in BigQuery are `jstor.jstor_countryYYYYMMDD` and `jstor.jstor_institutionYYYYMMDD`.
 
 ```eval_rst
 +------------------------------+---------+
@@ -352,7 +352,7 @@ gmail_api: google-cloud-platform://?token=<token>&refresh_token=<refresh_token>&
 ### JSTOR Institution
 
 ``` eval_rst
-.. tabularcolumns:: |l|l|l|p{6cm}| 
+.. tabularcolumns:: |p{4.5cm}|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/jstor_institution_latest.csv
    :width: 100%
@@ -363,7 +363,7 @@ gmail_api: google-cloud-platform://?token=<token>&refresh_token=<refresh_token>&
 ### JSTOR Country
 
 ``` eval_rst
-.. tabularcolumns:: |l|l|l|p{6cm}| 
+.. tabularcolumns:: |p{4.5cm}|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/jstor_country_latest.csv
    :width: 100%

@@ -10,6 +10,8 @@ The ONIX telescope downloads the ONIX files from the SFTP server. It then transf
 for loading into BigQuery with the [ONIX parser](https://github.com/The-Academic-Observatory/onix-parser) Java command 
 line tool. The data is loaded into BigQuery and then used by the ONIX Workflow.
 
+The corresponding table in BigQuery is `onix.onixYYYYMMDD`. 
+
 ```eval_rst
 +------------------------------+--------------+
 | Summary                      |              |
@@ -59,7 +61,7 @@ sftp_service: ssh://user-name:password@host-name:port?host_key=host-key
 
 ## Latest schema
 ``` eval_rst
-.. tabularcolumns:: |l|l|l|p{6cm}|
+.. tabularcolumns:: |p{4.5cm}|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/onix_latest.csv
    :width: 100%

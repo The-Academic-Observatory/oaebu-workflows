@@ -6,7 +6,6 @@ The earliest available data for the Fulcrum platform is April 2022. It follows t
 
 The corresponding table created in BigQuery is `irus.irus_fulcrumYYYYMMDD`.
 
-
 ```eval_rst
 +------------------------------+--------------+
 | Summary                      |              |
@@ -80,9 +79,9 @@ The transformed data is loaded from the Google Cloud bucket into a partitioned B
 ## Latest schema
 
 ```eval_rst
-.. tabularcolumns:: |l|l|l|p{6cm}| 
+.. tabularcolumns:: |p{4.5cm}|l|l|p{6cm}| 
 .. csv-table::
-   :file: ../../schemas/irus_fulcrum.csv
+   :file: ../../schemas/irus_fulcrum_latest.csv
    :width: 100%
    :header-rows: 1
    :class: longtable

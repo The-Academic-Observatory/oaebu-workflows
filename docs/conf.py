@@ -10,26 +10,31 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-# import os
-# import sys
 # sys.path.insert(0, os.path.abspath('.'))
+import sys
 import os
 import shutil
 from pathlib import Path
 
 from recommonmark.transform import AutoStructify
 
-from generate_schema_csv import generate_csv, generate_latest_files
+from generate_schema_csv import generate_csv, generate_csv_pdf, generate_latest_files
 
-# -- Formatting --------------------------------------------------------------
+# -- Project information -----------------------------------------------------
+
+project = "Book Usage Data Workflows"
+copyright = "2020-2022 Curtin University"
+author = "Curtin University"
+
+
+# -- Options for PDFL output -------------------------------------------------
 
 latex_elements = {
     'sphinxsetup': "verbatimforcewraps, verbatimmaxunderfull=0",
+    'extraclassoptions': 'openany,oneside',
     'preamble': r'''
         \usepackage[none]{hyphenat}
         \usepackage{makeidx}
-        \usepackage{ragged2e}
-        \RaggedRight
         \makeindex
         \makeatletter
         \renewenvironment{theindex}
@@ -40,12 +45,6 @@ latex_elements = {
     '''
 }
 
-
-# -- Project information -----------------------------------------------------
-
-project = "Book Usage Data Workflows"
-copyright = "2022-2025 Curtin University"
-author = "Curtin University"
 
 # -- General configuration ---------------------------------------------------
 
@@ -58,7 +57,10 @@ extensions = [
     "sphinx.ext.intersphinx",
     "autoapi.extension",
     "recommonmark",
+    "sphinx.ext.autodoc",
 ]
+
+autodoc_typehints = 'description'
 
 # Auto API settings: https://github.com/readthedocs/sphinx-autoapi
 autoapi_type = "python"
@@ -67,6 +69,8 @@ autoapi_add_toctree_entry = False
 autoapi_python_use_implicit_namespaces = True
 autoapi_root = "oaebu_workflows/api"
 
+autoapi_python_use_implicit_namespaces = True
+autoapi_python_class_content = 'both'
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["templates"]
@@ -99,8 +103,23 @@ def setup(app):
     app.add_config_value("recommonmark_config", {"enable_eval_rst": True, "auto_toc_tree_section": "Contents"}, True)
     app.add_transform(AutoStructify)
 
+# -- Build options to format tables for html or pdf output -------------------------------------------------
 
-generate_csv(schema_dir="../oaebu_workflows/database/schema")
-generate_latest_files()
-html_build_dir = "_build/html"
-Path(html_build_dir).mkdir(exist_ok=True, parents=True)
+# Determine the command used to build the documentation
+build_command = ' '.join(sys.argv)
+
+if 'html' in build_command:
+    generate_csv(schema_dir="../oaebu_workflows/database/schema")
+    generate_latest_files()
+    html_build_dir = "_build/html"
+    Path(html_build_dir).mkdir(exist_ok=True, parents=True)
+elif 'latexpdf' in build_command:
+   generate_csv_pdf(schema_dir="../oaebu_workflows/database/schema")
+   generate_latest_files()
+   latex_build_dir = "_build/latex"
+   Path(latex_build_dir).mkdir(exist_ok=True, parents=True)
+else:
+    generate_csv(schema_dir="../oaebu_workflows/database/schema")
+    generate_latest_files()
+    html_build_dir = "_build/html"
+    Path(html_build_dir).mkdir(exist_ok=True, parents=True)

@@ -97,22 +97,15 @@ Similar to the publisher names described above, multiple publisher UUIDs can be 
 '|' character.
 
 ## Cloud Function
-<<<<<<< HEAD:docs/oaebu_workflows/telescopes/irus_oapen.md
-
-The OAPEN IRUS-UK telescope makes use of a Google Cloud Function that resides in the OAPEN Google project.
-=======
 The IRUS OAPEN telescope makes use of a Google Cloud Function that resides in the OAPEN Google project. 
->>>>>>> 1da38aa (COK-531 supporting rendering of pdf in progress. Changes to conf.py to be improved for longtable and api reference still not line breaking correctly. onix, thoth and book product tale schemas with long names still need to be accounted for.):docs/oaebu_workflows/telescopes/oapen_irus_uk.md
+
 There is a specific airflow task that will create the Cloud Function if it does not exist yet, or update it if the source code has changed.  
+
 The source code for the Cloud Function can be found inside a separate repository that is part of the same organization (https://github.com/The-Academic-Observatory/oapen-irus-uk-cloud-function).
 
 ### Download access stats data
-<<<<<<< HEAD:docs/oaebu_workflows/telescopes/irus_oapen.md
-
-The Cloud Function downloads OAPEN IRUS-UK access stats data for 1 month and for a single publisher. Usage data after April 2020 is hosted on a new platform.  
-=======
 The Cloud Function downloads IRUS OAPEN access stats data for 1 month and for a single publisher. Usage data after April 2020 is hosted on a new platform.  
->>>>>>> 1da38aa (COK-531 supporting rendering of pdf in progress. Changes to conf.py to be improved for longtable and api reference still not line breaking correctly. onix, thoth and book product tale schemas with long names still need to be accounted for.):docs/oaebu_workflows/telescopes/oapen_irus_uk.md
+
 The newer data is obtained by using their API, this requires a `requestor_id` and an `api_key`.  
 Data before April 2020 is obtained from an URL, this requires an `email` and a `password`.
 
@@ -164,19 +157,10 @@ Note that all values need to be urlencoded.
 In the config.yaml file, the following airflow connections are required:
 
 ### oapen_irus_uk_login
-<<<<<<< HEAD:docs/oaebu_workflows/telescopes/irus_oapen.md
-
-To get the email address/password combination, contact OAPEN IRUS-UK.
-
-### oapen_irus_uk_api
-
-To get the requestor_id/api_key, contact OAPEN IRUS-UK.
-=======
 To get the email address/password combination, contact IRUS.
 
 ### oapen_irus_uk_api
 To get the requestor_id/api_key, contact IRUS.
->>>>>>> 1da38aa (COK-531 supporting rendering of pdf in progress. Changes to conf.py to be improved for longtable and api reference still not line breaking correctly. onix, thoth and book product tale schemas with long names still need to be accounted for.):docs/oaebu_workflows/telescopes/oapen_irus_uk.md
 
 ### geoip_license_key
 
@@ -192,20 +176,11 @@ geoip_license_key: mysql://user_id:license_key@
 ```
 
 ## Latest schema
-<<<<<<< HEAD:docs/oaebu_workflows/telescopes/irus_oapen.md
-
 ```eval_rst
-=======
-``` eval_rst
-.. tabularcolumns:: |l|l|l|p{6cm}| 
->>>>>>> 1da38aa (COK-531 supporting rendering of pdf in progress. Changes to conf.py to be improved for longtable and api reference still not line breaking correctly. onix, thoth and book product tale schemas with long names still need to be accounted for.):docs/oaebu_workflows/telescopes/oapen_irus_uk.md
+.. tabularcolumns:: |p{4.5cm}|l|l|p{6cm}|
 .. csv-table::
    :file: ../../schemas/irus_oapen.csv
    :width: 100%
    :header-rows: 1
-<<<<<<< HEAD:docs/oaebu_workflows/telescopes/irus_oapen.md
-```
-=======
    :class: longtable
 ```
->>>>>>> 1da38aa (COK-531 supporting rendering of pdf in progress. Changes to conf.py to be improved for longtable and api reference still not line breaking correctly. onix, thoth and book product tale schemas with long names still need to be accounted for.):docs/oaebu_workflows/telescopes/oapen_irus_uk.md
