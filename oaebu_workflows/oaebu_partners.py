@@ -116,8 +116,8 @@ OAEBU_DATA_PARTNER_DATASETS = dict(
         type_id="ucl_discovery",
         bq_dataset_id="ucl",
         bq_table_name="ucl_discovery",
-        isbn_field_name="isbn",
-        title_field_name="book_title",
+        isbn_field_name="ISBN",
+        title_field_name="title",
         sharded=False,
     ),
     irus_fulcrum=OaebuPartner(

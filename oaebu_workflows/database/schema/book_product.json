@@ -424,6 +424,26 @@
         "name": "irus_fulcrum_metadata",
         "type": "RECORD",
         "description": "Metadata derived from IRUS Fulcrum"
+      },
+      {
+        "fields": [
+          {
+            "mode": "NULLABLE",
+            "name": "ISBN13",
+            "type": "STRING",
+            "description": "ISBN of the book"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "eprint_id",
+            "type": "STRING",
+            "description": "The UCL Discovery eprint ID"
+          }
+        ],
+        "mode": "NULLABLE",
+        "name": "ucl_discovery_metadata",
+        "type": "RECORD",
+        "description": "Metadata derived from UCL Discovery"
       }
     ],
     "mode": "NULLABLE",
@@ -1047,13 +1067,13 @@
               },
               {
                 "mode": "NULLABLE",
-                "name": "download_count",
+                "name": "country_downloads",
                 "type": "INTEGER",
                 "description": "Number of downloads for the given country"
               }
             ],
             "mode": "REPEATED",
-            "name": "downloads_per_country",
+            "name": "country",
             "type": "RECORD",
             "description": "Number of downloads per country"
           }
