@@ -395,9 +395,9 @@
           }
         ],
         "mode": "NULLABLE",
-        "name": "oapen_irus_uk_metadata",
+        "name": "irus_oapen_metadata",
         "type": "RECORD",
-        "description": "Metadata derived from IRUS_UK"
+        "description": "Metadata derived from IRUS OAPEN"
       },
       {
         "fields": [
@@ -421,9 +421,9 @@
           }
         ],
         "mode": "NULLABLE",
-        "name": "fulcrum_metadata",
+        "name": "irus_fulcrum_metadata",
         "type": "RECORD",
-        "description": "Metadata derived from Fulcrum"
+        "description": "Metadata derived from IRUS Fulcrum"
       }
     ],
     "mode": "NULLABLE",
@@ -943,9 +943,9 @@
           }
         ],
         "mode": "NULLABLE",
-        "name": "oapen_irus_uk",
+        "name": "irus_oapen",
         "type": "RECORD",
-        "description": "Metrics derived from IRUS-UK"
+        "description": "Metrics from OAPEN. Recorded with the IRUS-UK platform"
       },
       {
         "fields": [
@@ -1019,9 +1019,9 @@
           }
         ],
         "mode": "NULLABLE",
-        "name": "fulcrum",
+        "name": "irus_fulcrum",
         "type": "RECORD",
-        "description": "Metrics derived from Fulcrum"
+        "description": "Metrics from Fulcrum. Recorded with the IRUS platform"
       },
       {
         "fields": [

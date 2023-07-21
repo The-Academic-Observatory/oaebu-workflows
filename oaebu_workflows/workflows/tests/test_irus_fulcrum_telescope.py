@@ -22,8 +22,8 @@ from airflow.utils.state import State
 from airflow.models.connection import Connection
 
 from oaebu_workflows.config import test_fixtures_folder
-from oaebu_workflows.workflows.fulcrum_telescope import (
-    FulcrumTelescope,
+from oaebu_workflows.workflows.irus_fulcrum_telescope import (
+    IrusFulcrumTelescope,
     download_fulcrum_month_data,
     transform_fulcrum_data,
 )
@@ -42,7 +42,7 @@ from observatory.platform.observatory_config import Workflow
 FAKE_PUBLISHERS = ["Fake Publisher 1", "Fake Publisher 2", "Fake Publisher 3"]
 
 
-class TestFulcrumTelescope(ObservatoryTestCase):
+class TestIrusFulcrumTelescope(ObservatoryTestCase):
     """Tests for the Fulcrum telescope"""
 
     def __init__(self, *args, **kwargs):
@@ -56,15 +56,15 @@ class TestFulcrumTelescope(ObservatoryTestCase):
         self.data_location = os.getenv("TEST_GCP_DATA_LOCATION")
 
         # Fixtures
-        self.download_cassette = os.path.join(test_fixtures_folder("fulcrum"), "fulcrum_download_cassette.yaml")
-        self.test_table = os.path.join(test_fixtures_folder("fulcrum"), "test_final_table.json")
-        self.test_totals_download = os.path.join(test_fixtures_folder("fulcrum"), "test_totals_download.jsonl")
-        self.test_country_download = os.path.join(test_fixtures_folder("fulcrum"), "test_country_download.jsonl")
-        self.test_transform = os.path.join(test_fixtures_folder("fulcrum"), "test_transform.jsonl")
+        self.download_cassette = os.path.join(test_fixtures_folder("irus_fulcrum"), "fulcrum_download_cassette.yaml")
+        self.test_table = os.path.join(test_fixtures_folder("irus_fulcrum"), "test_final_table.json")
+        self.test_totals_download = os.path.join(test_fixtures_folder("irus_fulcrum"), "test_totals_download.jsonl")
+        self.test_country_download = os.path.join(test_fixtures_folder("irus_fulcrum"), "test_country_download.jsonl")
+        self.test_transform = os.path.join(test_fixtures_folder("irus_fulcrum"), "test_transform.jsonl")
 
     def test_dag_structure(self):
         """Test that the ONIX DAG has the correct structure and raises errors when necessary"""
-        dag = FulcrumTelescope(
+        dag = IrusFulcrumTelescope(
             dag_id="fulcrum_test", cloud_workspace=self.fake_cloud_workspace, publishers=FAKE_PUBLISHERS
         ).make_dag()
 
@@ -89,7 +89,7 @@ class TestFulcrumTelescope(ObservatoryTestCase):
                 Workflow(
                     dag_id="fulcrum_test",
                     name="Fulcrum Telescope",
-                    class_name="oaebu_workflows.workflows.fulcrum_telescope.FulcrumTelescope",
+                    class_name="oaebu_workflows.workflows.irus_fulcrum_telescope.IrusFulcrumTelescope",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(publishers=[FAKE_PUBLISHERS]),
                 )
@@ -108,7 +108,7 @@ class TestFulcrumTelescope(ObservatoryTestCase):
         with env.create():
             # Setup Telescope
             execution_date = pendulum.datetime(year=2022, month=4, day=7)
-            telescope = FulcrumTelescope(
+            telescope = IrusFulcrumTelescope(
                 dag_id="fulcrum_test",
                 cloud_workspace=env.cloud_workspace,
                 publishers=FAKE_PUBLISHERS,

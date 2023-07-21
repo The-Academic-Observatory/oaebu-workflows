@@ -59,7 +59,7 @@ from observatory.platform.gcs import (
 )
 
 
-class OapenIrusUkRelease(PartitionRelease):
+class IrusOapenRelease(PartitionRelease):
     def __init__(
         self,
         dag_id: str,
@@ -68,7 +68,7 @@ class OapenIrusUkRelease(PartitionRelease):
         data_interval_end: pendulum.DateTime,
         partition_date: pendulum.DateTime,
     ):
-        """Create a OapenIrusUkRelease instance.
+        """Create a IrusOapenRelease instance.
 
         :param dag_id: The ID of the DAG
         :param run_id: The Airflow run ID
@@ -77,15 +77,15 @@ class OapenIrusUkRelease(PartitionRelease):
         super().__init__(dag_id=dag_id, run_id=run_id, partition_date=partition_date)
         self.data_interval_start = data_interval_start
         self.data_interval_end = data_interval_end
-        self.download_path = os.path.join(self.download_folder, "oapen_irus_uk.jsonl.gz")
-        self.transform_path = os.path.join(self.transform_folder, "oapen_irus_uk.jsonl.gz")
+        self.download_path = os.path.join(self.download_folder, "irus_oapen.jsonl.gz")
+        self.transform_path = os.path.join(self.transform_folder, "irus_oapen.jsonl.gz")
         self.blob_name = gcs_blob_name_from_path(
             os.path.join(self.download_folder, f'{self.partition_date.format("YYYY_MM")}.jsonl.gz')
         )
         self.cloud_function_path = os.path.join(self.download_folder, "oapen_cloud_function.zip")
 
 
-class OapenIrusUkTelescope(Workflow):
+class IrusOapenTelescope(Workflow):
     OAPEN_PROJECT_ID = "oapen-usage-data-gdpr-proof"  # The oapen project id.
     OAPEN_BUCKET = f"{OAPEN_PROJECT_ID}_cloud-function"  # Storage bucket with the source code
     FUNCTION_NAME = "oapen-access-stats"  # Name of the google cloud function
@@ -105,17 +105,17 @@ class OapenIrusUkTelescope(Workflow):
         cloud_workspace: CloudWorkspace,
         publisher_name_v4: str,
         publisher_uuid_v5: str,
-        bq_dataset_id: str = "oapen",
-        bq_table_name: str = "oapen_irus_uk",
-        bq_dataset_description: str = "OAPEN Irus dataset",
+        bq_dataset_id: str = "irus",
+        bq_table_name: str = "irus_oapen",
+        bq_dataset_description: str = "IRUS dataset",
         bq_table_description: str = None,
         schema_folder: str = default_schema_folder(),
         api_dataset_id: str = "oapen",
         max_cloud_function_instances: int = 0,
         observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
         geoip_license_conn_id: str = "geoip_license_key",
-        oapen_irus_api_conn_id: str = "oapen_irus_uk_api",
-        oapen_irus_login_conn_id: str = "oapen_irus_uk_login",
+        oapen_irus_api_conn_id: str = "irus_api",
+        oapen_irus_login_conn_id: str = "irus_login",
         catchup: bool = True,
         start_date: pendulum.DateTime = pendulum.datetime(2015, 6, 1),
         schedule_interval: str = "0 0 4 * *", # Run on the 4th of every month
@@ -144,7 +144,7 @@ class OapenIrusUkTelescope(Workflow):
         """
         if bq_table_description is None:
             bq_table_description = {
-                "oapen_irus_uk": "Access stats from the OAPEN IRUS UK platform. Before 2020-04 "
+                "irus_oapen": "Metrics from IRUS OAPEN. Before 2020-04 "
                 "from: https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/. "
                 "After 2020-04 from the OAPEN_SUSHI API (documentation not "
                 "published)."
@@ -193,8 +193,8 @@ class OapenIrusUkTelescope(Workflow):
         self.add_task(self.add_new_dataset_releases)
         self.add_task(self.cleanup)
 
-    def make_release(self, **kwargs) -> List[OapenIrusUkRelease]:
-        """Create a list of OapenIrusUkRelease instances for a given month.
+    def make_release(self, **kwargs) -> List[IrusOapenRelease]:
+        """Create a list of IrusOapenRelease instances for a given month.
         Say the dag is scheduled to run on 2022-04-07
         Interval_start will be 2022-03-01
         Interval_end will be 2022-04-01
@@ -202,7 +202,7 @@ class OapenIrusUkTelescope(Workflow):
 
         :param kwargs: the context passed from the PythonOperator.
         See https://airflow.apache.org/docs/stable/macros-ref.html for the keyword arguments that can be passed
-        :return: list of OapenIrusUkRelease instances
+        :return: list of IrusOapenRelease instances
         """
         # Get release_date
         data_interval_start = kwargs["data_interval_start"].start_of("month")
@@ -211,7 +211,7 @@ class OapenIrusUkTelescope(Workflow):
 
         logging.info(f"Release/partition date: {partition_date}")
         releases = [
-            OapenIrusUkRelease(
+            IrusOapenRelease(
                 dag_id=self.dag_id,
                 run_id=kwargs["run_id"],
                 data_interval_start=data_interval_start,
@@ -221,20 +221,20 @@ class OapenIrusUkTelescope(Workflow):
         ]
         return releases
 
-    def transfer(self, releases: List[OapenIrusUkRelease], **kwargs):
+    def transfer(self, releases: List[IrusOapenRelease], **kwargs):
         """Task to transfer the file for each release.
 
-        :param releases: the list of OapenIrusUkRelease instances.
+        :param releases: the list of IrusOapenRelease instances.
         """
         for release in releases:
             success = gcs_copy_blob(
                 blob_name=release.blob_name,
-                src_bucket=OapenIrusUkTelescope.OAPEN_BUCKET,
+                src_bucket=IrusOapenTelescope.OAPEN_BUCKET,
                 dst_bucket=self.cloud_workspace.download_bucket,
             )
             set_task_state(success, kwargs["ti"].task_id, release=release)
 
-    def download_transform(self, releases: List[OapenIrusUkRelease], **kwargs):
+    def download_transform(self, releases: List[IrusOapenRelease], **kwargs):
         """Task to download the access stats to a local file for each release."""
         for release in releases:
             success = gcs_download_blob(
@@ -256,16 +256,16 @@ class OapenIrusUkTelescope(Workflow):
             # Write list into gzipped JSON Lines file
             save_jsonl_gz(release.transform_path, results)
 
-    def create_cloud_function(self, releases: List[OapenIrusUkRelease], **kwargs):
+    def create_cloud_function(self, releases: List[IrusOapenRelease], **kwargs):
         """Task to create the cloud function for each release."""
         for release in releases:
             # set up cloud function variables
-            oapen_project_id = OapenIrusUkTelescope.OAPEN_PROJECT_ID
-            source_bucket = OapenIrusUkTelescope.OAPEN_BUCKET
-            function_name = OapenIrusUkTelescope.FUNCTION_NAME
-            function_region = OapenIrusUkTelescope.FUNCTION_REGION
-            function_source_url = OapenIrusUkTelescope.FUNCTION_SOURCE_URL
-            function_blob_name = OapenIrusUkTelescope.FUNCTION_BLOB_NAME
+            oapen_project_id = IrusOapenTelescope.OAPEN_PROJECT_ID
+            source_bucket = IrusOapenTelescope.OAPEN_BUCKET
+            function_name = IrusOapenTelescope.FUNCTION_NAME
+            function_region = IrusOapenTelescope.FUNCTION_REGION
+            function_source_url = IrusOapenTelescope.FUNCTION_SOURCE_URL
+            function_blob_name = IrusOapenTelescope.FUNCTION_BLOB_NAME
             location = f"projects/{oapen_project_id}/locations/{function_region}"
             full_name = f"{location}/functions/{function_name}"
 
@@ -303,14 +303,14 @@ class OapenIrusUkTelescope(Workflow):
             else:
                 logging.info(f"Using existing cloud function, source code has not changed.")
 
-    def call_cloud_function(self, releases: List[OapenIrusUkRelease], **kwargs):
+    def call_cloud_function(self, releases: List[IrusOapenRelease], **kwargs):
         """Task to call the cloud function for each release."""
         for release in releases:
             # set up cloud function variables
-            oapen_project_id = OapenIrusUkTelescope.OAPEN_PROJECT_ID
-            source_bucket = OapenIrusUkTelescope.OAPEN_BUCKET
-            function_name = OapenIrusUkTelescope.FUNCTION_NAME
-            function_region = OapenIrusUkTelescope.FUNCTION_REGION
+            oapen_project_id = IrusOapenTelescope.OAPEN_PROJECT_ID
+            source_bucket = IrusOapenTelescope.OAPEN_BUCKET
+            function_name = IrusOapenTelescope.FUNCTION_NAME
+            function_region = IrusOapenTelescope.FUNCTION_REGION
             location = f"projects/{oapen_project_id}/locations/{function_region}"
             full_name = f"{location}/functions/{function_name}"
             geoip_license_key = BaseHook.get_connection(self.geoip_license_conn_id).password
@@ -344,7 +344,7 @@ class OapenIrusUkTelescope(Workflow):
                 release.blob_name,
             )
 
-    def upload_transformed(self, releases: List[OapenIrusUkRelease], **kwargs) -> None:
+    def upload_transformed(self, releases: List[IrusOapenRelease], **kwargs) -> None:
         """Uploads the transformed files to GCS for each release"""
         for release in releases:
             success = gcs_upload_files(
@@ -353,7 +353,7 @@ class OapenIrusUkTelescope(Workflow):
             )
             set_task_state(success, kwargs["ti"].task_id, release=release)
 
-    def bq_load(self, releases: List[OapenIrusUkRelease], **kwargs) -> None:
+    def bq_load(self, releases: List[IrusOapenRelease], **kwargs) -> None:
         """Loads the sales and traffic data into BigQuery"""
         bq_create_dataset(
             project_id=self.cloud_workspace.project_id,
@@ -378,7 +378,7 @@ class OapenIrusUkTelescope(Workflow):
             )
             set_task_state(state, kwargs["ti"].task_id, release=release)
 
-    def add_new_dataset_releases(self, releases: List[OapenIrusUkRelease], **kwargs) -> None:
+    def add_new_dataset_releases(self, releases: List[IrusOapenRelease], **kwargs) -> None:
         """Adds release information to API."""
         api = make_observatory_api(observatory_api_conn_id=self.observatory_api_conn_id)
         for release in releases:
@@ -392,7 +392,7 @@ class OapenIrusUkTelescope(Workflow):
             )
             api.post_dataset_release(dataset_release)
 
-    def cleanup(self, releases: List[OapenIrusUkRelease], **kwargs) -> None:
+    def cleanup(self, releases: List[IrusOapenRelease], **kwargs) -> None:
         """Delete all files, folders and XComs associated with this release."""
         for release in releases:
             cleanup(
@@ -419,7 +419,7 @@ def upload_source_code_to_bucket(
         f.write(response.content)
 
     # Check if current md5 hash matches expected md5 hash
-    expected_md5_hash = OapenIrusUkTelescope.FUNCTION_MD5_HASH
+    expected_md5_hash = IrusOapenTelescope.FUNCTION_MD5_HASH
     actual_md5_hash = get_file_hash(file_path=cloud_function_path, algorithm="md5")
     if expected_md5_hash != actual_md5_hash:
         raise AirflowException(f"md5 hashes do not match, expected: {expected_md5_hash}, actual: {actual_md5_hash}")
@@ -479,7 +479,7 @@ def create_cloud_function(
             "source": {"storageSource": {"bucket": source_bucket, "object": blob_name}},
         },
         "serviceConfig": {
-            "timeoutSeconds": OapenIrusUkTelescope.FUNCTION_TIMEOUT,
+            "timeoutSeconds": IrusOapenTelescope.FUNCTION_TIMEOUT,
             "availableMemory": "4096M",
             "maxInstanceCount": max_active_runs,
             "allTrafficOnLatestRevision": True,
@@ -500,7 +500,7 @@ def create_cloud_function(
             service.projects()
             .locations()
             .functions()
-            .create(parent=location, functionId=OapenIrusUkTelescope.FUNCTION_NAME, body=body)
+            .create(parent=location, functionId=IrusOapenTelescope.FUNCTION_NAME, body=body)
             .execute()
         )
         logging.info(f"Creating cloud function, response: {response}")
@@ -571,7 +571,7 @@ def call_cloud_function(
             function_uri,
             data=json.dumps(data),
             headers={"Content-Type": "application/json"},
-            timeout=OapenIrusUkTelescope.FUNCTION_TIMEOUT,
+            timeout=IrusOapenTelescope.FUNCTION_TIMEOUT,
         )
         logging.info(f"Call cloud function response status code: {response.status_code}, reason: {response.reason}")
         if response.status_code != 200:

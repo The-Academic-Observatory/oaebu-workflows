@@ -46,7 +46,7 @@ IRUS_FULCRUM_ENDPOINT_TEMPLATE = (
 )
 
 
-class FulcrumRelease(PartitionRelease):
+class IrusFulcrumRelease(PartitionRelease):
     def __init__(
         self,
         dag_id: str,
@@ -55,7 +55,7 @@ class FulcrumRelease(PartitionRelease):
         data_interval_end: pendulum.DateTime,
         partition_date: pendulum.DateTime,
     ):
-        """Create a FulcrumRelease instance.
+        """Create a IrusFulcrumRelease instance.
 
         :param dag_id: The ID of the DAG
         :param run_id: The airflow run ID
@@ -71,15 +71,15 @@ class FulcrumRelease(PartitionRelease):
         self.transform_path = os.path.join(self.transform_folder, "fulcrum.json.gz")
 
 
-class FulcrumTelescope(Workflow):
+class IrusFulcrumTelescope(Workflow):
     def __init__(
         self,
         dag_id: str,
         cloud_workspace: CloudWorkspace,
         publishers: List[str],
-        bq_dataset_id: str = "fulcrum",
-        bq_table_name: str = "fulcrum",
-        bq_dataset_description: str = "IRUS Fulcrum Data Feed",
+        bq_dataset_id: str = "irus",
+        bq_table_name: str = "irus_fulcrum",
+        bq_dataset_description: str = "IRUS dataset",
         bq_table_description: str = None,
         api_dataset_id: str = "fulcrum",
         schema_folder: str = default_schema_folder(),
@@ -105,6 +105,9 @@ class FulcrumTelescope(Workflow):
         :param schedule_interval: The schedule interval of the DAG
         :param start_date: The start date of the DAG
         """
+        if bq_table_description is None:
+            bq_table_description = "Fulcrum metrics as recorded by the IRUS platform"
+
         super().__init__(
             dag_id,
             start_date,
@@ -137,8 +140,8 @@ class FulcrumTelescope(Workflow):
         self.add_task(self.add_new_dataset_releases)
         self.add_task(self.cleanup)
 
-    def make_release(self, **kwargs) -> FulcrumRelease:
-        """Create a FulcrumRelease instance
+    def make_release(self, **kwargs) -> IrusFulcrumRelease:
+        """Create a IrusFulcrumRelease instance
         Dates are best explained with an example
         Say the dag is scheduled to run on 2022-04-07
         Interval_start will be 2022-03-01
@@ -148,7 +151,7 @@ class FulcrumTelescope(Workflow):
         data_interval_start = kwargs["data_interval_start"].start_of("month")
         data_interval_end = kwargs["data_interval_end"].start_of("month")
         partition_date = data_interval_start.end_of("month")
-        return FulcrumRelease(
+        return IrusFulcrumRelease(
             self.dag_id,
             kwargs["run_id"],
             data_interval_start=data_interval_start,
@@ -156,10 +159,10 @@ class FulcrumTelescope(Workflow):
             partition_date=partition_date,
         )
 
-    def download(self, release: FulcrumRelease, **kwargs):
+    def download(self, release: IrusFulcrumRelease, **kwargs):
         """Task to download the Fulcrum data for a release
 
-        :param releases: the FulcrumRelease instance.
+        :param releases: the IrusFulcrumRelease instance.
         """
         requestor_id = BaseHook.get_connection(self.oapen_irus_api_conn_id).login
         totals_data, country_data = download_fulcrum_month_data(release.partition_date, requestor_id)
@@ -167,7 +170,7 @@ class FulcrumTelescope(Workflow):
         save_jsonl_gz(release.download_totals_path, totals_data)
         save_jsonl_gz(release.download_country_path, country_data)
 
-    def upload_downloaded(self, release: FulcrumRelease, **kwargs):
+    def upload_downloaded(self, release: IrusFulcrumRelease, **kwargs):
         """Upload the downloaded fulcrum data to the google cloud download bucket"""
         success = gcs_upload_files(
             bucket_name=self.cloud_workspace.download_bucket,
@@ -175,7 +178,7 @@ class FulcrumTelescope(Workflow):
         )
         set_task_state(success, kwargs["ti"].task_id, release=release)
 
-    def transform(self, release: FulcrumRelease, **kwargs):
+    def transform(self, release: IrusFulcrumRelease, **kwargs):
         """Task to transform the fulcrum data"""
         logging.info(f"Transforming the Fulcrum dataset with the following publisher filter: {self.publishers}")
         totals_data = load_jsonl(release.download_totals_path)
@@ -193,14 +196,14 @@ class FulcrumTelescope(Workflow):
         )
         save_jsonl_gz(release.transform_path, transformed_data)
 
-    def upload_transformed(self, release: FulcrumRelease, **kwargs):
+    def upload_transformed(self, release: IrusFulcrumRelease, **kwargs):
         """Upload the transformed fulcrum data to the google cloud download bucket"""
         success = gcs_upload_files(
             bucket_name=self.cloud_workspace.transform_bucket, file_paths=[release.transform_path]
         )
         set_task_state(success, kwargs["ti"].task_id, release=release)
 
-    def bq_load(self, release: FulcrumRelease, **kwargs) -> None:
+    def bq_load(self, release: IrusFulcrumRelease, **kwargs) -> None:
         """Load the transfromed data into bigquery"""
         bq_create_dataset(
             project_id=self.cloud_workspace.project_id,
@@ -227,7 +230,7 @@ class FulcrumTelescope(Workflow):
         )
         set_task_state(success, kwargs["ti"].task_id, release=release)
 
-    def add_new_dataset_releases(self, release: FulcrumRelease, **kwargs) -> None:
+    def add_new_dataset_releases(self, release: IrusFulcrumRelease, **kwargs) -> None:
         """Adds release information to API."""
         api = make_observatory_api(observatory_api_conn_id=self.observatory_api_conn_id)
         dataset_release = DatasetRelease(
@@ -240,7 +243,7 @@ class FulcrumTelescope(Workflow):
         )
         api.post_dataset_release(dataset_release)
 
-    def cleanup(self, release: FulcrumRelease, **kwargs) -> None:
+    def cleanup(self, release: IrusFulcrumRelease, **kwargs) -> None:
         """Delete all files and folders associated with this release."""
         cleanup(self.dag_id, execution_date=kwargs["execution_date"], workflow_folder=release.workflow_folder)
 

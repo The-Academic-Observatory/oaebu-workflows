@@ -26,8 +26,8 @@ WITH months as (SELECT
     CAST(onix.published_year as INT64) as published_year,
     month.month,
     month.jstor_country as jstor,
-    month.oapen_irus_uk.country as oapen_irus_uk,
-    month.fulcrum.country as fulcrum,
+    month.irus_oapen.country as irus_oapen,
+    month.irus_fulcrum.country as irus_fulcrum,
     month.google_analytics.views_total_country as google_analytics_page_views,
     month.google_analytics.downloads_total_country as google_analytics_downloads,
     month.google_analytics.downloads_pdf_book_country as google_analytics_downloads_pdf_book,
@@ -39,7 +39,7 @@ WITH months as (SELECT
     month.google_books_sales.countries as google_books_sales,
     month.ucl_discovery.downloads_per_country as ucl_discovery
 FROM `{{ book_product_table_id }}`, UNNEST(months) as month
-WHERE ISBN13 is not null AND month.month is not null AND (month.jstor_country IS NOT NULL OR month.oapen_irus_uk.country IS NOT NULL OR month.fulcrum.country IS NOT NULL OR month.google_analytics IS NOT NULL OR month.google_books_sales IS NOT NULL OR month.ucl_discovery.downloads_per_country IS NOT NULL)),
+WHERE ISBN13 is not null AND month.month is not null AND (month.jstor_country IS NOT NULL OR month.irus_oapen.country IS NOT NULL OR month.irus_fulcrum.country IS NOT NULL OR month.google_analytics IS NOT NULL OR month.google_books_sales IS NOT NULL OR month.ucl_discovery.downloads_per_country IS NOT NULL)),
 
 countries as (
     SELECT
@@ -83,7 +83,7 @@ jstor_month_country as (
     FROM months, UNNEST(jstor)
 ),
 
-oapen_month_country as (
+irus_oapen_month_country as (
     SELECT
         ISBN13,
         month,
@@ -93,10 +93,10 @@ oapen_month_country as (
         total_item_requests,
         unique_item_investigations,
         unique_item_requests
-    FROM months, UNNEST(oapen_irus_uk)
+    FROM months, UNNEST(irus_oapen)
 ),
 
-fulcrum_month_country as (
+irus_fulcrum_month_country as (
     SELECT
         ISBN13,
         month,
@@ -105,7 +105,7 @@ fulcrum_month_country as (
         total_item_requests,
         unique_item_investigations,
         unique_item_requests
-    FROM months, UNNEST(fulcrum)
+    FROM months, UNNEST(irus_fulcrum)
 ),
 
 google_analytics_page_views_month_country as (
@@ -275,8 +275,8 @@ SELECT
     month_country.country_iso_name,
     month_country.country_wikipedia_name,
     STRUCT(jstor.Total_Item_Requests) as jstor,
-    STRUCT(oapen.title_requests, oapen.total_item_investigations, oapen.total_item_requests, oapen.unique_item_investigations, oapen.unique_item_requests) as oapen_irus_uk,
-    STRUCT(fulcrum.total_item_investigations, fulcrum.total_item_requests, fulcrum.unique_item_investigations, fulcrum.unique_item_requests) as fulcrum,
+    STRUCT(irus_oapen.title_requests, irus_oapen.total_item_investigations, irus_oapen.total_item_requests, irus_oapen.unique_item_investigations, irus_oapen.unique_item_requests) as irus_oapen,
+    STRUCT(irus_fulcrum.total_item_investigations, irus_fulcrum.total_item_requests, irus_fulcrum.unique_item_investigations, irus_fulcrum.unique_item_requests) as irus_fulcrum,
     STRUCT(
       google_page_views.value as page_views,
       google_downloads.value as downloads,
@@ -291,8 +291,8 @@ SELECT
     STRUCT(ucl_discovery.download_count as download_count) as ucl_discovery
 FROM month_country
 LEFT JOIN jstor_month_country as jstor ON month_country.ISBN13 = jstor.ISBN13 AND month_country.month = jstor.month AND month_country.alpha2 = jstor.alpha2
-LEFT JOIN oapen_month_country as oapen ON month_country.ISBN13 = oapen.ISBN13 AND month_country.month = oapen.month AND month_country.alpha2 = oapen.alpha2
-LEFT JOIN fulcrum_month_country as fulcrum on month_country.ISBN13 = fulcrum.ISBN13 AND month_country.month = fulcrum.month AND month_country.alpha2 = fulcrum.alpha2
+LEFT JOIN irus_oapen_month_country as irus_oapen ON month_country.ISBN13 = irus_oapen.ISBN13 AND month_country.month = irus_oapen.month AND month_country.alpha2 = irus_oapen.alpha2
+LEFT JOIN irus_fulcrum_month_country as irus_fulcrum on month_country.ISBN13 = irus_fulcrum.ISBN13 AND month_country.month = irus_fulcrum.month AND month_country.alpha2 = irus_fulcrum.alpha2
 LEFT JOIN google_analytics_page_views_month_country as google_page_views ON month_country.ISBN13 = google_page_views.ISBN13 AND month_country.month = google_page_views.month AND month_country.alpha2 = google_page_views.country_code
 LEFT JOIN google_analytics_downloads_total_month_country as google_downloads ON month_country.ISBN13 = google_downloads.ISBN13 AND month_country.month = google_downloads.month AND month_country.alpha2 = google_downloads.country_code
 LEFT JOIN google_analytics_downloads_pdf_book_month_country as google_downloads_pdf_book ON month_country.ISBN13 = google_downloads_pdf_book.ISBN13 AND month_country.month = google_downloads_pdf_book.month AND month_country.alpha2 = google_downloads_pdf_book.country_code
@@ -304,9 +304,9 @@ LEFT JOIN google_analytics_downloads_mobi_book_month_country as google_downloads
 LEFT JOIN google_books_month_country as google_books ON month_country.ISBN13 = google_books.ISBN13 AND month_country.month = google_books.month AND month_country.alpha2 = google_books.alpha2
 LEFT JOIN ucl_discovery_month_country as ucl_discovery ON month_country.ISBN13 = ucl_discovery.ISBN13 AND month_country.month = ucl_discovery.month AND month_country.alpha2 = ucl_discovery.alpha2
 WHERE jstor.total_item_requests IS NOT NULL OR
-oapen.title_requests IS NOT NULL OR
-oapen.total_item_requests IS NOT NULL OR
-fulcrum.total_item_requests IS NOT NULL OR
+irus_oapen.title_requests IS NOT NULL OR
+irus_oapen.total_item_requests IS NOT NULL OR
+irus_fulcrum.total_item_requests IS NOT NULL OR
 google_page_views.value IS NOT NULL OR
 google_downloads.value IS NOT NULL OR
 google_downloads_pdf_book.value IS NOT NULL OR
