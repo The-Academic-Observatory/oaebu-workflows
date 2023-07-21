@@ -86,7 +86,7 @@ class FulcrumTelescope(Workflow):
         observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
         oapen_irus_api_conn_id: str = "oapen_irus_uk_api",
         catchup: bool = True,
-        schedule_interval: str = "0 0 7 * *",  # Run on the 7th of every month
+        schedule_interval: str = "0 0 4 * *",  # Run on the 4th of every month
         start_date: pendulum.DateTime = pendulum.datetime(2022, 4, 1),  # Earliest available data
     ):
         """The Fulcrum Telescope
