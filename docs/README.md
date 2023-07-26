@@ -18,5 +18,5 @@
 4) Activate virtual env: `conda activate <nameofvenv>`
 5) Add docs directory directory to Python path: `PYTHONPATH="${PYTHONPATH}:<pathtorepository>/oaebu-workflows/docs"` followed by `export PYTHONPATH`. Make sure to replace `pathtorepository` with the file path to the `oaebu-workflows` folder
 6) Install documentation dependencies: `pip install -r requirements.txt`
-7) Build documentation: `make html`
-8) To view the documentation, open `_build/html/index.html`.
+7) Build documentation: `make html` or `make latexpdf`
+8) To view the documentation, open `_build/html/index.html` or `_build/latex/index.html`.

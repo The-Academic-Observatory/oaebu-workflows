@@ -6,6 +6,7 @@ The metadata for all eprints is obtained from the publicly available CSV file (h
 Additionally for each eprint the total downloads and downloads per country is gathered from the publicly available stats
  (https://discovery.ucl.ac.uk/cgi/stats/report).
 
+The corresponding table in BigQuery is `ucl.ucl_discoveryYYYYMMDD`. 
 
 ```eval_rst
 +------------------------------+---------+
@@ -37,8 +38,10 @@ Additionally for each eprint the total downloads and downloads per country is ga
 
 ## Latest schema
 ``` eval_rst
+.. tabularcolumns:: |p{4.5cm}|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/ucl_discovery_latest.csv
    :width: 100%
    :header-rows: 1
+   :class: longtable
 ```

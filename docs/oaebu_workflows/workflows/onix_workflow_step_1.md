@@ -28,35 +28,41 @@ The ONIX workflow is dependent on the ONIX telescope.  It waits for the ONIX tel
 The Work ID will be an arbitrary ISBN representative from a product in the equivalence class.
 
 ``` eval_rst
+.. tabularcolumns:: |p{4.5cm}|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/onix_workid_isbn_latest.csv
    :width: 100%
    :header-rows: 1
+   :class: longtable
 ```
 
 ## Work Family ID
 The Work Family ID will be an arbitrary Work ID (ISBN) representative from a work in the equivalence class.
 
 ``` eval_rst
+.. tabularcolumns:: |p{4.5cm}|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/onix_workfamilyid_isbn_latest.csv
    :width: 100%
    :header-rows: 1
+   :class: longtable
 ```
 
 ## ONIX Work ID ISBN Errors
 
 ``` eval_rst
+.. tabularcolumns:: |p{4.5cm}|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/onix_workid_isbn_errors_latest.csv
    :width: 100%
    :header-rows: 1
+   :class: longtable
 ```
 ## Create Crossref metadata table
-Crossref data is required to proceed. The ISBNs for each work is obtained from the publisher's Onix table. For each of these ISBNs, the Crossref [metadata REST API](https://api.crossref.org/) is queried.  
+Crossref Metadata is required to proceed. The ISBNs for each work is obtained from the publisher's Onix table. For each of these ISBNs, the Crossref Metadata table produced by the [Academic Observatory workflows](https://github.com/The-Academic-Observatory/academic-observatory-workflows/tree/develop) is queried. Refer to the [Crossref Metadata telescope](../telescopes/crossref_metadata.md).  
 
 ## Create Crossref events table
-Similarly to the metadata, Crossref event data is retrieved through Crossref's dedicated [event REST API](https://www.eventdata.crossref.org/guide/service/query-api/). The API accepts queries based on DOI only, which we retrienve by matching the appropriate ISBN13 from the metadata.  
+Similarly to Crossref Metadata, Crossref Event Data is retrieved through Crossref's dedicated [event REST API](https://www.eventdata.crossref.org/guide/service/query-api/) through the [Crossref Event Data telescope](../telescopes/crossref_events.md). The API accepts queries based on DOI only, which we retrieve by matching the appropriate ISBN13 from the metadata.  
 
 ## Create book table
 The book table is a collection of works and their relevant details for the relative publisher. The table accommodates a title's Crossref metadata, events and separate chapters.
@@ -82,20 +88,24 @@ For each data source, including the intermediate tables, we perform basic qualit
 [Link to Query](https://github.com/The-Academic-Observatory/oaebu-workflows/blob/develop/oaebu_workflows/database/sql/onix_aggregate_metrics.sql.jinja2)
 
 ``` eval_rst
+.. tabularcolumns:: |p{4.5cm}|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/onix_aggregate_metrics_latest.csv
    :width: 100%
    :header-rows: 1
+   :class: longtable
 ```
 ### ONIX Invalid ISBN
 
 Details ISBN13s in the ONIX feed that are not valid.
 
 ``` eval_rst
+.. tabularcolumns:: |p{4.5cm}|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/onix_invalid_isbn_latest.csv
    :width: 100%
    :header-rows: 1
+   :class: longtable
 ```
 
 ### Data Platform Invalid ISBN
@@ -103,10 +113,12 @@ Details ISBN13s in the ONIX feed that are not valid.
 Details ISBN13s in the data source that are not valid. An example schema is below, as data platforms may use different name fields (e.g, 'ISBN', 'publication_id', 'Primary_ISBN').
 
 ``` eval_rst
+.. tabularcolumns:: |p{4.5cm}|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/platform_invalid_isbn_latest.csv
    :width: 100%
    :header-rows: 1
+   :class: longtable
 ```
 
 ### Data Platform Unmatched ISBN
@@ -114,8 +126,10 @@ Details ISBN13s in the data source that are not valid. An example schema is belo
 Details ISBN-13s in the data source that were not matched to ISBN-13s in the ONIX feed.
 
 ``` eval_rst
+.. tabularcolumns:: |p{4.5cm}|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/platform_unmatched_isbn_latest.csv
    :width: 100%
    :header-rows: 1
+   :class: longtable
 ```

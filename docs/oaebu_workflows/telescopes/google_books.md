@@ -246,17 +246,21 @@ sftp_service: ssh://<username>:<password>@<host>:<port>?host_key=<host_key>
 ### Google Books Sales
 
 ``` eval_rst
+.. tabularcolumns:: |p{4.5cm}|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/google_books_sales_latest.csv
    :width: 100%
    :header-rows: 1
+   :class: longtable
 ```
 
 ### Google Books Traffic
 
 ``` eval_rst
+.. tabularcolumns:: |p{4.5cm}|l|l|p{6cm}| 
 .. csv-table::
    :file: ../../schemas/google_books_traffic_latest.csv
    :width: 100%
    :header-rows: 1
+   :class: longtable
 ```
