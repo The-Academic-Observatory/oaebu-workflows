@@ -11,8 +11,7 @@ library systems, author profiling, specialist subject databases, scholarly shari
 . _- source: [Crossref Metadata](https://www.crossref.org/services/metadata-retrieval/)_ 
 and [schema details](https://github.com/Crossref/rest-api-doc/blob/master/api_format.md).
 
-The BigQuery table created by the Crossref Metadata telescope from the [Academic Observatory workflows](https://academic-observatory-workflows.readthedocs.io/en/latest/telescopes/crossref_metadata.html) is queried 
-with the list of ISBNs from a publisher's Onix feed to create a filtered table in BigQuery called `crossref.crossref_metadataYYYYMMDD`.
+The BigQuery table created by the Crossref Metadata telescope from the [Academic Observatory workflows](https://academic-observatory-workflows.readthedocs.io/en/latest/telescopes/crossref_metadata.html) is queried with the list of ISBNs from a publisher's Onix feed to create a filtered table in BigQuery called `crossref.crossref_metadataYYYYMMDD`. This table is created during the [Onix workflow](../workflows/onix_workflow_step_1.md).
 
 
 ## Latest schema

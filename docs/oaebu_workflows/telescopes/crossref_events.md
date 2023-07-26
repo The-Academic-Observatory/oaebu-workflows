@@ -22,7 +22,7 @@ Twitter, Wikipedia, and Wordpress.com
 
 See the crossref events [page](https://www.crossref.org/services/event-data/), and [data details](https://www.eventdata.crossref.org/guide/data/events/), for more information.
 
-The corresponding table created in BigQuery is `crossref.crossref_eventsYYYYMMDD`. 
+The corresponding table created in BigQuery is `crossref.crossref_eventsYYYYMMDD`. This table is created during the [Onix workflow](../workflows/onix_workflow_step_1.md).
 
 ```eval_rst
 +------------------------------+---------+

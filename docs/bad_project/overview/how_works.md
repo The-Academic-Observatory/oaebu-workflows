@@ -1,7 +1,7 @@
 How the BAD Project Works
 ==========================
 
-The BAD project technology stack uses the book industry metadata interchange standard ONIX, combined with open bibliographic metadata (Crossref and OAPEN) to integrate usage data from multiple sources. Data integration through the Book Usage Data Workflows code base is built on an open-source workflow system written in Python. Data workflows (or telescopes) fetch, process, disambiguate and analyse data about open access eBooks from multiple sources. This data is saved to Google Cloud’s BigQuery data warehouse. The multiple workflows include: 
+The BAD project technology stack uses the book industry metadata interchange standard ONIX, combined with open bibliographic metadata (Crossref and OAPEN) to integrate usage data from multiple sources. Data integration through the Book Usage Data Workflows code base is built on an open-source workflow system written in Python, and is designed to run using Apache Airflow workflows as a manager/scheduler in conjunction with the [Observatory Platform](https://github.com/The-Academic-Observatory/observatory-platform), an environment for fetching, processing and analysing data. Data workflows (or telescopes) fetch, process, disambiguate and analyse data about open access eBooks from multiple sources. This data is saved to Google Cloud’s BigQuery data warehouse. The multiple workflows include: 
 
  1. Ingesting data via telescope workflows from Crossref Event Data,  Crossref Metadata, Google Analytics, Google Books, IRUS Fulcrum, IRUS OAPEN, JSTOR, OAPEN metadata, ONIX, Thoth, UCL Discovery, and
 

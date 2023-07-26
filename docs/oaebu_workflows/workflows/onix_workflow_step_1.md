@@ -59,10 +59,10 @@ The Work Family ID will be an arbitrary Work ID (ISBN) representative from a wor
    :class: longtable
 ```
 ## Create Crossref metadata table
-Crossref data is required to proceed. The ISBNs for each work is obtained from the publisher's Onix table. For each of these ISBNs, the Crossref metadata table produced by the [Academic Observatory workflows](https://github.com/The-Academic-Observatory/academic-observatory-workflows/tree/develop) is queried.  
+Crossref Metadata is required to proceed. The ISBNs for each work is obtained from the publisher's Onix table. For each of these ISBNs, the Crossref Metadata table produced by the [Academic Observatory workflows](https://github.com/The-Academic-Observatory/academic-observatory-workflows/tree/develop) is queried. Refer to the [Crossref Metadata telescope](../telescopes/crossref_metadata.md).  
 
 ## Create Crossref events table
-Similarly to the metadata, Crossref event data is retrieved through Crossref's dedicated [event REST API](https://www.eventdata.crossref.org/guide/service/query-api/). The API accepts queries based on DOI only, which we retrieve by matching the appropriate ISBN13 from the metadata.  
+Similarly to Crossref Metadata, Crossref Event Data is retrieved through Crossref's dedicated [event REST API](https://www.eventdata.crossref.org/guide/service/query-api/) through the [Crossref Event Data telescope](../telescopes/crossref_events.md). The API accepts queries based on DOI only, which we retrieve by matching the appropriate ISBN13 from the metadata.  
 
 ## Create book table
 The book table is a collection of works and their relevant details for the relative publisher. The table accommodates a title's Crossref metadata, events and separate chapters.

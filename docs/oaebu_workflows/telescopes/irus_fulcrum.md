@@ -1,6 +1,6 @@
 # IRUS Fulcrum
 
-The IRUS Fulcrum telescope collects usage statistics for titles accessed via the [Fulcrum Platform](https://www.fulcrum.org/). Usage data is accessible through [IRUS](https://irus.jisc.ac.uk/r5/) in much the same way as the [IRUS OAPEN](./oapen_irus_uk.md) telescope. Unlike IRUS OAPEN, IRUS Fulcrum does not record sensitive IP address information. This makes dealing with the data much simpler.
+The IRUS Fulcrum telescope collects usage statistics for titles accessed via the [Fulcrum Platform](https://www.fulcrum.org/). Usage data is accessible through [IRUS](https://irus.jisc.ac.uk/r5/) in much the same way as the [IRUS OAPEN](./irus_oapen.md) telescope. Unlike IRUS OAPEN, IRUS Fulcrum does not record sensitive IP address information. This makes dealing with the data much simpler.
 
 The earliest available data for the Fulcrum platform is April 2022. It follows that all data is of [COUNTER](https://www.projectcounter.org/) 5 standard.
 
