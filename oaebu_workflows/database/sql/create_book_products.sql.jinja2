@@ -163,24 +163,6 @@ CREATE TEMP FUNCTION group_items_irus_location(items ARRAY<STRUCT<latitude FLOAT
 # Helper Function:
 {#
 Output Schema:
-country_code                    STRING    NULLABLE
-country_name                    STRING    NULLABLE
-download_count                  INTEGER   NULLABLE
-#}
-CREATE TEMP FUNCTION group_items_ucl_country(items ARRAY<STRUCT<download_count INT64, country_name STRING, country_code STRING>>) as (
-  ARRAY(
-    (SELECT AS STRUCT
-      country_code,
-      MAX(country_name) as country_name,
-      SUM(download_count) as download_count,
-    FROM UNNEST(items)
-    GROUP BY country_code)
-  )
-);
-
-# Helper Function:
-{#
-Output Schema:
 lower_trim_word                 STRING   NULLABLE
 #}
 CREATE TEMP FUNCTION custom_split(str STRING, sep STRING) AS (
@@ -190,7 +172,6 @@ CREATE TEMP FUNCTION custom_split(str STRING, sep STRING) AS (
     WHERE TRIM(word) != ''
     )
 );
-
 
 {#
 The purpose of this block of SQL is to create an empty row of data, which comforms to the OAPEN raw data.
@@ -364,11 +345,10 @@ Providng an empty row enable simplicity of the downstream queries and also means
 #}
 empty_ucl_discovery as (
     SELECT
-        CAST(NULL as STRING) as isbn,
-        CAST(NULL as STRING) as book_title,
+        CAST(NULL as STRING) as ISBN13,
         CAST(NULL as DATE) as release_date,
-        CAST(NULL as INT64) as total_downloads,
-        [STRUCT(CAST(null as INT64) as download_count, CAST(NULL as STRING) as country_name, CAST(NULL as STRING) as country_code)] as downloads_per_country
+        [STRUCT(CAST(NULL as INT64) as count)] as total,
+        [STRUCT(CAST(NULL as INT64) as count, CAST(NULL as STRING) as country_code)] as country
 ),
 
 {#
@@ -770,23 +750,50 @@ irus_fulcrum_metadata as (
 
 # UCL Discovery Metrics
 {#
-The purpose of this block of SQL is to organise the metrics from IRUS OAPEN for easier consumption of downstream queries.
+The purpose of this block of SQL is to organise the metrics from UCL Discovery for easier consumption of downstream queries.
 
 Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'ucl_discovery_table_id'.
 This will either point to 'empty_ucl_discovery' (defined above as an empty row) or the name of the real data table in bigquery.
 The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
+Providng an empty row enables simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
+#}
+ucl_discovery_metrics AS (
+    SELECT
+        ISBN as ISBN13,
+        release_date,
+        STRUCT( 
+            MAX(total_downloads) AS total_downloads,
+            ARRAY_AGG(STRUCT(
+                ucl_country.value AS country_code,
+                IFNULL(countries.iso_name, "N/A") AS country_name,
+                ucl_country.count AS country_downloads)) AS country  
+            ) AS metrics
+        FROM
+            `{{ ucl_discovery_table_id }}`,
+            UNNEST(country) AS ucl_country
+        LEFT JOIN
+            `{{ country_table_id }}` AS countries
+        ON
+            ucl_country.value = countries.alpha2
+        GROUP BY
+            ISBN13, release_date
+),
+
+# UCL Discovery Metadata
+{#
+The purpose of this block of SQL is to organise the Metadata from UCL Discovery for easier consumption of downstream queries.
+
+Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'irus_fulcrum_table_id'.
+This will either point to 'empty_irus_oapen' (defined above as an empty row) or the name of the real data table in bigquery.
+The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
 Providng an empty row enable simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
 #}
-ucl_discovery_metrics as (
+ucl_discovery_metadata as (
     SELECT
-        isbn as ISBN13,
-        release_date,
-        STRUCT(
-            SUM(total_downloads) as total_downloads, group_items_ucl_country(ARRAY_CONCAT_AGG(downloads_per_country)) as downloads_per_country
-        ) as metrics
+        ISBN as ISBN13, 
+        eprint_id
     FROM `{{ ucl_discovery_table_id }}`
-    WHERE isbn IS NOT NULL
-    GROUP BY isbn, release_date
+    GROUP BY ISBN13, eprint_id
 ),
 
 # Crossref Events
@@ -898,7 +905,7 @@ SELECT
         crossref_objects, chapters, events.overall as events, google_books_sales_metadata as google_books_sales,
         google_books_traffic_metadata as google_books_traffic, jstor_country_metadata as jstor_metadata,
         jstor_institution_metadata as jstor_institution_metadata, irus_oapen_metadata as irus_oapen_metadata,
-        irus_fulcrum_metadata as irus_fulcrum_metadata
+        irus_fulcrum_metadata as irus_fulcrum_metadata, ucl_discovery_metadata as ucl_discovery_metadata
     ) as metadata,
     metrics.months
 FROM onix_ebook_titles
@@ -911,4 +918,5 @@ LEFT JOIN jstor_country_metadata on jstor_country_metadata.ISBN13 = onix_ebook_t
 LEFT JOIN jstor_institution_metadata on jstor_institution_metadata.ISBN13 = onix_ebook_titles.ISBN13
 LEFT JOIN irus_oapen_metadata on irus_oapen_metadata.ISBN13 = onix_ebook_titles.ISBN13
 LEFT JOIN irus_fulcrum_metadata on irus_fulcrum_metadata.ISBN13 = onix_ebook_titles.ISBN13
+LEFT JOIN ucl_discovery_metadata on ucl_discovery_metadata.ISBN13 = onix_ebook_titles.ISBN13
 LEFT JOIN `{{ book_table_id }}` as public_data on public_data.isbn = onix_ebook_titles.ISBN13

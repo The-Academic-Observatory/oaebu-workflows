@@ -66,13 +66,13 @@
     "type": "RECORD",
     "fields": [
       {
-        "description": "The country name of the client registered by oapen irus uk.",
+        "description": "The country name of the client registered by IRUS.",
         "mode": "NULLABLE",
         "name": "name",
         "type": "STRING"
       },
       {
-        "description": "The country code of the client registered by oapen irus uk.",
+        "description": "The country code of the client registered by IRUS.",
         "mode": "NULLABLE",
         "name": "code",
         "type": "STRING"
