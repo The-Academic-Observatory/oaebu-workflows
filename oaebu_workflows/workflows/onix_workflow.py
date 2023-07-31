@@ -658,8 +658,8 @@ class OnixWorkflow(Workflow):
         google_books_traffic_table_id = "empty_google_books_traffic"
         jstor_country_table_id = "empty_jstor_country"
         jstor_institution_table_id = "empty_jstor_institution"
-        irus_oapen_table_id = "empty_oapen"
-        irus_fulcrum_table_id = "empty_fulcrum"
+        irus_oapen_table_id = "empty_irus_oapen"
+        irus_fulcrum_table_id = "empty_irus_fulcrum"
         ucl_discovery_table_id = "empty_ucl_discovery"
         if google_analytics_dataset:
             google_analytics_table_id = bq_sharded_table_id(
