@@ -736,6 +736,7 @@ class OnixWorkflow(Workflow):
             self.bq_onix_table_name,
             release.onix_snapshot_date,
         )
+        country_table_id = bq_table_id(self.bq_country_project_id, self.bq_country_dataset_id, "country")
         template_path = os.path.join(sql_folder(), "create_book_products.sql.jinja2")
         sql = render_template(
             template_path,
@@ -749,6 +750,7 @@ class OnixWorkflow(Workflow):
             irus_fulcrum_table_id=irus_fulcrum_table_id,
             ucl_discovery_table_id=ucl_discovery_table_id,
             book_table_id=book_table_id,
+            country_table_id=country_table_id,
             workid_table_id=workid_table_id,
             workfamilyid_table_id=workfamilyid_table_id,
             onix_workflow=True,

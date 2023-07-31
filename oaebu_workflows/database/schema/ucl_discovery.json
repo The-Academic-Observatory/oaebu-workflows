@@ -1,195 +1,91 @@
 [
   {
-    "description": "Eprint id.",
+    "description": "ISBN13 of the book.",
     "mode": "REQUIRED",
-    "name": "eprintid",
+    "name": "ISBN",
+    "type": "STRING"
+  },
+  {
+    "description": "eprint ID of the book.",
+    "mode": "REQUIRED",
+    "name": "eprint_id",
     "type": "STRING"
   },
   {
     "description": "Title of the book.",
-    "mode": "REQUIRED",
-    "name": "book_title",
-    "type": "STRING"
-  },
-  {
-    "description": "Family name of the creators",
-    "mode": "REPEATED",
-    "name": "creators_name_family",
-    "type": "STRING"
-  },
-  {
-    "description": "Given name of the creators",
-    "mode": "REPEATED",
-    "name": "creators_name_given",
-    "type": "STRING"
-  },
-    {
-    "description": "Info on whether the book is published",
     "mode": "NULLABLE",
-    "name": "ispublished",
+    "name": "title",
     "type": "STRING"
   },
   {
-    "description": "Subjects",
-    "mode": "REPEATED",
-    "name": "subjects",
-    "type": "STRING"
-  },
-  {
-    "description": "Divisions",
-    "mode": "REPEATED",
-    "name": "divisions",
-    "type": "STRING"
-  },
-  {
-    "description": "Keywords",
-    "mode": "REPEATED",
-    "name": "keywords",
-    "type": "STRING"
-  },
-  {
-    "description": "Abstract",
+    "description": "Timescale of the statistics as reported by the origin.",
     "mode": "NULLABLE",
-    "name": "abstract",
-    "type": "STRING"
+    "name": "timescale",
+    "type": "RECORD",
+    "fields": [
+      {
+        "description": "Format of the 'to' and 'from' fields",
+        "mode": "NULLABLE",
+        "name": "format",
+        "type": "STRING"
+      },
+      {
+        "description": "Beginning of date range for the statistics",
+        "mode": "NULLABLE",
+        "name": "from",
+        "type": "STRING"
+      },
+      {
+        "description": "End of date range for the statistics",
+        "mode": "NULLABLE",
+        "name": "to",
+        "type": "STRING"
+      }
+    ]
   },
   {
-    "description": "Date",
+    "description": "Origin of the statistics",
     "mode": "NULLABLE",
-    "name": "date",
-    "type": "STRING"
+    "name": "origin",
+    "type": "RECORD",
+    "fields": [
+      {
+        "description": "The URL of the origin",
+        "mode": "NULLABLE",
+        "name": "url",
+        "type": "STRING"
+      },
+      {
+        "description": "The name of the origin",
+        "mode": "NULLABLE",
+        "name": "name",
+        "type": "STRING"
+      }
+    ]
   },
   {
-    "description": "Publisher",
+    "description": "The aggregated statistics for the reported period",
     "mode": "NULLABLE",
-    "name": "publisher",
-    "type": "STRING"
-  },
-  {
-    "description": "Official URL",
-    "mode": "NULLABLE",
-    "name": "official_url",
-    "type": "STRING"
-  },
-  {
-    "description": "OA status",
-    "mode": "NULLABLE",
-    "name": "oa_status",
-    "type": "STRING"
-  },
-  {
-    "description": "Language",
-    "mode": "NULLABLE",
-    "name": "language",
-    "type": "STRING"
-  },
-  {
-    "description": "DOI",
-    "mode": "NULLABLE",
-    "name": "doi",
-    "type": "STRING"
-  },
-  {
-    "description": "ISBN",
-    "mode": "NULLABLE",
-    "name": "isbn",
-    "type": "STRING"
-  },
-  {
-    "description": "ISBN10",
-    "mode": "NULLABLE",
-    "name": "isbn10",
-    "type": "STRING"
-  },
-  {
-    "description": "Language elements",
-    "mode": "NULLABLE",
-    "name": "language_elements",
-    "type": "STRING"
-  },
-  {
-    "description": "Series",
-    "mode": "NULLABLE",
-    "name": "series",
-    "type": "STRING"
-  },
-    {
-    "description": "Page range",
-    "mode": "NULLABLE",
-    "name": "pagerange",
-    "type": "STRING"
-  },
-  {
-    "description": "Pages",
-    "mode": "NULLABLE",
-    "name": "pages",
-    "type": "INTEGER"
-  },
-  {
-    "description": "Family name of the editors",
-    "mode": "REPEATED",
-    "name": "editors_name_family",
-    "type": "STRING"
-  },
-  {
-    "description": "Given name of the editors",
-    "mode": "REPEATED",
-    "name": "editors_name_given",
-    "type": "STRING"
-  },
-  {
-    "description": "Family name of the lyricists",
-    "mode": "REPEATED",
-    "name": "lyricists_name_family",
-    "type": "STRING"
-  },
-  {
-    "description": "Given name of the lyricists",
-    "mode": "REPEATED",
-    "name": "lyricists_name_given",
-    "type": "STRING"
-  },
-  {
-    "description": "Begin date.",
-    "mode": "REQUIRED",
-    "name": "begin_date",
-    "type": "DATE"
-  },
-  {
-    "description": "End date.",
-    "mode": "REQUIRED",
-    "name": "end_date",
-    "type": "DATE"
-  },
-  {
-    "description": "Number of downloads",
-    "mode": "REQUIRED",
     "name": "total_downloads",
     "type": "INTEGER"
   },
   {
-    "description": "Number of downloads per country",
+    "description": "The aggregated statistics for each reported country",
     "mode": "REPEATED",
-    "name": "downloads_per_country",
+    "name": "country",
     "type": "RECORD",
     "fields": [
       {
-        "description": "Number of downloads for the given country",
+        "description": "The two letter country code.",
         "mode": "NULLABLE",
-        "name": "download_count",
+        "name": "value",
+        "type": "STRING"
+      },
+      {
+        "description": "The total number of item downloads for the reported period from this country.",
+        "mode": "NULLABLE",
+        "name": "count",
         "type": "INTEGER"
-      },
-      {
-        "description": "Country name",
-        "mode": "NULLABLE",
-        "name": "country_name",
-        "type": "STRING"
-      },
-      {
-        "description": "Country code",
-        "mode": "NULLABLE",
-        "name": "country_code",
-        "type": "STRING"
       }
     ]
   },

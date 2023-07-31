@@ -44,7 +44,7 @@ from observatory.platform.api import get_dataset_releases
 from observatory.platform.observatory_config import Workflow
 from observatory.platform.files import load_jsonl
 from observatory.platform.bigquery import bq_find_schema, bq_run_query, bq_sharded_table_id, bq_table_id
-from observatory.platform.gcs import gcs_upload_file, gcs_blob_name_from_path
+from observatory.platform.gcs import gcs_blob_name_from_path
 from observatory.platform.config import module_file_path
 from observatory.platform.observatory_environment import (
     ObservatoryEnvironment,
@@ -593,8 +593,6 @@ class TestOnixWorkflow(ObservatoryTestCase):
         fake_view_dataset = env.add_dataset(prefix="views")
         with env.create():
             doi_table_file = test_fixtures_folder("onix_workflow", "doi_isbn_query_test.jsonl")
-            # blob = os.path.join(self.test_onix_folder, os.path.basename(doi_table_file))
-            # gcs_upload_file(bucket_name=env.transform_bucket, blob_name=blob, file_path=doi_table_file)
 
             fake_doi_isbn_table = load_jsonl(doi_table_file)
             test_table = Table(
@@ -777,6 +775,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
             ("google_books_traffic", partner_dataset, False, "google_books_traffic"),
             ("irus_oapen", partner_dataset, False, "irus_oapen"),
             ("irus_fulcrum", partner_dataset, False, "irus_fulcrum"),
+            ("ucl_discovery", partner_dataset, False, "ucl_discovery"),
         ]
         if include_google_analytics:
             table_dataset_sharded_schema.append(
@@ -862,8 +861,8 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 "google_analytics",
                 "irus_oapen",
                 "irus_fulcrum",
-                "onix",
                 "ucl_discovery",
+                "onix",
             ]
 
             # Setup telescope
@@ -945,7 +944,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     "jstor_country_unmatched_ISBN": f"SELECT ISBN from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.jstor_country_unmatched_ISBN{release_suffix}",
                     "jstor_institution_invalid_isbn": f"SELECT * from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.jstor_invalid_isbn{release_suffix}",
                     "jstor_institution_invalid_eisbn": f"SELECT * from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.jstor_invalid_eisbn{release_suffix}",
-                    "jstor_institution_unmatched_ISBN": f"SELECT ISBN from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.jstor_country_unmatched_ISBN{release_suffix}",
+                    "jstor_institution_unmatched_ISBN": f"SELECT ISBN from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.jstor_institution_unmatched_ISBN{release_suffix}",
                     "google_books_sales_invalid_isbn": f"SELECT * from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.google_books_sales_invalid_isbn{release_suffix}",
                     "google_books_sales_unmatched_Primary_ISBN": f"SELECT Primary_ISBN from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.google_books_sales_unmatched_Primary_ISBN{release_suffix}",
                     "google_books_traffic_invalid_isbn": f"SELECT * from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.google_books_traffic_invalid_isbn{release_suffix}",
@@ -954,6 +953,8 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     "irus_oapen_unmatched_ISBN": f"SELECT ISBN from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.irus_oapen_unmatched_ISBN{release_suffix}",
                     "irus_fulcrum_invalid_isbn": f"SELECT * from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.irus_fulcrum_invalid_isbn{release_suffix}",
                     "irus_fulcrum_unmatched_ISBN": f"SELECT ISBN from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.irus_fulcrum_unmatched_ISBN{release_suffix}",
+                    "ucl_discovery_invalid_isbn": f"SELECT * from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.ucl_discovery_invalid_isbn{release_suffix}",
+                    "ucl_discovery_unmatched_ISBN": f"SELECT ISBN from {self.gcp_project_id}.{oaebu_data_qa_dataset_id}.ucl_discovery_unmatched_ISBN{release_suffix}",
                 }
                 if include_google_analytics:
                     data_qa_sql[
@@ -1059,7 +1060,8 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 )
 
                 # Create oaebu intermediate tables - onix doesn't have an intermediate table so skip it
-                for data_partner in data_partners[1:]:
+                for data_partner in [dp for dp in data_partners if dp.type_id != "onix"]:
+                    # for data_partner in data_partners[1:]:
                     ti = env.run_task(f"create_oaebu_intermediate_table_{data_partner.bq_table_name}")
                     self.assertEqual(ti.state, State.SUCCESS)
 
@@ -1112,7 +1114,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 invalid_isbns_expected = set(sorted(["111", "1111111111111", "113", "211"]))
                 invalid_eisbns_expected = set(
                     sorted(["111", "1111111111111", "113", None], key=lambda x: x or "0")
-                )  # lamnda method allows sorting a None
+                )  # lambda method allows sorting a None
                 unmatched_isbns_expected = set(sorted(["111", "113", "211"]))
 
                 for partner in data_partners[1:]:
@@ -1162,7 +1164,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 export_tables = [
                     ("book_product_list", 4),
                     ("book_product_metrics", 5),
-                    ("book_product_metrics_country", 18),
+                    ("book_product_metrics_country", 22),
                     ("book_product_metrics_institution", 1),
                     ("institution_list", 1),
                     ("book_product_metrics_city", 26),
