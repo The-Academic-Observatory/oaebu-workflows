@@ -37,10 +37,10 @@ It should be noted that the *totals* data is not necessarily a simply aggregatio
 The telescope's workflow can be broken down as such:
 
 ### Download
-Acquires the eprint IDs and publication dates from [[The Google Sheet]]. For each ID that has a publication date that is before the current scheduled run date, download the country and totals data. Then upload to GCS download bucket.
+Acquires the eprint IDs and publication dates from [the Google Sheet](#the-google-sheet). For each ID that has a publication date that is before the current scheduled run date, download the country and totals data. Then upload to GCS download bucket.
 
 ### Transform
-Acquires the eprint IDs, ISBN13s and titles from [[The Google Sheet]]. For each ID, load the downloaded data (both coutried and totals) into a single data structure and include the title (whether it is empty or not does not matter - the title exists for completeness only). Add an additional field to each row - the *release_date* which is determined by the scheduled runtime. Upload this transformed structure to GCS transform bucket.
+Acquires the eprint IDs, ISBN13s and titles from [the Google Sheet](#the-google-sheet). For each ID, load the downloaded data (both coutried and totals) into a single data structure and include the title (whether it is empty or not does not matter - the title exists for completeness only). Add an additional field to each row - the *release_date* which is determined by the scheduled runtime. Upload this transformed structure to GCS transform bucket.
 
 ### BQ Load
 Load the table into BigQuery and partition on the *release_date*.
