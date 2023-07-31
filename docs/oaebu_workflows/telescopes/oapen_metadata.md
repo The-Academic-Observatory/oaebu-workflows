@@ -5,6 +5,8 @@ OAPEN enables libraries and aggregators to use the metadata of all available tit
 The metadata is available in different formats and this telescope harvests the data in the XML format.  
 See the [OAPEN Metadata webpage](https://www.oapen.org/resources/15635975-metadata) for more information.
 
+The corresponding table in BigQuery is `onix.onixYYYYMMDD`. 
+
 ```eval_rst
 +------------------------------+------------+
 | Summary                      |            |
@@ -43,7 +45,7 @@ The XML file containing metadata is updated daily at +0000GMT. This telescope is
 
 ## Results
 
-The resulting ONIX table will be stored in BigQuery - `oaebu-oapen.onix.onixYYYYMMDD`
+The resulting ONIX table will be stored in BigQuery - `onix.onixYYYYMMDD`
 
 ## Tasks
 
@@ -64,3 +66,13 @@ The transform step modifies the downloaded metadata into a valid ONIX format. Th
 ### Load to BigQuery
 
 The valid ONIX feed can now be loaded from the transform bucket into a BigQuery sharded table.
+
+## Latest schema
+``` eval_rst
+.. tabularcolumns:: |p{4.5cm}|l|l|p{6cm}| 
+.. csv-table::
+   :file: ../../schemas/onix_latest.csv
+   :width: 100%
+   :header-rows: 1
+   :class: longtable
+```

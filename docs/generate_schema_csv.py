@@ -49,9 +49,9 @@ def schema_to_csv(*, schema: List, output: List, prefix: str = ""):
             ffield = field["fields"]
             schema_to_csv(schema=ffield, output=output, prefix=f"{prefix}{fname}.")
 
-
 def generate_csv(*, schema_dir):
     """Convert all observatory schema files in JSON format to CSV for inclusion in Sphinx.
+    Split long text for pdf
     :param schema_dir: Path to schema directory.
     """
 
@@ -62,6 +62,7 @@ def generate_csv(*, schema_dir):
         shutil.rmtree(dst_dir)
 
     Path(dst_dir).mkdir(exist_ok=True, parents=True)
+    max_length = 30 
 
     for schema_file in schema_files:
         filename = os.path.basename(schema_file)
@@ -109,6 +110,46 @@ def generate_latest_files():
         src_file = table_schemas[table][-1]
         shutil.copyfile(src_file, dst_path)
 
+      
+def wrap_long_first_words(text, max_length):
+    """ 
+    Break long strings so they will wrap on a new line in tables
+    text = text to split
+    max_length = number of characters to split text
+    """
+    if len(text) > max_length:
+        wrapped_text = "\n".join([text[i:i+max_length] for i in range(0, len(text), max_length)])
+        return wrapped_text
+    else:
+        return text
+        
+def generate_csv_pdf(*, schema_dir):
+    """Convert all observatory schema files in JSON format to CSV for inclusion in Sphinx.
+    Split long text for pdf output
+    :param schema_dir: Path to schema directory.
+    """
+
+    schema_files = glob(os.path.join(schema_dir, "*.json"))
+    dst_dir = "schemas"
+
+    if os.path.exists(dst_dir):
+        shutil.rmtree(dst_dir)
+
+    Path(dst_dir).mkdir(exist_ok=True, parents=True)
+    max_length = 30 
+
+    for schema_file in schema_files:
+        filename = os.path.basename(schema_file)
+        filename = filename[:-4] + "csv"  # Remove json and add csv suffix
+        with open(schema_file, "r", encoding="utf-8") as f:
+            data = f.read()
+        schema = json.loads(data)
+        rows = list()
+        schema_to_csv(schema=schema, output=rows)
+        df = pd.DataFrame(rows)
+        df.iloc[:, 0] = df.iloc[:, 0].apply(wrap_long_first_words, args=(max_length,))
+        df.to_csv(os.path.join(dst_dir, filename), index=False)
+ 
 
 if __name__ == "__main__":
     generate_csv(schema_dir=os.path.join("..", "oaebu_workflows", "database", "schema"))

@@ -3,8 +3,8 @@ Book Usage Data Workflows
 
 Book Usage Data Workflows provides Apache Airflow workflows for fetching, processing and analysing data about Open Access Books.
 
-The workflows include: Directory of Open Access Books (DOAB), Google Analytics, Google Books, JSTOR, Oapen IRUS UK,
-Oapen Metadata, Onix, UCL Discovery and an Onix Workflow for combining all of this data.
+The workflows include: Google Analytics, Google Books, JSTOR, IRUS Fulcrum, IRUS OAPEN,
+ONIX, Thoth, UCL Discovery and an Onix Workflow for combining all of this data.
 
 Telescope Workflows
 ====================

@@ -1,7 +1,7 @@
 # IRUS OAPEN
 
-IRUS-UK provides OAPEN COUNTER standard access reports. Almost all books on OAPEN are provided as a whole book PDF file.
-The reports show access figures for each month as well as the location of the access.
+IRUS provides OAPEN COUNTER standard access reports. Almost all books on OAPEN are provided as a whole book PDF file. The reports show access figures for each month as well as the location of the access. 
+
 Since the location info includes an IP-address, the original data is handled only from within the OAPEN Google Cloud project.
 
 Using a Cloud Function, the original data is downloaded and IP-addresses are replaced with geographical information, such as city and country.  
@@ -10,7 +10,7 @@ After this transformation, the data without IP-addresses is uploaded to a Google
 This is all done from within the OAPEN Google Cloud project.
 The Cloud Function is created and called from the telescope, when the Cloud Function has finished the data is copied from the Storage Bucket inside the OAPEN project, to a Bucket inside the main airflow project.
 
-The corresponding table created in BigQuery is `oapen.oapen_irus_ukYYYYMMDD`.
+The corresponding table created in BigQuery is `irus.irus_oapenYYYYMMDD`.
 
 ```eval_rst
 +------------------------------+---------+
@@ -97,14 +97,15 @@ Similar to the publisher names described above, multiple publisher UUIDs can be 
 '|' character.
 
 ## Cloud Function
+The IRUS OAPEN telescope makes use of a Google Cloud Function that resides in the OAPEN Google project. 
 
-The OAPEN IRUS-UK telescope makes use of a Google Cloud Function that resides in the OAPEN Google project.
 There is a specific airflow task that will create the Cloud Function if it does not exist yet, or update it if the source code has changed.  
+
 The source code for the Cloud Function can be found inside a separate repository that is part of the same organization (https://github.com/The-Academic-Observatory/oapen-irus-uk-cloud-function).
 
 ### Download access stats data
+The Cloud Function downloads IRUS OAPEN access stats data for 1 month and for a single publisher. Usage data after April 2020 is hosted on a new platform.  
 
-The Cloud Function downloads OAPEN IRUS-UK access stats data for 1 month and for a single publisher. Usage data after April 2020 is hosted on a new platform.  
 The newer data is obtained by using their API, this requires a `requestor_id` and an `api_key`.  
 Data before April 2020 is obtained from an URL, this requires an `email` and a `password`.
 
@@ -156,12 +157,10 @@ Note that all values need to be urlencoded.
 In the config.yaml file, the following airflow connections are required:
 
 ### oapen_irus_uk_login
-
-To get the email address/password combination, contact OAPEN IRUS-UK.
+To get the email address/password combination, contact IRUS.
 
 ### oapen_irus_uk_api
-
-To get the requestor_id/api_key, contact OAPEN IRUS-UK.
+To get the requestor_id/api_key, contact IRUS.
 
 ### geoip_license_key
 
@@ -177,10 +176,11 @@ geoip_license_key: mysql://user_id:license_key@
 ```
 
 ## Latest schema
-
 ```eval_rst
+.. tabularcolumns:: |p{4.5cm}|l|l|p{6cm}|
 .. csv-table::
    :file: ../../schemas/irus_oapen.csv
    :width: 100%
    :header-rows: 1
+   :class: longtable
 ```
