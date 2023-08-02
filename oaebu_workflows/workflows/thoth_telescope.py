@@ -91,7 +91,7 @@ class ThothTelescope(Workflow):
         observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
         catchup: bool = False,
         start_date: pendulum.DateTime = pendulum.datetime(2022, 12, 1),
-        schedule_interval: str = "@weekly",
+        schedule: str = "@weekly",
     ):
         """Construct an ThothOnixTelescope instance.
         :param dag_id: The ID of the DAG
@@ -108,12 +108,12 @@ class ThothTelescope(Workflow):
         :param observatory_api_conn_id: Airflow connection ID for the overvatory API
         :param catchup: Whether to catchup the DAG or not
         :param start_date: The start date of the DAG
-        :param schedule_interval: The schedule interval of the DAG
+        :param schedule: The schedule interval of the DAG
         """
         super().__init__(
             dag_id,
             start_date=start_date,
-            schedule_interval=schedule_interval,
+            schedule=schedule,
             airflow_conns=[observatory_api_conn_id],
             catchup=catchup,
             tags=["oaebu"],

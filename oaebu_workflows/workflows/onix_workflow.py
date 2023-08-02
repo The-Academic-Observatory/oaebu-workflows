@@ -162,7 +162,7 @@ class OnixWorkflow(Workflow):
         sensor_dag_ids: List[str] = None,
         catchup: Optional[bool] = False,
         start_date: Optional[pendulum.DateTime] = pendulum.datetime(2022, 8, 1),
-        schedule_interval: Optional[str] = "@weekly",
+        schedule: Optional[str] = "@weekly",
     ):
         """
         Initialises the workflow object.
@@ -208,7 +208,7 @@ class OnixWorkflow(Workflow):
         :param sensor_dag_ids: Dag IDs for dependent tasks
         :param catchup: Whether to catch up missed DAG runs.
         :param start_date: Start date of the DAG.
-        :param schedule_interval: Scheduled interval for running the DAG.
+        :param schedule: Scheduled interval for running the DAG.
         """
 
         if not sensor_dag_ids:
@@ -258,7 +258,7 @@ class OnixWorkflow(Workflow):
         self.sensor_dag_ids = sensor_dag_ids
         self.catchup = catchup
         self.start_date = start_date
-        self.schedule_interval = schedule_interval
+        self.schedule = schedule
 
         # Initialise the data partners
         self.data_partners = []
@@ -280,7 +280,7 @@ class OnixWorkflow(Workflow):
         super().__init__(
             dag_id=self.dag_id,
             start_date=start_date,
-            schedule_interval=schedule_interval,
+            schedule=schedule,
             catchup=catchup,
             airflow_conns=[observatory_api_conn_id],
             tags=["oaebu"],

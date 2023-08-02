@@ -86,7 +86,7 @@ class IrusFulcrumTelescope(Workflow):
         observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
         irus_oapen_api_conn_id: str = "irus_api",
         catchup: bool = True,
-        schedule_interval: str = "0 0 4 * *",  # Run on the 4th of every month
+        schedule: str = "0 0 4 * *",  # Run on the 4th of every month
         start_date: pendulum.DateTime = pendulum.datetime(2022, 4, 1),  # Earliest available data
     ):
         """The Fulcrum Telescope
@@ -102,7 +102,7 @@ class IrusFulcrumTelescope(Workflow):
         :param observatory_api_conn_id: Airflow connection ID for the overvatory API
         :param irus_oapen_api_conn_id: Airflow connection ID OAPEN IRUS UK (counter 5)
         :param catchup: Whether to catchup the DAG or not
-        :param schedule_interval: The schedule interval of the DAG
+        :param schedule: The schedule interval of the DAG
         :param start_date: The start date of the DAG
         """
         if bq_table_description is None:
@@ -111,7 +111,7 @@ class IrusFulcrumTelescope(Workflow):
         super().__init__(
             dag_id,
             start_date,
-            schedule_interval,
+            schedule,
             airflow_conns=[observatory_api_conn_id, irus_oapen_api_conn_id],
             catchup=catchup,
             tags=["oaebu"],

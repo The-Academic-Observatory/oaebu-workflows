@@ -88,7 +88,7 @@ class UclDiscoveryTelescope(Workflow):
         observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
         oaebu_service_account_conn_id: str = "oaebu_service_account",
         max_threads: int = os.cpu_count() * 2,
-        schedule_interval: str = "0 0 4 * *",  # run on the 4th of every month
+        schedule: str = "0 0 4 * *",  # run on the 4th of every month
         start_date: pendulum.DateTime = pendulum.datetime(2015, 6, 1),
         catchup: bool = True,
         max_active_runs: int = 10,
@@ -107,7 +107,7 @@ class UclDiscoveryTelescope(Workflow):
         :param observatory_api_conn_id: Airflow connection ID for the overvatory API
         :param oaebu_service_account_conn_id: Airflow connection ID for the oaebu service account
         :param max_threads: The maximum number threads to utilise for parallel processes
-        :param schedule_interval: The schedule interval of the DAG
+        :param schedule: The schedule interval of the DAG
         :param start_date: The start date of the DAG
         :param catchup: Whether to catchup the DAG or not
         :param max_active_runs: The maximum number of concurrent DAG runs
@@ -115,7 +115,7 @@ class UclDiscoveryTelescope(Workflow):
         super().__init__(
             dag_id,
             start_date,
-            schedule_interval,
+            schedule,
             catchup=catchup,
             max_active_runs=max_active_runs,
             airflow_conns=[observatory_api_conn_id, oaebu_service_account_conn_id],

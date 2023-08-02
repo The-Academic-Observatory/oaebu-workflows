@@ -86,7 +86,7 @@ class GoogleBooksTelescope(Workflow):
         sftp_service_conn_id: str = "sftp_service",
         observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
         catchup: bool = False,
-        schedule_interval: str = "@weekly",
+        schedule: str = "@weekly",
         start_date: pendulum.DateTime = pendulum.datetime(2018, 1, 1),
     ):
         """Construct a GoogleBooksTelescope instance.
@@ -104,13 +104,13 @@ class GoogleBooksTelescope(Workflow):
         :param sftp_service_conn_id: Airflow connection ID for the SFTP service
         :param observatory_api_conn_id: Airflow connection ID for the overvatory API
         :param catchup: Whether to catchup the DAG or not
-        :param schedule_interval: The schedule interval of the DAG
+        :param schedule: The schedule interval of the DAG
         :param start_date: The start date of the DAG
         """
         super().__init__(
             dag_id,
             start_date,
-            schedule_interval,
+            schedule,
             catchup=catchup,
             airflow_conns=[sftp_service_conn_id, observatory_api_conn_id],
             tags=["oaebu"],

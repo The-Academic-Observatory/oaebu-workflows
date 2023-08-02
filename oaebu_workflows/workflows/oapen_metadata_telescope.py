@@ -95,7 +95,7 @@ class OapenMetadataTelescope(Workflow):
         observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
         catchup=False,
         start_date: pendulum.DateTime = pendulum.datetime(2018, 5, 14),
-        schedule_interval: str = "@weekly",
+        schedule: str = "@weekly",
     ):
         """Construct a OapenMetadataTelescope instance.
         :param dag_id: The ID of the DAG
@@ -109,12 +109,12 @@ class OapenMetadataTelescope(Workflow):
         :param observatory_api_conn_id: Airflow connection ID for the overvatory API
         :param catchup: Whether to catchup the DAG or not
         :param start_date: The start date of the DAG
-        :param schedule_interval: The schedule interval of the DAG
+        :param schedule: The schedule interval of the DAG
         """
         super().__init__(
             dag_id,
             start_date,
-            schedule_interval,
+            schedule,
             airflow_conns=[observatory_api_conn_id],
             catchup=catchup,
             tags=["oaebu"],

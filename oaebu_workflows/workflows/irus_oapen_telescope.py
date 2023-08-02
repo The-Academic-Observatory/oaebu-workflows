@@ -118,7 +118,7 @@ class IrusOapenTelescope(Workflow):
         irus_oapen_login_conn_id: str = "irus_login",
         catchup: bool = True,
         start_date: pendulum.DateTime = pendulum.datetime(2015, 6, 1),
-        schedule_interval: str = "0 0 4 * *",  # Run on the 4th of every month
+        schedule: str = "0 0 4 * *", # Run on the 4th of every month
         max_active_runs: int = 5,
     ):
         """The OAPEN irus uk telescope.
@@ -139,7 +139,7 @@ class IrusOapenTelescope(Workflow):
         :param irus_oapen_login_conn_id: The Airflow connection ID for IRUS API (login) - for counter 4
         :param catchup: Whether to catchup the DAG or not
         :param start_date: The start date of the DAG
-        :param schedule_interval: The schedule interval of the DAG
+        :param schedule: The schedule interval of the DAG
         :param max_active_runs: The maximum number of concurrent DAG instances
         """
         if bq_table_description is None:
@@ -148,7 +148,7 @@ class IrusOapenTelescope(Workflow):
         super().__init__(
             dag_id,
             start_date,
-            schedule_interval,
+            schedule,
             catchup=catchup,
             airflow_conns=[
                 observatory_api_conn_id,
