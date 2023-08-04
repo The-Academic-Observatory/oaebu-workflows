@@ -404,7 +404,7 @@ def jstor_transform(
         with open(download_file, "r") as tsv_file:
             first_line = tsv_file.readline()
             tsv_file.seek(0)
-            if first_line.startswith("Report_Name"):
+            if "Report_Name" in first_line:
                 line = None
                 while line != "\n":
                     line = next(tsv_file)
