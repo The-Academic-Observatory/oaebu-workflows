@@ -114,11 +114,11 @@ class IrusOapenTelescope(Workflow):
         max_cloud_function_instances: int = 0,
         observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
         geoip_license_conn_id: str = "geoip_license_key",
-        oapen_irus_api_conn_id: str = "irus_api",
-        oapen_irus_login_conn_id: str = "irus_login",
+        irus_oapen_api_conn_id: str = "irus_api",
+        irus_oapen_login_conn_id: str = "irus_login",
         catchup: bool = True,
         start_date: pendulum.DateTime = pendulum.datetime(2015, 6, 1),
-        schedule_interval: str = "0 0 4 * *", # Run on the 4th of every month
+        schedule_interval: str = "0 0 4 * *",  # Run on the 4th of every month
         max_active_runs: int = 5,
     ):
         """The OAPEN irus uk telescope.
@@ -135,20 +135,15 @@ class IrusOapenTelescope(Workflow):
         :param max_cloud_function_instances:
         :param observatory_api_conn_id: Airflow connection ID for the overvatory API
         :param geoip_license_conn_id: The Airflow connection ID for the GEOIP license
-        :param oapen_irus_api_conn_id: The Airflow connection ID for IRUS API - for counter 5
-        :param oapen_irus_login_conn_id: The Airflow connection ID for IRUS API (login) - for counter 4
+        :param irus_oapen_api_conn_id: The Airflow connection ID for IRUS API - for counter 5
+        :param irus_oapen_login_conn_id: The Airflow connection ID for IRUS API (login) - for counter 4
         :param catchup: Whether to catchup the DAG or not
         :param start_date: The start date of the DAG
         :param schedule_interval: The schedule interval of the DAG
         :param max_active_runs: The maximum number of concurrent DAG instances
         """
         if bq_table_description is None:
-            bq_table_description = {
-                "irus_oapen": "Metrics from IRUS OAPEN. Before 2020-04 "
-                "from: https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/. "
-                "After 2020-04 from the OAPEN_SUSHI API (documentation not "
-                "published)."
-            }
+            bq_table_description = "OAPEN metrics as recorded by the IRUS platform"
 
         super().__init__(
             dag_id,
@@ -158,8 +153,8 @@ class IrusOapenTelescope(Workflow):
             airflow_conns=[
                 observatory_api_conn_id,
                 geoip_license_conn_id,
-                oapen_irus_api_conn_id,
-                oapen_irus_login_conn_id,
+                irus_oapen_api_conn_id,
+                irus_oapen_login_conn_id,
             ],
             max_active_runs=max_active_runs,
             tags=["oaebu"],
@@ -177,8 +172,8 @@ class IrusOapenTelescope(Workflow):
         self.max_cloud_function_instances = max_cloud_function_instances
         self.observatory_api_conn_id = observatory_api_conn_id
         self.geoip_license_conn_id = geoip_license_conn_id
-        self.oapen_irus_api_conn_id = oapen_irus_api_conn_id
-        self.oapen_irus_login_conn_id = oapen_irus_login_conn_id
+        self.irus_oapen_api_conn_id = irus_oapen_api_conn_id
+        self.irus_oapen_login_conn_id = irus_oapen_login_conn_id
 
         check_workflow_inputs(self)
 
@@ -317,9 +312,9 @@ class IrusOapenTelescope(Workflow):
 
             # get the publisher_uuid or publisher_id, both are set to empty strings when publisher id is 'oapen'
             if release.partition_date >= pendulum.datetime(2020, 4, 1):
-                airflow_conn = self.oapen_irus_api_conn_id
+                airflow_conn = self.irus_oapen_api_conn_id
             else:
-                airflow_conn = self.oapen_irus_login_conn_id
+                airflow_conn = self.irus_oapen_login_conn_id
             username = BaseHook.get_connection(airflow_conn).login
             password = BaseHook.get_connection(airflow_conn).password
 

@@ -115,7 +115,7 @@ class TestIrusFulcrumTelescope(ObservatoryTestCase):
                 bq_dataset_id=env.add_dataset(),
             )
             dag = telescope.make_dag()
-            env.add_connection(Connection(conn_id=telescope.oapen_irus_api_conn_id, uri=f"http://fake_api_login:@"))
+            env.add_connection(Connection(conn_id=telescope.irus_oapen_api_conn_id, uri=f"http://fake_api_login:@"))
 
             # Add the fake requestor ID as a connection
             with env.create_dag_run(dag, execution_date):

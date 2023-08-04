@@ -182,9 +182,9 @@ class TestIrusOapenTelescope(ObservatoryTestCase):
                 # Add airflow connections
                 conn = Connection(conn_id=telescope.geoip_license_conn_id, uri="http://email_address:password@")
                 env.add_connection(conn)
-                conn = Connection(conn_id=telescope.oapen_irus_api_conn_id, uri="mysql://requestor_id:api_key@")
+                conn = Connection(conn_id=telescope.irus_oapen_api_conn_id, uri="mysql://requestor_id:api_key@")
                 env.add_connection(conn)
-                conn = Connection(conn_id=telescope.oapen_irus_login_conn_id, uri="mysql://user_id:license_key@")
+                conn = Connection(conn_id=telescope.irus_oapen_login_conn_id, uri="mysql://user_id:license_key@")
                 env.add_connection(conn)
 
                 # Test that all dependencies are specified: no error should be thrown

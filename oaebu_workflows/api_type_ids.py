@@ -36,7 +36,7 @@ class DatasetTypeId:
     google_books_traffic = "google_books_traffic"
     jstor_country = "jstor_country"
     jstor_institution = "jstor_institution"
-    oapen_irus_uk = "oapen_irus_uk"
+    irus_oapen = "irus_oapen"
     ucl_discovery = "ucl_discovery"
     fulcrum = "fulcrum"
 
@@ -55,7 +55,7 @@ class WorkflowTypeId:
     google_analytics = "google_analytics"
     google_books = "google_books"
     jstor = "jstor"
-    oapen_irus_uk = "oapen_irus_uk"
+    irus_oapen = "irus_oapen"
     ucl_discovery = "ucl_discovery"
     fulcrum = "fulcrum"
 
