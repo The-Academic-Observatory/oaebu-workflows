@@ -494,7 +494,7 @@ def get_release_date(report_path: str) -> pendulum.DateTime:
         first_line = tsv_file.readline()
 
     # Process report with the old header
-    if not first_line.startswith("Report_Name"):
+    if not "Report_Name" in first_line:
         return get_release_date_deprecated(report_path)
 
     # Process report with new header
