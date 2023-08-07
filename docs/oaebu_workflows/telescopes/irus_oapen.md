@@ -156,10 +156,10 @@ In the 'permissions' tab, click 'Grant Access', add the airflow service account 
 Note that all values need to be urlencoded.
 In the config.yaml file, the following airflow connections are required:
 
-### oapen_irus_uk_login
+### irus_oapen_login
 To get the email address/password combination, contact IRUS.
 
-### oapen_irus_uk_api
+### irus_oapen_api
 To get the requestor_id/api_key, contact IRUS.
 
 ### geoip_license_key
@@ -170,8 +170,8 @@ Then, click on 'Generate new license key', this can be used for the 'license_key
 Answer \_No* for the question: "Old versions of our GeoIP Update program use a different license key format. Will this key be used for GeoIP Update?"
 
 ```yaml
-oapen_irus_uk_login: mysql://email_address:password@
-oapen_irus_uk_api: mysql://requestor_id:api_key@
+irus_oapen_login: mysql://email_address:password@
+irus_oapen_api: mysql://requestor_id:api_key@
 geoip_license_key: mysql://user_id:license_key@
 ```
 
