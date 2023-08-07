@@ -119,7 +119,7 @@ class JstorTelescope(Workflow):
         observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
         catchup: bool = False,
         max_active_runs: int = 1,
-        schedule_interval: str = "0 0 4 * *",  # 4th day of every month
+        schedule: str = "0 0 4 * *",  # 4th day of every month
         start_date: pendulum.DateTime = pendulum.datetime(2016, 10, 1),
     ):
         """Construct a JstorTelescope instance.
@@ -138,13 +138,13 @@ class JstorTelescope(Workflow):
         :param observatory_api_conn_id: Airflow connection ID for the overvatory API
         :param catchup: Whether to catchup the DAG or not
         :param max_active_runs: The maximum number of DAG runs that can be run concurrently
-        :param schedule_interval: The schedule interval of the DAG
+        :param schedule: The schedule interval of the DAG
         :param start_date: The start date of the DAG
         """
         super().__init__(
             dag_id,
             start_date,
-            schedule_interval,
+            schedule,
             catchup=catchup,
             airflow_conns=[gmail_api_conn_id, observatory_api_conn_id],
             max_active_runs=max_active_runs,

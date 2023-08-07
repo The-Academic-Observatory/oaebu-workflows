@@ -13,18 +13,16 @@
 # limitations under the License.
 
 # Author: James Diprose
-import os
+
 import json
+import os
 import re
 from typing import Dict
 
 from airflow.exceptions import AirflowException
 
 from observatory.platform.config import module_file_path
-from observatory.platform.workflows.elastic_import_workflow import ElasticImportConfig
 from observatory.platform.utils.jinja2_utils import render_template
-from observatory.platform.elastic.kibana import TimeField
-from observatory.platform.elastic.elastic import KeepInfo, KeepOrder
 
 
 def test_fixtures_folder(*subdirs) -> str:
@@ -98,21 +96,3 @@ def elastic_mappings_folder() -> str:
     """
 
     return module_file_path("oaebu_workflows.database.mappings")
-
-
-ELASTIC_OAEBU_KIBANA_TIME_FIELDS = [
-    TimeField("^oaebu-.*-unmatched-book-metrics$", "release_date"),
-    TimeField("^oaebu-.*-book-product-list$", "time_field"),
-    TimeField("^oaebu-.*$", "month"),
-]
-ELASTIC_INDEX_KEEP_INFO = {
-    "": KeepInfo(ordering=KeepOrder.newest, num=3),
-    "oaebu": KeepInfo(ordering=KeepOrder.newest, num=3),
-}
-
-ELASTIC_IMPORT_CONFIG = ElasticImportConfig(
-    elastic_mappings_path=elastic_mappings_folder(),
-    elastic_mappings_func=load_elastic_mappings_oaebu,
-    kibana_time_fields=ELASTIC_OAEBU_KIBANA_TIME_FIELDS,
-    index_keep_info=ELASTIC_INDEX_KEEP_INFO,
-)
