@@ -404,7 +404,7 @@ def jstor_transform(
         with open(download_file, "r") as tsv_file:
             first_line = tsv_file.readline()
             tsv_file.seek(0)
-            if first_line.startswith("Report_Name"):
+            if "Report_Name" in first_line:
                 line = None
                 while line != "\n":
                     line = next(tsv_file)
@@ -494,7 +494,7 @@ def get_release_date(report_path: str) -> pendulum.DateTime:
         first_line = tsv_file.readline()
 
     # Process report with the old header
-    if not first_line.startswith("Report_Name"):
+    if not "Report_Name" in first_line:
         return get_release_date_deprecated(report_path)
 
     # Process report with new header
