@@ -1,0 +1,76 @@
+{
+    "ONIXMessage": {
+        "@xlmns": [],
+        "@release": [],
+        "Header": {
+            "Sender": {
+                "SenderName": [],
+                "EmailAddress": []
+            },
+            "SentDateTime": []
+        },
+        "Product": {
+            "RecordReference": [],
+            "NotificationType": [],
+            "RecordSourceType": [],
+            "Edition": {
+                "EditionNumber": []
+            },
+            "ProductIdentifier": {
+                "ProductIDType": [],
+                "ProductIDTypeName": [],
+                "IDValue": []
+            },
+            "PublishingDate": {
+                "PublishingDateRole": [],
+                "PublishingDate": []
+            },
+            "DescriptiveDetail": {
+                "ProductComposition": [],
+                "ProductForm": [],
+                "ProductFormDetail": [],
+                "PrimaryContentType": [],
+                "Subject": {
+                    "SubjectCode": [],
+                    "SubjectSchemeIdentifier": [],
+                    "SubjectHeadingText": []
+                },
+                "TitleDetail": {
+                    "TitleType": [],
+                    "TitleElement": {
+                        "TitleElementLevel": [],
+                        "TitleText": []
+                    }
+                },
+                "Contributor": {
+                    "SequenceNumber": [],
+                    "ContributorRole": [],
+                    "NamesBeforeKey": [],
+                    "KeyNames": [],
+                    "NameIdentifier": {
+                        "NameIDType": [],
+                        "IDValue": []
+                    },
+                    "PersonName": []
+                }
+            },
+            "RelatedMaterial": {
+                "RelatedProduct": {
+                    "ProductRelationCode": [],
+                    "ProductIdentifier": {
+                        "ProductIDType": [],
+                        "IDValue": []
+                    }
+                },
+                "RelatedWork": {
+                    "WorkRelationCode": {
+                        "WorkIdentifiers": {
+                            "WorkIDType": [],
+                            "IDValue": []
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

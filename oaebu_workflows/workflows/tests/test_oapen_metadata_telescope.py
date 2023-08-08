@@ -15,10 +15,10 @@
 # Author: Aniek Roelofs, Tuan Chien, Keegan Smith
 
 import os
+import unittest
 from unittest.mock import MagicMock
 from tempfile import NamedTemporaryFile
-from xml.etree import ElementTree
-import json
+from xml.parsers.expat import ExpatError
 
 import pendulum
 import vcr
@@ -28,11 +28,10 @@ from airflow.utils.state import State
 from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.workflows.oapen_metadata_telescope import (
     OapenMetadataTelescope,
-    download_oapen_metadata,
-    oapen_metadata_parse,
+    download_metadata,
     remove_invalid_products,
     find_onix_product,
-    process_xml_element,
+    parse_through_schema,
 )
 from observatory.platform.api import get_dataset_releases
 from observatory.platform.observatory_config import Workflow
@@ -59,34 +58,16 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
         self.project_id = os.getenv("TEST_GCP_PROJECT_ID")
         self.data_location = os.getenv("TEST_GCP_DATA_LOCATION")
 
-        # VCR Cassettes
-        self.valid_download_cassette = test_fixtures_folder("oapen_metadata", "oapen_metadata_cassette_valid.yaml")
-        self.invalid_download_cassette = test_fixtures_folder("oapen_metadata", "oapen_metadata_cassette_invalid.yaml")
-        self.bad_response_cassette = test_fixtures_folder("oapen_metadata", "oapen_metadata_cassette_bad_response.yaml")
-        self.empty_download_cassette = test_fixtures_folder("oapen_metadata", "oapen_metadata_cassette_empty.yaml")
-        self.header_only_download_cassette = test_fixtures_folder(
-            "oapen_metadata", "oapen_metadata_cassette_header_only.yaml"
-        )
-
-        # Files for testing
-        self.valid_download_xml = test_fixtures_folder("oapen_metadata", "oapen_metadata_download_valid.xml")
-        self.invalid_download_xml = test_fixtures_folder("oapen_metadata", "oapen_metadata_download_invalid.xml")
-        self.empty_xml = test_fixtures_folder("oapen_metadata", "oapen_metadata_download_empty.xml")
-        self.valid_parsed_xml = test_fixtures_folder("oapen_metadata", "oapen_metadata_parsed_valid.xml")
-        self.invalid_parsed_xml = test_fixtures_folder("oapen_metadata", "oapen_metadata_parsed_invalid.xml")
-        self.valid_processed_xml = test_fixtures_folder("oapen_metadata", "oapen_metadata_processed_valid.xml")
-        self.processing_test_before = test_fixtures_folder("oapen_metadata", "processing_test_before.xml")
-        self.processing_test_after = test_fixtures_folder("oapen_metadata", "processing_test_after.xml")
-        self.invalid_products_xml = test_fixtures_folder("oapen_metadata", "oapen_metadata_invalid_products.xml")
-        self.parsed_json = test_fixtures_folder("oapen_metadata", "oapen_metadata_parsed.json")
-        # Valid fields json for the xml processing test
-        self.processing_test_fields = test_fixtures_folder("oapen_metadata", "processing_test_valid_fields.json")
+        self.metadata_uri = "https://library.oapen.org/download-export?format=onix"  # metadata URI
+        self.valid_download_cassette = test_fixtures_folder("oapen_metadata", "cassette_valid.yaml")  # VCR Cassette
+        self.test_table = test_fixtures_folder("oapen_metadata", "test_table.json")  # File for testing final table
 
     def test_dag_structure(self):
         """Test that the Oapen Metadata DAG has the correct structure"""
         dag = OapenMetadataTelescope(
             dag_id="oapen_metadata",
             cloud_workspace=self.fake_cloud_workspace,
+            metadata_uri="",
         ).make_dag()
         self.assert_dag_structure(
             {
@@ -111,6 +92,7 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
                     name="OAPEN Metadata Telescope",
                     class_name="oaebu_workflows.workflows.oapen_metadata_telescope.OapenMetadataTelescope",
                     cloud_workspace=self.fake_cloud_workspace,
+                    kwargs=dict(metadata_uri=""),
                 )
             ],
         )
@@ -129,6 +111,7 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
             telescope = OapenMetadataTelescope(
                 dag_id="oapen_metadata",
                 cloud_workspace=env.cloud_workspace,
+                metadata_uri=self.metadata_uri,
                 bq_dataset_id=dataset_id,
             )
             dag = telescope.make_dag()
@@ -168,7 +151,7 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
                 )
 
                 # Test download task
-                self.assertEqual(1, len(os.listdir(os.path.dirname(release.download_path))))
+                self.assertTrue(os.path.exists(release.download_path))
                 self.assert_file_integrity(release.download_path, "6df963cd448fe3ec8acb76bf49b34928", "md5")
 
                 # Test that download file uploaded to BQ
@@ -177,15 +160,11 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
                 )
 
                 # Test transform task
-                # release.transform_path -> oapen_onix_20210206.jsonl.gz
-                # release.invalid_products_path -> oapen_onix_invalid_products_20210206.xml
-                # release.post_parse_onix -> full.jsonl
-                self.assertTrue(os.path.exists(release.transform_path))
+                self.assertTrue(os.path.exists(release.parsed_metadata))
+                self.assertTrue(os.path.exists(release.validated_onix))
                 self.assertTrue(os.path.exists(release.invalid_products_path))
-                self.assertTrue(os.path.exists(release.post_parse_onix))
-                self.assert_file_integrity(release.transform_path, "e3474ca2", "gzip_crc")
-                self.assert_file_integrity(release.invalid_products_path, "297173aa0a09aa1dc538eadfc48285c5", "md5")
-                self.assert_file_integrity(release.post_parse_onix, "ecf04d998a7110d80d2eab47d058cfac", "md5")
+                self.assertTrue(os.path.exists(release.parsed_onix))
+                self.assertTrue(os.path.exists(release.transform_path))
 
                 # Test that transformed files uploaded to BQ
                 self.assert_blob_integrity(
@@ -197,7 +176,7 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
                     release.invalid_products_path,
                 )
                 self.assert_blob_integrity(
-                    env.transform_bucket, gcs_blob_name_from_path(release.post_parse_onix), release.post_parse_onix
+                    env.transform_bucket, gcs_blob_name_from_path(release.parsed_onix), release.parsed_onix
                 )
 
                 # Test that table is loaded to BQ
@@ -208,7 +187,7 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
                     release.snapshot_date,
                 )
                 self.assert_table_integrity(table_id, expected_rows=2)
-                self.assert_table_content(table_id, load_and_parse_json(self.parsed_json), primary_key="ISBN13")
+                self.assert_table_content(table_id, load_and_parse_json(self.test_table), primary_key="ISBN13")
 
                 # Add_dataset_release_task
                 dataset_releases = get_dataset_releases(dag_id=telescope.dag_id, dataset_id=telescope.api_dataset_id)
@@ -223,155 +202,200 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
                 self.assertEqual(ti.state, State.SUCCESS)
                 self.assert_cleanup(release.workflow_folder)
 
-    def test_download_oapen_metadata(self):
-        """Tests the function used to download the oapen metadata xml file"""
-        download_file = NamedTemporaryFile(delete=False)
 
-        # Remove the wait time before retries for testing
-        download_oapen_metadata.retry.sleep = MagicMock()
+class TestDownloadMetadata(unittest.TestCase):
+    # Cassettes
+    valid_download_cassette = test_fixtures_folder("oapen_metadata", "cassette_valid.yaml")
+    invalid_download_cassette = test_fixtures_folder("oapen_metadata", "cassette_invalid.yaml")
+    empty_download_cassette = test_fixtures_folder("oapen_metadata", "cassette_empty.yaml")
+    bad_response_cassette = test_fixtures_folder("oapen_metadata", "cassette_bad_response.yaml")
+    header_only_download_cassette = test_fixtures_folder("oapen_metadata", "cassette_header_only.yaml")
 
-        # For a valid XML
+    # XMLs
+    valid_download_xml = test_fixtures_folder("oapen_metadata", "metadata_download_valid.xml")
+
+    # Download URI
+    uri = "https://library.oapen.org/download-export?format=onix"
+
+    # Remove the wait time before retries for testing
+    download_metadata.retry.sleep = MagicMock()
+
+    def test_download_metadata(self):
+        """Test that metadata successfully downloads after 200 respose"""
         with vcr.VCR().use_cassette(self.valid_download_cassette, record_mode="none", allow_playback_repeats=True):
-            download_oapen_metadata(download_file.name)
-        with open(download_file.name, "r") as f:
-            downloaded_xml = f.readlines()
+            with NamedTemporaryFile() as download_file:
+                download_metadata(self.uri, download_file.name)
+                with open(download_file.name, "r") as f:
+                    downloaded_xml = f.readlines()
         with open(self.valid_download_xml, "r") as f:
             assertion_xml = f.readlines()
-        assert len(downloaded_xml) == len(
-            assertion_xml
-        ), f"Downloaded 'valid' XML has {len(downloaded_xml)} lines. Expected {len(assertion_xml)}"
-        assert downloaded_xml == assertion_xml, "Downloaded 'valid' XML is not equal to the expected XML"
+        self.assertEqual(len(downloaded_xml), len(assertion_xml))
+        self.assertEqual(downloaded_xml, assertion_xml)
 
-        # For invalid XML
+    def test_download_metadata_invalid_xml(self):
+        """Test behaviour when the downloaded file is an invalid XML"""
         with vcr.VCR().use_cassette(self.invalid_download_cassette, record_mode="none", allow_playback_repeats=True):
-            self.assertRaises(ElementTree.ParseError, download_oapen_metadata, download_file.name)
+            with NamedTemporaryFile() as download_file:
+                self.assertRaises(ExpatError, download_metadata, self.uri, download_file.name)
 
-        # For empty XML
+    def test_download_metadata_empty_xml(self):
+        """Test behaviour when the downloaded file is an empty XML"""
         with vcr.VCR().use_cassette(self.empty_download_cassette, record_mode="none", allow_playback_repeats=True):
-            self.assertRaises(ElementTree.ParseError, download_oapen_metadata, download_file.name)
+            with NamedTemporaryFile() as download_file:
+                self.assertRaises(ExpatError, download_metadata, self.uri, download_file.name)
 
+    def test_download_metadata_no_products(self):
+        """Test behaviour when the downloaded file is an empty XML"""
         # For only-header XML
         with vcr.VCR().use_cassette(
             self.header_only_download_cassette, record_mode="none", allow_playback_repeats=True
         ):
-            self.assertRaises(AirflowException, download_oapen_metadata, download_file.name)
+            with NamedTemporaryFile() as download_file:
+                self.assertRaisesRegex(
+                    AirflowException, "No products found", download_metadata, self.uri, download_file.name
+                )
 
-        # For non-200 response code
+    def test_download_metadata_bad_response(self):
+        """Test behaviour when the downloaded file has a non-200 response code"""
         with vcr.VCR().use_cassette(self.bad_response_cassette, record_mode="none", allow_playback_repeats=True):
-            self.assertRaises(ConnectionError, download_oapen_metadata, download_file.name)
+            with NamedTemporaryFile() as download_file:
+                self.assertRaisesRegex(
+                    ConnectionError, "Expected status code 200", download_metadata, self.uri, download_file.name
+                )
 
-    def test_oapen_metadata_parse(self):
-        """Tests the function used to parse the relevant fields into an onix file"""
-        telescope = OapenMetadataTelescope(
-            dag_id="oapen_metadata",
-            cloud_workspace=self.fake_cloud_workspace,
-        )
-        with open(telescope.onix_product_fields_file) as f:
-            onix_product_fields = json.load(f)
-        with open(telescope.onix_header_fields_file) as f:
-            onix_header_fields = json.load(f)
-        parsed_file = NamedTemporaryFile(delete=False)
 
-        # For a valid XML
-        oapen_metadata_parse(
-            self.valid_download_xml,
-            parsed_file.name,
-            onix_product_fields=onix_product_fields,
-            onix_header_fields=onix_header_fields,
-        )
-        with open(parsed_file.name, "r") as f:
-            parsed_xml = f.readlines()
-        with open(self.valid_parsed_xml, "r") as f:
-            assertion_xml = f.readlines()
-        assert len(parsed_xml) == len(
-            assertion_xml
-        ), f"Downloaded 'valid' XML has {len(parsed_xml)} lines. Expected {len(assertion_xml)}"
-        assert parsed_xml == assertion_xml, "Parsed 'valid' XML is not equal to the expected XML"
+class TestParseThroughSchema(unittest.TestCase):
+    def test_parse_through_schema(self):
+        """Tests the generic use case of the function"""
+        input_dict = {
+            "thing": {"subthing": {"subsubthing": {"subsubsubthing": "1", "unimportant_subsubsubthing": "1"}}},
+            "unimportant_thing": "1",
+        }
+        schema_dict = {"thing": {"subthing": {"subsubthing": {"subsubsubthing": []}}}}
+        expected_output = {"thing": {"subthing": {"subsubthing": {"subsubsubthing": "1"}}}}
+        self.assertEqual(parse_through_schema(input_dict, schema_dict), expected_output)
 
-        # For invalid XML
-        self.assertRaises(
-            ElementTree.ParseError,
-            oapen_metadata_parse,
-            self.invalid_download_xml,
-            parsed_file.name,
-            onix_product_fields=onix_product_fields,
-            onix_header_fields=onix_header_fields,
-        )
+    def test_matching_keys(self):
+        """Tests that the function correctly processes the input dictionary when all nested keys match the schema"""
+        input_dict = {"thing": {"subthing": {"subsubthing": {"subsubsubthing": "1"}}}}
+        schema_dict = {"thing": {"subthing": {"subsubthing": {"subsubsubthing": []}}}}
+        expected_output = {"thing": {"subthing": {"subsubthing": {"subsubsubthing": "1"}}}}
+        self.assertEqual(parse_through_schema(input_dict, schema_dict), expected_output)
 
-        # For empty XML
-        self.assertRaises(
-            ElementTree.ParseError,
-            oapen_metadata_parse,
-            self.empty_xml,
-            parsed_file.name,
-            onix_product_fields=onix_product_fields,
-            onix_header_fields=onix_header_fields,
-        )
+    def test_empty_input(self):
+        """Tests that the function correctly handles an empty input dictionary"""
+        input_dict = {}
+        schema_dict = {"thing": {"subthing": {"subsubthing": []}}}
+        expected_output = {}
+        self.assertEqual(parse_through_schema(input_dict, schema_dict), expected_output)
+
+    def test_no_matching_keys(self):
+        """Tests that the function correctly handles an input dictionary with no matching keys in the schema"""
+        input_dict = {"thing": {"subthing": {"subsubthing": "1"}}}
+        schema_dict = {"other_thing": {"other_subthing": {"other_subsubthing": []}}}
+        expected_output = {}
+        self.assertEqual(parse_through_schema(input_dict, schema_dict), expected_output)
+
+    def test_edge_case_empty_schema(self):
+        """Tests that the function correctly handles an empty schema"""
+        input_dict = {"thing": {"subthing": {"subsubthing": "1"}}}
+        schema_dict = {}
+        expected_output = {}
+        self.assertEqual(parse_through_schema(input_dict, schema_dict), expected_output)
+
+
+class TestRemoveInvalidProducts(unittest.TestCase):
+    valid_parsed_xml = test_fixtures_folder("oapen_metadata", "parsed_valid.xml")
+    invalid_products_removed_xml = test_fixtures_folder("oapen_metadata", "invalid_products_removed.xml")
+    empty_xml = test_fixtures_folder("oapen_metadata", "empty_download.xml")
+    invalid_products_xml = test_fixtures_folder("oapen_metadata", "invalid_products.xml")
 
     def test_remove_invalid_products(self):
         """Tests the function used to remove invalid products from an xml file"""
-        processed_file = NamedTemporaryFile(delete=False)
-        invalid_products_file = NamedTemporaryFile(delete=False)
+        with NamedTemporaryFile() as invalid_products_file, NamedTemporaryFile() as processed_file:
+            remove_invalid_products(
+                self.valid_parsed_xml, processed_file.name, invalid_products_file=invalid_products_file.name
+            )
 
-        # For a valid XML
-        remove_invalid_products(
-            self.valid_parsed_xml, processed_file.name, invalid_products_file=invalid_products_file.name
-        )
-        with open(processed_file.name) as f:
-            processed_xml = f.readlines()
-        with open(self.valid_processed_xml) as f:
-            assertion_xml = f.readlines()
-        assert len(processed_xml) == len(
-            assertion_xml
-        ), f"Downloaded 'valid' XML has {len(processed_xml)} lines. Expected {len(assertion_xml)}"
-        assert processed_xml == assertion_xml, "Processed 'valid' XML is not equal to the expected XML"
-        # Check the invalid products xml
-        with open(invalid_products_file.name) as f:
-            invalid_products_xml = f.readlines()
-        with open(self.invalid_products_xml) as f:
-            assertion_xml = f.readlines()
-        assert len(invalid_products_xml) == len(
-            assertion_xml
-        ), f"Downloaded 'valid' XML has {len(invalid_products_xml)} lines. Expected {len(assertion_xml)}"
-        assert (
-            invalid_products_xml == assertion_xml
-        ), "Generated 'invalid products' XML is not equal to the expected XML"
+            # Make assertions of the processed xml
+            with open(processed_file.name) as f:
+                processed_xml = f.readlines()
+            with open(self.invalid_products_removed_xml) as f:
+                assertion_xml = f.readlines()
+            self.assertEqual(len(processed_xml), len(assertion_xml))
+            self.assertEqual(processed_xml, assertion_xml)
 
-        # For an invalid XML
-        self.assertRaises(AttributeError, remove_invalid_products, self.invalid_parsed_xml, processed_file.name)
+            # Make assertions of the invalid products
+            with open(invalid_products_file.name) as f:
+                invalid_products_xml = f.readlines()
+            with open(self.invalid_products_xml) as f:
+                assertion_xml = f.readlines()
+            self.assertEqual(len(invalid_products_xml), len(assertion_xml))
+            self.assertEqual(invalid_products_xml, assertion_xml)
 
-        # For an empty XML
-        self.assertRaises(AttributeError, remove_invalid_products, self.invalid_parsed_xml, processed_file.name)
+    def test_empty_xml(self):
+        """Tests the function used to remove invalid products from an xml file"""
+        with NamedTemporaryFile() as invalid_products_file, NamedTemporaryFile() as processed_file:
+            self.assertRaises(
+                AttributeError,
+                remove_invalid_products,
+                self.empty_xml,
+                processed_file.name,
+                invalid_products_file=invalid_products_file.name,
+            )
+
+
+class TestFindOnixProduct(unittest.TestCase):
+    # Tests that the function can extract multiple products from a valid input xml
+    valid_input = [
+        "<ONIXMessage>",
+        "<Product>",
+        "<RecordReference>1</RecordReference>",
+        "</Product>",
+        "<Product>",
+        "<RecordReference>2</RecordReference>",
+        "</Product>",
+        "<Product>",
+        "<RecordReference>3</RecordReference>",
+        "<SomeOtherField>something else</SomeOtherField>",
+        "</Product>",
+        "</ONIXMessage>",
+    ]
 
     def test_find_onix_product(self):
-        """Tests the function that determines the line range of a product that encompasses a given line"""
-        with open(self.valid_parsed_xml) as f:
-            all_lines = f.readlines()
+        """Test that the function can extract multiple products from a valid input xml"""
+        output = find_onix_product(self.valid_input, 1)
+        self.assertEqual(output.record_reference, "1")
+        self.assertEqual(output.product, {"RecordReference": "1"})
+        output = find_onix_product(self.valid_input, 8)
+        self.assertEqual(output.record_reference, "3")
+        self.assertEqual(output.product, {"RecordReference": "3", "SomeOtherField": "something else"})
 
-        # Make assertions [(line_number, (expected_output_range))]
-        assertions = [(150, (9, 165)), (170, (166, 224)), (225, (166, 224)), (226, (226, 289))]
-        for line, product_range in assertions:
-            output_range = find_onix_product(all_lines, line)
-            assert (
-                output_range == product_range
-            ), f"Product range not as expected for inpiut line {line}. Expected {product_range}, got {output_range}"
+    def test_out_of_bounds_supplied(self):
+        """Test that errors are thrown when improper input is supplied"""
+        self.assertRaisesRegex(IndexError, "not within the length of the file", find_onix_product, self.valid_input, -1)
+        self.assertRaisesRegex(
+            IndexError, "not within the length of the file", find_onix_product, self.valid_input, len(self.valid_input)
+        )
 
-        self.assertRaises(AirflowException, find_onix_product, all_lines, 1)
-        self.assertRaises(IndexError, find_onix_product, all_lines, int(1e10))
+    def test_missing_record_reference(self):
+        """Tests that a product without a RecordReference raises a KeyError"""
+        all_lines = ["<Product>", "<RandomField>1</RandomField>", "</Product>"]
+        self.assertRaises(KeyError, find_onix_product, all_lines, 1)
 
-    def test_process_xml_element(self):
-        """Tests the function that removes undesired fields from an xml recusrively"""
-        with open(self.processing_test_fields) as f:
-            viable_fields = json.load(f)
+    def test_empty_product(self):
+        """Tests that a product without a RecordReference raises a KeyError"""
+        all_lines = ["<Product>", "</Product>"]
+        self.assertRaisesRegex(ValueError, "Product field is empty", find_onix_product, all_lines, 1)
 
-        # Process the input xml
-        tree = ElementTree.parse(self.processing_test_before)
-        test_xml = ElementTree.Element(tree.getroot().tag)
-        process_xml_element(tree.getroot(), viable_fields, test_xml)
-
-        # Canonicalize the expected and test xmls and compare them
-        expected_xml = ElementTree.canonicalize(from_file=self.processing_test_after, strip_text=True)
-        test_xml = ElementTree.canonicalize(ElementTree.tostring(test_xml), strip_text=True)
-        assert (
-            expected_xml == test_xml
-        ), f"Processed XML is not equal to expected XML. Expected {expected_xml}, got {test_xml}"
+    def test_no_product_tags(self):
+        """Tests that the function raises a ValueError when <Product> tags are not closed or missing"""
+        missing_product_xml = ["<ONIXMessage>", "</ONIXMessage>"]
+        with self.assertRaisesRegex(ValueError, "Product not found surrounding line"):
+            find_onix_product(missing_product_xml, 0)
+        missing_product_xml = ["<ONIXMessage>", "<Product>", "</ONIXMessage>"]
+        with self.assertRaisesRegex(ValueError, "Product not found surrounding line"):
+            find_onix_product(missing_product_xml, 1)
+        missing_product_xml = ["<ONIXMessage>", "</Product>" "</ONIXMessage>"]
+        with self.assertRaisesRegex(ValueError, "Product not found surrounding line"):
+            find_onix_product(missing_product_xml, 1)
