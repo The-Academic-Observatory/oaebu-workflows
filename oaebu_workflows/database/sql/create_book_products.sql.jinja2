@@ -345,10 +345,11 @@ Providng an empty row enable simplicity of the downstream queries and also means
 #}
 empty_ucl_discovery as (
     SELECT
-        CAST(NULL as STRING) as ISBN13,
+        CAST(NULL as STRING) as ISBN,
+        CAST(NULL as STRING) as eprint_id,
         CAST(NULL as DATE) as release_date,
-        [STRUCT(CAST(NULL as INT64) as count)] as total,
-        [STRUCT(CAST(NULL as INT64) as count, CAST(NULL as STRING) as country_code)] as country
+        CAST(NULL as INT64) as total_downloads,
+        [STRUCT(CAST(NULL as INT64) as count, CAST(NULL as STRING) as value)] as country
 ),
 
 {#
@@ -765,7 +766,7 @@ ucl_discovery_metrics AS (
             MAX(total_downloads) AS total_downloads,
             ARRAY_AGG(STRUCT(
                 ucl_country.value AS country_code,
-                IFNULL(countries.iso_name, "N/A") AS country_name,
+                countries.iso_name AS country_name,
                 ucl_country.count AS country_downloads)) AS country  
             ) AS metrics
         FROM
