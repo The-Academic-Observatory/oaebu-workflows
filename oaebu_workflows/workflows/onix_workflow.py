@@ -462,6 +462,13 @@ class OnixWorkflow(Workflow):
 
         :param release: The onix workflow release object
         """
+        bq_create_dataset(
+            project_id=self.cloud_workspace.project_id,
+            dataset_id=self.bq_oaebu_crossref_dataset_id,
+            location=self.cloud_workspace.data_location,
+            description="Data from Crossref sources",
+        )
+
         onix_table_id = bq_sharded_table_id(
             self.cloud_workspace.project_id,
             self.bq_onix_dataset_id,
@@ -496,12 +503,7 @@ class OnixWorkflow(Workflow):
 
     def create_oaebu_crossref_events_table(self, release: OnixWorkflowRelease, **kwargs):
         """Download, transform, upload and create a table for crossref events"""
-        bq_create_dataset(
-            project_id=self.cloud_workspace.project_id,
-            dataset_id=self.bq_oaebu_crossref_dataset_id,
-            location=self.cloud_workspace.data_location,
-            description="Data from Crossref sources",
-        )
+
         # Get the unique dois from the metadata table
         metadata_table_id = bq_sharded_table_id(
             self.cloud_workspace.project_id,
