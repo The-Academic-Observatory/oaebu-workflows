@@ -653,6 +653,8 @@ class OnixWorkflow(Workflow):
         irus_oapen_dataset = data_partner_datasets.get("irus_oapen")
         irus_fulcrum_dataset = data_partner_datasets.get("irus_fulcrum")
         ucl_discovery_dataset = data_partner_datasets.get("ucl_discovery")
+        internet_archive_dataset = data_partner_datasets.get("internet_archive")
+        worldreader_dataset = data_partner_datasets.get("worldreader")
 
         # Create matched tables for supplied data partners
         google_analytics_table_id = "empty_google_analytics"
@@ -663,6 +665,8 @@ class OnixWorkflow(Workflow):
         irus_oapen_table_id = "empty_irus_oapen"
         irus_fulcrum_table_id = "empty_irus_fulcrum"
         ucl_discovery_table_id = "empty_ucl_discovery"
+        internet_archive_table_id = "empty_internet_archive"
+        worldreader_table_id = "empty_worldreader"
         if google_analytics_dataset:
             google_analytics_table_id = bq_sharded_table_id(
                 self.cloud_workspace.project_id,
@@ -717,6 +721,20 @@ class OnixWorkflow(Workflow):
                 "irus_fulcrum_matched",
                 release.snapshot_date,
             )
+        if internet_archive_dataset:
+            internet_archive_table_id = bq_sharded_table_id(
+                self.cloud_workspace.project_id,
+                self.bq_oaebu_intermediate_dataset,
+                "internet_archive_matched",
+                release.snapshot_date,
+            )
+        if worldreader_dataset:
+            worldreader_table_id = bq_sharded_table_id(
+                self.cloud_workspace.project_id,
+                self.bq_oaebu_intermediate_dataset,
+                "worldreader_matched",
+                release.snapshot_date,
+            )
         workid_table_id = bq_sharded_table_id(
             self.cloud_workspace.project_id,
             self.bq_onix_workflow_dataset,
@@ -751,13 +769,14 @@ class OnixWorkflow(Workflow):
             irus_oapen_table_id=irus_oapen_table_id,
             irus_fulcrum_table_id=irus_fulcrum_table_id,
             ucl_discovery_table_id=ucl_discovery_table_id,
+            internet_archive_table_id=internet_archive_table_id,
+            worldreader_table_id=worldreader_table_id,
             book_table_id=book_table_id,
             country_table_id=country_table_id,
             workid_table_id=workid_table_id,
             workfamilyid_table_id=workfamilyid_table_id,
             onix_workflow=True,
         )
-
         schema_file_path = bq_find_schema(path=self.schema_folder, table_name=self.bq_book_product_table_name)
         table_id = bq_sharded_table_id(
             self.cloud_workspace.project_id,
@@ -813,6 +832,7 @@ class OnixWorkflow(Workflow):
             bisac_table_id=bisac_table_id,
             thema_table_id=thema_table_id,
         )
+        print(sql)
         status = bq_create_table_from_query(sql=sql, table_id=output_table_id, schema_file_path=schema_file_path)
         set_task_state(status, kwargs["ti"].task_id, release=release)
 
