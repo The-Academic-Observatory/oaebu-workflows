@@ -37,9 +37,10 @@ WITH months as (SELECT
     month.google_analytics.downloads_epub_chapter_country as google_analytics_downloads_epub_chapter,
     month.google_analytics.downloads_mobi_book_country as google_analytics_downloads_mobi_book,
     month.google_books_sales.countries as google_books_sales,
-    month.ucl_discovery.country as ucl_discovery
+    month.ucl_discovery.country as ucl_discovery,
+    month.worldreader.country as worldreader
 FROM `{{ book_product_table_id }}`, UNNEST(months) as month
-WHERE ISBN13 is not null AND month.month is not null AND (month.jstor_country IS NOT NULL OR month.irus_oapen.country IS NOT NULL OR month.irus_fulcrum.country IS NOT NULL OR month.google_analytics IS NOT NULL OR month.google_books_sales IS NOT NULL OR month.ucl_discovery.country IS NOT NULL)),
+WHERE ISBN13 is not null AND month.month is not null AND (month.jstor_country IS NOT NULL OR month.irus_oapen.country IS NOT NULL OR month.irus_fulcrum.country IS NOT NULL OR month.google_analytics IS NOT NULL OR month.google_books_sales IS NOT NULL OR month.ucl_discovery.country IS NOT NULL or month.worldreader.country IS NOT NULL)),
 
 countries as (
     SELECT
@@ -259,8 +260,18 @@ ucl_discovery_month_country as (
         month,
         country_name,
         country_code as alpha2,
-        country_downloads
+        country_downloads AS download_count
     FROM months, UNNEST(ucl_discovery)
+),
+
+worldreader_month_country as (
+    SELECT
+        ISBN13, 
+        month, 
+        country_name,
+        country_code, 
+        downloads AS download_count
+    FROM months, UNNEST(worldreader)
 )
 
 SELECT
@@ -288,7 +299,8 @@ SELECT
       google_downloads_mobi_book.value as downloads_mobi_book
     ) as google_analytics,
     STRUCT(google_books.qty as qty) as google_books_sales,
-    STRUCT(ucl_discovery.country_downloads as download_count) as ucl_discovery
+    STRUCT(ucl_discovery.download_count ) as ucl_discovery,
+    STRUCT(worldreader.download_count) as worldreader
 FROM month_country
 LEFT JOIN jstor_month_country as jstor ON month_country.ISBN13 = jstor.ISBN13 AND month_country.month = jstor.month AND month_country.alpha2 = jstor.alpha2
 LEFT JOIN irus_oapen_month_country as irus_oapen ON month_country.ISBN13 = irus_oapen.ISBN13 AND month_country.month = irus_oapen.month AND month_country.alpha2 = irus_oapen.alpha2
@@ -303,6 +315,7 @@ LEFT JOIN google_analytics_downloads_epub_chapter_month_country as google_downlo
 LEFT JOIN google_analytics_downloads_mobi_book_month_country as google_downloads_mobi_book ON month_country.ISBN13 = google_downloads_mobi_book.ISBN13 AND month_country.month = google_downloads_mobi_book.month AND month_country.alpha2 = google_downloads_mobi_book.country_code
 LEFT JOIN google_books_month_country as google_books ON month_country.ISBN13 = google_books.ISBN13 AND month_country.month = google_books.month AND month_country.alpha2 = google_books.alpha2
 LEFT JOIN ucl_discovery_month_country as ucl_discovery ON month_country.ISBN13 = ucl_discovery.ISBN13 AND month_country.month = ucl_discovery.month AND month_country.alpha2 = ucl_discovery.alpha2
+LEFT JOIN worldreader_month_country as worldreader ON month_country.ISBN13 = worldreader.ISBN13 AND month_country.month = worldreader.month AND month_country.alpha2 = worldreader.country_code
 WHERE jstor.total_item_requests IS NOT NULL OR
 irus_oapen.title_requests IS NOT NULL OR
 irus_oapen.total_item_requests IS NOT NULL OR
@@ -316,4 +329,5 @@ google_downloads_epub_book.value IS NOT NULL OR
 google_downloads_epub_chapter.value IS NOT NULL OR
 google_downloads_mobi_book.value IS NOT NULL OR
 google_books.qty IS NOT NULL OR
-ucl_discovery.country_downloads IS NOT NULL
+ucl_discovery.download_count IS NOT NULL OR
+worldreader.download_count IS NOT NULL

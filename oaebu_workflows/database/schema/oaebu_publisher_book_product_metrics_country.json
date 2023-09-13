@@ -232,5 +232,19 @@
     "name": "ucl_discovery",
     "type": "RECORD",
     "description": "Metrics from UCL Discovery"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "download_count",
+        "type": "INTEGER",
+        "description": "Number of downloads"
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "worldreader",
+    "type": "RECORD",
+    "description": "Metrics from Worldreader"
   }
 ]

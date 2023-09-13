@@ -128,4 +128,20 @@ OAEBU_DATA_PARTNER_DATASETS = dict(
         title_field_name="book_title",
         sharded=False,
     ),
+    internet_archive=OaebuPartner(
+        type_id="internet_archive",
+        bq_dataset_id="internet_archive",
+        bq_table_name="internet_archive",
+        isbn_field_name="ISBN13",
+        title_field_name="title",
+        sharded=False,
+    ),
+    worldreader=OaebuPartner(
+        type_id="worldreader",
+        bq_dataset_id="worldreader",
+        bq_table_name="worldreader",
+        isbn_field_name="ISBN13",
+        title_field_name="title",
+        sharded=False,
+    ),
 )

@@ -163,6 +163,25 @@ CREATE TEMP FUNCTION group_items_irus_location(items ARRAY<STRUCT<latitude FLOAT
 # Helper Function:
 {#
 Output Schema:
+name                            STRING    NULLABLE
+code                            STRING    NULLABLE
+namew                           INTEGER   NULLABLE
+downloads                       INTEGER   NULLABLE
+#}
+CREATE TEMP FUNCTION group_items_worldreader_country(items ARRAY<STRUCT<country_name STRING, code STRING, downloads INT64>>) as (
+  ARRAY(
+    (SELECT AS STRUCT
+      country_name,
+      MAX(code) as country_code,
+      SUM(downloads) as downloads
+    FROM UNNEST(items)
+    GROUP BY country_name)
+  )
+);
+
+# Helper Function:
+{#
+Output Schema:
 lower_trim_word                 STRING   NULLABLE
 #}
 CREATE TEMP FUNCTION custom_split(str STRING, sep STRING) AS (
@@ -333,6 +352,26 @@ empty_google_analytics as (
         STRUCT(
             [STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value)] as country
         ) as page_views
+),
+
+empty_internet_archive as (
+    SELECT
+        CAST(null as STRING) as ISBN13,
+        CAST(null as STRING) as title,
+        CAST(null as INTEGER) as value,
+        CAST(null as DATE) as month,
+        CAST(null as DATE) as release_date,
+),
+
+empty_worldreader as (
+    SELECT
+        CAST(null as STRING) as ISBN13,
+        CAST(null as STRING) as title,
+        CAST(null as STRING) as country_code,
+        CAST(null as STRING) as country_name,
+        CAST(null as INTEGER) as value,
+        CAST(null as DATE) as month,
+        CAST(null as DATE) as release_date,
 ),
 
 {#
@@ -797,6 +836,57 @@ ucl_discovery_metadata as (
     GROUP BY ISBN13, eprint_id
 ),
 
+# Worldreader Metrics
+worldreader_metrics as (
+    SELECT
+        ISBN13, 
+        release_date,
+        STRUCT(
+            SUM(value) as total_downloads,
+            ARRAY_AGG(STRUCT(
+                country_code,
+                country_name, 
+                value AS downloads
+            )) AS country
+        ) AS metrics
+      #group_items_worldreader_country(ARRAY_CONCAT(country_code, country_name, value)) as country
+      #ARRAY_AGG(value) as country_downloads, 
+      #ARRAY_AGG(country_name) as country
+  FROM `{{ worldreader_table_id }}`
+  GROUP BY ISBN13, release_date
+),
+
+# Worldreader Metadata
+worldreader_metadata as (
+    SELECT
+        ISBN13, 
+        MAX(title) as book_title, 
+    FROM `{{ worldreader_table_id }}`
+    GROUP BY ISBN13
+),
+
+# Internet Archive Metrics
+internet_archive_metrics as (
+    SELECT 
+        ISBN13,
+        release_date,
+        STRUCT(
+            SUM(value) as total_downloads
+        ) as metrics
+    FROM `{{ internet_archive_table_id }}`
+    GROUP BY ISBN13, release_date
+),
+
+# Internet Archive Metadata
+internet_archive_metadata as (
+    SELECT
+        ISBN13,
+        MAX(title) as book_title
+    FROM `{{ internet_archive_table_id }}`
+    GROUP BY ISBN13
+),
+
+
 # Crossref Events
 {#
 The purpose of this block of SQL is to
@@ -828,7 +918,9 @@ unique_releases as (
             ARRAY(SELECT DISTINCT(release_date) FROM jstor_country_metrics),
             ARRAY(SELECT DISTINCT(release_date) FROM jstor_institution_metrics),
             ARRAY(SELECT DISTINCT(release_date) FROM irus_oapen_metrics),
-            ARRAY(SELECT DISTINCT(release_date) FROM irus_fulcrum_metrics)
+            ARRAY(SELECT DISTINCT(release_date) FROM irus_fulcrum_metrics),
+            ARRAY(SELECT DISTINCT(release_date) FROM worldreader_metrics),
+            ARRAY(SELECT DISTINCT(release_date) FROM internet_archive_metrics)
         )
     ) as release_date
     ORDER BY release_date DESC
@@ -867,7 +959,9 @@ metrics as (
             jstor_institution.metrics as jstor_institution,
             irus_oapen.metrics as irus_oapen,
             irus_fulcrum.metrics as irus_fulcrum,
-            ucl_discovery.metrics as ucl_discovery
+            ucl_discovery.metrics as ucl_discovery,
+            worldreader.metrics as worldreader,
+            internet_archive.metrics as internet_archive
         ) ORDER BY ebook_months.release_date DESC) as months
     FROM ebook_months
     LEFT JOIN google_analytics_metrics as google_analytics ON ebook_months.ISBN13 = google_analytics.ISBN13 AND ebook_months.release_date = google_analytics.release_date
@@ -878,6 +972,8 @@ metrics as (
     LEFT JOIN irus_oapen_metrics as irus_oapen ON ebook_months.ISBN13 = irus_oapen.ISBN13 AND ebook_months.release_date = irus_oapen.release_date
     LEFT JOIN irus_fulcrum_metrics as irus_fulcrum ON ebook_months.ISBN13 = irus_fulcrum.ISBN13 AND ebook_months.release_date = irus_fulcrum.release_date
     LEFT JOIN ucl_discovery_metrics as ucl_discovery ON ebook_months.ISBN13 = ucl_discovery.ISBN13 AND ebook_months.release_date = ucl_discovery.release_date
+    LEFT JOIN worldreader_metrics as worldreader ON ebook_months.ISBN13 = worldreader.ISBN13 AND ebook_months.release_date = worldreader.release_date
+    LEFT JOIN internet_archive_metrics as internet_archive ON ebook_months.ISBN13 = internet_archive.ISBN13 AND ebook_months.release_date = internet_archive.release_date
     LEFT JOIN crossref_events as crossref_events ON ebook_months.ISBN13 = crossref_events.ISBN13 AND ebook_months.release_date = crossref_events.release_date
     WHERE google_analytics.metrics IS NOT NULL 
     OR google_books_sales.metrics IS NOT NULL 
@@ -887,6 +983,8 @@ metrics as (
     OR irus_oapen.metrics IS NOT NULL 
     OR irus_fulcrum.metrics IS NOT NULL 
     OR ucl_discovery.metrics IS NOT NULL
+    OR worldreader.metrics IS NOT NULL
+    OR internet_archive.metrics IS NOT NULL
     OR crossref_events.metrics IS NOT NULL 
     GROUP BY ebook_months.ISBN13
 )
@@ -906,7 +1004,8 @@ SELECT
         crossref_objects, chapters, events.overall as events, google_books_sales_metadata as google_books_sales,
         google_books_traffic_metadata as google_books_traffic, jstor_country_metadata as jstor_metadata,
         jstor_institution_metadata as jstor_institution_metadata, irus_oapen_metadata as irus_oapen_metadata,
-        irus_fulcrum_metadata as irus_fulcrum_metadata, ucl_discovery_metadata as ucl_discovery_metadata
+        irus_fulcrum_metadata as irus_fulcrum_metadata, ucl_discovery_metadata as ucl_discovery_metadata, 
+        worldreader_metadata as worldreader_metadata, internet_archive_metadata as internet_archive_metadata
     ) as metadata,
     metrics.months
 FROM onix_ebook_titles
@@ -920,4 +1019,6 @@ LEFT JOIN jstor_institution_metadata on jstor_institution_metadata.ISBN13 = onix
 LEFT JOIN irus_oapen_metadata on irus_oapen_metadata.ISBN13 = onix_ebook_titles.ISBN13
 LEFT JOIN irus_fulcrum_metadata on irus_fulcrum_metadata.ISBN13 = onix_ebook_titles.ISBN13
 LEFT JOIN ucl_discovery_metadata on ucl_discovery_metadata.ISBN13 = onix_ebook_titles.ISBN13
-LEFT JOIN `{{ book_table_id }}` as public_data on public_data.isbn = onix_ebook_titles.ISBN13
+LEFT JOIN worldreader_metadata on worldreader_metadata.ISBN13 = onix_ebook_titles.ISBN13
+LEFT JOIN internet_archive_metadata on internet_archive_metadata.ISBN13 = onix_ebook_titles.ISBN13
+LEFT JOIN `{{ book_table_id }}` as public_data on public_data.isbn = onix_ebook_titles.ISBN13;
