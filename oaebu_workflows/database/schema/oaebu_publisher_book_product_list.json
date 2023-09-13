@@ -37,15 +37,15 @@
   },
   {
     "mode": "NULLABLE",
-    "name": "time_field",
-    "type": "DATE",
-    "description": "Required for Elasticsearch, generally not used though"
+    "name": "published_year",
+    "type": "INTEGER",
+    "description": "The year the book was published"
   },
   {
     "mode": "NULLABLE",
-    "name": "published_year",
-    "type": "INTEGER",
-    "description": "The published year of the book"
+    "name": "published_date",
+    "type": "DATE",
+    "description": "The date the book was published"
   },
   {
     "mode": "NULLABLE",

@@ -1076,7 +1076,8 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 self.assert_table_content(
                     table_id,
                     load_and_parse_json(
-                        test_fixtures_folder("onix_workflow", "e2e_outputs", fixture_name), date_fields=["month"]
+                        test_fixtures_folder("onix_workflow", "e2e_outputs", fixture_name),
+                        date_fields={"month", "published_date"},
                     ),
                     primary_key="ISBN13",
                 )
@@ -1173,7 +1174,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     ("book_product_subject_bic_metrics", 0),
                     ("book_product_subject_bisac_metrics", 0),
                     ("book_product_subject_thema_metrics", 0),
-                    ("book_product_year_metrics", 1),
+                    ("book_product_year_metrics", 2),
                     ("book_product_subject_year_metrics", 0),
                     ("book_product_author_metrics", 0),
                 ]
@@ -1195,7 +1196,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 )
                 fixture_table = load_and_parse_json(
                     test_fixtures_folder("onix_workflow", "e2e_outputs", "book_product_list.json"),
-                    date_fields=["time_field"],
+                    date_fields=["published_date"],
                 )
                 self.assert_table_content(table_id, fixture_table, primary_key="product_id")
 
