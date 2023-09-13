@@ -1043,7 +1043,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 )
                 crossref_fixture_table = load_and_parse_json(
                     test_fixtures_folder("onix_workflow", "e2e_outputs", "crossref_events.json"),
-                    date_fields=["timestamp", "occurred_at", "updated_date", "issued", "dateModified"],
+                    timestamp_fields=["timestamp", "occurred_at", "updated_date", "issued", "dateModified"],
                 )
                 self.assert_table_content(table_id, crossref_fixture_table, primary_key="id")
 
@@ -1076,7 +1076,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 self.assert_table_content(
                     table_id,
                     load_and_parse_json(
-                        test_fixtures_folder("onix_workflow", "e2e_outputs", fixture_name), date_fields="month"
+                        test_fixtures_folder("onix_workflow", "e2e_outputs", fixture_name), date_fields=["month"]
                     ),
                     primary_key="ISBN13",
                 )
