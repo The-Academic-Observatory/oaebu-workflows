@@ -38,6 +38,12 @@
         "description": "The year the book was published"
       },
       {
+        "mode": "NULLABLE",
+        "name": "published_date",
+        "type": "DATE",
+        "description": "The date the book was published"
+      },
+      {
         "mode": "REPEATED",
         "name": "bic_subjects",
         "type": "STRING",

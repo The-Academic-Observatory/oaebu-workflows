@@ -433,6 +433,10 @@ onix_ebook_titles_raw as (
                 SUBSTRING(CAST(dates.Date as STRING), 0, 4)
             FROM UNNEST(onix.PublishingDates) as dates
             WHERE dates.PublishingDateRole = "Publication date")[SAFE_OFFSET(0)] as published_year,
+            ARRAY(SELECT
+                PARSE_DATE("%Y%m%d", SUBSTRING(CAST(dates.Date as STRING), 0, 8))
+            FROM UNNEST(onix.PublishingDates) as dates
+            WHERE dates.PublishingDateRole = "Publication date")[SAFE_OFFSET(0)] as published_date,
             # The following four sub-queries all pull data from the onix.subjects array, but neatly organised the values into the 4 current classification systems
             ARRAY(
                 SELECT
