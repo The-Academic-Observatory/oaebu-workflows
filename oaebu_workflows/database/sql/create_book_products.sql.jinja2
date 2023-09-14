@@ -460,7 +460,7 @@ onix_ebook_titles_raw as (
             (SELECT
                 ARRAY(
                     SELECT as STRUCT
-                        PersonName, ORCID
+                        PersonName, PersonNameInverted, ORCID
                     FROM UNNEST(onix.Contributors) as contributor
                 )
             ) as authors

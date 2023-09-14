@@ -1105,7 +1105,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 self.assertEqual(records[0]["no_relatedproducts"], 3)
                 self.assertEqual(records[0]["no_doi"], 4)
                 self.assertEqual(records[0]["no_productform"], 0)
-                self.assertEqual(records[0]["no_contributors"], 4)
+                self.assertEqual(records[0]["no_contributors"], 2)
                 self.assertEqual(records[0]["no_titledetails"], 4)
                 self.assertEqual(records[0]["no_publisher_urls"], 4)
 
@@ -1176,7 +1176,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     ("book_product_subject_thema_metrics", 0),
                     ("book_product_year_metrics", 2),
                     ("book_product_subject_year_metrics", 0),
-                    ("book_product_author_metrics", 0),
+                    ("book_product_author_metrics", 1),
                 ]
 
                 export_prefix = self.gcp_project_id.replace("-", "_")

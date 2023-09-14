@@ -162,7 +162,7 @@ class TestThothTelescope(ObservatoryTestCase):
                 )
 
                 # Transformed file
-                self.assert_file_integrity(release.transform_path, "f384ecd8", "gzip_crc")
+                self.assert_file_integrity(release.transform_path, "1b12c3a9", "gzip_crc")
 
                 # Uploaded transform blob
                 self.assert_blob_integrity(

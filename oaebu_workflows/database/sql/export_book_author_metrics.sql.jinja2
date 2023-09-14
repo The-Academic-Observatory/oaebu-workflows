@@ -26,6 +26,7 @@ CREATE TEMP FUNCTION group_counts(counts ARRAY<STRUCT<name STRING, value INT64>>
 
 SELECT
     author.PersonName,
+    MAX(author.PersonNameInverted) as PersonNameInverted,
     MAX(author.ORCID) as orcid,
     count(ISBN13) as unique_books,
     month.month,

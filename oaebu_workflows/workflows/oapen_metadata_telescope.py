@@ -42,7 +42,7 @@ from oaebu_workflows.config import schema_folder as default_schema_folder
 from oaebu_workflows.onix import (
     onix_parser_download,
     onix_parser_execute,
-    onix_create_personname_field,
+    onix_create_personname_fields,
 )
 from observatory.api.client.model.dataset_release import DatasetRelease
 from observatory.platform.api import make_observatory_api
@@ -225,7 +225,7 @@ class OapenMetadataTelescope(Workflow):
             set_task_state(success, task_id=kwargs["ti"].task_id, release=release)
 
         # Add the Contributors.PersonName field
-        onix = onix_create_personname_field(load_jsonl(release.parsed_onix))
+        onix = onix_create_personname_fields(load_jsonl(release.parsed_onix))
         save_jsonl_gz(release.transform_path, onix)
 
     def upload_transformed(self, release: OapenMetadataRelease, **kwargs) -> None:
