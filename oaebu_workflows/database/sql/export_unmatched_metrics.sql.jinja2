@@ -19,13 +19,13 @@ Primarily, the goal is to create a flat structure which is suitable for graphing
 #}
 
 WITH google_analytics as (
-    {% if google_analytics_unmatched_table_id %}
+    {% if google_analytics3_unmatched_table_id %}
     SELECT
-        {{ google_analytics_isbn }} as ISBN,
+        {{ google_analytics3_isbn }} as ISBN,
         title,
         release_date,
         "google_analytics" as source
-    FROM `{{ google_analytics_unmatched_table_id }}`
+    FROM `{{ google_analytics3_unmatched_table_id }}`
     {% else %}
     SELECT
         CAST(NULL as STRING) as ISBN,

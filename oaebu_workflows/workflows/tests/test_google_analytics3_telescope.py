@@ -1,4 +1,4 @@
-# Copyright 2020 Curtin University
+# Copyright 2023 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Author: Aniek Roelofs
+# Author: Aniek Roelofs, Keegan Smith
 
 import gzip
 import json
@@ -25,12 +25,12 @@ from airflow.utils.state import State
 from googleapiclient.discovery import build
 from googleapiclient.http import HttpMockSequence
 
-from oaebu_workflows.workflows.google_analytics_telescope import GoogleAnalyticsTelescope
+from oaebu_workflows.workflows.google_analytics3_telescope import GoogleAnalytics3Telescope
+from oaebu_workflows.oaebu_partners import partner_from_str
 from oaebu_workflows.config import test_fixtures_folder
 from observatory.platform.api import get_dataset_releases
 from observatory.platform.observatory_config import Workflow
-from observatory.platform.gcs import gcs_blob_name_from_path
-from observatory.platform.bigquery import bq_table_id, bq_find_schema
+from observatory.platform.bigquery import bq_table_id
 from observatory.platform.observatory_environment import (
     ObservatoryEnvironment,
     ObservatoryTestCase,
@@ -39,7 +39,7 @@ from observatory.platform.observatory_environment import (
 )
 
 
-class TestGoogleAnalyticsTelescope(ObservatoryTestCase):
+class TestGoogleAnalytics3Telescope(ObservatoryTestCase):
     """Tests for the Google Analytics telescope"""
 
     def __init__(self, *args, **kwargs):
@@ -47,21 +47,21 @@ class TestGoogleAnalyticsTelescope(ObservatoryTestCase):
         :param args: arguments.
         :param kwargs: keyword arguments.
         """
-        super(TestGoogleAnalyticsTelescope, self).__init__(*args, **kwargs)
+        super(TestGoogleAnalytics3Telescope, self).__init__(*args, **kwargs)
         self.project_id = os.getenv("TEST_GCP_PROJECT_ID")
         self.data_location = os.getenv("TEST_GCP_DATA_LOCATION")
         self.view_id = "11235141"
         self.pagepath_regex = r".*regex$"
         self.organisation_name = "UCL Press"
-        self.test_table = os.path.join(test_fixtures_folder("google_analytics"), "test_table.json")
-        self.test_table_anu = os.path.join(test_fixtures_folder("google_analytics"), "test_table_anu.json")
+        self.test_table = os.path.join(test_fixtures_folder("google_analytics3"), "test_table.json")
+        self.test_table_anu = os.path.join(test_fixtures_folder("google_analytics3"), "test_table_anu.json")
 
     def test_dag_structure(self):
         """Test that the Google Analytics DAG has the correct structure.
         :return: None
         """
         cloud_workspace = self.fake_cloud_workspace
-        dag = GoogleAnalyticsTelescope(
+        dag = GoogleAnalytics3Telescope(
             dag_id="google_analytics_test",
             organisation_name="Organisation Name",
             cloud_workspace=cloud_workspace,
@@ -86,206 +86,38 @@ class TestGoogleAnalyticsTelescope(ObservatoryTestCase):
         env = ObservatoryEnvironment(
             workflows=[
                 Workflow(
-                    dag_id="google_analytics",
+                    dag_id="google_analytics3",
                     name="My Google Analytics Workflow",
-                    class_name="oaebu_workflows.workflows.google_analytics_telescope.GoogleAnalyticsTelescope",
+                    class_name="oaebu_workflows.workflows.google_analytics3_telescope.GoogleAnalytics3Telescope",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(organisation_name="My Organisation", pagepath_regex="", view_id="123456"),
                 )
             ]
         )
         with env.create():
-            self.assert_dag_load_from_config("google_analytics")
+            self.assert_dag_load_from_config("google_analytics3")
 
         # Errors should be raised if kwargs dict not supplied
         env.workflows[0].kwargs = {}
         with env.create():
             with self.assertRaises(AssertionError) as cm:
-                self.assert_dag_load_from_config("google_analytics")
+                self.assert_dag_load_from_config("google_analytics3")
             msg = cm.exception.args[0]
             self.assertTrue("missing 3 required positional arguments" in msg)
             self.assertTrue("organisation_name" in msg)
             self.assertTrue("pagepath_regex" in msg)
             self.assertTrue("view_id" in msg)
 
-    @patch("oaebu_workflows.workflows.google_analytics_telescope.build")
-    @patch("oaebu_workflows.workflows.google_analytics_telescope.ServiceAccountCredentials")
+    @patch("oaebu_workflows.workflows.google_analytics3_telescope.build")
+    @patch("oaebu_workflows.workflows.google_analytics3_telescope.ServiceAccountCredentials")
     def test_telescope(self, mock_account_credentials, mock_build):
-        """Test the Google Analytics telescope end to end."""
-        # Mock the Google Reporting Analytics API service
-        mock_account_credentials.from_json_keyfile_dict.return_value = ""
-
-        http = HttpMockSequence(create_http_mock_sequence(self.organisation_name))
-        mock_build.return_value = build("analyticsreporting", "v4", http=http)
-
-        # Setup Observatory environment
-        env = ObservatoryEnvironment(
-            self.project_id, self.data_location, api_host="localhost", api_port=find_free_port()
-        )
-        # Setup Telescope
-        execution_date = pendulum.datetime(year=2022, month=6, day=1)
-        telescope = GoogleAnalyticsTelescope(
-            dag_id="google_analytics_test",
-            organisation_name=self.organisation_name,
-            cloud_workspace=env.cloud_workspace,
-            view_id=self.view_id,
-            pagepath_regex=self.pagepath_regex,
-            bq_dataset_id=env.add_dataset(),
-        )
-        dag = telescope.make_dag()
-
-        # Create the Observatory environment and run tests
-        with env.create():
-            with env.create_dag_run(dag, execution_date):
-                # Add OAEBU service account connection connection
-                conn = Connection(
-                    conn_id="oaebu_service_account",
-                    uri=f"google-cloud-platform://?type=service_account&private_key_id=private_key_id"
-                    f"&private_key=private_key"
-                    f"&client_email=client_email"
-                    f"&client_id=client_id",
-                )
-                env.add_connection(conn)
-
-                # Test that all dependencies are specified: no error should be thrown
-                ti = env.run_task(telescope.check_dependencies.__name__)
-                self.assertEqual(ti.state, State.SUCCESS)
-
-                # Test download_transform task
-                ti = env.run_task(telescope.download_transform.__name__)
-                self.assertEqual(ti.state, State.SUCCESS)
-
-                # Test that transformed file uploaded
-                ti = env.run_task(telescope.upload_transformed.__name__)
-                self.assertEqual(ti.state, State.SUCCESS)
-
-                # Test that data loaded into BigQuery
-                with patch("oaebu_workflows.workflows.google_analytics_telescope.bq_find_schema") as mock_schema:
-                    mock_schema.return_value = bq_find_schema(
-                        path=telescope.schema_folder, table_name=telescope.bq_table_name
-                    )
-                    ti = env.run_task(telescope.bq_load.__name__)
-                self.assertEqual(ti.state, State.SUCCESS)
-
-                ### Make Assertions ###
-
-                # Use release to check tasks
-                release = telescope.make_release(
-                    run_id=env.dag_run.run_id,
-                    data_interval_start=pendulum.parse(str(env.dag_run.data_interval_start)),
-                    data_interval_end=pendulum.parse(str(env.dag_run.data_interval_end)),
-                )[0]
-
-                # Test download_transform task
-                self.assertTrue(os.path.isfile(release.transform_path))
-                self.assert_blob_integrity(
-                    env.transform_bucket, gcs_blob_name_from_path(release.transform_path), release.transform_path
-                )
-
-                # Use frozenset to test results are as expected, many dict transformations re-order items in dict
-                actual_list = []
-                with gzip.open(release.transform_path, "rb") as f:
-                    for line in f:
-                        actual_list.append(json.loads(line))
-                expected_list = [
-                    {
-                        "url": "/base/path/151420",
-                        "title": "Anything public program drive north.",
-                        "start_date": "2022-06-01",
-                        "end_date": "2022-06-30",
-                        "average_time": 59.5,
-                        "unique_views": {
-                            "country": [{"name": "country 1", "value": 3}, {"name": "country 2", "value": 3}],
-                            "referrer": [{"name": "referrer 1", "value": 3}, {"name": "referrer 2", "value": 3}],
-                            "social_network": [
-                                {"name": "social_network 1", "value": 3},
-                                {"name": "social_network 2", "value": 3},
-                            ],
-                        },
-                        "page_views": {
-                            "country": [{"name": "country 1", "value": 4}, {"name": "country 2", "value": 4}],
-                            "referrer": [{"name": "referrer 1", "value": 4}, {"name": "referrer 2", "value": 4}],
-                            "social_network": [
-                                {"name": "social_network 1", "value": 4},
-                                {"name": "social_network 2", "value": 4},
-                            ],
-                        },
-                        "sessions": {
-                            "country": [{"name": "country 1", "value": 1}, {"name": "country 2", "value": 1}],
-                            "source": [{"name": "source 1", "value": 1}, {"name": "source 2", "value": 1}],
-                        },
-                        "release_date": "2022-06-30",
-                    },
-                    {
-                        "url": "/base/path/833557",
-                        "title": "Standard current never no.",
-                        "start_date": "2022-06-01",
-                        "end_date": "2022-06-30",
-                        "average_time": 49.6,
-                        "unique_views": {"country": [], "referrer": [], "social_network": []},
-                        "page_views": {"country": [], "referrer": [], "social_network": []},
-                        "sessions": {"country": [], "source": []},
-                        "release_date": "2022-06-30",
-                    },
-                    {
-                        "url": "/base/path/833557?fbclid=123",
-                        "title": "Standard current never no.",
-                        "start_date": "2022-06-01",
-                        "end_date": "2022-06-30",
-                        "average_time": 38.8,
-                        "unique_views": {
-                            "country": [{"name": "country 2", "value": 2}],
-                            "referrer": [{"name": "referrer 2", "value": 2}],
-                            "social_network": [{"name": "social_network 2", "value": 2}],
-                        },
-                        "page_views": {
-                            "country": [{"name": "country 2", "value": 4}],
-                            "referrer": [{"name": "referrer 2", "value": 4}],
-                            "social_network": [{"name": "social_network 2", "value": 4}],
-                        },
-                        "sessions": {"country": [], "source": []},
-                        "release_date": "2022-06-30",
-                    },
-                ]
-                self.assertEqual(3, len(actual_list))
-                self.assertEqual(frozenset(expected_list[0]), frozenset(actual_list[0]))
-                self.assertEqual(frozenset(expected_list[1]), frozenset(actual_list[1]))
-                self.assertEqual(frozenset(expected_list[2]), frozenset(actual_list[2]))
-
-                # BQ Table
-                table_id = bq_table_id(
-                    telescope.cloud_workspace.project_id, telescope.bq_dataset_id, telescope.bq_table_name
-                )
-                self.assert_table_integrity(table_id, expected_rows=3)
-                self.assert_table_content(
-                    table_id,
-                    load_and_parse_json(self.test_table, date_fields=["release_date", "start_date", "end_date"]),
-                    primary_key="url",
-                )
-
-                # Add_dataset_release_task
-                dataset_releases = get_dataset_releases(dag_id=telescope.dag_id, dataset_id=telescope.api_dataset_id)
-                self.assertEqual(len(dataset_releases), 0)
-                ti = env.run_task(telescope.add_new_dataset_releases.__name__)
-                self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = get_dataset_releases(dag_id=telescope.dag_id, dataset_id=telescope.api_dataset_id)
-                self.assertEqual(len(dataset_releases), 1)
-
-                # Test that all telescope data deleted
-                ti = env.run_task(telescope.cleanup.__name__)
-                self.assertEqual(ti.state, State.SUCCESS)
-                self.assert_cleanup(release.workflow_folder)
-
-    @patch("oaebu_workflows.workflows.google_analytics_telescope.build")
-    @patch("oaebu_workflows.workflows.google_analytics_telescope.ServiceAccountCredentials")
-    def test_telescope_anu(self, mock_account_credentials, mock_build):
         """Test the Google Analytics telescope end to end specifically for ANU Press, to test custom dimensions.
         :return: None.
         """
         # Mock the Google Reporting Analytics API service
         mock_account_credentials.from_json_keyfile_dict.return_value = ""
 
-        http = HttpMockSequence(create_http_mock_sequence(GoogleAnalyticsTelescope.ANU_ORG_NAME))
+        http = HttpMockSequence(create_http_mock_sequence(GoogleAnalytics3Telescope.ANU_ORG_NAME))
         mock_build.return_value = build("analyticsreporting", "v4", http=http)
 
         # Setup Observatory environment
@@ -294,15 +126,15 @@ class TestGoogleAnalyticsTelescope(ObservatoryTestCase):
         )
         # Setup Telescope
         execution_date = pendulum.datetime(year=2022, month=6, day=1)
-        telescope = GoogleAnalyticsTelescope(
+        partner = partner_from_str("google_analytics3")
+        partner.bq_dataset_id = env.add_dataset()
+        telescope = GoogleAnalytics3Telescope(
             dag_id="google_analytics_test",
-            organisation_name=GoogleAnalyticsTelescope.ANU_ORG_NAME,
+            organisation_name=GoogleAnalytics3Telescope.ANU_ORG_NAME,
             cloud_workspace=env.cloud_workspace,
             view_id=self.view_id,
             pagepath_regex=self.pagepath_regex,
-            bq_dataset_id=env.add_dataset(),
-            bq_dataset_description="TEST",
-            bq_table_description="TEST",
+            data_partner=partner,
         )
         dag = telescope.make_dag()
 
@@ -435,7 +267,9 @@ class TestGoogleAnalyticsTelescope(ObservatoryTestCase):
 
                 # Test that data loaded into BigQuery
                 table_id = bq_table_id(
-                    telescope.cloud_workspace.project_id, telescope.bq_dataset_id, telescope.bq_table_name
+                    telescope.cloud_workspace.project_id,
+                    telescope.data_partner.bq_dataset_id,
+                    telescope.data_partner.bq_table_name,
                 )
                 self.assert_table_integrity(table_id, expected_rows=3)
                 self.assert_table_content(
@@ -494,7 +328,7 @@ def create_http_mock_sequence(organisation_name: str) -> list:
         ]
     }
     # Add custom dimensions from ANU Press
-    if organisation_name == GoogleAnalyticsTelescope.ANU_ORG_NAME:
+    if organisation_name == GoogleAnalytics3Telescope.ANU_ORG_NAME:
         list_books["reports"][0]["columnHeader"]["dimensions"] += [f"ga:dimension{(str(i))}" for i in range(1, 7)]
         list_books["reports"][0]["data"]["rows"][0]["dimensions"] += [
             "1234567890123",
@@ -536,7 +370,7 @@ def create_http_mock_sequence(organisation_name: str) -> list:
         ]
     }
     # Add custom dimensions from ANU Press
-    if organisation_name == GoogleAnalyticsTelescope.ANU_ORG_NAME:
+    if organisation_name == GoogleAnalytics3Telescope.ANU_ORG_NAME:
         list_books_next_page["reports"][0]["columnHeader"]["dimensions"] += [
             f"ga:dimension{(str(i))}" for i in range(1, 7)
         ]

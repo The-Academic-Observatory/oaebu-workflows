@@ -1,4 +1,4 @@
-# Copyright 2021 Curtin University
+# Copyright 2023 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,21 +17,21 @@
 import logging
 import os
 import re
-from typing import List
+from typing import List, Union
 
 import pendulum
 from airflow.exceptions import AirflowException
 from airflow.models.taskinstance import TaskInstance
 from google.cloud.bigquery import SourceFormat
 
-from oaebu_workflows.config import schema_folder as default_schema_folder
+from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from oaebu_workflows.onix import onix_collapse_subjects, onix_parser_download, onix_parser_execute
 from observatory.api.client.model.dataset_release import DatasetRelease
 from observatory.platform.api import make_observatory_api
 from observatory.platform.airflow import AirflowConns
 from observatory.platform.files import load_jsonl, save_jsonl_gz
 from observatory.platform.gcs import gcs_blob_uri, gcs_upload_files, gcs_blob_name_from_path
-from observatory.platform.bigquery import bq_find_schema, bq_load_table, bq_sharded_table_id, bq_create_dataset
+from observatory.platform.bigquery import bq_load_table, bq_sharded_table_id, bq_create_dataset
 from observatory.platform.observatory_config import CloudWorkspace
 from observatory.platform.sftp import SftpFolders, make_sftp_connection
 from observatory.platform.workflows.workflow import (
@@ -74,12 +74,10 @@ class OnixTelescope(Workflow):
         cloud_workspace: CloudWorkspace,
         date_regex: str,
         sftp_root: str = "/",
-        bq_dataset_id: str = "onix",
-        bq_table_name: str = "onix",
+        metadata_partner: Union[str, OaebuPartner] = "onix",
         bq_dataset_description: str = "ONIX data provided by Org",
         bq_table_description: str = None,
         api_dataset_id: str = "onix",
-        schema_folder: str = default_schema_folder(),
         observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
         sftp_service_conn_id: str = "sftp_service",
         catchup: bool = False,
@@ -90,13 +88,11 @@ class OnixTelescope(Workflow):
         :param dag_id: The ID of the DAG
         :param cloud_workspace: The CloudWorkspace object for this DAG
         :param sftp_root: The working root of the SFTP server, passed to the SftoFolders class
+        :param metadata_partner: The metadata partner name
         :param date_regex: Regular expression for extracting a date string from an ONIX file name
-        :param bq_dataset_id: The BigQuery dataset ID
-        :param bq_table_name: The BigQuery table name
         :param bq_dataset_description: Description for the BigQuery dataset
         :param bq_table_description: Description for the biguery table
         :param api_dataset_id: The ID to store the dataset release in the API
-        :param schema_folder: The path to the SQL schema folder
         :param observatory_api_conn_id: Airflow connection ID for the overvatory API
         :param sftp_service_conn_id: Airflow connection ID for the SFTP service
         :param catchup: Whether to catchup the DAG or not
@@ -114,16 +110,13 @@ class OnixTelescope(Workflow):
         self.dag_id = dag_id
         self.cloud_workspace = cloud_workspace
         self.sftp_root = sftp_root
+        self.metadata_partner = partner_from_str(metadata_partner, metadata_partner=True)
         self.date_regex = date_regex
-        self.bq_dataset_id = bq_dataset_id
-        self.bq_table_name = bq_table_name
         self.bq_dataset_description = bq_dataset_description
         self.bq_table_description = bq_table_description
         self.api_dataset_id = api_dataset_id
-        self.schema_folder = schema_folder
         self.observatory_api_conn_id = observatory_api_conn_id
         self.sftp_service_conn_id = sftp_service_conn_id
-
         self.sftp_folders = SftpFolders(dag_id, sftp_conn_id=sftp_service_conn_id, sftp_root=sftp_root)
 
         check_workflow_inputs(self)
@@ -238,20 +231,23 @@ class OnixTelescope(Workflow):
         """Task to load each transformed release to BigQuery."""
         bq_create_dataset(
             project_id=self.cloud_workspace.project_id,
-            dataset_id=self.bq_dataset_id,
+            dataset_id=self.metadata_partner.bq_dataset_id,
             location=self.cloud_workspace.data_location,
             description=self.bq_dataset_description,
         )
         # Load each transformed release
         for release in releases:
             table_id = bq_sharded_table_id(
-                self.cloud_workspace.project_id, self.bq_dataset_id, self.bq_table_name, release.snapshot_date
+                self.cloud_workspace.project_id,
+                self.metadata_partner.bq_dataset_id,
+                self.metadata_partner.bq_table_name,
+                release.snapshot_date,
             )
             uri = gcs_blob_uri(self.cloud_workspace.transform_bucket, gcs_blob_name_from_path(release.transform_path))
             state = bq_load_table(
                 uri=uri,
                 table_id=table_id,
-                schema_file_path=bq_find_schema(path=self.schema_folder, table_name=self.bq_table_name),
+                schema_file_path=os.path.join(self.metadata_partner.schema_folder, "telescope.json"),
                 source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
                 table_description=self.bq_table_description,
             )

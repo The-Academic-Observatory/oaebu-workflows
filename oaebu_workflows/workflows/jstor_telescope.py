@@ -1,4 +1,4 @@
-# Copyright 2020 Curtin University
+# Copyright 2023 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import os
 import os.path
 import shutil
 from collections import OrderedDict
-from typing import List, Optional
+from typing import List, Union
 from tempfile import TemporaryDirectory
 
 import pendulum
@@ -37,14 +37,14 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import Resource, build
 from tenacity import retry, stop_after_attempt, wait_exponential, wait_fixed
 
-from oaebu_workflows.config import schema_folder as default_schema_folder
+from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from observatory.api.client.model.dataset_release import DatasetRelease
 from observatory.platform.api import make_observatory_api
 from observatory.platform.airflow import AirflowConns
 from observatory.platform.files import save_jsonl_gz
 from observatory.platform.utils.url_utils import get_user_agent, retry_get_url
 from observatory.platform.gcs import gcs_upload_files, gcs_blob_uri, gcs_blob_name_from_path
-from observatory.platform.bigquery import bq_load_table, bq_table_id, bq_find_schema, bq_create_dataset
+from observatory.platform.bigquery import bq_load_table, bq_table_id, bq_create_dataset
 from observatory.platform.observatory_config import CloudWorkspace
 from observatory.platform.files import add_partition_date, convert
 from observatory.platform.workflows.workflow import (
@@ -107,14 +107,12 @@ class JstorTelescope(Workflow):
         dag_id: str,
         cloud_workspace: CloudWorkspace,
         publisher_id: str,
-        bq_dataset_id: str = "jstor",
-        bq_country_table_name: str = "jstor_country",
-        bq_institution_table_name: str = "jstor_institution",
+        country_partner: Union[str, OaebuPartner] = "jstor_country",
+        institution_partner: Union[str, OaebuPartner] = "jstor_institution",
         bq_dataset_description: str = "Data from JSTOR sources",
         bq_country_table_description: str = None,
         bq_institution_table_description: str = None,
         api_dataset_id: str = "jstor",
-        schema_folder: str = default_schema_folder(),
         gmail_api_conn_id: str = "gmail_api",
         observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
         catchup: bool = False,
@@ -126,14 +124,12 @@ class JstorTelescope(Workflow):
         :param dag_id: The ID of the DAG
         :param cloud_workspace: The CloudWorkspace object for this DAG
         :param publisher_id: The ID of the publisher for this DAG
-        :param bq_dataset_id: The BigQuery dataset ID
-        :param bq_country_table_name: The name of the BigQuery JSTOR country table
-        :param bq_institution_table_name: The name of the BigQuery JSTOR institution table
+        :param country_partner: The name of the country partner
+        :param institution_partner: The name of the institution partner
         :param bq_dataset_description: Description for the BigQuery dataset
         :param bq_country_table_description: Description for the BigQuery JSTOR country table
         :param bq_institution_table_description: Description for the BigQuery JSTOR institution table
         :param api_dataset_id: The ID to store the dataset release in the API
-        :param schema_folder: The path to the SQL schema folder
         :param gmail_api_conn_id: Airflow connection ID for the Gmail API
         :param observatory_api_conn_id: Airflow connection ID for the overvatory API
         :param catchup: Whether to catchup the DAG or not
@@ -153,15 +149,13 @@ class JstorTelescope(Workflow):
 
         self.dag_id = dag_id
         self.cloud_workspace = cloud_workspace
+        self.country_partner = partner_from_str(country_partner)
+        self.institution_partner = partner_from_str(institution_partner)
         self.publisher_id = publisher_id
-        self.bq_dataset_id = bq_dataset_id
-        self.bq_country_table_name = bq_country_table_name
-        self.bq_institution_table_name = bq_institution_table_name
         self.bq_dataset_description = bq_dataset_description
         self.bq_country_table_description = bq_country_table_description
         self.bq_institution_table_description = bq_institution_table_description
         self.api_dataset_id = api_dataset_id
-        self.schema_folder = schema_folder
         self.gmail_api_conn_id = gmail_api_conn_id
         self.observatory_api_conn_id = observatory_api_conn_id
 
@@ -314,28 +308,24 @@ class JstorTelescope(Workflow):
 
     def bq_load(self, releases: List[JstorRelease], **kwargs) -> None:
         """Loads the sales and traffic data into BigQuery"""
-        bq_create_dataset(
-            project_id=self.cloud_workspace.project_id,
-            dataset_id=self.bq_dataset_id,
-            location=self.cloud_workspace.data_location,
-            description=self.bq_dataset_description,
-        )
 
         for release in releases:
-            for table_name, table_description, file_path in [
-                (self.bq_country_table_name, self.bq_country_table_description, release.transform_country_path),
-                (
-                    self.bq_institution_table_name,
-                    self.bq_institution_table_description,
-                    release.transform_institution_path,
-                ),
+            for partner, table_description, file_path in [
+                (self.country_partner, self.bq_country_table_description, release.transform_country_path),
+                (self.institution_partner, self.bq_institution_table_description, release.transform_institution_path),
             ]:
+                bq_create_dataset(
+                    project_id=self.cloud_workspace.project_id,
+                    dataset_id=partner.bq_dataset_id,
+                    location=self.cloud_workspace.data_location,
+                    description=self.bq_dataset_description,
+                )
                 uri = gcs_blob_uri(self.cloud_workspace.transform_bucket, gcs_blob_name_from_path(file_path))
-                table_id = bq_table_id(self.cloud_workspace.project_id, self.bq_dataset_id, table_name)
+                table_id = bq_table_id(self.cloud_workspace.project_id, partner.bq_dataset_id, partner.bq_table_name)
                 state = bq_load_table(
                     uri=uri,
                     table_id=table_id,
-                    schema_file_path=bq_find_schema(path=self.schema_folder, table_name=table_name),
+                    schema_file_path=os.path.join(partner.schema_folder, "telescope.json"),
                     source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
                     partition_type=TimePartitioningType.MONTH,
                     partition=True,

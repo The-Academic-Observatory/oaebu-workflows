@@ -1,4 +1,4 @@
-# Copyright 2020 Curtin University
+# Copyright 2023 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,6 +31,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import RequestMockBuilder
 
 from oaebu_workflows.config import test_fixtures_folder
+from oaebu_workflows.oaebu_partners import partner_from_str
 from oaebu_workflows.workflows.irus_oapen_telescope import (
     IrusOapenRelease,
     IrusOapenTelescope,
@@ -115,16 +116,17 @@ class TestIrusOapenTelescope(ObservatoryTestCase):
         env = ObservatoryEnvironment(
             self.project_id, self.data_location, api_host="localhost", api_port=find_free_port()
         )
-        dataset_id = env.add_dataset()
 
         # Setup Telescope
         execution_date = pendulum.datetime(year=2021, month=2, day=14)
+        patner = partner_from_str("irus_oapen")
+        patner.bq_dataset_id = env.add_dataset()
         telescope = IrusOapenTelescope(
             dag_id="irus_oapen_test",
             cloud_workspace=env.cloud_workspace,
             publisher_name_v4=self.publisher_name_v4,
             publisher_uuid_v5=self.publisher_uuid_v5,
-            bq_dataset_id=dataset_id,
+            data_partner=patner,
         )
         # Fake oapen project and bucket
         IrusOapenTelescope.OAPEN_PROJECT_ID = env.project_id
@@ -240,8 +242,8 @@ class TestIrusOapenTelescope(ObservatoryTestCase):
                 self.assertEqual(ti.state, State.SUCCESS)
                 table_id = bq_table_id(
                     project_id=telescope.cloud_workspace.project_id,
-                    dataset_id=telescope.bq_dataset_id,
-                    table_id=telescope.bq_table_name,
+                    dataset_id=telescope.data_partner.bq_dataset_id,
+                    table_id=telescope.data_partner.bq_table_name,
                 )
                 self.assert_table_integrity(table_id, 2)
 

@@ -1,4 +1,4 @@
-# Copyright 2020 Curtin University
+# Copyright 2023 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 
 import logging
 import os
-from typing import List
+from typing import List, Union
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import pendulum
@@ -26,13 +26,13 @@ from google.cloud.bigquery import SourceFormat, TimePartitioningType, WriteDispo
 from google.oauth2 import service_account
 from apiclient import discovery
 
-from oaebu_workflows.config import schema_folder as default_schema_folder
+from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from observatory.api.client.model.dataset_release import DatasetRelease
 from observatory.platform.api import make_observatory_api
 from observatory.platform.airflow import AirflowConns
 from observatory.platform.files import save_jsonl_gz, load_jsonl
 from observatory.platform.gcs import gcs_blob_uri, gcs_upload_files, gcs_blob_name_from_path
-from observatory.platform.bigquery import bq_find_schema, bq_load_table, bq_table_id, bq_create_dataset
+from observatory.platform.bigquery import bq_load_table, bq_table_id, bq_create_dataset
 from observatory.platform.utils.url_utils import retry_get_url
 from observatory.platform.observatory_config import CloudWorkspace
 from observatory.platform.files import add_partition_date
@@ -79,12 +79,10 @@ class UclDiscoveryTelescope(Workflow):
         dag_id: str,
         cloud_workspace: CloudWorkspace,
         sheet_id: str,
-        bq_dataset_id: str = "ucl",
-        bq_table_name: str = "ucl_discovery",
+        data_partner: Union[str, OaebuPartner] = "ucl_discovery",
         bq_dataset_description: str = "UCL Discovery dataset",
         bq_table_description: str = "UCL Discovery table",
         api_dataset_id: str = "ucl",
-        schema_folder: str = default_schema_folder(),
         observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
         oaebu_service_account_conn_id: str = "oaebu_service_account",
         max_threads: int = os.cpu_count() * 2,
@@ -98,12 +96,10 @@ class UclDiscoveryTelescope(Workflow):
         :param dag_id: The ID of the DAG
         :param cloud_workspace: The CloudWorkspace object for this DAG
         :param sheet_id:  The ID of the google sheet match eprint ID to ISBN13
-        :param bq_dataset_id: The BigQuery dataset ID
-        :param bq_table_name: The BigQuery table name
+        :param data_partner: The name of the data partner
         :param bq_dataset_description: Description for the BigQuery dataset
         :param bq_table_description: Description for the biguery table
         :param api_dataset_id: The ID to store the dataset release in the API
-        :param schema_folder: The path to the SQL schema folder
         :param observatory_api_conn_id: Airflow connection ID for the overvatory API
         :param oaebu_service_account_conn_id: Airflow connection ID for the oaebu service account
         :param max_threads: The maximum number threads to utilise for parallel processes
@@ -125,12 +121,10 @@ class UclDiscoveryTelescope(Workflow):
         self.dag_id = dag_id
         self.cloud_workspace = cloud_workspace
         self.sheet_id = sheet_id
-        self.bq_dataset_id = bq_dataset_id
-        self.bq_table_name = bq_table_name
+        self.data_partner = partner_from_str(data_partner)
         self.bq_dataset_description = bq_dataset_description
         self.bq_table_description = bq_table_description
         self.api_dataset_id = api_dataset_id
-        self.schema_folder = schema_folder
         self.oaebu_service_account_conn_id = oaebu_service_account_conn_id
         self.max_threads = max_threads
         self.observatory_api_conn_id = observatory_api_conn_id
@@ -244,17 +238,19 @@ class UclDiscoveryTelescope(Workflow):
         """Loads the transformed data into BigQuery"""
         bq_create_dataset(
             project_id=self.cloud_workspace.project_id,
-            dataset_id=self.bq_dataset_id,
+            dataset_id=self.data_partner.bq_dataset_id,
             location=self.cloud_workspace.data_location,
             description=self.bq_dataset_description,
         )
 
         uri = gcs_blob_uri(self.cloud_workspace.transform_bucket, gcs_blob_name_from_path(release.transform_path))
-        table_id = bq_table_id(self.cloud_workspace.project_id, self.bq_dataset_id, self.bq_table_name)
+        table_id = bq_table_id(
+            self.cloud_workspace.project_id, self.data_partner.bq_dataset_id, self.data_partner.bq_table_name
+        )
         state = bq_load_table(
             uri=uri,
             table_id=table_id,
-            schema_file_path=bq_find_schema(path=self.schema_folder, table_name=self.bq_table_name),
+            schema_file_path=os.path.join(self.data_partner.schema_folder, "telescope.json"),
             source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
             partition_type=TimePartitioningType.MONTH,
             partition=True,

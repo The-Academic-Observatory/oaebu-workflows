@@ -1,4 +1,4 @@
-# Copyright 2020 Curtin University
+# Copyright 2023 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ import json
 import logging
 import os
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 import pendulum
 import requests
@@ -33,13 +33,13 @@ from googleapiclient.discovery import Resource, build
 from googleapiclient.errors import HttpError
 from oauth2client.service_account import ServiceAccountCredentials
 
-from oaebu_workflows.config import schema_folder as default_schema_folder
+from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from observatory.api.client.model.dataset_release import DatasetRelease
 from observatory.platform.api import make_observatory_api
 from observatory.platform.airflow import AirflowConns
 from observatory.platform.files import get_file_hash, save_jsonl_gz
 from observatory.platform.files import add_partition_date
-from observatory.platform.bigquery import bq_load_table, bq_table_id, bq_find_schema, bq_create_dataset
+from observatory.platform.bigquery import bq_load_table, bq_table_id, bq_create_dataset
 from observatory.platform.observatory_config import CloudWorkspace
 from observatory.platform.workflows.workflow import (
     PartitionRelease,
@@ -105,11 +105,9 @@ class IrusOapenTelescope(Workflow):
         cloud_workspace: CloudWorkspace,
         publisher_name_v4: str,
         publisher_uuid_v5: str,
-        bq_dataset_id: str = "irus",
-        bq_table_name: str = "irus_oapen",
+        data_partner: Union[str, OaebuPartner] = "irus_oapen",
         bq_dataset_description: str = "IRUS dataset",
         bq_table_description: str = None,
-        schema_folder: str = default_schema_folder(),
         api_dataset_id: str = "oapen",
         max_cloud_function_instances: int = 0,
         observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
@@ -126,11 +124,9 @@ class IrusOapenTelescope(Workflow):
         :param cloud_workspace: The CloudWorkspace object for this DAG
         :param publisher_name_v4: The publisher's name for version 4
         :param publisher_uuid_v5: The publisher's uuid for version 5
-        :param bq_dataset_id: The BigQuery dataset ID
-        :param bq_table_name: The BigQuery table name
+        :param data_partner: The data partner
         :param bq_dataset_description: Description for the BigQuery dataset
         :param bq_table_description: Description for the biguery table
-        :param schema_folder: The path to the SQL schema folder
         :param api_dataset_id: The ID to store the dataset release in the API
         :param max_cloud_function_instances:
         :param observatory_api_conn_id: Airflow connection ID for the overvatory API
@@ -163,11 +159,9 @@ class IrusOapenTelescope(Workflow):
         self.cloud_workspace = cloud_workspace
         self.publisher_name_v4 = publisher_name_v4
         self.publisher_uuid_v5 = publisher_uuid_v5
-        self.bq_dataset_id = bq_dataset_id
-        self.bq_table_name = bq_table_name
+        self.data_partner = partner_from_str(data_partner)
         self.bq_dataset_description = bq_dataset_description
         self.bq_table_description = bq_table_description
-        self.schema_folder = schema_folder
         self.api_dataset_id = api_dataset_id
         self.max_cloud_function_instances = max_cloud_function_instances
         self.observatory_api_conn_id = observatory_api_conn_id
@@ -352,17 +346,19 @@ class IrusOapenTelescope(Workflow):
         """Loads the sales and traffic data into BigQuery"""
         bq_create_dataset(
             project_id=self.cloud_workspace.project_id,
-            dataset_id=self.bq_dataset_id,
+            dataset_id=self.data_partner.bq_dataset_id,
             location=self.cloud_workspace.data_location,
             description=self.bq_dataset_description,
         )
         for release in releases:
             uri = gcs_blob_uri(self.cloud_workspace.transform_bucket, gcs_blob_name_from_path(release.transform_path))
-            table_id = bq_table_id(self.cloud_workspace.project_id, self.bq_dataset_id, self.bq_table_name)
+            table_id = bq_table_id(
+                self.cloud_workspace.project_id, self.data_partner.bq_dataset_id, self.data_partner.bq_table_name
+            )
             state = bq_load_table(
                 uri=uri,
                 table_id=table_id,
-                schema_file_path=bq_find_schema(path=self.schema_folder, table_name=self.bq_table_name),
+                schema_file_path=os.path.join(self.data_partner.schema_folder, "telescope.json"),
                 source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
                 partition_type=TimePartitioningType.MONTH,
                 partition=True,

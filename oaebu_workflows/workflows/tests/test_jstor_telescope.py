@@ -1,4 +1,4 @@
-# Copyright 2020 Curtin University
+# Copyright 2023 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import HttpMockSequence
 
 from oaebu_workflows.config import test_fixtures_folder
+from oaebu_workflows.oaebu_partners import partner_from_str
 from oaebu_workflows.workflows.jstor_telescope import JstorRelease, JstorTelescope, get_label_id, get_release_date
 from observatory.platform.observatory_environment import ObservatoryEnvironment, ObservatoryTestCase, find_free_port
 from observatory.platform.observatory_config import Workflow
@@ -142,11 +143,16 @@ class TestJstorTelescope(ObservatoryTestCase):
 
         # Setup Telescope
         execution_date = pendulum.datetime(year=2020, month=11, day=1)
+        country_partner = partner_from_str("jstor_country")
+        country_partner.bq_dataset_id = dataset_id
+        institution_partner = partner_from_str("jstor_institution")
+        institution_partner.bq_dataset_id = dataset_id
         telescope = JstorTelescope(
             dag_id="jstor_test_telescope",
             cloud_workspace=env.cloud_workspace,
             publisher_id=self.publisher_id,
-            bq_dataset_id=dataset_id,
+            country_partner=country_partner,
+            institution_partner=institution_partner,
         )
         dag = telescope.make_dag()
 
@@ -261,12 +267,14 @@ class TestJstorTelescope(ObservatoryTestCase):
                 ti = env.run_task(telescope.bq_load.__name__)
                 self.assertEqual(ti.state, State.SUCCESS)
                 country_table_id = bq_table_id(
-                    telescope.cloud_workspace.project_id, telescope.bq_dataset_id, telescope.bq_country_table_name
+                    telescope.cloud_workspace.project_id,
+                    telescope.country_partner.bq_dataset_id,
+                    telescope.country_partner.bq_table_name,
                 )
                 institution_table_id = bq_table_id(
                     telescope.cloud_workspace.project_id,
-                    telescope.bq_dataset_id,
-                    telescope.bq_institution_table_name,
+                    telescope.institution_partner.bq_dataset_id,
+                    telescope.institution_partner.bq_table_name,
                 )
                 self.assert_table_integrity(country_table_id, self.country_report["table_rows"])
                 self.assert_table_integrity(institution_table_id, self.institution_report["table_rows"])

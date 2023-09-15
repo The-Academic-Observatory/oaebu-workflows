@@ -1,4 +1,4 @@
-# Copyright 2020 Curtin University
+# Copyright 2023 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,14 +18,14 @@ import csv
 import os
 import re
 from collections import OrderedDict, defaultdict
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 import pendulum
 from airflow.exceptions import AirflowException
 from airflow.models.taskinstance import TaskInstance
 from google.cloud.bigquery import TimePartitioningType, SourceFormat, WriteDisposition
 
-from oaebu_workflows.config import schema_folder as default_schema_folder
+from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from observatory.api.client.model.dataset_release import DatasetRelease
 from observatory.platform.api import make_observatory_api
 from observatory.platform.airflow import AirflowConns
@@ -33,7 +33,7 @@ from observatory.platform.files import save_jsonl_gz
 from observatory.platform.files import convert, add_partition_date
 from observatory.platform.gcs import gcs_upload_files, gcs_blob_uri, gcs_blob_name_from_path
 from observatory.platform.observatory_config import CloudWorkspace
-from observatory.platform.bigquery import bq_load_table, bq_table_id, bq_find_schema, bq_create_dataset
+from observatory.platform.bigquery import bq_load_table, bq_table_id, bq_create_dataset
 from observatory.platform.sftp import SftpFolders, make_sftp_connection
 from observatory.platform.workflows.workflow import (
     PartitionRelease,
@@ -75,13 +75,11 @@ class GoogleBooksTelescope(Workflow):
         dag_id: str,
         cloud_workspace: CloudWorkspace,
         sftp_root: str = "/",
-        bq_dataset_id: str = "google",
+        sales_partner: Union[str, OaebuPartner] = "google_books_sales",
+        traffic_partner: Union[str, OaebuPartner] = "google_books_traffic",
         bq_dataset_description: str = "Data from Google sources",
-        bq_sales_table_name: str = "google_books_sales",
         bq_sales_table_description: str = None,
-        bq_traffic_table_name: str = "google_books_traffic",
         bq_traffic_table_description: str = None,
-        schema_folder: str = default_schema_folder(),
         api_dataset_id: str = "google_books",
         sftp_service_conn_id: str = "sftp_service",
         observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
@@ -93,13 +91,11 @@ class GoogleBooksTelescope(Workflow):
         :param dag_id: The ID of the DAG
         :param cloud_workspace: The CloudWorkspace object for this DAG
         :param sftp_root: The root of the SFTP filesystem to work with
-        :param bq_dataset_id: The BigQuery dataset ID
+        :param sales_partner: The name of the sales partner
+        :param traffic_partner: The name of the traffic partner
         :param bq_dataset_description: Description for the BigQuery dataset
-        :param bq_sales_table_name: The name of the BigQuery Google Books Sales table
         :param bq_sales_table_description: Description for the BigQuery Google Books Sales table
-        :param bq_traffic_table_name: The name of the BigQuery Google Books Traffic table
         :param bq_traffic_table_description: Description for the BigQuery Google Books Traffic table
-        :param schema_folder: The path to the SQL schema folder
         :param api_dataset_id: The ID to store the dataset release in the API
         :param sftp_service_conn_id: Airflow connection ID for the SFTP service
         :param observatory_api_conn_id: Airflow connection ID for the overvatory API
@@ -118,13 +114,11 @@ class GoogleBooksTelescope(Workflow):
         self.dag_id = dag_id
         self.cloud_workspace = cloud_workspace
         self.sftp_root = sftp_root
-        self.bq_dataset_id = bq_dataset_id
+        self.sales_partner = partner_from_str(sales_partner)
+        self.traffic_partner = partner_from_str(traffic_partner)
         self.bq_dataset_description = bq_dataset_description
-        self.bq_sales_table_name = bq_sales_table_name
         self.bq_sales_table_description = bq_sales_table_description
-        self.bq_traffic_table_name = bq_traffic_table_name
         self.bq_traffic_table_description = bq_traffic_table_description
-        self.schema_folder = schema_folder
         self.api_dataset_id = api_dataset_id
         self.sftp_service_conn_id = sftp_service_conn_id
         self.observatory_api_conn_id = observatory_api_conn_id
@@ -266,24 +260,23 @@ class GoogleBooksTelescope(Workflow):
 
     def bq_load(self, releases: List[GoogleBooksRelease], **kwargs) -> None:
         """Loads the sales and traffic data into BigQuery"""
-        bq_create_dataset(
-            project_id=self.cloud_workspace.project_id,
-            dataset_id=self.bq_dataset_id,
-            location=self.cloud_workspace.data_location,
-            description=self.bq_dataset_description,
-        )
         for release in releases:
-            for table_name, table_description, file_path in zip(
-                [self.bq_sales_table_name, self.bq_traffic_table_name],
-                [self.bq_sales_table_description, self.bq_traffic_table_description],
-                [release.transform_sales_path, release.transform_traffic_path],
-            ):
+            for partner, table_description, file_path in [
+                [self.sales_partner, self.bq_sales_table_description, release.transform_sales_path],
+                [self.traffic_partner, self.bq_traffic_table_description, release.transform_traffic_path],
+            ]:
+                bq_create_dataset(
+                    project_id=self.cloud_workspace.project_id,
+                    dataset_id=partner.bq_dataset_id,
+                    location=self.cloud_workspace.data_location,
+                    description=self.bq_dataset_description,
+                )
                 uri = gcs_blob_uri(self.cloud_workspace.transform_bucket, gcs_blob_name_from_path(file_path))
-                table_id = bq_table_id(self.cloud_workspace.project_id, self.bq_dataset_id, table_name)
+                table_id = bq_table_id(self.cloud_workspace.project_id, partner.bq_dataset_id, partner.bq_table_name)
                 success = bq_load_table(
                     uri=uri,
                     table_id=table_id,
-                    schema_file_path=bq_find_schema(path=self.schema_folder, table_name=table_name),
+                    schema_file_path=os.path.join(partner.schema_folder, "telescope.json"),
                     source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
                     partition_type=TimePartitioningType.MONTH,
                     partition=True,
