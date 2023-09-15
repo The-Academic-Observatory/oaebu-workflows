@@ -73,7 +73,13 @@
             "mode": "NULLABLE",
             "name": "PersonName",
             "type": "STRING",
-            "description": "The Authors Full Name"
+            "description": "The Author's Full Name in the format '[first name] [last name]'"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "PersonNameInverted",
+            "type": "STRING",
+            "description": "The Authors Full Name in the format '[last name], [first name]'"
           },
           {
             "mode": "NULLABLE",

@@ -22,7 +22,7 @@ from unittest.mock import patch
 
 from oaebu_workflows.onix import (
     onix_collapse_subjects,
-    onix_create_personname_field,
+    onix_create_personname_fields,
     onix_parser_download,
     onix_parser_execute,
 )
@@ -98,23 +98,65 @@ class TestOnixFunctions(ObservatoryTestCase):
         self.assertEqual(len(actual_onix), len(expected_onix))
         self.assertEqual(json.dumps(actual_onix, sort_keys=True), json.dumps(expected_onix, sort_keys=True))
 
-    def test_onix_create_personname_field(self):
+    def test_onix_create_personname_fields(self):
         """Tests the function that creates the personname field"""
         input_onix = [
-            {"Contributors": [{"PersonName": "John Doe", "KeyNames": None, "NamesBeforeKey": None}]},
-            {"Contributors": [{"PersonName": None, "KeyNames": "Doe", "NamesBeforeKey": "John"}]},
-            {"Contributors": [{"PersonName": None, "KeyNames": "Doe", "NamesBeforeKey": None}]},
-            {"Contributors": [{"PersonName": None, "KeyNames": None, "NamesBeforeKey": None}]},
+            {
+                "Contributors": [
+                    {"PersonName": "John Doe", "PersonNameInverted": None, "KeyNames": None, "NamesBeforeKey": None}
+                ]
+            },
+            {
+                "Contributors": [
+                    {"PersonName": None, "PersonNameInverted": None, "KeyNames": "Doe", "NamesBeforeKey": "John"}
+                ]
+            },
+            {
+                "Contributors": [
+                    {"PersonName": None, "PersonNameInverted": "Doe, John", "KeyNames": "Doe", "NamesBeforeKey": None}
+                ]
+            },
+            {
+                "Contributors": [
+                    {"PersonName": None, "PersonNameInverted": None, "KeyNames": None, "NamesBeforeKey": None}
+                ]
+            },
             {"empty": "empty"},
         ]
         expected_out = [
-            {"Contributors": [{"PersonName": "John Doe", "KeyNames": None, "NamesBeforeKey": None}]},
-            {"Contributors": [{"PersonName": "John Doe", "KeyNames": "Doe", "NamesBeforeKey": "John"}]},
-            {"Contributors": [{"PersonName": None, "KeyNames": "Doe", "NamesBeforeKey": None}]},
-            {"Contributors": [{"PersonName": None, "KeyNames": None, "NamesBeforeKey": None}]},
+            {
+                "Contributors": [
+                    {
+                        "PersonName": "John Doe",
+                        "PersonNameInverted": None,
+                        "KeyNames": None,
+                        "NamesBeforeKey": None,
+                    }
+                ]
+            },
+            {
+                "Contributors": [
+                    {
+                        "PersonName": "John Doe",
+                        "PersonNameInverted": "Doe, John",
+                        "KeyNames": "Doe",
+                        "NamesBeforeKey": "John",
+                    }
+                ]
+            },
+            {
+                "Contributors": [
+                    {"PersonName": None, "PersonNameInverted": "Doe, John", "KeyNames": "Doe", "NamesBeforeKey": None}
+                ]
+            },
+            {
+                "Contributors": [
+                    {"PersonName": None, "PersonNameInverted": None, "KeyNames": None, "NamesBeforeKey": None}
+                ]
+            },
             {"empty": "empty"},
         ]
-        output_onix = onix_create_personname_field(input_onix)
+        output_onix = onix_create_personname_fields(input_onix)
         self.assertEqual(len(output_onix), len(expected_out))
         for actual, expected in zip(output_onix, expected_out):
             self.assertDictEqual(actual, expected)

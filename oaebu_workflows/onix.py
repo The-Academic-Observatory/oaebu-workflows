@@ -80,21 +80,26 @@ def onix_collapse_subjects(onix: List[dict]) -> List[dict]:
     return onix
 
 
-def onix_create_personname_field(onix: List[dict]) -> List[dict]:
-    """Given an ONIX feed, attempts to populate the Contributors.PersonName field by concatenating the
-    Contributors.NamesBeforeKey and Contributors.KeyNames fields where possible
+def onix_create_personname_fields(onix: List[dict]) -> List[dict]:
+    """Given an ONIX feed, attempts to populate the Contributors.PersonName and/or Contributors.PersonNameInverted
+    fields by concatenating the Contributors.NamesBeforeKey and Contributors.KeyNames fields where possible
 
     :param onix: The input onix feed
-    :return: The onix feed with the PersonName field populated where possible
+    :return: The onix feed with the additional fields populated where possible
     """
 
     def _can_make_personname(contributor: dict) -> bool:
-        return contributor.get("KeyNames") and contributor.get("NamesBeforeKey") and not contributor.get("PersonName")
+        return contributor.get("KeyNames") and contributor.get("NamesBeforeKey")
+
+    def _can_make_personname_inverted(contributor: dict) -> bool:
+        return contributor.get("NamesBeforeKey") and contributor.get("KeyNames")
 
     for entry in [i for i in onix if i.get("Contributors")]:
         for c in entry["Contributors"]:
             if _can_make_personname(c) and not c.get("PersonName"):
                 c["PersonName"] = f"{c['NamesBeforeKey']} {c['KeyNames']}"
+            if _can_make_personname_inverted(c) and not c.get("PersonNameInverted"):
+                c["PersonNameInverted"] = f"{c['KeyNames']}, {c['NamesBeforeKey']}"
     return onix
 
 

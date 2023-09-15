@@ -76,5 +76,31 @@
     "name": "keywords",
     "type": "STRING",
     "description": "A list of keywords"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "PersonName",
+        "type": "STRING",
+        "description": "The author's full name in the format '[first name] [last name]'"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "PersonNameInverted",
+        "type": "STRING",
+        "description": "The author's full name in the format '[last name], [first name]'"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "ORCID",
+        "type": "STRING",
+        "description": "The Authors ORCID ID"
+      }
+    ],
+    "mode": "REPEATED",
+    "name": "authors",
+    "type": "RECORD",
+    "description": "A list of Book Authors"
   }
 ]

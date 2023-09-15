@@ -25,7 +25,7 @@ from oaebu_workflows.onix import (
     onix_parser_download,
     onix_parser_execute,
     onix_collapse_subjects,
-    onix_create_personname_field,
+    onix_create_personname_fields,
 )
 from oaebu_workflows.config import schema_folder as default_schema_folder
 from observatory.api.client.model.dataset_release import DatasetRelease
@@ -178,9 +178,8 @@ class ThothTelescope(Workflow):
             parser_path, input_dir=release.download_folder, output_dir=release.transform_folder
         )
         set_task_state(success, task_id=kwargs["ti"].task_id, release=release)
-        logging.info("Transforming onix feed - collapsing keywords")
         transformed = onix_collapse_subjects(load_jsonl(os.path.join(release.transform_folder, "full.jsonl")))
-        transformed = onix_create_personname_field(transformed)
+        transformed = onix_create_personname_fields(transformed)
         save_jsonl_gz(release.transform_path, transformed)
 
     def upload_transformed(self, release: ThothRelease, **kwargs) -> None:
