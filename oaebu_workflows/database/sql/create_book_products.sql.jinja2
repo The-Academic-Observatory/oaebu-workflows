@@ -351,7 +351,7 @@ empty_google_analytics as (
         CAST(null as STRING) as publication_format,
         STRUCT(
             [STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value)] as country
-        ) as page_views
+        ) as {{ ga3_views_field }}
 ),
 
 empty_internet_archive as (
@@ -500,51 +500,51 @@ google_analytics_grouped_metrics AS(
   IF
     (publication_format = 'PDF'
       AND publication_whole_or_part = 'whole',
-      group_items_google_analytics(ARRAY_CONCAT_AGG(page_views.country)),
+      group_items_google_analytics(ARRAY_CONCAT_AGG({{ ga3_views_field }}.country)),
       ARRAY_AGG(STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value))) AS pdf_book_country,
   IF
     (publication_format = 'PDF'
       AND publication_whole_or_part = 'part',
-      group_items_google_analytics(ARRAY_CONCAT_AGG(page_views.country)),
+      group_items_google_analytics(ARRAY_CONCAT_AGG({{ ga3_views_field }}.country)),
       ARRAY_AGG(STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value))) AS pdf_chapter_country,
   IF
     (publication_format = 'HTML'
       AND publication_whole_or_part = 'whole',
-      group_items_google_analytics(ARRAY_CONCAT_AGG(page_views.country)),
+      group_items_google_analytics(ARRAY_CONCAT_AGG({{ ga3_views_field }}.country)),
       ARRAY_AGG(STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value))) AS html_book_country,
   IF
     (publication_format = 'HTML'
       AND publication_whole_or_part = 'part',
-      group_items_google_analytics(ARRAY_CONCAT_AGG(page_views.country)),
+      group_items_google_analytics(ARRAY_CONCAT_AGG({{ ga3_views_field }}.country)),
       ARRAY_AGG(STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value))) AS html_chapter_country,
   IF
     (publication_format = 'EPUB'
       AND publication_whole_or_part = 'whole',
-      group_items_google_analytics(ARRAY_CONCAT_AGG(page_views.country)),
+      group_items_google_analytics(ARRAY_CONCAT_AGG({{ ga3_views_field }}.country)),
       ARRAY_AGG(STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value))) AS epub_book_country,
   IF
     (publication_format = 'EPUB'
       AND publication_whole_or_part = 'part',
-      group_items_google_analytics(ARRAY_CONCAT_AGG(page_views.country)),
+      group_items_google_analytics(ARRAY_CONCAT_AGG({{ ga3_views_field }}.country)),
       ARRAY_AGG(STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value))) AS epub_chapter_country,
   IF
     (publication_format = 'MOBI'
       AND publication_whole_or_part = 'whole',
-      group_items_google_analytics(ARRAY_CONCAT_AGG(page_views.country)),
+      group_items_google_analytics(ARRAY_CONCAT_AGG({{ ga3_views_field }}.country)),
       ARRAY_AGG(STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value))) AS mobi_book_country,
   IF
     (publication_format = 'MOBI'
       AND publication_whole_or_part = 'part',
-      group_items_google_analytics(ARRAY_CONCAT_AGG(page_views.country)),
+      group_items_google_analytics(ARRAY_CONCAT_AGG({{ ga3_views_field }}.country)),
       ARRAY_AGG(STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value))) AS mobi_chapter_country,
   IF
     (publication_format IN ('PDF','HTML', 'EPUB', 'MOBI')
       AND publication_whole_or_part IN ('whole', 'part'),
-      group_items_google_analytics(ARRAY_CONCAT_AGG(page_views.country)),
+      group_items_google_analytics(ARRAY_CONCAT_AGG({{ ga3_views_field }}.country)),
       ARRAY_AGG(STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value))) AS downloads_total_country,
   IF
     (publication_whole_or_part = '(citation)',
-      group_items_google_analytics(ARRAY_CONCAT_AGG(page_views.country)),
+      group_items_google_analytics(ARRAY_CONCAT_AGG({{ ga3_views_field }}.country)),
       ARRAY_AGG(STRUCT(CAST(NULL as STRING) as name, CAST(null as INT64) as value))) AS views_total_country,
   FROM
     `{{ google_analytics_table_id }}`

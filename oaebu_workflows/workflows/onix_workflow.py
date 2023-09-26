@@ -152,6 +152,7 @@ class OnixWorkflow(Workflow):
         oaebu_intermediate_match_suffix: str = "_matched",
         # Run parameters
         data_partners: List[Union[str, OaebuPartner]] = None,
+        ga3_views_field="page_views",
         schema_folder: str = default_schema_folder(),
         mailto: str = "agent@observatory.academy",
         crossref_start_date: pendulum.DateTime = pendulum.datetime(2018, 5, 14),
@@ -198,6 +199,7 @@ class OnixWorkflow(Workflow):
         :param oaebu_intermediate_match_suffix: Suffix to append to intermediate tables
 
         :param data_partners: OAEBU data sources.
+        :param ga3_views_field: The name of the GA3 views field - should be either 'page_views' or 'unique_views'
         :param schema_folder: the SQL schema path.
         :param mailto: email address used to identify the user when sending requests to an API.
         :param crossref_start_date: The starting date of crossref's API calls
@@ -248,6 +250,7 @@ class OnixWorkflow(Workflow):
         self.oaebu_intermediate_match_suffix = oaebu_intermediate_match_suffix
         # Run parameters
         self.data_partners = data_partners
+        self.ga3_views_field = ga3_views_field
         self.schema_folder = schema_folder
         self.mailto = mailto
         self.crossref_start_date = crossref_start_date
@@ -775,6 +778,7 @@ class OnixWorkflow(Workflow):
             country_table_id=country_table_id,
             workid_table_id=workid_table_id,
             workfamilyid_table_id=workfamilyid_table_id,
+            ga3_views_field=self.ga3_views_field,
             onix_workflow=True,
         )
         schema_file_path = bq_find_schema(path=self.schema_folder, table_name=self.bq_book_product_table_name)
@@ -792,7 +796,7 @@ class OnixWorkflow(Workflow):
         release: OnixWorkflowRelease,
         **kwargs,
     ):
-        """Create an intermediate oaebu table.  They are of the form datasource_matched<date>"""
+        """Create an intermediate oaebu table. They are of the form datasource_matched<date>"""
         output_table: str = kwargs["output_table"]
         query_template: str = kwargs["query_template"]
         bq_create_dataset(
