@@ -1,76 +1,78 @@
 {
     "ONIXMessage": {
-        "@xlmns": [],
-        "@release": [],
+        "@xlmns": null,
+        "@release": null,
         "Header": {
             "Sender": {
-                "SenderName": [],
-                "EmailAddress": []
+                "SenderName": null,
+                "EmailAddress": null
             },
-            "SentDateTime": []
+            "SentDateTime": null
         },
-        "Product": {
-            "RecordReference": [],
-            "NotificationType": [],
-            "RecordSourceType": [],
-            "Edition": {
-                "EditionNumber": []
-            },
-            "ProductIdentifier": {
-                "ProductIDType": [],
-                "ProductIDTypeName": [],
-                "IDValue": []
-            },
-            "PublishingDate": {
-                "PublishingDateRole": [],
-                "PublishingDate": []
-            },
-            "DescriptiveDetail": {
-                "ProductComposition": [],
-                "ProductForm": [],
-                "ProductFormDetail": [],
-                "PrimaryContentType": [],
-                "Subject": {
-                    "SubjectCode": [],
-                    "SubjectSchemeIdentifier": [],
-                    "SubjectHeadingText": []
+        "Product": [
+            {
+                "RecordReference": null,
+                "NotificationType": null,
+                "RecordSourceType": null,
+                "Edition": {
+                    "EditionNumber": null
                 },
-                "TitleDetail": {
-                    "TitleType": [],
-                    "TitleElement": {
-                        "TitleElementLevel": [],
-                        "TitleText": []
-                    }
+                "ProductIdentifier": {
+                    "ProductIDType": null,
+                    "ProductIDTypeName": null,
+                    "IDValue": null
                 },
-                "Contributor": {
-                    "SequenceNumber": [],
-                    "ContributorRole": [],
-                    "NamesBeforeKey": [],
-                    "KeyNames": [],
-                    "NameIdentifier": {
-                        "NameIDType": [],
-                        "IDValue": []
+                "PublishingDate": {
+                    "PublishingDateRole": null,
+                    "PublishingDate": null
+                },
+                "DescriptiveDetail": {
+                    "ProductComposition": null,
+                    "ProductForm": null,
+                    "ProductFormDetail": null,
+                    "PrimaryContentType": null,
+                    "Subject": {
+                        "SubjectCode": null,
+                        "SubjectSchemeIdentifier": null,
+                        "SubjectHeadingText": null
                     },
-                    "PersonName": []
-                }
-            },
-            "RelatedMaterial": {
-                "RelatedProduct": {
-                    "ProductRelationCode": [],
-                    "ProductIdentifier": {
-                        "ProductIDType": [],
-                        "IDValue": []
+                    "TitleDetail": {
+                        "TitleType": null,
+                        "TitleElement": {
+                            "TitleElementLevel": null,
+                            "TitleText": null
+                        }
+                    },
+                    "Contributor": {
+                        "SequenceNumber": null,
+                        "ContributorRole": null,
+                        "NamesBeforeKey": null,
+                        "KeyNames": null,
+                        "NameIdentifier": {
+                            "NameIDType": null,
+                            "IDValue": null
+                        },
+                        "PersonName": null
                     }
                 },
-                "RelatedWork": {
-                    "WorkRelationCode": {
-                        "WorkIdentifiers": {
-                            "WorkIDType": [],
-                            "IDValue": []
+                "RelatedMaterial": {
+                    "RelatedProduct": {
+                        "ProductRelationCode": null,
+                        "ProductIdentifier": {
+                            "ProductIDType": null,
+                            "IDValue": null
+                        }
+                    },
+                    "RelatedWork": {
+                        "WorkRelationCode": {
+                            "WorkIdentifiers": {
+                                "WorkIDType": null,
+                                "IDValue": null
+                            }
                         }
                     }
                 }
             }
-        }
+        ]
     }
 }
