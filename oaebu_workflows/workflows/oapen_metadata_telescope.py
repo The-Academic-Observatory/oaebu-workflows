@@ -147,7 +147,7 @@ class OapenMetadataTelescope(Workflow):
         self.observatory_api_conn_id = observatory_api_conn_id
 
         # Fixture file paths
-        self.oapen_schema = os.path.join(self.schema_folder, "oapen_metadata_fields.json")
+        self.oapen_schema = os.path.join(self.schema_folder, "oapen_metadata_filter.json")
 
         check_workflow_inputs(self)
 
