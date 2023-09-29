@@ -160,7 +160,7 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
                 )
 
                 # Test transform task
-                self.assertTrue(os.path.exists(release.parsed_metadata))
+                self.assertTrue(os.path.exists(release.filtered_metadata))
                 self.assertTrue(os.path.exists(release.validated_onix))
                 self.assertTrue(os.path.exists(release.invalid_products_path))
                 self.assertTrue(os.path.exists(release.parsed_onix))
