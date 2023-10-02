@@ -86,7 +86,7 @@ class OapenMetadataRelease(SnapshotRelease):
         super().__init__(dag_id=dag_id, run_id=run_id, snapshot_date=snapshot_date)
         self.download_path = os.path.join(self.download_folder, f"metadata_{snapshot_date.format('YYYYMMDD')}.xml")
         # Transform step outputs
-        self.parsed_metadata = os.path.join(self.transform_folder, "parsed_metadata.xml")  # After schema parse
+        self.filtered_metadata = os.path.join(self.transform_folder, "filtered_metadata.xml")  # After schema parse
         self.validated_onix = os.path.join(self.transform_folder, "validated_onix.xml")  # After removal of errors
         self.invalid_products_path = os.path.join(self.transform_folder, "onix_invalid_products.xml")  # Errors
         self.parsed_onix = os.path.join(self.transform_folder, "full.jsonl")  # The result of the java parser
@@ -147,7 +147,7 @@ class OapenMetadataTelescope(Workflow):
         self.observatory_api_conn_id = observatory_api_conn_id
 
         # Fixture file paths
-        self.oapen_schema = os.path.join(self.schema_folder, "oapen_metadata_fields.json")
+        self.oapen_schema = os.path.join(self.schema_folder, "oapen_metadata_filter.json")
 
         check_workflow_inputs(self)
 
@@ -201,13 +201,13 @@ class OapenMetadataTelescope(Workflow):
             oapen_schema = json.load(f)
         with open(release.download_path, "rb") as f:
             metadata = xmltodict.parse(f)
-        metadata = parse_through_schema(metadata, oapen_schema)
-        with open(release.parsed_metadata, "w") as f:
+        metadata = filter_through_schema(metadata, oapen_schema)
+        with open(release.filtered_metadata, "w") as f:
             xmltodict.unparse(metadata, output=f, pretty=True)
 
         # Remove any products with errors in them
         remove_invalid_products(
-            release.parsed_metadata,
+            release.filtered_metadata,
             release.validated_onix,
             invalid_products_file=release.invalid_products_path,
         )
@@ -331,41 +331,50 @@ def download_metadata(uri: str, download_path: str) -> None:
         raise AirflowException("No products found in metadata")
 
 
-def parse_through_schema(input: dict, schema: dict):
-    """A recursive function that processes an XML by iterating through the tree and only keeping the elements if they
-    are described as expected in the viable fields.
-    For example, say we have an xml with this structure:
-    <thing>
-        <subthing>1
-            <subsubthing>1</subsubthing>
-        </subthing>
-        <unimportantsubthing>5</unimportantsubthing>
-    </thing>
+def filter_through_schema(input: dict, schema: dict):
+    """
+    This function recursively traverses the input dictionary and compares it to the provided schema.
+    It retains only the fields and values that exist in the schema structure, and discards
+    any fields that do not match the schema.
 
-    and the viable fields looks like this:
-    {"thing":{
-        "subthing":{
-            "subsubthing":[]
+    # Example usage with a dictionary and schema:
+        input_dict = {
+            "name": "John",
+            "age": 30,
+            "address": {
+                "street": "123 Main St",
+                "city": "New York",
+                "zip": "10001"
             }
         }
-    }
-    Our resulting xml would look like this:
-    <thing>
-        <subthing>1
-            <subsubthing>1</subsubthing>
-        </subthing>
-    </thing>
+        schema = {
+            "name": null,
+            "age": null,
+            "address": {
+                "street": null,
+                "city": null
+            }
+        }
+        filtered_dict = filter_dict_by_schema(input_dict, schema)
+        filtered_dict will be:
+        {
+            "name": "John",
+            "age": 30,
+            "address": {
+                "street": "123 Main St",
+                "city": "New York"
+            }
+        }
 
-    :param xml_elem: The xml element to process
-    :param viable_fields: A dictionary describing the fileds to retain
-    :param xml_parent: The parent xml element to write to
+    :param input: The dictionary to filter
+    :param schema: The schema describing the desired structure of the dictionary
     """
-    for key in list(input.keys()):
-        if key not in schema.keys():
-            input.pop(key)
-        elif isinstance(input[key], dict) and isinstance(schema[key], dict):
-            parse_through_schema(input[key], schema[key])
-    return input
+    if isinstance(input, dict) and isinstance(schema, dict):
+        return {key: filter_through_schema(value, schema.get(key)) for key, value in input.items() if key in schema}
+    elif isinstance(input, list) and isinstance(schema, list):
+        return [filter_through_schema(item, schema[0]) for item in input]
+    else:
+        return input
 
 
 def remove_invalid_products(input_xml: str, output_xml: str, invalid_products_file: str = None) -> None:
