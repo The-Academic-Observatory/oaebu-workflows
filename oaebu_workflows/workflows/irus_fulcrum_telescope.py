@@ -214,7 +214,7 @@ class IrusFulcrumTelescope(Workflow):
         success = bq_load_table(
             uri=uri,
             table_id=table_id,
-            schema_file_path=os.path.join(self.data_partner.schema_folder, "telescope.json"),
+            schema_file_path=self.data_partner.schema_path,
             source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
             table_description=self.bq_table_description,
             partition=True,

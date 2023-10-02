@@ -325,7 +325,7 @@ class JstorTelescope(Workflow):
                 state = bq_load_table(
                     uri=uri,
                     table_id=table_id,
-                    schema_file_path=os.path.join(partner.schema_folder, "telescope.json"),
+                    schema_file_path=partner.schema_path,
                     source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
                     partition_type=TimePartitioningType.MONTH,
                     partition=True,

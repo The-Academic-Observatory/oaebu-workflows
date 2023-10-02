@@ -40,7 +40,7 @@ class OaebuPartner:
     isbn_field_name: str
     title_field_name: str
     sharded: bool
-    schema_folder: str
+    schema_path: str
 
     def __str__(self):
         return self.type_id
@@ -54,7 +54,7 @@ OAEBU_METADATA_PARTNERS = dict(
         isbn_field_name="ISBN13",
         title_field_name="TitleDetails.TitleElements.TitleText",
         sharded=True,
-        schema_folder=os.path.join(schema_folder(), "partners", "onix"),
+        schema_path=os.path.join(schema_folder(), "onix", "onix.json"),
     ),
     thoth=OaebuPartner(
         type_id="thoth",
@@ -63,7 +63,7 @@ OAEBU_METADATA_PARTNERS = dict(
         isbn_field_name="ISBN13",
         title_field_name="TitleDetails.TitleElements.TitleText",
         sharded=True,
-        schema_folder=os.path.join(schema_folder(), "partners", "onix"),
+        schema_path=os.path.join(schema_folder(), "onix", "onix.json"),
     ),
     oapen_metadata=OaebuPartner(
         type_id="oapen_metadata",
@@ -72,7 +72,7 @@ OAEBU_METADATA_PARTNERS = dict(
         isbn_field_name="ISBN13",
         title_field_name="TitleDetails.TitleElements.TitleText",
         sharded=True,
-        schema_folder=os.path.join(schema_folder(), "partners", "onix"),
+        schema_path=os.path.join(schema_folder(), "onix", "onix.json"),
     ),
 )
 
@@ -84,7 +84,7 @@ OAEBU_DATA_PARTNERS = dict(
         isbn_field_name="publication_id",
         title_field_name="title",
         sharded=False,
-        schema_folder=os.path.join(schema_folder(), "partners", "google_analytics3"),
+        schema_path=os.path.join(schema_folder(), "google", "google_analytics.json"),
     ),
     google_books_sales=OaebuPartner(
         type_id="google_books_sales",
@@ -93,7 +93,7 @@ OAEBU_DATA_PARTNERS = dict(
         isbn_field_name="Primary_ISBN",
         title_field_name="Title",
         sharded=False,
-        schema_folder=os.path.join(schema_folder(), "partners", "google_books_sales"),
+        schema_path=os.path.join(schema_folder(), "google", "google_books_sales.json"),
     ),
     google_books_traffic=OaebuPartner(
         type_id="google_books_traffic",
@@ -102,7 +102,7 @@ OAEBU_DATA_PARTNERS = dict(
         isbn_field_name="Primary_ISBN",
         title_field_name="Title",
         sharded=False,
-        schema_folder=os.path.join(schema_folder(), "partners", "google_books_traffic"),
+        schema_path=os.path.join(schema_folder(), "google", "google_books_traffic.json"),
     ),
     jstor_country=OaebuPartner(
         type_id="jstor_country",
@@ -111,7 +111,7 @@ OAEBU_DATA_PARTNERS = dict(
         isbn_field_name="ISBN",
         title_field_name="Book_Title",
         sharded=False,
-        schema_folder=os.path.join(schema_folder(), "partners", "jstor_country"),
+        schema_path=os.path.join(schema_folder(), "jstor", "jstor_country.json"),
     ),
     jstor_institution=OaebuPartner(
         type_id="jstor_institution",
@@ -120,7 +120,7 @@ OAEBU_DATA_PARTNERS = dict(
         isbn_field_name="ISBN",
         title_field_name="Book_Title",
         sharded=False,
-        schema_folder=os.path.join(schema_folder(), "partners", "jstor_institution"),
+        schema_path=os.path.join(schema_folder(), "jstor", "jstor_institution.json"),
     ),
     irus_oapen=OaebuPartner(
         type_id="irus_oapen",
@@ -129,7 +129,7 @@ OAEBU_DATA_PARTNERS = dict(
         isbn_field_name="ISBN",
         title_field_name="book_title",
         sharded=False,
-        schema_folder=os.path.join(schema_folder(), "partners", "irus_oapen"),
+        schema_path=os.path.join(schema_folder(), "irus", "irus_oapen.json"),
     ),
     irus_fulcrum=OaebuPartner(
         type_id="irus_fulcrum",
@@ -138,7 +138,7 @@ OAEBU_DATA_PARTNERS = dict(
         isbn_field_name="ISBN",
         title_field_name="book_title",
         sharded=False,
-        schema_folder=os.path.join(schema_folder(), "partners", "irus_fulcrum"),
+        schema_path=os.path.join(schema_folder(), "irus", "irus_fulcrum.json"),
     ),
     ucl_discovery=OaebuPartner(
         type_id="ucl_discovery",
@@ -147,7 +147,7 @@ OAEBU_DATA_PARTNERS = dict(
         isbn_field_name="ISBN",
         title_field_name="title",
         sharded=False,
-        schema_folder=os.path.join(schema_folder(), "partners", "ucl_discovery"),
+        schema_path=os.path.join(schema_folder(), "ucl", "ucl_discovery.json"),
     ),
     internet_archive=OaebuPartner(
         type_id="internet_archive",
@@ -156,7 +156,7 @@ OAEBU_DATA_PARTNERS = dict(
         isbn_field_name="ISBN13",
         title_field_name="title",
         sharded=False,
-        schema_folder=os.path.join(schema_folder(), "partners", "internet_archive"),
+        schema_path=os.path.join(schema_folder(), "internet_archive", "internet_archive.json"),
     ),
     worldreader=OaebuPartner(
         type_id="worldreader",
@@ -165,7 +165,7 @@ OAEBU_DATA_PARTNERS = dict(
         isbn_field_name="ISBN13",
         title_field_name="title",
         sharded=False,
-        schema_folder=os.path.join(schema_folder(), "partners", "worldreader"),
+        schema_path=os.path.join(schema_folder(), "worldreader", "worldreader.json"),
     ),
 )
 

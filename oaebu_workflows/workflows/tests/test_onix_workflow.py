@@ -128,7 +128,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
             isbn_field_name="isbn",
             title_field_name="title",
             sharded=True,
-            schema_folder=os.path.join(default_schema_folder(), "partners", "onix"),
+            schema_path=os.path.join(default_schema_folder(), "onix", "onix.json"),
         )
 
         # vcrpy cassettes for http request mocking
@@ -585,7 +585,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         fake_doi_isbn_dataset_id = env.add_dataset(prefix="doi_isbn_test")
         fake_sharded_dataset = env.add_dataset(prefix="sharded_data")
         fake_view_dataset = env.add_dataset(prefix="views")
-        fake_table_schema = os.path.join(self.schema_path, "partners", "onix", "telescope.json")
+        fake_table_schema = os.path.join(self.schema_path, "onix", "onix.json")
         with env.create():
             doi_table_file = test_fixtures_folder("onix_workflow", "doi_isbn_query_test.jsonl")
 
@@ -775,7 +775,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     partner.sharded,
                     partner.bq_dataset_id,
                     load_jsonl(test_fixtures_folder("onix_workflow", "e2e_inputs", f"{partner_name}.jsonl")),
-                    os.path.join(partner.schema_folder, "telescope.json"),
+                    partner.schema_path,
                 )
             )
 
@@ -788,7 +788,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 metadata_partner.sharded,
                 metadata_partner.bq_dataset_id,
                 load_jsonl(test_fixtures_folder("onix_workflow", "e2e_inputs", f"onix.jsonl")),
-                os.path.join(metadata_partner.schema_folder, "telescope.json"),
+                metadata_partner.schema_path,
             )
         )
 

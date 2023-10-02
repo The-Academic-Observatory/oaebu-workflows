@@ -247,7 +247,7 @@ class OnixTelescope(Workflow):
             state = bq_load_table(
                 uri=uri,
                 table_id=table_id,
-                schema_file_path=os.path.join(self.metadata_partner.schema_folder, "telescope.json"),
+                schema_file_path=self.metadata_partner.schema_path,
                 source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
                 table_description=self.bq_table_description,
             )
