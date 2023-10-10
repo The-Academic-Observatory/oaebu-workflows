@@ -3,5 +3,5 @@
 
     background
     how_works
-    partner_data
-    public_data
+    dashboard_data
+    faq

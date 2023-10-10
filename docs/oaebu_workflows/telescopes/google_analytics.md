@@ -1,6 +1,6 @@
-# Google Analytics
+# Google Analytics Universal
 
-Google Analytics is a web analytics service offered by Google that tracks and reports website traffic.  
+Google Analytics was a web analytics service offered by Google that tracks and reports website traffic (now replaced with Google Analytics 4).  
 This telescope gets data from Google Analytics for 1 view id per publisher and for several combinations of metrics and dimensions.  
 It is possible to add a regex expression to filter on pagepaths, so only data on relevant pagepaths is collected.  
 Note that Google Analytics data is only available for the last 26 months, see 
@@ -55,8 +55,7 @@ These are the 'view_id' and the 'pagepath_regex'.
 
 ### view_id
 The view_id points to the specific view on which Google Analytics data is collected.  
-See [the google support page](https://support.google.com/analytics/answer/1009618?hl=en) for more information on the
- hierarchy of the Analytics account.
+See [the google support page](https://support.google.com/analytics/answer/1009618?hl=en) for more information on the hierarchy of the Analytics account.
 Below is more information on how to list the view_ids which a service account has access to.
 
 ### pagepath_regex

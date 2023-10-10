@@ -1,5 +1,5 @@
 
-Book Analytics Dashboard Project (2022-2025)
+Book Analytics Dashboard
 ##############################
 
 Overview
@@ -11,7 +11,7 @@ Overview
     overview/index
 
 
-Help
+More Information and Contact Us
 ==============================
 
 .. toctree::

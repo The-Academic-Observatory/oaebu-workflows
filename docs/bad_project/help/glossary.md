@@ -60,6 +60,9 @@
 
     telescope	
        A telescope is a data workflow that fetches and ingests data from a data source. Some telescopes run workflows that process and output data to other places. Workflows are built on top of Apache Airflow's Directed Acyclic Graph (DAGs), where a DAG is “a collection of organized tasks that you want to schedule and run” [15]_ 
+    
+    the Dashboard
+       Refers to the books analytics service operated by OAPEN [16]_
        
 
 .. [1] https://openknowledge.community/projects/bad-project/
@@ -91,3 +94,5 @@
 .. [14] https://bisg.org/general/custom.asp?page=ONIXforBooks
 
 .. [15] https://cloud.google.com/composer/docs/run-apache-airflow-dag
+
+.. [16] https://oapen.org/article/book-analytics-service

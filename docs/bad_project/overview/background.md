@@ -1,23 +1,19 @@
-BAD Project Background
+Book Analytics Dashboard
 =======================
 
-## BAD Project Description
-The Book Analytics Dashboard Project (2022-2025) is focused on creating a sustainable OA Book focused analytics service. This service is needed to safeguard and support diversity in the voices, perspectives, geographies, topics and languages made visible through OA Books. Funded by the [Mellon Foundation](https://mellon.org/), the Book Analytics Dashboard project is building on an earlier Mellon-funded initiative: [Developing a Pilot Data Trust for OA eBook Usage (2020 – 2022)](https://educopia.org/data_trust/). In addition to scaling workflows, infrastructure and customer support, the Demonstration Project is developing a long-term plan for housing, maintenance and funding of the analytics service as a sustainable community infrastructure.
+## How can the Book Analytics Dashboard help me?
+Whether you’re a publisher, librarian, funder, administrator, or other stakeholder in the scholarly communications community, the Dashboard can help you gain a fuller view of book usage data.
 
-The pilot project developed a prototype dashboard for gathering book usage information from multiple data sources, and combining and presenting it in interactive visualisation dashboards for publisher partners. This pilot project is now in the process of scaling up to a full Dashboard service in 2022-2025. See the [BAD template dashboard here](http:/template.book-analytics.org/).
+Books are made available through a multitude of different platforms, and each has its own way of providing usage statistics. Using our Dashboard gives you a single point of synthesis of usage data from a wide range of [sources](dashboard_data.md), allowing you a consolidated view of usage. 
 
+We take care to bring together a synthesis of usage data of known provenance to allow you to compare data across your chosen time span. Learn more about how we collect and [process book usage data](how_works.md).
 
-## Partner Organisations
-This project is led by Principle Investigators Lucy Montgomery and Cameron Neylon from [Curtin University](https://www.curtin.edu.au/), Niels Stern and Ronald Snijder from the [OAPEN Foundation](https://oapen.org/), and Katherine Skinner (formerly [Educopia Institute](https://educopia.org/), now Research Lead at IOI). 
+## Who’s behind the Dashboard and how it is operated?
+The Dashboard was initially developed as a [pilot project 2020-2022](https://digital.library.unt.edu/ark:/67531/metadc1596980/), which developed a prototype for gathering book usage information from multiple data sources, and combining and presenting it in interactive visualisation dashboards for publisher partners.
 
-## More Information
-* [Visit the BAD project website](http://book-analytics.org/)
-* Follow the BAD project on Twitter [@BookAnalytics](https://twitter.com/BookAnalytics)
-* [Join the BAD project mailing list](https://docs.google.com/forms/d/e/1FAIpQLSdt7m9xL_4LxY3RUlX7DFg9uq7_12c8NLtDj036eGIZszPONA/viewform)
-* [Visit the BAD project Zenodo community](https://zenodo.org/communities/book-analytics-dashboard-project/?page=1&size=20)
-* [See the BAD template dashboard](http:/template.book-analytics.org/), powered by the University of Michigan Press' data
-* [Our book-focussed GitHub repository](https://github.com/The-Academic-Observatory/oaebu-workflows)
+Funded again by the [Mellon Foundation](https://mellon.org/), the pilot project was scaled up to become the [Book Analytics Dashboard project (2022-2025)](https://doi.org/10.5281/zenodo.7894603), focused on creating a sustainable OA book focused analytics service. 
 
-## Contact
-If you have any questions about the project, code or documentation, please contact:
-info@book-analytics.org
+The fully-functional Dashboard is now operated by [OAPEN](https://www.oapen.org/), a trusted infrastructure for OA books. OAPEN is a not-for-profit organisation which [cannot be sold](https://oapen.hypotheses.org/621), and has committed to the [Principles of Open Scholarly Infrastructure (POSI)](https://doi.org/10.24343/C34W2H) with a [public self-audit](https://oapen.hypotheses.org/524) of their practices across the themes of governance, sustainability, and insurance. OAPEN was chosen as the host organisation by the Book Analytics Dashboard (BAD) project Advisory Board, following a series of focus groups with publishers which endorsed OAPEN as an organisation which could be trusted by the community to run the Dashboard in an open and consultative way.
+
+Community voices are an essential part of the governance strategy for the BAD project. We want to ensure that effective channels are available for feedback, feature requests, praise, and suggestions for improvement; and that these are regularly reviewed and connected to our development planning. During Q3 and Q4 2023, we will be working directly with Dashboard partners to imagine, design, and implement community engagement processes that will allow easy communication and proactive connectivity between the BAD project team and community members.
+

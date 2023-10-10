@@ -1,8 +1,8 @@
 
-Book Analytics Dashboard Project (2022-2025)
+Book Analytics Dashboard
 ##############################
 
-This project documentation includes how the BAD project works and information on the data sources used.
+Documentation on how the Dashboard works and information on the data sources used.
 
 .. toctree::
     :maxdepth: 2
