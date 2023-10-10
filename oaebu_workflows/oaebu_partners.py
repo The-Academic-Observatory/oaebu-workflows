@@ -1,4 +1,4 @@
-# Copyright 2023 Curtin University
+# Copyright 2020-2023 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -178,10 +178,11 @@ def partner_from_str(partner: Union[str, OaebuPartner], metadata_partner: bool =
     :raises Exception: Raised if the partner name is not found
     :return: The OaebuPartner
     """
-    partners_dict = OAEBU_METADATA_PARTNERS if metadata_partner else OAEBU_DATA_PARTNERS
 
     if isinstance(partner, OaebuPartner):
         return partner
+
+    partners_dict = OAEBU_METADATA_PARTNERS if metadata_partner else OAEBU_DATA_PARTNERS
 
     try:
         partner = partners_dict[str(partner)]
