@@ -14,7 +14,7 @@ Features to explore:
 * See **usage across geographic regions** - from the “Global Reach” page, select a country from the country filter and see on the number of book downloads and the number of chapter downloads. Countries and territories are based on ISO standard 3166.
 
 ## I’m not yet participating in BAD, but can I see a demo?
-You may view the [BAD template Dashboard](template.book-analytics.org), powered by usage data from the University of Michigan Press which they have very kindly made publicly available, with no login details required.
+You may view the [BAD template Dashboard](https://template.book-analytics.org/), powered by usage data from the University of Michigan Press which they have very kindly made publicly available, with no login details required.
 
 ## How should I interpret the data from the Dashboard?
 Presenting a holistic view of usage information can be difficult, because ebooks can be hosted in multiple repositories and platforms, in different file formats (PDF, EPUB, MOBI, HTML), and in different levels (whole book or by chapter). Each repository provides book content to different audiences in different ways.
