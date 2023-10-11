@@ -1,0 +1,78 @@
+{
+    "ONIXMessage": {
+        "@xlmns": null,
+        "@release": null,
+        "Header": {
+            "Sender": {
+                "SenderName": null,
+                "EmailAddress": null
+            },
+            "SentDateTime": null
+        },
+        "Product": [
+            {
+                "RecordReference": null,
+                "NotificationType": null,
+                "RecordSourceType": null,
+                "Edition": {
+                    "EditionNumber": null
+                },
+                "ProductIdentifier": {
+                    "ProductIDType": null,
+                    "ProductIDTypeName": null,
+                    "IDValue": null
+                },
+                "PublishingDate": {
+                    "PublishingDateRole": null,
+                    "PublishingDate": null
+                },
+                "DescriptiveDetail": {
+                    "ProductComposition": null,
+                    "ProductForm": null,
+                    "ProductFormDetail": null,
+                    "PrimaryContentType": null,
+                    "Subject": {
+                        "SubjectCode": null,
+                        "SubjectSchemeIdentifier": null,
+                        "SubjectHeadingText": null
+                    },
+                    "TitleDetail": {
+                        "TitleType": null,
+                        "TitleElement": {
+                            "TitleElementLevel": null,
+                            "TitleText": null
+                        }
+                    },
+                    "Contributor": {
+                        "SequenceNumber": null,
+                        "ContributorRole": null,
+                        "NamesBeforeKey": null,
+                        "KeyNames": null,
+                        "NameIdentifier": {
+                            "NameIDType": null,
+                            "IDValue": null
+                        },
+                        "PersonName": null
+                    }
+                },
+                "RelatedMaterial": {
+                    "RelatedProduct": {
+                        "ProductRelationCode": null,
+                        "ProductIdentifier": {
+                            "ProductIDType": null,
+                            "IDValue": null
+                        }
+                    },
+                    "RelatedWork": {
+                        "WorkRelationCode": {
+                            "WorkIdentifiers": {
+                                "WorkIDType": null,
+                                "IDValue": null
+                            }
+                        }
+                    }
+                }
+            }
+        ]
+    }
+}

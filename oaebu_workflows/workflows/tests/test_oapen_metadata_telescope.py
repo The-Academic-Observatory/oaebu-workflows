@@ -31,7 +31,7 @@ from oaebu_workflows.workflows.oapen_metadata_telescope import (
     download_metadata,
     remove_invalid_products,
     find_onix_product,
-    parse_through_schema,
+    filter_through_schema,
 )
 from observatory.platform.api import get_dataset_releases
 from observatory.platform.observatory_config import Workflow
@@ -160,7 +160,7 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
                 )
 
                 # Test transform task
-                self.assertTrue(os.path.exists(release.parsed_metadata))
+                self.assertTrue(os.path.exists(release.filtered_metadata))
                 self.assertTrue(os.path.exists(release.validated_onix))
                 self.assertTrue(os.path.exists(release.invalid_products_path))
                 self.assertTrue(os.path.exists(release.parsed_onix))
@@ -264,44 +264,58 @@ class TestDownloadMetadata(unittest.TestCase):
                 )
 
 
-class TestParseThroughSchema(unittest.TestCase):
-    def test_parse_through_schema(self):
+class TestFilterThroughSchema(unittest.TestCase):
+    def test_filter_through_schema(self):
         """Tests the generic use case of the function"""
         input_dict = {
-            "thing": {"subthing": {"subsubthing": {"subsubsubthing": "1", "unimportant_subsubsubthing": "1"}}},
-            "unimportant_thing": "1",
+            # Handle a list of dicts
+            "things": [
+                {"subthing": {"subsubthing": {"subsubsubthing": "1", "unimportant_subsubsubthing": "1"}}},
+                {"subthing": {"subsubthing": {"subsubsubthing": "2"}}, "anotherthing": "2"},
+            ],
+            "unimportant_thing": "unimportant",  # Neglected field
+            "important_thing": "important",  # Field to include
         }
-        schema_dict = {"thing": {"subthing": {"subsubthing": {"subsubsubthing": []}}}}
-        expected_output = {"thing": {"subthing": {"subsubthing": {"subsubsubthing": "1"}}}}
-        self.assertEqual(parse_through_schema(input_dict, schema_dict), expected_output)
+        schema = {
+            "things": [{"subthing": {"subsubthing": {"subsubsubthing": None}}, "anotherthing": None}],
+            "important_thing": None,
+        }
+        expected_output = {
+            "things": [
+                {"subthing": {"subsubthing": {"subsubsubthing": "1"}}},
+                {"subthing": {"subsubthing": {"subsubsubthing": "2"}}, "anotherthing": "2"},
+            ],
+            "important_thing": "important",
+        }
+        self.assertEqual(filter_through_schema(input_dict, schema), expected_output)
 
     def test_matching_keys(self):
         """Tests that the function correctly processes the input dictionary when all nested keys match the schema"""
         input_dict = {"thing": {"subthing": {"subsubthing": {"subsubsubthing": "1"}}}}
-        schema_dict = {"thing": {"subthing": {"subsubthing": {"subsubsubthing": []}}}}
+        schema_dict = {"thing": {"subthing": {"subsubthing": {"subsubsubthing": None}}}}
         expected_output = {"thing": {"subthing": {"subsubthing": {"subsubsubthing": "1"}}}}
-        self.assertEqual(parse_through_schema(input_dict, schema_dict), expected_output)
+        self.assertEqual(filter_through_schema(input_dict, schema_dict), expected_output)
 
     def test_empty_input(self):
         """Tests that the function correctly handles an empty input dictionary"""
         input_dict = {}
-        schema_dict = {"thing": {"subthing": {"subsubthing": []}}}
+        schema_dict = {"thing": {"subthing": {"subsubthing": None}}}
         expected_output = {}
-        self.assertEqual(parse_through_schema(input_dict, schema_dict), expected_output)
+        self.assertEqual(filter_through_schema(input_dict, schema_dict), expected_output)
 
     def test_no_matching_keys(self):
         """Tests that the function correctly handles an input dictionary with no matching keys in the schema"""
         input_dict = {"thing": {"subthing": {"subsubthing": "1"}}}
-        schema_dict = {"other_thing": {"other_subthing": {"other_subsubthing": []}}}
+        schema_dict = {"other_thing": {"other_subthing": {"other_subsubthing": None}}}
         expected_output = {}
-        self.assertEqual(parse_through_schema(input_dict, schema_dict), expected_output)
+        self.assertEqual(filter_through_schema(input_dict, schema_dict), expected_output)
 
     def test_edge_case_empty_schema(self):
         """Tests that the function correctly handles an empty schema"""
         input_dict = {"thing": {"subthing": {"subsubthing": "1"}}}
         schema_dict = {}
         expected_output = {}
-        self.assertEqual(parse_through_schema(input_dict, schema_dict), expected_output)
+        self.assertEqual(filter_through_schema(input_dict, schema_dict), expected_output)
 
 
 class TestRemoveInvalidProducts(unittest.TestCase):
