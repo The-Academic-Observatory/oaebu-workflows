@@ -8,7 +8,7 @@ Books are made available through a multitude of different platforms, and each ha
 
 We take care to bring together a synthesis of usage data of known provenance to allow you to compare data across your chosen time span. Learn more about how we collect and [process book usage data](how_works.md).
 
-## Who’s behind the Dashboard and how it is operated?
+## Who’s behind the Dashboard and how is it operated?
 The Dashboard was initially developed as a [pilot project 2020-2022](https://digital.library.unt.edu/ark:/67531/metadc1596980/), which developed a prototype for gathering book usage information from multiple data sources, and combining and presenting it in interactive visualisation dashboards for publisher partners.
 
 Funded again by the [Mellon Foundation](https://mellon.org/), the pilot project was scaled up to become the [Book Analytics Dashboard project (2022-2025)](https://doi.org/10.5281/zenodo.7894603), focused on creating a sustainable OA book focused analytics service. 
