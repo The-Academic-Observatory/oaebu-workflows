@@ -29,13 +29,12 @@ from oaebu_workflows.onix import (
     elevate_related_products,
 )
 from oaebu_workflows.config import test_fixtures_folder
+from observatory.platform.observatory_environment import ObservatoryTestCase
 
 
-class TestOnixFunctions(unittest.TestCase):
+
+class TestOnixFunctions(ObservatoryTestCase):
     """Tests for the ONIX telescope"""
-
-    def __init__(self, *args, **kwargs):
-        self.onix_test_path = test_fixtures_folder("onix", "20210330_CURTINPRESS_ONIX.xml")
 
     def test_onix_parser_download_execute(self):
         """Tests the onix_parser_download and onix_parser_execute functions"""
@@ -63,7 +62,7 @@ class TestOnixFunctions(unittest.TestCase):
             self.assertEqual(success, False)
 
             ### Test parser_execute: nonzero returncode ###
-            shutil.copy(self.onix_test_path, input_dir)
+            shutil.copy(test_fixtures_folder("onix", "20210330_CURTINPRESS_ONIX.xml"), input_dir)
             with patch("oaebu_workflows.onix.wait_for_process") as mock_wfp:
                 mock_wfp.return_value = ("stdout", "stderr")
                 with patch("oaebu_workflows.onix.subprocess.Popen") as mock_popen:

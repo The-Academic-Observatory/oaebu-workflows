@@ -117,6 +117,8 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
                 cloud_workspace=env.cloud_workspace,
                 metadata_uri=self.metadata_uri,
                 metadata_partner=partner,
+                elevate_related_products=True,
+                bq_dataset_id=dataset_id,
             )
             dag = telescope.make_dag()
 
@@ -156,7 +158,7 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
 
                 # Test download task
                 self.assertTrue(os.path.exists(release.download_path))
-                self.assert_file_integrity(release.download_path, "6df963cd448fe3ec8acb76bf49b34928", "md5")
+                self.assert_file_integrity(release.download_path, "d4da435afdacef896b37b915ba2cf2da", "md5")
 
                 # Test that download file uploaded to BQ
                 self.assert_blob_integrity(

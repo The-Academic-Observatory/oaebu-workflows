@@ -176,10 +176,14 @@ def elevate_related_products(product: dict) -> List[dict]:
     # Get the related products
     try:
         related_products = product["RelatedMaterial"]["RelatedProduct"]["ProductIdentifier"]
-        rp_isbns = [rp["IDValue"] for rp in related_products if str(rp["ProductIDType"]) == "15"]
     except KeyError:
         # There are no related products for this product
         return return_products
+
+    if isinstance(related_products, list):
+        rp_isbns = [rp["IDValue"] for rp in related_products if str(rp["ProductIDType"]) == "15"]
+    else:
+        rp_isbns = [related_products["IDValue"]] if str(related_products["ProductIDType"]) == "15" else []
 
     # Elevate all related products in this product
     elevated_isbns = []
