@@ -45,6 +45,7 @@ from oaebu_workflows.onix import (
     onix_parser_download,
     onix_parser_execute,
     onix_create_personname_fields,
+    elevate_related_products,
 )
 from observatory.api.client.model.dataset_release import DatasetRelease
 from observatory.platform.api import make_observatory_api
@@ -86,6 +87,7 @@ class OapenMetadataRelease(SnapshotRelease):
         self.filtered_metadata = os.path.join(self.transform_folder, "filtered_metadata.xml")  # After schema parse
         self.validated_onix = os.path.join(self.transform_folder, "validated_onix.xml")  # After removal of errors
         self.invalid_products_path = os.path.join(self.transform_folder, "onix_invalid_products.xml")  # Errors
+        self.elevated_products_path = os.path.join(self.transform_folder, "elevated_products.xml")  # Product elevation
         self.parsed_onix = os.path.join(self.transform_folder, "full.jsonl")  # The result of the java parser
         self.transform_path = os.path.join(self.transform_folder, "onix.jsonl.gz")  # Final onix file
 
@@ -99,6 +101,9 @@ class OapenMetadataTelescope(Workflow):
         cloud_workspace: CloudWorkspace,
         metadata_uri: str,
         metadata_partner: Union[str, OaebuPartner] = "oapen_metadata",
+        elevate_related_products: bool = False,
+        bq_dataset_id: str = "onix",
+        bq_table_name: str = "onix",
         bq_dataset_description: str = "OAPEN Metadata converted to ONIX",
         bq_table_description: str = None,
         api_dataset_id: str = "oapen",
@@ -112,6 +117,9 @@ class OapenMetadataTelescope(Workflow):
         :param cloud_workspace: The CloudWorkspace object for this DAG
         :param metadata_uri: The URI of the metadata XML file
         :param metadata_partner: The metadata partner name
+        :param elevate_related_products: Whether to pull out the related products to the product level.
+        :param bq_dataset_id: The BigQuery dataset ID
+        :param bq_table_name: The BigQuery table name
         :param bq_dataset_description: Description for the BigQuery dataset
         :param bq_table_description: Description for the biguery table
         :param api_dataset_id: The ID to store the dataset release in the API
@@ -132,6 +140,9 @@ class OapenMetadataTelescope(Workflow):
         self.cloud_workspace = cloud_workspace
         self.metadata_uri = metadata_uri
         self.metadata_partner = partner_from_str(metadata_partner, metadata_partner=True)
+        self.elevate_related_products = elevate_related_products
+        self.bq_dataset_id = bq_dataset_id
+        self.bq_table_name = bq_table_name
         self.bq_dataset_description = bq_dataset_description
         self.bq_table_description = bq_table_description
         self.api_dataset_id = api_dataset_id
@@ -184,8 +195,9 @@ class OapenMetadataTelescope(Workflow):
         This involves several steps
         1) Parse the XML metadata to keep our desired fields
         2) Remove products containing errors
-        3) Parse the validated ONIX file through the java parser to return .jsonl format
-        4) Add the contributor.personname field
+        3) (Optional) - Pull our related products to the product level
+        4) Parse the validated ONIX file through the java parser to return .jsonl format
+        5) Add the contributor.personname field
         """
         # Parse the downloaded metadata through the schema to extract relevant fields only
         with open(self.oapen_schema) as f:
@@ -203,15 +215,24 @@ class OapenMetadataTelescope(Workflow):
             invalid_products_file=release.invalid_products_path,
         )
 
+        # Elevate related products to the product level
+        if self.elevate_related_products:
+            products = metadata["ONIXMessage"]["Product"]
+            elevated = [item for p in products for item in elevate_related_products(p)]
+            metadata["ONIXMessage"]["Product"] = elevated
+            with open(release.elevated_products_path, "w") as f:
+                xmltodict.unparse(metadata, output=f, pretty=True)
+
         # Assert that the new onix file is valid
-        if validate_onix(release.validated_onix):
+        to_parse = release.elevated_products_path if self.elevate_related_products else release.validated_onix
+        if validate_onix(to_parse):
             raise AirflowException("Errors found in processed ONIX file. Cannot proceed without valid ONIX.")
 
         # Parse the onix file through the Java parser - should result in release.parsed_onix file
         success, parser_path = onix_parser_download()
         set_task_state(success, task_id=kwargs["ti"].task_id, release=release)
         with TemporaryDirectory() as tmp_dir:
-            shutil.copy(release.validated_onix, os.path.join(tmp_dir, "input.xml"))
+            shutil.copy(to_parse, os.path.join(tmp_dir, "input.xml"))
             success = onix_parser_execute(parser_path, input_dir=tmp_dir, output_dir=release.transform_folder)
             set_task_state(success, task_id=kwargs["ti"].task_id, release=release)
 
