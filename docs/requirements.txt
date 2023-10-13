@@ -5,3 +5,4 @@ recommonmark==0.7.*
 pbr==5.5.*
 pandas
 myst-parser==2.0.0
+docutils < 0.17
