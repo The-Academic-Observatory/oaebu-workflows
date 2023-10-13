@@ -1,4 +1,4 @@
-# Copyright 2020 Curtin University
+# Copyright 2020-2023 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,8 +24,8 @@ from airflow.models.connection import Connection
 import vcr
 
 from oaebu_workflows.config import test_fixtures_folder
+from oaebu_workflows.oaebu_partners import partner_from_str
 from oaebu_workflows.workflows.ucl_discovery_telescope import (
-    UclDiscoveryRelease,
     UclDiscoveryTelescope,
     get_isbn_eprint_mappings,
     download_discovery_stats,
@@ -98,11 +98,13 @@ class TestUclDiscoveryTelescope(ObservatoryTestCase):
         )
 
         # Setup Telescope
+        data_partner = partner_from_str("ucl_discovery")
+        data_partner.bq_dataset_id = env.add_dataset()
         telescope = UclDiscoveryTelescope(
             dag_id="ucl_discovery",
             cloud_workspace=env.cloud_workspace,
             sheet_id="foo",
-            bq_dataset_id=env.add_dataset(),
+            data_partner=data_partner,
             max_threads=1,
         )
         dag = telescope.make_dag()
@@ -198,7 +200,9 @@ class TestUclDiscoveryTelescope(ObservatoryTestCase):
 
             # Bigquery load
             table_id = bq_table_id(
-                telescope.cloud_workspace.project_id, telescope.bq_dataset_id, telescope.bq_table_name
+                telescope.cloud_workspace.project_id,
+                telescope.data_partner.bq_dataset_id,
+                telescope.data_partner.bq_table_name,
             )
             self.assert_table_integrity(table_id, 2)
             self.assert_table_content(

@@ -1,4 +1,4 @@
-# Copyright 2021 Curtin University
+# Copyright 2021-2023 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ from airflow.models import Connection
 from airflow.utils.state import State
 
 from oaebu_workflows.workflows.onix_telescope import OnixTelescope, OnixRelease
+from oaebu_workflows.oaebu_partners import partner_from_str
 from oaebu_workflows.config import test_fixtures_folder
 from observatory.platform.api import get_dataset_releases
 from observatory.platform.bigquery import bq_sharded_table_id
@@ -122,12 +123,14 @@ class TestOnixTelescope(ObservatoryTestCase):
         with env.create(), sftp_server.create() as sftp_root:
             # Setup Telescope
             execution_date = pendulum.datetime(year=2021, month=3, day=31)
+            partner = partner_from_str("onix", metadata_partner=True)
+            partner.bq_dataset_id = dataset_id
             telescope = OnixTelescope(
                 dag_id="onix_telescope_test",
                 cloud_workspace=env.cloud_workspace,
                 sftp_root="/",
                 date_regex=self.date_regex,
-                bq_dataset_id=dataset_id,
+                metadata_partner=partner,
             )
             dag = telescope.make_dag()
 
@@ -206,8 +209,8 @@ class TestOnixTelescope(ObservatoryTestCase):
                 self.assertEqual(ti.state, State.SUCCESS)
                 table_id = bq_sharded_table_id(
                     telescope.cloud_workspace.project_id,
-                    telescope.bq_dataset_id,
-                    telescope.bq_table_name,
+                    telescope.metadata_partner.bq_dataset_id,
+                    telescope.metadata_partner.bq_table_name,
                     release.snapshot_date,
                 )
                 self.assert_table_integrity(table_id, expected_rows=1)

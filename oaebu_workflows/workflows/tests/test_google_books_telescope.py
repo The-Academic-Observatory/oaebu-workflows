@@ -1,4 +1,4 @@
-# Copyright 2020 Curtin University
+# Copyright 2020-2023 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ from airflow.utils.state import State
 from click.testing import CliRunner
 
 from oaebu_workflows.config import test_fixtures_folder
+from oaebu_workflows.oaebu_partners import partner_from_str
 from oaebu_workflows.workflows.google_books_telescope import (
     GoogleBooksRelease,
     GoogleBooksTelescope,
@@ -127,11 +128,16 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
             with sftp_server.create() as sftp_root:
                 # Setup Telescope
                 execution_date = pendulum.datetime(year=2021, month=3, day=31)
+                sales_partner = partner_from_str("google_books_sales")
+                sales_partner.bq_dataset_id = dataset_id
+                traffic_partner = partner_from_str("google_books_traffic")
+                traffic_partner.bq_dataset_id = dataset_id
                 telescope = GoogleBooksTelescope(
                     dag_id="google_books_test",
                     cloud_workspace=env.cloud_workspace,
                     sftp_root="/",
-                    bq_dataset_id=dataset_id,
+                    sales_partner=sales_partner,
+                    traffic_partner=traffic_partner,
                 )
                 dag = telescope.make_dag()
 
@@ -251,11 +257,15 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
 
                     # Test that data loaded into BigQuery
                     table_id = bq_table_id(
-                        telescope.cloud_workspace.project_id, telescope.bq_dataset_id, telescope.bq_sales_table_name
+                        telescope.cloud_workspace.project_id,
+                        telescope.sales_partner.bq_dataset_id,
+                        telescope.sales_partner.bq_table_name,
                     )
                     self.assert_table_integrity(table_id, params["bq_rows"])
                     table_id = bq_table_id(
-                        telescope.cloud_workspace.project_id, telescope.bq_dataset_id, telescope.bq_traffic_table_name
+                        telescope.cloud_workspace.project_id,
+                        telescope.traffic_partner.bq_dataset_id,
+                        telescope.traffic_partner.bq_table_name,
                     )
                     self.assert_table_integrity(table_id, params["bq_rows"])
 
@@ -301,7 +311,8 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
                 dag_id="google_books_test",
                 cloud_workspace=self.fake_cloud_workspace,
                 sftp_root="/",
-                bq_dataset_id="dataset_id",
+                sales_partner=partner_from_str("google_books_sales"),
+                traffic_partner=partner_from_str("google_books_traffic"),
             )
             sales_file_path = test_fixtures_folder("google_books", "GoogleSalesTransactionReport_2020_02.csv")
             traffic_file_path = test_fixtures_folder("google_books", "GoogleBooksTrafficReport_2020_02.csv")

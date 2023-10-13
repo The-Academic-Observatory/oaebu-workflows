@@ -16,6 +16,7 @@
 
 import os
 import logging
+from typing import Union
 
 import pendulum
 from airflow.exceptions import AirflowException
@@ -27,16 +28,11 @@ from oaebu_workflows.onix import (
     onix_collapse_subjects,
     onix_create_personname_fields,
 )
-from oaebu_workflows.config import schema_folder as default_schema_folder
+from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from observatory.api.client.model.dataset_release import DatasetRelease
 from observatory.platform.api import make_observatory_api
 from observatory.platform.airflow import AirflowConns
-from observatory.platform.bigquery import (
-    bq_find_schema,
-    bq_load_table,
-    bq_sharded_table_id,
-    bq_create_dataset,
-)
+from observatory.platform.bigquery import bq_load_table, bq_sharded_table_id, bq_create_dataset
 from observatory.platform.observatory_config import CloudWorkspace
 from observatory.platform.utils.url_utils import retry_get_url
 from observatory.platform.files import save_jsonl_gz, load_jsonl
@@ -81,13 +77,11 @@ class ThothTelescope(Workflow):
         cloud_workspace: CloudWorkspace,
         publisher_id: str,
         format_specification: str,
-        bq_dataset_id: str = "onix",
-        bq_table_name: str = "onix",
+        metadata_partner: Union[str, OaebuPartner] = "thoth",
         bq_dataset_description: str = "Thoth ONIX Feed",
         bq_table_description: str = None,
         api_dataset_id: str = "onix",
         host_name: str = "https://export.thoth.pub",
-        schema_folder: str = default_schema_folder(),
         observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
         catchup: bool = False,
         start_date: pendulum.DateTime = pendulum.datetime(2022, 12, 1),
@@ -98,13 +92,11 @@ class ThothTelescope(Workflow):
         :param cloud_workspace: The CloudWorkspace object for this DAG
         :param publisher_id: The Thoth ID for this publisher
         :param format_specification: The Thoth ONIX/metadata format specification. e.g. "onix_3.0::oapen"
-        :param bq_dataset_id: The BigQuery dataset ID
-        :param bq_table_name: The BigQuery table name
+        :param metadata_partner: The metadata partner name
         :param bq_dataset_description: Description for the BigQuery dataset
         :param bq_table_description: Description for the biguery table
         :param api_dataset_id: The ID to store the dataset release in the API
         :param host_name: The Thoth host name
-        :param schema_folder: The path to the SQL schema folder
         :param observatory_api_conn_id: Airflow connection ID for the overvatory API
         :param catchup: Whether to catchup the DAG or not
         :param start_date: The start date of the DAG
@@ -122,14 +114,12 @@ class ThothTelescope(Workflow):
         self.dag_id = dag_id
         self.cloud_workspace = cloud_workspace
         self.publisher_id = publisher_id
-        self.bq_dataset_id = bq_dataset_id
-        self.bq_table_name = bq_table_name
+        self.metadata_partner = partner_from_str(metadata_partner, metadata_partner=True)
         self.bq_dataset_description = bq_dataset_description
         self.bq_table_description = bq_table_description
         self.api_dataset_id = api_dataset_id
         self.host_name = host_name
         self.format_specification = format_specification
-        self.schema_folder = schema_folder
         self.observatory_api_conn_id = observatory_api_conn_id
 
         check_workflow_inputs(self)
@@ -193,18 +183,21 @@ class ThothTelescope(Workflow):
         """Task to load the transformed ONIX jsonl file to BigQuery."""
         bq_create_dataset(
             project_id=self.cloud_workspace.project_id,
-            dataset_id=self.bq_dataset_id,
+            dataset_id=self.metadata_partner.bq_dataset_id,
             location=self.cloud_workspace.data_location,
             description=self.bq_dataset_description,
         )
         uri = gcs_blob_uri(self.cloud_workspace.transform_bucket, gcs_blob_name_from_path(release.transform_path))
         table_id = bq_sharded_table_id(
-            self.cloud_workspace.project_id, self.bq_dataset_id, self.bq_table_name, release.snapshot_date
+            self.cloud_workspace.project_id,
+            self.metadata_partner.bq_dataset_id,
+            self.metadata_partner.bq_table_name,
+            release.snapshot_date,
         )
         state = bq_load_table(
             uri=uri,
             table_id=table_id,
-            schema_file_path=bq_find_schema(path=self.schema_folder, table_name="onix"),
+            schema_file_path=self.metadata_partner.schema_path,
             source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
             table_description=self.bq_table_description,
         )
