@@ -4,3 +4,4 @@ sphinx-rtd-theme==0.5.*
 recommonmark==0.7.*
 pbr==5.5.*
 pandas
+myst-parser==2.0.0
