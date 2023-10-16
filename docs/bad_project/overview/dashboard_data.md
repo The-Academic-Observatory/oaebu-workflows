@@ -3,7 +3,7 @@ Dashboard Data Sources
 
 The data sources currently visualised in the Dashboard are detailed in the table below. The standard data sources and variables used are included, other data sources and variables may be supported as an extra add-on service.
 
-Where the Dashboard gets title metadata from:
+**Where the Dashboard gets title metadata from:**
 
 ``` eval_rst
 .. tabularcolumns:: |l|
@@ -14,7 +14,7 @@ Where the Dashboard gets title metadata from:
    :class: longtable
 ```
 
-Where the Dashboard gets usage and event data from:
+**Where the Dashboard gets usage and event data from:**
 
 ``` eval_rst
 .. tabularcolumns:: |l|
@@ -27,7 +27,7 @@ Where the Dashboard gets usage and event data from:
 
 
 ## Public access data sources
-The public access data sources are those where data is made publicly available by the data source. No additional access permission is required from Dashboard partners for the Dashboard to access the following public data sources if partners want them to be included on their dashboard/s.
+The public access data sources are those where data is made publicly available by the data source. No additional access permission is required from Dashboard partners for the Dashboard to access the following data sources if partners want them to be included on their dashboard/s.
 
 ### Crossref Event Data
 Crossref Event Data captures online discussion about research outputs, such as [‘a citation in a dataset or patent, a mention in a news article, Wikipedia page or on a blog, or discussion and comment on social media’](https://www.crossref.org/services/event-data/). The event data is retrieved using the [Crossref Events API](https://www.eventdata.crossref.org/guide/service/query-api/). Crossref Event data must be queried using a DOI, which the Dashboard obtains from Crossref Metadata. 
@@ -45,7 +45,7 @@ Thoth is a free, open metadata service that publishers can choose to utilise as 
 University College London (UCL) is an eBook publisher, and partner in the Dashboard. UCL Discovery is UCL's open access repository, showcasing and providing access to the full texts of UCL research publications.
 
 ## Private access data sources - access permission required
-The following private access data sources require specific access permissions to be grantedfrom the Dashboard partner for the Dashboard to access data if partners want them to be included on their dashboard/s.
+The following private access data sources require specific access permissions to be granted from the Dashboard partner for the Dashboard to access data if partners want them to be included on their dashboard/s.
 
 ### Google Analytics Universal
 Google Analytics Universal monitors and records web traffic for specific websites. If a Dashboard partner had configured Google Analytics on their publisher website, the Google Analytics data can be used to find out which countries and territories website visitors are from.
