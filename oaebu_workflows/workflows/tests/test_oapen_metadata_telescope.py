@@ -24,6 +24,7 @@ import pendulum
 import vcr
 from airflow.exceptions import AirflowException
 from airflow.utils.state import State
+from tenacity import stop_after_attempt
 
 from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.workflows.oapen_metadata_telescope import (
@@ -234,18 +235,21 @@ class TestDownloadMetadata(unittest.TestCase):
 
     def test_download_metadata_invalid_xml(self):
         """Test behaviour when the downloaded file is an invalid XML"""
+        download_metadata.retry.stop = stop_after_attempt(1)
         with vcr.VCR().use_cassette(self.invalid_download_cassette, record_mode="none", allow_playback_repeats=True):
             with NamedTemporaryFile() as download_file:
                 self.assertRaises(ExpatError, download_metadata, self.uri, download_file.name)
 
     def test_download_metadata_empty_xml(self):
         """Test behaviour when the downloaded file is an empty XML"""
+        download_metadata.retry.stop = stop_after_attempt(1)
         with vcr.VCR().use_cassette(self.empty_download_cassette, record_mode="none", allow_playback_repeats=True):
             with NamedTemporaryFile() as download_file:
                 self.assertRaises(ExpatError, download_metadata, self.uri, download_file.name)
 
     def test_download_metadata_no_products(self):
         """Test behaviour when the downloaded file is an empty XML"""
+        download_metadata.retry.stop = stop_after_attempt(1)
         # For only-header XML
         with vcr.VCR().use_cassette(
             self.header_only_download_cassette, record_mode="none", allow_playback_repeats=True
@@ -257,6 +261,7 @@ class TestDownloadMetadata(unittest.TestCase):
 
     def test_download_metadata_bad_response(self):
         """Test behaviour when the downloaded file has a non-200 response code"""
+        download_metadata.retry.stop = stop_after_attempt(1)
         with vcr.VCR().use_cassette(self.bad_response_cassette, record_mode="none", allow_playback_repeats=True):
             with NamedTemporaryFile() as download_file:
                 self.assertRaisesRegex(
