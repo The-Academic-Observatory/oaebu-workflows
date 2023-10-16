@@ -1,3 +1,6 @@
+Dashboard overview
+_________
+
 .. toctree::
     :maxdepth: 1
 

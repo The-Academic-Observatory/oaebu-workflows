@@ -1,7 +1,7 @@
-Dashboard Use and FAQ
+Dashboard use and FAQ
 ==========================
 
-## What can I see in the dashboard?
+## What can I see in the Dashboard?
 
 Publishers, in your Dashboard, you can see usage data for your own published works. You can see the usage of the books you have published in terms of views, downloads, and online mentions and events. You can also view which countries and institutions are using your books, and which subjects are represented in your collections. 
 
@@ -13,7 +13,7 @@ Features to explore:
 * See **usage for a specific title** - from the “Overview” page, select a book title from the filter and see the total access number
 * See **usage across geographic regions** - from the “Global Reach” page, select a country from the country filter and see on the number of book downloads and the number of chapter downloads. Countries and territories are based on ISO standard 3166.
 
-## I’m not yet participating in BAD, but can I see a demo?
+## I’m not yet participating, but can I see a demo?
 You may view the [BAD template Dashboard](https://template.book-analytics.org/), powered by usage data from the University of Michigan Press which they have very kindly made publicly available, with no login details required.
 
 ## How should I interpret the data from the Dashboard?

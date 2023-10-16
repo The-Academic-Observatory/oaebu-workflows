@@ -1,4 +1,4 @@
-# Crossref Metadata
+# Crossref metadata
 
 Crossref is a non-for-profit membership organisation working on making scholarly communications better. 
 It is an official Digital Object Identifier (DOI) Registration Agency of the International DOI Foundation. 

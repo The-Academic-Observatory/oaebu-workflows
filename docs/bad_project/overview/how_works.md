@@ -1,4 +1,4 @@
-How the Dashboard Works
+How the Dashboard works
 ==========================
 
 ## How does the Dashboard collect and process book usage data?
