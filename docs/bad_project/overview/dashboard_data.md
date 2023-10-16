@@ -3,9 +3,21 @@ Dashboard Data Sources
 
 The data sources currently visualised in the Dashboard are detailed in the table below. The standard data sources and variables used are included, other data sources and variables may be supported as an extra add-on service.
 
+Where the Dashboard gets title metadata from:
 
 ``` eval_rst
-.. tabularcolumns:: |l|l|l|l| 
+.. tabularcolumns:: |l|
+.. csv-table::
+   :file: dashboard_title_sources.csv
+   :width: 100%
+   :header-rows: 1
+   :class: longtable
+```
+
+Where the Dashboard gets usage and event data from:
+
+``` eval_rst
+.. tabularcolumns:: |l|
 .. csv-table::
    :file: dashboard_sources.csv
    :width: 100%
@@ -13,8 +25,9 @@ The data sources currently visualised in the Dashboard are detailed in the table
    :class: longtable
 ```
 
-## Public data sources
-The public data sources are where data is publicly available, rather than data provided by a specific Dashboard partner. No additional permission is required from Dashboard partners for the Dashboard to access the following public data sources.
+
+## Public access data sources
+The public access data sources are those where data is made publicly available by the data source. No additional access permission is required from Dashboard partners for the Dashboard to access the following public data sources if partners want them to be included on their dashboard/s.
 
 ### Crossref Event Data
 Crossref Event Data captures online discussion about research outputs, such as [‘a citation in a dataset or patent, a mention in a news article, Wikipedia page or on a blog, or discussion and comment on social media’](https://www.crossref.org/services/event-data/). The event data is retrieved using the [Crossref Events API](https://www.eventdata.crossref.org/guide/service/query-api/). Crossref Event data must be queried using a DOI, which the Dashboard obtains from Crossref Metadata. 
@@ -31,8 +44,8 @@ Thoth is a free, open metadata service that publishers can choose to utilise as 
 ### UCL Discovery
 University College London (UCL) is an eBook publisher, and partner in the Dashboard. UCL Discovery is UCL's open access repository, showcasing and providing access to the full texts of UCL research publications.
 
-## Private data sources - permission required
-The following private data sources require specific permission from the Dashboard partner for the Dashboard to access data. 
+## Private access data sources - access permission required
+The following private access data sources require specific access permissions to be grantedfrom the Dashboard partner for the Dashboard to access data if partners want them to be included on their dashboard/s.
 
 ### Google Analytics Universal
 Google Analytics Universal monitors and records web traffic for specific websites. If a Dashboard partner had configured Google Analytics on their publisher website, the Google Analytics data can be used to find out which countries and territories website visitors are from.
@@ -46,9 +59,8 @@ The Google Books Partner program hosts eBooks, including some free open access e
 ### ONIX-FTP feed from publishers
 [ONIX](https://www.editeur.org/83/Overview/) is a standard that book publishers use to share information about the books that they have published. BAD project dashboard partners that have ONIX feeds are given credentials and access to their own upload folder on the Mellon SFTP server. The BAD project dashboard partner uploads their ONIX feed to their upload folder on a weekly, fortnightly or monthly basis. The Book Usage Data Workflows ONIX telescope downloads, transforms (with the ONIX parser Java command line tool) and then loads the ONIX data into BigQuery for further processing.
 
-
-## Private data sources - no additional permission required
-The following private data sources do not require additional permission from the Dashboard partner for the Dashboard to access data. 
+## Private access data sources - no additional access permission required
+The following private access data sources are already available to the Dashboard through existing arrangements. They do not require additional access permissions to be granted from the Dashboard partners for the Dashboard to access data if partners want them to be included on their dashboard/s.
 
 ### IRUS Fulcrum
 IRUS provides COUNTER standard access reports for eBooks hosted on the Fulcrum platform. [Fulcrum](https://www.press.umich.edu/librarians) is a “community-developed, open source platform for digital scholarship” which provides “users the ability to read books with associated digital enhancements, such as: 3-D models, embedded audio, video, and databases; zoomable online images, and interactive media”.
