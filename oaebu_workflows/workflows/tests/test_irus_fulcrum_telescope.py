@@ -1,4 +1,4 @@
-# Copyright 2021 Curtin University
+# Copyright 2022-2023 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ from airflow.utils.state import State
 from airflow.models.connection import Connection
 
 from oaebu_workflows.config import test_fixtures_folder
+from oaebu_workflows.oaebu_partners import partner_from_str
 from oaebu_workflows.workflows.irus_fulcrum_telescope import (
     IrusFulcrumTelescope,
     download_fulcrum_month_data,
@@ -108,11 +109,13 @@ class TestIrusFulcrumTelescope(ObservatoryTestCase):
         with env.create():
             # Setup Telescope
             execution_date = pendulum.datetime(year=2022, month=4, day=7)
+            partner = partner_from_str("irus_fulcrum")
+            partner.bq_dataset_id = env.add_dataset()
             telescope = IrusFulcrumTelescope(
                 dag_id="fulcrum_test",
                 cloud_workspace=env.cloud_workspace,
                 publishers=FAKE_PUBLISHERS,
-                bq_dataset_id=env.add_dataset(),
+                data_partner=partner,
             )
             dag = telescope.make_dag()
             env.add_connection(Connection(conn_id=telescope.irus_oapen_api_conn_id, uri=f"http://fake_api_login:@"))
@@ -180,7 +183,9 @@ class TestIrusFulcrumTelescope(ObservatoryTestCase):
 
                 # Uploaded table
                 table_id = bq_table_id(
-                    telescope.cloud_workspace.project_id, telescope.bq_dataset_id, telescope.bq_table_name
+                    telescope.cloud_workspace.project_id,
+                    telescope.data_partner.bq_dataset_id,
+                    telescope.data_partner.bq_table_name,
                 )
                 self.assert_table_integrity(table_id, expected_rows=3)
                 self.assert_table_content(

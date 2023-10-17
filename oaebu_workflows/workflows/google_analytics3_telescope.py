@@ -1,4 +1,4 @@
-# Copyright 2020 Curtin University
+# Copyright 2020-2023 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Author: Aniek Roelofs
+# Author: Aniek Roelofs, Keegan Smith
 
 from __future__ import annotations
 
 import logging
 import os
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Union
 
 import pendulum
 from airflow.exceptions import AirflowException, AirflowSkipException
@@ -27,14 +27,14 @@ from google.cloud.bigquery import TimePartitioningType, SourceFormat, WriteDispo
 from googleapiclient.discovery import Resource, build
 from oauth2client.service_account import ServiceAccountCredentials
 
-from oaebu_workflows.config import schema_folder as default_schema_folder
+from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from observatory.api.client.model.dataset_release import DatasetRelease
 from observatory.platform.api import make_observatory_api
 from observatory.platform.files import save_jsonl_gz
 from observatory.platform.airflow import AirflowConns
 from observatory.platform.files import add_partition_date
 from observatory.platform.gcs import gcs_upload_files, gcs_blob_uri, gcs_blob_name_from_path
-from observatory.platform.bigquery import bq_load_table, bq_table_id, bq_find_schema, bq_create_dataset
+from observatory.platform.bigquery import bq_load_table, bq_table_id, bq_create_dataset
 from observatory.platform.observatory_config import CloudWorkspace
 from observatory.platform.workflows.workflow import (
     Workflow,
@@ -45,7 +45,7 @@ from observatory.platform.workflows.workflow import (
 )
 
 
-class GoogleAnalyticsRelease(PartitionRelease):
+class GoogleAnalytics3Release(PartitionRelease):
     def __init__(
         self,
         dag_id: str,
@@ -54,7 +54,7 @@ class GoogleAnalyticsRelease(PartitionRelease):
         data_interval_end: pendulum.DateTime,
         partition_date: pendulum.DateTime,
     ):
-        """Construct a GoogleAnalyticsRelease.
+        """Construct a GoogleAnalytics3Release.
 
         :param dag_id: The ID of the DAG
         :param run_id: The Airflow run ID
@@ -67,7 +67,7 @@ class GoogleAnalyticsRelease(PartitionRelease):
         self.transform_path = os.path.join(self.transform_folder, f"{partition_date.format('YYYY_MM_DD')}.json.gz")
 
 
-class GoogleAnalyticsTelescope(Workflow):
+class GoogleAnalytics3Telescope(Workflow):
     """Google Analytics Telescope."""
 
     ANU_ORG_NAME = "ANU Press"
@@ -79,30 +79,26 @@ class GoogleAnalyticsTelescope(Workflow):
         cloud_workspace: CloudWorkspace,
         view_id: str,
         pagepath_regex: str,
-        bq_dataset_id: str = "google",
-        bq_table_name: str = "google_analytics",
+        data_partner: Union[str, OaebuPartner] = "google_analytics3",
         bq_dataset_description: str = "Data from Google sources",
         bq_table_description: str = None,
         api_dataset_id: str = "google_analytics",
-        schema_folder: str = default_schema_folder(),
         oaebu_service_account_conn_id: str = "oaebu_service_account",
         observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
         catchup: bool = True,
         start_date: pendulum.DateTime = pendulum.datetime(2018, 1, 1),
         schedule: str = "@monthly",
     ):
-        """Construct a GoogleAnalyticsTelescope instance.
+        """Construct a GoogleAnalytics3Telescope instance.
         :param dag_id: The ID of the DAG
         :param organisation_name: The organisation name as per Google Analytics
         :param cloud_workspace: The CloudWorkspace object for this DAG
         :param view_id: The Google Analytics view ID
         :param pagepath_regex: The pagepath regex
-        :param bq_dataset_id: The BigQuery dataset ID
-        :param bq_table_name: The BigQuery table name
+        :param data_partner: The name of the data partner
         :param bq_dataset_description: Description for the BigQuery dataset
         :param bq_table_description: Description for the biguery table
         :param api_dataset_id: The ID to store the dataset release in the API
-        :param schema_folder: The path to the SQL schema folder
         :param oaebu_service_account_conn_id: Airflow connection ID for the OAEBU service account
         :param observatory_api_conn_id: Airflow connection ID for the overvatory API
         :param catchup: Whether to catchup the DAG or not
@@ -123,12 +119,10 @@ class GoogleAnalyticsTelescope(Workflow):
         self.cloud_workspace = cloud_workspace
         self.view_id = view_id
         self.pagepath_regex = pagepath_regex
-        self.bq_dataset_id = bq_dataset_id
-        self.bq_table_name = bq_table_name
+        self.data_partner = partner_from_str(data_partner)
         self.bq_dataset_description = bq_dataset_description
         self.bq_table_description = bq_table_description
         self.api_dataset_id = api_dataset_id
-        self.schema_folder = schema_folder
         self.oaebu_service_account_conn_id = oaebu_service_account_conn_id
         self.observatory_api_conn_id = observatory_api_conn_id
 
@@ -141,7 +135,7 @@ class GoogleAnalyticsTelescope(Workflow):
         self.add_task(self.add_new_dataset_releases)
         self.add_task(self.cleanup)
 
-    def make_release(self, **kwargs) -> List[GoogleAnalyticsRelease]:
+    def make_release(self, **kwargs) -> List[GoogleAnalytics3Release]:
         """Make release instances. The release is passed as an argument to the function (TelescopeFunction) that is
         called in 'task_callable'.
 
@@ -158,7 +152,7 @@ class GoogleAnalyticsTelescope(Workflow):
             f"Start date: {data_interval_start}, end date:{data_interval_end}, parition_date: {partition_date}"
         )
         releases = [
-            GoogleAnalyticsRelease(
+            GoogleAnalytics3Release(
                 dag_id=self.dag_id,
                 run_id=kwargs["run_id"],
                 data_interval_start=data_interval_start,
@@ -183,7 +177,7 @@ class GoogleAnalyticsTelescope(Workflow):
             )
         return True
 
-    def download_transform(self, releases: List[GoogleAnalyticsRelease], **kwargs) -> None:
+    def download_transform(self, releases: List[GoogleAnalytics3Release], **kwargs) -> None:
         """Task to download and transform the google analytics release for a given month.
 
         :param releases: a list with one google analytics release.
@@ -217,7 +211,7 @@ class GoogleAnalyticsTelescope(Workflow):
         if not data_found:
             raise AirflowSkipException("No Google Analytics data available to download.")
 
-    def upload_transformed(self, releases: List[GoogleAnalyticsRelease], **kwargs) -> None:
+    def upload_transformed(self, releases: List[GoogleAnalytics3Release], **kwargs) -> None:
         """Uploads the transformed file to GCS"""
         for release in releases:
             state = gcs_upload_files(
@@ -225,24 +219,23 @@ class GoogleAnalyticsTelescope(Workflow):
             )
             set_task_state(state, kwargs["ti"].task_id, release=release)
 
-    def bq_load(self, releases: List[GoogleAnalyticsRelease], **kwargs) -> None:
+    def bq_load(self, releases: List[GoogleAnalytics3Release], **kwargs) -> None:
         """Loads the data into BigQuery"""
         bq_create_dataset(
             project_id=self.cloud_workspace.project_id,
-            dataset_id=self.bq_dataset_id,
+            dataset_id=self.data_partner.bq_dataset_id,
             location=self.cloud_workspace.data_location,
             description=self.bq_dataset_description,
         )
         for release in releases:
             uri = gcs_blob_uri(self.cloud_workspace.transform_bucket, gcs_blob_name_from_path(release.transform_path))
-            table_id = bq_table_id(self.cloud_workspace.project_id, self.bq_dataset_id, self.bq_table_name)
-            schema_prefix = self.organisation_name.lower().replace(" ", "_") + "_"
-            schema = bq_find_schema(path=self.schema_folder, table_name=self.bq_table_name, prefix=schema_prefix)
-            assert schema, "No schema found. Cannot proceed."
+            table_id = bq_table_id(
+                self.cloud_workspace.project_id, self.data_partner.bq_dataset_id, self.data_partner.bq_table_name
+            )
             state = bq_load_table(
                 uri=uri,
                 table_id=table_id,
-                schema_file_path=schema,
+                schema_file_path=self.data_partner.schema_path,
                 source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
                 partition_type=TimePartitioningType.MONTH,
                 partition=True,
@@ -253,7 +246,7 @@ class GoogleAnalyticsTelescope(Workflow):
             )
             set_task_state(state, kwargs["ti"].task_id, release=release)
 
-    def add_new_dataset_releases(self, releases: List[GoogleAnalyticsRelease], **kwargs) -> None:
+    def add_new_dataset_releases(self, releases: List[GoogleAnalytics3Release], **kwargs) -> None:
         """Adds release information to API."""
         api = make_observatory_api(observatory_api_conn_id=self.observatory_api_conn_id)
         for release in releases:
@@ -267,7 +260,7 @@ class GoogleAnalyticsTelescope(Workflow):
             )
             api.post_dataset_release(dataset_release)
 
-    def cleanup(self, releases: List[GoogleAnalyticsRelease], **kwargs) -> None:
+    def cleanup(self, releases: List[GoogleAnalytics3Release], **kwargs) -> None:
         """Delete all files, folders and XComs associated with this release."""
         for release in releases:
             cleanup(
@@ -342,7 +335,7 @@ def list_all_books(
     }
 
     # add all 6 custom dimensions for anu press
-    if organisation_name == GoogleAnalyticsTelescope.ANU_ORG_NAME:
+    if organisation_name == GoogleAnalytics3Telescope.ANU_ORG_NAME:
         for i in range(1, 7):
             body["reportRequests"][0]["dimensions"].append({"name": f"ga:dimension{str(i)}"})
 
@@ -397,7 +390,7 @@ def create_book_result_dicts(
             "sessions": {"country": {}, "source": {}},
         }
         # add custom dimension data for ANU Press
-        if organisation_name == GoogleAnalyticsTelescope.ANU_ORG_NAME:
+        if organisation_name == GoogleAnalytics3Telescope.ANU_ORG_NAME:
             # matches dimension order in 'list_all_books'
             custom_dimensions = {
                 "publication_id": entry["dimensions"][2],

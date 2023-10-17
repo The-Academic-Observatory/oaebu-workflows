@@ -1,4 +1,4 @@
-# Copyright 2021 Curtin University
+# Copyright 2023 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import pendulum
 import vcr
 from airflow.utils.state import State
 
+from oaebu_workflows.oaebu_partners import partner_from_str
 from oaebu_workflows.workflows.thoth_telescope import (
     ThothTelescope,
     thoth_download_onix,
@@ -115,18 +116,19 @@ class TestThothTelescope(ObservatoryTestCase):
         env = ObservatoryEnvironment(
             self.project_id, self.data_location, api_host="localhost", api_port=find_free_port()
         )
-        dataset_id = env.add_dataset()
 
         # Create the Observatory environment and run tests
         with env.create():
             # Setup Telescope
             execution_date = pendulum.datetime(year=2022, month=12, day=1)
+            metadata_partner = partner_from_str("thoth", metadata_partner=True)
+            metadata_partner.bq_dataset_id = env.add_dataset()
             telescope = ThothTelescope(
                 dag_id="thoth_telescope_test",
                 cloud_workspace=env.cloud_workspace,
                 format_specification="onix_3.0::oapen",
                 publisher_id=FAKE_PUBLISHER_ID,
-                bq_dataset_id=dataset_id,
+                metadata_partner=metadata_partner,
             )
             dag = telescope.make_dag()
 
@@ -172,8 +174,8 @@ class TestThothTelescope(ObservatoryTestCase):
                 # Uploaded table
                 table_id = bq_sharded_table_id(
                     telescope.cloud_workspace.project_id,
-                    telescope.bq_dataset_id,
-                    telescope.bq_table_name,
+                    telescope.metadata_partner.bq_dataset_id,
+                    telescope.metadata_partner.bq_table_name,
                     release.snapshot_date,
                 )
                 self.assert_table_integrity(table_id, expected_rows=2)

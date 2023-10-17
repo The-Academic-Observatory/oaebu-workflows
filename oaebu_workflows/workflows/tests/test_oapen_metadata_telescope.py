@@ -1,4 +1,4 @@
-# Copyright 2020 Curtin University
+# Copyright 2020-2023 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ from airflow.utils.state import State
 from tenacity import stop_after_attempt
 
 from oaebu_workflows.config import test_fixtures_folder
+from oaebu_workflows.oaebu_partners import partner_from_str
 from oaebu_workflows.workflows.oapen_metadata_telescope import (
     OapenMetadataTelescope,
     download_metadata,
@@ -109,11 +110,13 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
         dataset_id = env.add_dataset()
 
         with env.create():
+            partner = partner_from_str("oapen_metadata", metadata_partner=True)
+            partner.bq_dataset_id = dataset_id
             telescope = OapenMetadataTelescope(
                 dag_id="oapen_metadata",
                 cloud_workspace=env.cloud_workspace,
                 metadata_uri=self.metadata_uri,
-                bq_dataset_id=dataset_id,
+                metadata_partner=partner,
             )
             dag = telescope.make_dag()
 
@@ -183,8 +186,8 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
                 # Test that table is loaded to BQ
                 table_id = bq_sharded_table_id(
                     telescope.cloud_workspace.project_id,
-                    telescope.bq_dataset_id,
-                    telescope.bq_table_name,
+                    telescope.metadata_partner.bq_dataset_id,
+                    telescope.metadata_partner.bq_table_name,
                     release.snapshot_date,
                 )
                 self.assert_table_integrity(table_id, expected_rows=2)

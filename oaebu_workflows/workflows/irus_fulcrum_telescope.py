@@ -1,4 +1,4 @@
-# Copyright 2023 Curtin University
+# Copyright 2022-2023 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,21 +16,21 @@
 
 import logging
 import os
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 import pendulum
 from airflow.hooks.base import BaseHook
 from google.cloud.bigquery import SourceFormat, WriteDisposition
 from google.cloud.bigquery.table import TimePartitioningType
 
-from oaebu_workflows.config import schema_folder as default_schema_folder
+from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from observatory.platform.files import add_partition_date
 from observatory.platform.api import make_observatory_api, DatasetRelease
 from observatory.platform.airflow import AirflowConns
 from observatory.platform.observatory_config import CloudWorkspace
 from observatory.platform.files import save_jsonl_gz, load_jsonl
 from observatory.platform.gcs import gcs_blob_name_from_path, gcs_upload_files, gcs_blob_uri
-from observatory.platform.bigquery import bq_find_schema, bq_load_table, bq_create_dataset, bq_table_id
+from observatory.platform.bigquery import bq_load_table, bq_create_dataset, bq_table_id
 from observatory.platform.workflows.workflow import (
     Workflow,
     PartitionRelease,
@@ -77,12 +77,10 @@ class IrusFulcrumTelescope(Workflow):
         dag_id: str,
         cloud_workspace: CloudWorkspace,
         publishers: List[str],
-        bq_dataset_id: str = "irus",
-        bq_table_name: str = "irus_fulcrum",
+        data_partner: Union[str, OaebuPartner] = "irus_fulcrum",
         bq_dataset_description: str = "IRUS dataset",
         bq_table_description: str = None,
         api_dataset_id: str = "fulcrum",
-        schema_folder: str = default_schema_folder(),
         observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
         irus_oapen_api_conn_id: str = "irus_api",
         catchup: bool = True,
@@ -93,12 +91,10 @@ class IrusFulcrumTelescope(Workflow):
         :param dag_id: The ID of the DAG
         :param cloud_workspace: The CloudWorkspace object for this DAG
         :param publishers: The publishers pertaining to this DAG instance (as listed in Fulcrum)
-        :param bq_dataset_id: The BigQuery dataset ID
-        :param bq_table_name: The BigQuery table name
+        :param data_partner: The name of the data partner
         :param bq_dataset_description: Description for the BigQuery dataset
         :param bq_table_description: Description for the biguery table
         :param api_dataset_id: The ID to store the dataset release in the API
-        :param schema_folder: The path to the SQL schema folder
         :param observatory_api_conn_id: Airflow connection ID for the overvatory API
         :param irus_oapen_api_conn_id: Airflow connection ID OAPEN IRUS UK (counter 5)
         :param catchup: Whether to catchup the DAG or not
@@ -120,12 +116,10 @@ class IrusFulcrumTelescope(Workflow):
         self.dag_id = dag_id
         self.cloud_workspace = cloud_workspace
         self.publishers = publishers
-        self.bq_dataset_id = bq_dataset_id
-        self.bq_table_name = bq_table_name
+        self.data_partner = partner_from_str(data_partner)
         self.bq_dataset_description = bq_dataset_description
         self.bq_table_description = bq_table_description
         self.api_dataset_id = api_dataset_id
-        self.schema_folder = schema_folder
         self.observatory_api_conn_id = observatory_api_conn_id
         self.irus_oapen_api_conn_id = irus_oapen_api_conn_id
 
@@ -207,19 +201,20 @@ class IrusFulcrumTelescope(Workflow):
         """Load the transfromed data into bigquery"""
         bq_create_dataset(
             project_id=self.cloud_workspace.project_id,
-            dataset_id=self.bq_dataset_id,
+            dataset_id=self.data_partner.bq_dataset_id,
             location=self.cloud_workspace.data_location,
             description=self.bq_dataset_description,
         )
 
         # Load each transformed release
         uri = gcs_blob_uri(self.cloud_workspace.transform_bucket, gcs_blob_name_from_path(release.transform_path))
-        table_id = bq_table_id(self.cloud_workspace.project_id, self.bq_dataset_id, self.bq_table_name)
-        schema_file_path = bq_find_schema(path=self.schema_folder, table_name=self.bq_table_name)
+        table_id = bq_table_id(
+            self.cloud_workspace.project_id, self.data_partner.bq_dataset_id, self.data_partner.bq_table_name
+        )
         success = bq_load_table(
             uri=uri,
             table_id=table_id,
-            schema_file_path=schema_file_path,
+            schema_file_path=self.data_partner.schema_path,
             source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
             table_description=self.bq_table_description,
             partition=True,

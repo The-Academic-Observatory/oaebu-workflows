@@ -1,12 +1,8 @@
 Data source,Status,Access,COUNTER-conformant?,Events,Page Views,Book Views,Book Downloads,Chapter Downloads,Time aggregation
 Crossref Event Data,Current,Public,n/a,Y (count of event [id]),,,,,Monthly
-Crossref metadata,Current,Public,n/a,,,,,,Monthly
 Google Analytics Universal,Not current,Private,No,,Y [page_views],,Y (with custom dimensions),,Monthly
 Google Books,Current,Private,No,,,Y [BV_with_Pages_Viewed],Y [qty],,Monthly
 IRUS Fulcrum,Current,Private,Yes,,,,Y [title_requests] and [total_item_requests],,Monthly
 IRUS OAPEN,Current,Private,Yes,,,,Y [title_requests] and [total_item_requests],,Monthly
 JSTOR,Current,Private,Yes,,,,,Y [total_item_requests],Monthly
-OAPEN metadata,Current,Public,n/a,,,,,,n/a
-ONIX-FTP feed from publishers,Current,Private,n/a,,,,,,n/a
-Thoth,Current,Public,n/a,,,,,,n/a
 UCL Discovery,Current,Public,No,,,,Y [total_downloads],,Monthly

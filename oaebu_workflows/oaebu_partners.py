@@ -1,4 +1,4 @@
-# Copyright 2020 Curtin University
+# Copyright 2020-2023 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,15 +15,18 @@
 #
 # Author: Tuan Chien, Keegan Smith
 
-
+import os
+from typing import Union
 from dataclasses import dataclass
+
+from oaebu_workflows.config import schema_folder
 
 
 @dataclass
 class OaebuPartner:
     """Class for storing information about data sources we are using to produce oaebu intermediate tables for.
 
-    :param type_id: the dataset type id.
+    :param type_id: The dataset type id. Should be the same as its dictionary key
     :param bq_dataset_id: The BigQuery dataset ID Bigquery Dataset ID.
     :param bq_table_name: The BigQuery table name Bigquery Table name
     :param isbn_field_name: Name of the field containing the ISBN.
@@ -37,9 +40,13 @@ class OaebuPartner:
     isbn_field_name: str
     title_field_name: str
     sharded: bool
+    schema_path: str
+
+    def __str__(self):
+        return self.type_id
 
 
-OAEBU_DATA_PARTNER_DATASETS = dict(
+OAEBU_METADATA_PARTNERS = dict(
     onix=OaebuPartner(
         type_id="onix",
         bq_dataset_id="onix",
@@ -47,14 +54,16 @@ OAEBU_DATA_PARTNER_DATASETS = dict(
         isbn_field_name="ISBN13",
         title_field_name="TitleDetails.TitleElements.TitleText",
         sharded=True,
+        schema_path=os.path.join(schema_folder(), "onix", "onix.json"),
     ),
     thoth=OaebuPartner(
-        type_id="onix",
+        type_id="thoth",
         bq_dataset_id="onix",
         bq_table_name="onix",
         isbn_field_name="ISBN13",
         title_field_name="TitleDetails.TitleElements.TitleText",
         sharded=True,
+        schema_path=os.path.join(schema_folder(), "onix", "onix.json"),
     ),
     oapen_metadata=OaebuPartner(
         type_id="oapen_metadata",
@@ -63,14 +72,19 @@ OAEBU_DATA_PARTNER_DATASETS = dict(
         isbn_field_name="ISBN13",
         title_field_name="TitleDetails.TitleElements.TitleText",
         sharded=True,
+        schema_path=os.path.join(schema_folder(), "onix", "onix.json"),
     ),
-    google_analytics=OaebuPartner(
-        type_id="google_analytics",
+)
+
+OAEBU_DATA_PARTNERS = dict(
+    google_analytics3=OaebuPartner(
+        type_id="google_analytics3",
         bq_dataset_id="google",
-        bq_table_name="google_analytics",
+        bq_table_name="google_analytics3",
         isbn_field_name="publication_id",
         title_field_name="title",
         sharded=False,
+        schema_path=os.path.join(schema_folder(), "google", "google_analytics.json"),
     ),
     google_books_sales=OaebuPartner(
         type_id="google_books_sales",
@@ -79,6 +93,7 @@ OAEBU_DATA_PARTNER_DATASETS = dict(
         isbn_field_name="Primary_ISBN",
         title_field_name="Title",
         sharded=False,
+        schema_path=os.path.join(schema_folder(), "google", "google_books_sales.json"),
     ),
     google_books_traffic=OaebuPartner(
         type_id="google_books_traffic",
@@ -87,6 +102,7 @@ OAEBU_DATA_PARTNER_DATASETS = dict(
         isbn_field_name="Primary_ISBN",
         title_field_name="Title",
         sharded=False,
+        schema_path=os.path.join(schema_folder(), "google", "google_books_traffic.json"),
     ),
     jstor_country=OaebuPartner(
         type_id="jstor_country",
@@ -95,6 +111,7 @@ OAEBU_DATA_PARTNER_DATASETS = dict(
         isbn_field_name="ISBN",
         title_field_name="Book_Title",
         sharded=False,
+        schema_path=os.path.join(schema_folder(), "jstor", "jstor_country.json"),
     ),
     jstor_institution=OaebuPartner(
         type_id="jstor_institution",
@@ -103,6 +120,7 @@ OAEBU_DATA_PARTNER_DATASETS = dict(
         isbn_field_name="ISBN",
         title_field_name="Book_Title",
         sharded=False,
+        schema_path=os.path.join(schema_folder(), "jstor", "jstor_institution.json"),
     ),
     irus_oapen=OaebuPartner(
         type_id="irus_oapen",
@@ -111,14 +129,7 @@ OAEBU_DATA_PARTNER_DATASETS = dict(
         isbn_field_name="ISBN",
         title_field_name="book_title",
         sharded=False,
-    ),
-    ucl_discovery=OaebuPartner(
-        type_id="ucl_discovery",
-        bq_dataset_id="ucl",
-        bq_table_name="ucl_discovery",
-        isbn_field_name="ISBN",
-        title_field_name="title",
-        sharded=False,
+        schema_path=os.path.join(schema_folder(), "irus", "irus_oapen.json"),
     ),
     irus_fulcrum=OaebuPartner(
         type_id="irus_fulcrum",
@@ -127,6 +138,16 @@ OAEBU_DATA_PARTNER_DATASETS = dict(
         isbn_field_name="ISBN",
         title_field_name="book_title",
         sharded=False,
+        schema_path=os.path.join(schema_folder(), "irus", "irus_fulcrum.json"),
+    ),
+    ucl_discovery=OaebuPartner(
+        type_id="ucl_discovery",
+        bq_dataset_id="ucl",
+        bq_table_name="ucl_discovery",
+        isbn_field_name="ISBN",
+        title_field_name="title",
+        sharded=False,
+        schema_path=os.path.join(schema_folder(), "ucl", "ucl_discovery.json"),
     ),
     internet_archive=OaebuPartner(
         type_id="internet_archive",
@@ -135,6 +156,7 @@ OAEBU_DATA_PARTNER_DATASETS = dict(
         isbn_field_name="ISBN13",
         title_field_name="title",
         sharded=False,
+        schema_path=os.path.join(schema_folder(), "internet_archive", "internet_archive.json"),
     ),
     worldreader=OaebuPartner(
         type_id="worldreader",
@@ -143,5 +165,28 @@ OAEBU_DATA_PARTNER_DATASETS = dict(
         isbn_field_name="ISBN13",
         title_field_name="title",
         sharded=False,
+        schema_path=os.path.join(schema_folder(), "worldreader", "worldreader.json"),
     ),
 )
+
+
+def partner_from_str(partner: Union[str, OaebuPartner], metadata_partner: bool = False) -> OaebuPartner:
+    """Get the partner from a string.
+
+    :param partner: The partner name.
+    :param metadata_partner: If True, use the metadata partner dictionary; otherwise, use the data partners dictionary
+    :raises Exception: Raised if the partner name is not found
+    :return: The OaebuPartner
+    """
+
+    if isinstance(partner, OaebuPartner):
+        return partner
+
+    partners_dict = OAEBU_METADATA_PARTNERS if metadata_partner else OAEBU_DATA_PARTNERS
+
+    try:
+        partner = partners_dict[str(partner)]
+    except KeyError as e:
+        raise KeyError(f"Partner not found: {partner}").with_traceback(e.__traceback__)
+
+    return partner
