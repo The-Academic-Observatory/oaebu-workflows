@@ -1,8 +1,8 @@
 # Installation
-Observatory Platform supports Python 3.7 and above on Linux and MacOS.
+Observatory Platform supports Python 3.10 and above on Linux and MacOS.
 
 Dependencies:
-* Python 3.7
+* Python 3.10
 * pip
 * virtualenv 20 or greater
 * Docker Engine or Docker Desktop.
@@ -16,20 +16,20 @@ sudo apt update
 sudo apt install software-properties-common
 ```
 
-Add deadsnakes PPA which contains Python 3.7 for Ubuntu 18.04; press `Enter` when prompted:
+Add deadsnakes PPA which contains Python 3.10 for Ubuntu 18.04; press `Enter` when prompted:
 ```bash
 sudo add-apt-repository ppa:deadsnakes/ppa
 ```
 
-Install Python 3.7:
+Install Python 3.10:
 ```bash
-sudo apt install python3.7 python3.7-dev
+sudo apt install python3.10 python3.10-dev
 ```
 
 Install pip:
 ```bash
 curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-python3.7 get-pip.py
+python3.10 get-pip.py
 ```
 
 Install virtualenv 20 or greater:
@@ -47,19 +47,19 @@ Install [Homebrew](https://brew.sh/) with the following command:
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
 ```
 
-Install Python 3.7 with brew:
+Install Python 3.10 with brew:
 ```bash
-brew install python@3.7
+brew install python@3.10
 ```
 
-Add Python 3.7 to path:
+Add Python 3.10 to path:
 ```bash
-echo 'export PATH="/usr/local/opt/python@3.7/bin:$PATH"' >> ~/.bash_profile
+echo 'export PATH="/usr/local/opt/python@3.10/bin:$PATH"' >> ~/.bash_profile
 ```
 
 Install virtualenv 20 or greater:
 ```
-pip3.7 install --upgrade virtualenv
+pip3.10 install --upgrade virtualenv
 ```
 
 Install Docker Desktop:
@@ -86,7 +86,7 @@ git checkout develop
 
 Create a virtual environment:
 ```bash
-virtualenv -p python3.7 venv
+virtualenv -p python3.10 venv
 ```
 
 Activate the virtual environment:
