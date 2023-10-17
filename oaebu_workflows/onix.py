@@ -162,6 +162,24 @@ def elevate_related_products(product: dict) -> List[dict]:
     :param product: The ONIX product
     :return: A list containing the original ONIX product and its related children products.
     """
+
+    def _remove_duplicates(input_list: List[dict], key: str) -> List[dict]:
+        """Remove duplicates from a list of dictionaries based on a specified key
+
+        :param input_list: The original list of dictionaries.
+        :param key: The key in the dictionaries to identify duplicates.
+        :return: A new list containing unique dictionaries based on the specified key.
+        """
+        seen = set()
+        output_list = []
+
+        for item in input_list:
+            if item[key] not in seen:
+                seen.add(item[key])
+                output_list.append(item)
+
+        return output_list
+
     return_products = [product]
 
     # Get the original product ISBN
@@ -194,12 +212,16 @@ def elevate_related_products(product: dict) -> List[dict]:
 
         # Deepcopy the original product. Update record reference. Swap original ISBN with related ISBN.
         new_product = deepcopy(product)
-        new_product["ProductIdentifier"] = {"IDValue": rp_isbn, "ProductIDType": "15"}
+        new_product["ProductIdentifier"] = {"ProductIDType": "15", "IDValue": rp_isbn}
         new_product["RecordReference"] += f"_{rp_isbn}"
         for rp in new_product["RelatedMaterial"]["RelatedProduct"]["ProductIdentifier"]:
             if str(rp["ProductIDType"]) == "15" and rp["IDValue"] == rp_isbn:
                 rp["IDValue"] = isbn
-                break
+
+        # Remove duplicate related_products entries
+        new_product["RelatedMaterial"]["RelatedProduct"]["ProductIdentifier"] = _remove_duplicates(
+            new_product["RelatedMaterial"]["RelatedProduct"]["ProductIdentifier"], "IDValue"
+        )
 
         return_products.append(new_product)
         elevated_isbns.append(rp_isbn)

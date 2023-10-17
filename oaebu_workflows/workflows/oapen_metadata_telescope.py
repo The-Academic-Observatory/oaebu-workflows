@@ -217,8 +217,12 @@ class OapenMetadataTelescope(Workflow):
 
         # Elevate related products to the product level
         if self.elevate_related_products:
+            with open(release.validated_onix, "rb") as f:
+                metadata = xmltodict.parse(f)
             products = metadata["ONIXMessage"]["Product"]
+            logging.info(f"Number of products before elevation: {len(products)}")
             elevated = [item for p in products for item in elevate_related_products(p)]
+            logging.info(f"Number of products after elevation: {len(elevated)}")
             metadata["ONIXMessage"]["Product"] = elevated
             with open(release.elevated_products_path, "w") as f:
                 xmltodict.unparse(metadata, output=f, pretty=True)

@@ -169,6 +169,7 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
                 self.assertTrue(os.path.exists(release.filtered_metadata))
                 self.assertTrue(os.path.exists(release.validated_onix))
                 self.assertTrue(os.path.exists(release.invalid_products_path))
+                self.assertTrue(os.path.exists(release.elevated_products_path))
                 self.assertTrue(os.path.exists(release.parsed_onix))
                 self.assertTrue(os.path.exists(release.transform_path))
 
@@ -192,7 +193,7 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
                     telescope.metadata_partner.bq_table_name,
                     release.snapshot_date,
                 )
-                self.assert_table_integrity(table_id, expected_rows=2)
+                self.assert_table_integrity(table_id, expected_rows=3)
                 self.assert_table_content(table_id, load_and_parse_json(self.test_table), primary_key="ISBN13")
 
                 # Add_dataset_release_task
