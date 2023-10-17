@@ -1,12 +1,12 @@
 Book Usage Data Workflows
-##############################
+-------------------------
 
 Book Usage Data Workflows provides Apache Airflow workflows for fetching, processing and analysing data about Open Access Books.
 
 The workflows include: Google Analytics, Google Books, JSTOR, IRUS Fulcrum, IRUS OAPEN,
 ONIX, Thoth, UCL Discovery and an Onix Workflow for combining all of this data.
 
-Telescope Workflows
+Telescope workflows
 ====================
 A telescope is a type of workflow used to ingest data from different data sources, and to run workflows that process and
 output data to other places. Workflows are built on top of Apache Airflow's DAGs.
@@ -16,7 +16,7 @@ output data to other places. Workflows are built on top of Apache Airflow's DAGs
 
     telescopes/index
 
-Analytic Workflows
+Analytic workflows
 ===================
 Analytic workflows process the data ingested by telescope workflows and are also built on top of Apache Airflow DAGs.
 
@@ -26,7 +26,7 @@ Analytic workflows process the data ingested by telescope workflows and are also
     workflows/index
 
 
-License & Contributing Guidelines
+License & contributing guidelines
 =================================
 Information about licenses, contributing guidelines etc.
 
@@ -35,7 +35,7 @@ Information about licenses, contributing guidelines etc.
 
     license
 
-Python API Reference
+Python API reference
 =====================
 This page contains auto-generated API reference documentation [#f1]_.
 

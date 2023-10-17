@@ -1,18 +1,14 @@
-
-Book Analytics Dashboard
-##############################
-
 Overview
-==============================
+##########################
 
 .. toctree::
-    :maxdepth: 1
+    :maxdepth: 2
 
     overview/index
 
 
 More Information and Contact Us
-==============================
+##########################
 
 .. toctree::
     :maxdepth: 1

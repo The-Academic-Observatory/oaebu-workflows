@@ -1,4 +1,4 @@
-# OAPEN Metadata
+# OAPEN metadata
 
 The OAPEN Metadata telescope collects data from the OAPEN Metadata feed.
 OAPEN enables libraries and aggregators to use the metadata of all available titles in the OAPEN Library.  

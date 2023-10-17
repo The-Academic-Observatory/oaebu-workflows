@@ -1,4 +1,4 @@
-# More Information and Contact Us
+# More information and contact us
 
 For all your enquiries and questions, please contact us at info@book-analytics.org.
 

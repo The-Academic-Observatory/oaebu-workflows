@@ -1,7 +1,10 @@
-Dashboard Data Sources
+Dashboard data sources
 ==========================
 
-The data sources currently visualised in the Dashboard are detailed in the table below. The standard data sources and variables used are included, other data sources and variables may be supported as an extra add-on service.
+## What are the Dashboard’s data sources?
+To see the data sources for a specific Dashboard, click on About & FAQ on the Dashboard, and consult the list at Data Sources. The only obligatory data source is title metadata in ONIX format; each publisher then chooses the other data sources they wish to include.
+
+The data sources currently available to be visualised in the Dashboard are detailed in the tables below. The standard data sources and variables used are included, other data sources and variables may be supported as an extra add-on service.
 
 **Where the Dashboard gets title metadata from:**
 
@@ -32,10 +35,10 @@ The public access data sources are those where data is made publicly available b
 ### Crossref Event Data
 Crossref Event Data captures online discussion about research outputs, such as [‘a citation in a dataset or patent, a mention in a news article, Wikipedia page or on a blog, or discussion and comment on social media’](https://www.crossref.org/services/event-data/). The event data is retrieved using the [Crossref Events API](https://www.eventdata.crossref.org/guide/service/query-api/). Crossref Event data must be queried using a DOI, which the Dashboard obtains from Crossref Metadata. 
 
-### Crossref Metadata
+### Crossref metadata
 Crossref is a non-for-profit membership organization, and an official Digital Object Identifier (DOI) Registration Agency of the International DOI Foundation. They make metadata available for all DOIs registered with [Crossref](https://www.crossref.org/community/). The Dashboard uses Crossref Metadata to match ISBNs obtained from a publishers Onix feed to DOIs to query Crossref Event Data.
 
-### OAPEN Metadata
+### OAPEN metadata
 OAPEN enables libraries and aggregators to use the metadata of all available titles in the OAPEN Library. The metadata is available in different formats and the Dashboard harvests the data in the XML format to obtain an file in ONIX format for the OAPEN platform.
 
 ### Thoth
