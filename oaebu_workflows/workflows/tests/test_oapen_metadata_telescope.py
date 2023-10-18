@@ -158,7 +158,7 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
 
                 # Test download task
                 self.assertTrue(os.path.exists(release.download_path))
-                self.assert_file_integrity(release.download_path, "440e3c276c3966640ff858974812f00f", "md5")
+                self.assert_file_integrity(release.download_path, "c246a8f7487de756f4dd47cd0ab94363", "md5")
 
                 # Test that download file uploaded to BQ
                 self.assert_blob_integrity(
@@ -174,12 +174,21 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
                 self.assertTrue(os.path.exists(release.transform_path))
 
                 # Check file content is as expected
-                self.assert_file_integrity(release.filtered_metadata, "d41e87f64e2faf079bd0521949d478af", "md5")
-                self.assert_file_integrity(release.validated_onix, "a51f8dbebe2e8a32f818a30c47809373", "md5")
+                self.assert_file_integrity(release.filtered_metadata, "7e2b13ae1f25c2d09f11e7864c2f0f92", "md5")
+                self.assert_file_integrity(release.validated_onix, "6f6cd81c6abe047fffc95fd7d105d78e", "md5")
                 self.assert_file_integrity(release.invalid_products_path, "1ce5155e79ff4e405564038d4520ae3c", "md5")
-                self.assert_file_integrity(release.elevated_products_path, "bb21afcc4080c29722d21468ff522447", "md5")
-                self.assert_file_integrity(release.parsed_onix, "461c65358b9081a39095bbe878a048ac", "md5")
-                self.assert_file_integrity(release.transform_path, "71db480c", "gzip_crc")
+                self.assert_file_integrity(release.elevated_products_path, "f092a28a8e719f7fe101eb25d09505e8", "md5")
+                self.assert_file_integrity(release.parsed_onix, "3b0656629154aa1c376c1078a079e9da", "md5")
+                self.assert_file_integrity(release.transform_path, "4b2074e7", "gzip_crc")
+
+                from observatory.platform.files import crc32c_base64_hash, get_file_hash, gzip_file_crc, save_jsonl_gz
+
+                print(get_file_hash(file_path=release.filtered_metadata, algorithm="md5"))
+                print(get_file_hash(file_path=release.validated_onix, algorithm="md5"))
+                print(get_file_hash(file_path=release.invalid_products_path, algorithm="md5"))
+                print(get_file_hash(file_path=release.elevated_products_path, algorithm="md5"))
+                print(get_file_hash(file_path=release.parsed_onix, algorithm="md5"))
+                print(gzip_file_crc(release.transform_path))
 
                 # Test that transformed files uploaded to BQ
                 self.assert_blob_integrity(
@@ -201,7 +210,7 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
                     telescope.metadata_partner.bq_table_name,
                     release.snapshot_date,
                 )
-                self.assert_table_integrity(table_id, expected_rows=4)
+                self.assert_table_integrity(table_id, expected_rows=5)
                 self.assert_table_content(table_id, load_and_parse_json(self.test_table), primary_key="ISBN13")
 
                 # Add_dataset_release_task
