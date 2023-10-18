@@ -32,7 +32,6 @@ from oaebu_workflows.config import test_fixtures_folder
 from observatory.platform.observatory_environment import ObservatoryTestCase
 
 
-
 class TestOnixFunctions(ObservatoryTestCase):
     """Tests for the ONIX telescope"""
 
@@ -158,26 +157,35 @@ class TestElevateRelatedProducts(unittest.TestCase):
     def test_related_product_elevation(self):
         """Generic test use case"""
         product = {
-            "ProductIdentifier": {"ProductIDType": "15", "IDValue": "1234567890"},
+            "ProductIdentifier": {"ProductIDType": "15", "IDValue": "1"},
             "RelatedMaterial": {
-                "RelatedProduct": {"ProductIdentifier": [{"ProductIDType": "15", "IDValue": "0987654321"}]}
+                "RelatedProduct": {
+                    "ProductIdentifier": [
+                        {"ProductIDType": "15", "IDValue": "1"},
+                        {"ProductIDType": "15", "IDValue": "2"},
+                    ]
+                }
             },
             "RecordReference": "ABC123",
         }
         expected_result = [
             {
-                "ProductIdentifier": {"ProductIDType": "15", "IDValue": "1234567890"},
+                "ProductIdentifier": {"ProductIDType": "15", "IDValue": "1"},  # Original is untouched
                 "RelatedMaterial": {
-                    "RelatedProduct": {"ProductIdentifier": [{"ProductIDType": "15", "IDValue": "0987654321"}]}
+                    "RelatedProduct": {
+                        "ProductIdentifier": [
+                            {"ProductIDType": "15", "IDValue": "1"},
+                            {"ProductIDType": "15", "IDValue": "2"},
+                        ]
+                    }
                 },
                 "RecordReference": "ABC123",
             },
             {
-                "ProductIdentifier": {"ProductIDType": "15", "IDValue": "0987654321"},
-                "RelatedMaterial": {
-                    "RelatedProduct": {"ProductIdentifier": [{"ProductIDType": "15", "IDValue": "1234567890"}]}
-                },
-                "RecordReference": "ABC123_0987654321",
+                # 1 elevated product that has 1 related product - the original product
+                "ProductIdentifier": {"ProductIDType": "15", "IDValue": "2"},
+                "RelatedMaterial": {"RelatedProduct": {"ProductIdentifier": [{"ProductIDType": "15", "IDValue": "1"}]}},
+                "RecordReference": "ABC123_2",
             },
         ]
 
@@ -186,10 +194,8 @@ class TestElevateRelatedProducts(unittest.TestCase):
 
     def test_no_related_material(self):
         """Test with a product that has no RelatedMaterial"""
-        product = {"ProductIdentifier": {"ProductIDType": "15", "IDValue": "1234567890"}, "RecordReference": "ABC123"}
-        expected_result = [
-            {"ProductIdentifier": {"ProductIDType": "15", "IDValue": "1234567890"}, "RecordReference": "ABC123"}
-        ]
+        product = {"ProductIdentifier": {"ProductIDType": "15", "IDValue": "1"}, "RecordReference": "ABC123"}
+        expected_result = [{"ProductIdentifier": {"ProductIDType": "15", "IDValue": "1"}, "RecordReference": "ABC123"}]
 
         result = elevate_related_products(product)
         self.assertEqual(result, expected_result)
@@ -197,18 +203,14 @@ class TestElevateRelatedProducts(unittest.TestCase):
     def test_related_material_no_isbn(self):
         """Test with a product that has RelatedMaterial without isbns"""
         product = {
-            "ProductIdentifier": {"ProductIDType": "15", "IDValue": "0987654321"},
-            "RelatedMaterial": {
-                "RelatedProduct": {"ProductIdentifier": [{"ProductIDType": "10", "IDValue": "ABC123"}]}
-            },
+            "ProductIdentifier": {"ProductIDType": "15", "IDValue": "1"},
+            "RelatedMaterial": {"RelatedProduct": {"ProductIdentifier": [{"ProductIDType": "10", "IDValue": "A"}]}},
             "RecordReference": "XYZ",
         }
         expected_result = [
             {
-                "ProductIdentifier": {"ProductIDType": "15", "IDValue": "0987654321"},
-                "RelatedMaterial": {
-                    "RelatedProduct": {"ProductIdentifier": [{"ProductIDType": "10", "IDValue": "ABC123"}]}
-                },
+                "ProductIdentifier": {"ProductIDType": "15", "IDValue": "1"},
+                "RelatedMaterial": {"RelatedProduct": {"ProductIdentifier": [{"ProductIDType": "10", "IDValue": "A"}]}},
                 "RecordReference": "XYZ",
             }
         ]
@@ -219,7 +221,7 @@ class TestElevateRelatedProducts(unittest.TestCase):
     def test_no_isbn_product_identifier(self):
         # Test with a product that has a ProductIdentifier that is not an ISBN. No changes should occur.
         product = {
-            "ProductIdentifier": {"ProductIDType": "10", "IDValue": "ABC123"},
+            "ProductIdentifier": {"ProductIDType": "10", "IDValue": "A"},
             "RelatedMaterial": {
                 "RelatedProduct": {"ProductIdentifier": [{"ProductIDType": "15", "IDValue": "0987654321"}]}
             },
@@ -227,7 +229,7 @@ class TestElevateRelatedProducts(unittest.TestCase):
         }
         expected_result = [
             {
-                "ProductIdentifier": {"ProductIDType": "10", "IDValue": "ABC123"},
+                "ProductIdentifier": {"ProductIDType": "10", "IDValue": "A"},
                 "RelatedMaterial": {
                     "RelatedProduct": {"ProductIdentifier": [{"ProductIDType": "15", "IDValue": "0987654321"}]}
                 },

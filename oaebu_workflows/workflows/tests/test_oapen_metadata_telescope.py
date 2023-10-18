@@ -158,7 +158,7 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
 
                 # Test download task
                 self.assertTrue(os.path.exists(release.download_path))
-                self.assert_file_integrity(release.download_path, "d4da435afdacef896b37b915ba2cf2da", "md5")
+                self.assert_file_integrity(release.download_path, "440e3c276c3966640ff858974812f00f", "md5")
 
                 # Test that download file uploaded to BQ
                 self.assert_blob_integrity(
@@ -172,6 +172,14 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
                 self.assertTrue(os.path.exists(release.elevated_products_path))
                 self.assertTrue(os.path.exists(release.parsed_onix))
                 self.assertTrue(os.path.exists(release.transform_path))
+
+                # Check file content is as expected
+                self.assert_file_integrity(release.filtered_metadata, "d41e87f64e2faf079bd0521949d478af", "md5")
+                self.assert_file_integrity(release.validated_onix, "a51f8dbebe2e8a32f818a30c47809373", "md5")
+                self.assert_file_integrity(release.invalid_products_path, "1ce5155e79ff4e405564038d4520ae3c", "md5")
+                self.assert_file_integrity(release.elevated_products_path, "bb21afcc4080c29722d21468ff522447", "md5")
+                self.assert_file_integrity(release.parsed_onix, "461c65358b9081a39095bbe878a048ac", "md5")
+                self.assert_file_integrity(release.transform_path, "71db480c", "gzip_crc")
 
                 # Test that transformed files uploaded to BQ
                 self.assert_blob_integrity(
@@ -193,7 +201,7 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
                     telescope.metadata_partner.bq_table_name,
                     release.snapshot_date,
                 )
-                self.assert_table_integrity(table_id, expected_rows=3)
+                self.assert_table_integrity(table_id, expected_rows=4)
                 self.assert_table_content(table_id, load_and_parse_json(self.test_table), primary_key="ISBN13")
 
                 # Add_dataset_release_task
