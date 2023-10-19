@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Author: Aniek Roelofs
+# Author: Aniek Roelofs, Keegan Smith
 
 from __future__ import annotations
 
@@ -20,8 +20,8 @@ import base64
 import csv
 import logging
 import os
-import os.path
 import shutil
+import re
 from collections import OrderedDict
 from typing import List, Union
 from tempfile import TemporaryDirectory
@@ -101,12 +101,14 @@ class JstorTelescope(Workflow):
     MAX_WAIT_TIME = 60 * 10  # seconds
     EXP_BASE = 3
     MULTIPLIER = 10
+    WAIT_FN = wait_fixed(FIXED_WAIT) + wait_exponential(multiplier=MULTIPLIER, exp_base=EXP_BASE, max=MAX_WAIT_TIME)
 
     def __init__(
         self,
         dag_id: str,
         cloud_workspace: CloudWorkspace,
         publisher_id: str,
+        collection: bool = False,
         country_partner: Union[str, OaebuPartner] = "jstor_country",
         institution_partner: Union[str, OaebuPartner] = "jstor_institution",
         bq_dataset_description: str = "Data from JSTOR sources",
@@ -124,6 +126,7 @@ class JstorTelescope(Workflow):
         :param dag_id: The ID of the DAG
         :param cloud_workspace: The CloudWorkspace object for this DAG
         :param publisher_id: The ID of the publisher for this DAG
+        collection TODO
         :param country_partner: The name of the country partner
         :param institution_partner: The name of the institution partner
         :param bq_dataset_description: Description for the BigQuery dataset
@@ -149,9 +152,10 @@ class JstorTelescope(Workflow):
 
         self.dag_id = dag_id
         self.cloud_workspace = cloud_workspace
+        self.publisher_id = publisher_id
+        self.collection = collection
         self.country_partner = partner_from_str(country_partner)
         self.institution_partner = partner_from_str(institution_partner)
-        self.publisher_id = publisher_id
         self.bq_dataset_description = bq_dataset_description
         self.bq_country_table_description = bq_country_table_description
         self.bq_institution_table_description = bq_institution_table_description
@@ -169,7 +173,7 @@ class JstorTelescope(Workflow):
         self.add_task(self.upload_transformed)
         self.add_task(self.bq_load)
         self.add_task(self.add_new_dataset_releases)
-        self.add_task(self.cleanup)
+        # self.add_task(self.cleanup) TODO: replace
 
     def make_release(self, **kwargs) -> List[JstorRelease]:
         """Make release instances. The release is passed as an argument to the function (TelescopeFunction) that is
@@ -217,7 +221,10 @@ class JstorTelescope(Workflow):
         :return: Whether to continue the DAG
         """
         service = create_gmail_service()
-        available_reports = list_reports(service, self.publisher_id)
+        if self.collection:
+            available_reports = Collection.list_reports(service, self.publisher_id)
+        else:
+            available_reports = Publisher.list_reports(service, self.publisher_id)
         continue_dag = len(available_reports) > 0
         if continue_dag:
             # Push messages
@@ -242,12 +249,13 @@ class JstorTelescope(Workflow):
         with TemporaryDirectory() as reports_folder:
             for report in available_reports:
                 # Download report to temporary file
-                url = report["url"]
                 tmp_download_path = os.path.join(reports_folder, "report.tsv")
-                download_report(url, tmp_download_path)
-
-                # Get the release date
-                start_date, end_date = get_release_date(tmp_download_path)
+                if self.collection:
+                    Collection.download_report(report["id"], report["attachment_id"], tmp_download_path)
+                    start_date, end_date = Collection.get_release_date(tmp_download_path)
+                else:
+                    Publisher.download_report(report["url"], tmp_download_path)
+                    start_date, end_date = Publisher.get_release_date(tmp_download_path)
 
                 # Create temporary release and move report to correct path
                 release = JstorRelease(
@@ -263,9 +271,8 @@ class JstorTelescope(Workflow):
                 )
                 shutil.move(tmp_download_path, download_path)
 
-                release_date = release.partition_date.format("YYYYMMDD")
-
                 # Add reports to list with available releases
+                release_date = release.partition_date.format("YYYYMMDD")
                 try:
                     available_releases[release_date].append(report)
                 except KeyError:
@@ -289,13 +296,22 @@ class JstorTelescope(Workflow):
     def transform(self, releases: List[JstorRelease], **kwargs):
         """Task to transform the Jstor releases for a given month."""
         for release in releases:
-            jstor_transform(
-                download_country=release.download_country_path,
-                download_institution=release.download_institution_path,
-                transfrom_country=release.transform_country_path,
-                transform_institution=release.transform_institution_path,
-                partition_date=release.partition_date,
-            )
+            if self.collection:
+                Collection.jstor_transform(
+                    download_country=release.download_country_path,
+                    download_institution=release.download_institution_path,
+                    transfrom_country=release.transform_country_path,
+                    transform_institution=release.transform_institution_path,
+                    partition_date=release.partition_date,
+                )
+            else:
+                Publisher.jstor_transform(
+                    download_country=release.download_country_path,
+                    download_institution=release.download_institution_path,
+                    transfrom_country=release.transform_country_path,
+                    transform_institution=release.transform_institution_path,
+                    partition_date=release.partition_date,
+                )
 
     def upload_transformed(self, releases: List[JstorRelease], **kwargs) -> None:
         """Uploads the transformed files to GCS for each release"""
@@ -373,168 +389,6 @@ class JstorTelescope(Workflow):
                     set_task_state(False, kwargs["ti"].task_id, release=release)
 
 
-def jstor_transform(
-    download_country, download_institution, transfrom_country, transform_institution, partition_date
-) -> None:
-    """Transform a Jstor release into json lines format and gzip the result._summary_
-
-    :param download_country: The path to the country download report
-    :param download_institution: The path to the institution download report
-    :param transfrom_country: The path to write the transformed country file to
-    :param transform_institution: The path to write the transformed institution file to
-    :param partition_date: The partition/release date of this report
-    """
-    for download_file, transform_file in zip(
-        [download_country, download_institution], [transfrom_country, transform_institution]
-    ):
-        release_column = partition_date.strftime("%b-%Y")  # e.g. Jan-2020
-        usage_month = partition_date.strftime("%Y-%m")
-        results = []
-        # Check if report has header in old or new format based on the first line
-        with open(download_file, "r") as tsv_file:
-            first_line = tsv_file.readline()
-            tsv_file.seek(0)
-            if "Report_Name" in first_line:
-                line = None
-                while line != "\n":
-                    line = next(tsv_file)
-            csv_reader = csv.DictReader(tsv_file, delimiter="\t")
-            for row in csv_reader:
-                transformed_row = OrderedDict((convert(k), v) for k, v in row.items())
-                transformed_row.pop(release_column, None)
-                if "Usage_Month" not in transformed_row:
-                    transformed_row["Usage_Month"] = usage_month
-                if "Total_Item_Requests" not in transformed_row:
-                    transformed_row["Total_Item_Requests"] = transformed_row.pop("Reporting_Period_Total")
-                results.append(transformed_row)
-
-        results = add_partition_date(
-            results, partition_date, TimePartitioningType.MONTH, partition_field="release_date"
-        )
-        save_jsonl_gz(transform_file, results)
-
-
-@retry(
-    stop=stop_after_attempt(JstorTelescope.MAX_ATTEMPTS),
-    reraise=True,
-    wait=wait_fixed(JstorTelescope.FIXED_WAIT)
-    + wait_exponential(
-        multiplier=JstorTelescope.MULTIPLIER, exp_base=JstorTelescope.EXP_BASE, max=JstorTelescope.MAX_WAIT_TIME
-    ),
-)
-def get_header_info(url: str) -> List[str, str]:
-    """Get header info from url and parse for filename and extension of file.
-
-    :param url: Download url
-    :return: Filename and file extension
-    """
-    logging.info(
-        f"Getting HEAD of report: {url}, "
-        f'attempt: {get_header_info.retry.statistics["attempt_number"]}, '
-        f'idle for: {get_header_info.retry.statistics["idle_for"]}'
-    )
-    headers = {"User-Agent": get_user_agent(package_name="oaebu_workflows")}
-    response = requests.head(url, allow_redirects=True, headers=headers)
-    if response.status_code != 200:
-        raise AirflowException(
-            f"Could not get HEAD of report download url, reason: {response.reason}, "
-            f"status_code: {response.status_code}"
-        )
-    filename, extension = response.headers["Content-Disposition"].split("=")[1].split(".")
-    return filename, extension
-
-
-@retry(
-    stop=stop_after_attempt(JstorTelescope.MAX_ATTEMPTS),
-    reraise=True,
-    wait=wait_fixed(JstorTelescope.FIXED_WAIT)
-    + wait_exponential(
-        multiplier=JstorTelescope.MULTIPLIER, exp_base=JstorTelescope.EXP_BASE, max=JstorTelescope.MAX_WAIT_TIME
-    ),
-)
-def download_report(url: str, download_path: str) -> None:
-    """Download report from url to a file.
-
-    :param url: Download url
-    :param download_path: Path to download data to
-    """
-    logging.info(
-        f"Downloading report: {url}, "
-        f"to: {download_path}, "
-        f'attempt: {download_report.retry.statistics["attempt_number"]}, '
-        f'idle for: {download_report.retry.statistics["idle_for"]}'
-    )
-    headers = {"User-Agent": get_user_agent(package_name="oaebu_workflows")}
-    response = retry_get_url(url, headers=headers)
-    content = response.content.decode("utf-8")
-    with open(download_path, "w") as f:
-        f.write(content)
-
-
-def get_release_date(report_path: str) -> pendulum.DateTime:
-    """Get the release date from the "Reporting_Period" part of the header.
-    Also checks if the reports contains data from exactly one month.
-
-    :param report_path: The path to the JSTOR report
-    :return: The release date, defaults to end of the month
-    """
-
-    # Check if report has header in old or new format based on the first line
-    with open(report_path, "r") as tsv_file:
-        first_line = tsv_file.readline()
-
-    # Process report with the old header
-    if not "Report_Name" in first_line:
-        return get_release_date_deprecated(report_path)
-
-    # Process report with new header
-    with open(report_path, "r") as tsv_file:
-        for line in tsv_file:
-            line = line.strip("\n").split("\t")
-            if line[0] == "Reporting_Period":
-                start_date = pendulum.parse(line[1].split(" ")[0])
-                end_date = pendulum.parse(line[1].split(" ")[-1])
-                break
-
-    # Check that month of start and end date are the same
-    if start_date.end_of("month").start_of("day") != end_date:
-        raise AirflowException(
-            f"Report contains data that is not from exactly 1 month, start date: {start_date}, end date: {end_date}"
-        )
-    return start_date, end_date
-
-
-def get_release_date_deprecated(report_path: str) -> pendulum.DateTime:
-    """This function is deprecated, because the headers for the reports have changed since 2021-10-01.
-    It might still be used for reports that were created before this date and have not been processed yet.
-    Get the release date from the "Usage Month" column in the first row of the report.
-    Also checks if the reports contains data from the same month only.
-
-    :param report_path: The path to the JSTOR report
-    :return: The start and end dates
-    """
-    # Load report data into list of dicts
-    with open(report_path) as tsv_file:
-        csv_list = list(csv.DictReader(tsv_file, delimiter="\t"))
-
-    # get the first and last usage month
-    first_usage_month = csv_list[0]["Usage Month"]
-    last_usage_month = csv_list[-1]["Usage Month"]
-
-    # check that month in first and last row are the same
-    if first_usage_month != last_usage_month:
-        raise AirflowException(
-            f"Report contains data from more than 1 month, start month: {first_usage_month}, "
-            f"end month: {last_usage_month}"
-        )
-
-    # get the release date from the last usage month
-    start_date = pendulum.from_format(first_usage_month, "YYYY-MM").start_of("month").start_of("day")
-    end_date = pendulum.from_format(last_usage_month, "YYYY-MM").end_of("month").start_of("day")
-
-    return start_date, end_date
-
-
 def create_gmail_service() -> Resource:
     """Build the gmail service.
 
@@ -547,6 +401,23 @@ def create_gmail_service() -> Resource:
     service = build("gmail", "v1", credentials=creds, cache_discovery=False)
 
     return service
+
+
+def get_messages(service: Resource, list_params: dict) -> List[dict]:
+    first_query = True
+    next_page_token = None
+    messages = []
+    while next_page_token or first_query:
+        # Set the next page token if it isn't the first query
+        if not first_query:
+            list_params["pageToken"] = next_page_token
+        first_query = False
+
+        # Get the results
+        results = service.users().messages().list(**list_params).execute()
+        next_page_token = results.get("nextPageToken")
+        messages += results["messages"]
+    return messages
 
 
 def get_label_id(service: Resource, label_name: str) -> str:
@@ -573,84 +444,330 @@ def get_label_id(service: Resource, label_name: str) -> str:
     return label_id
 
 
-def list_reports(service: Resource, publisher_id: str) -> List[dict]:
-    """List the available releases by going through the messages of a gmail account and looking for a specific pattern.
+class Collection:
+    """Stores functions specific to the collection use-case"""
 
-    If a message has been processed previously it has a specific label, messages with this label will be skipped.
-    The message should include a download url. The head of this download url contains the filename, from which the
-    release date and publisher can be derived.
+    @staticmethod
+    def list_reports(service: Resource, publisher_id: str) -> List[dict]:
+        """List the available reports by going through the gmail messages from a specific sender.
 
-    :param service: Gmail service
-    :param publisher_id: Id of the publisher
-    :return: Dictionary with release dates as key and reports info as value, where reports info is a list of country
-    and/or institution reports.
-    """
-    # List messages with specific query
-    list_params = {
-        "userId": "me",
-        "q": f'-label:{JstorTelescope.PROCESSED_LABEL_NAME} subject:"JSTOR Publisher Report Available" from:no-reply@ithaka.org',
-        "labelIds": ["INBOX"],
-        "maxResults": 500,
-    }
-    first_query = True
-    next_page_token = None
-    messages = []
-    while next_page_token or first_query:
-        # Set the next page token if it isn't the first query
-        if not first_query:
-            list_params["pageToken"] = next_page_token
-        first_query = False
+        :param service: Gmail service
+        :param publisher_id: Id of the publisher/collection
+        :return: A list if dictionaries representing the messages with reports as attachments.
+            Each has keys "type", "attachment_id" and "id".
+        """
+        # List messages with specific query
+        list_params = {
+            "userId": "me",
+            "q": f"-label:{JstorTelescope.PROCESSED_LABEL_NAME} from:grp_ithaka_data_intelligence@ithaka.org",
+            "labelIds": ["INBOX"],
+            "maxResults": 500,
+        }
+        available_reports = []
+        country_regex = rf"^{publisher_id}_Open_Country_Usage\.csv$"
+        institution_regex = rf"^{publisher_id}_Open_Institution_Usage\.csv$"
+        for message_info in get_messages(service, list_params):
+            message_id = message_info["id"]
+            message = service.users().messages().get(userId="me", id=message_id).execute()
 
-        # Get the results
-        results = service.users().messages().list(**list_params).execute()
-        next_page_token = results.get("nextPageToken")
-        messages += results["messages"]
+            # Get download filenames
+            for attachment in message["payload"]["parts"]:
+                if re.match(country_regex, attachment["filename"]):
+                    report_type = "country"
+                elif re.match(institution_regex, attachment["filename"]):
+                    report_type = "institution"
+                else:
+                    continue
+                attachment_id = attachment["body"]["attachmentId"]
+                available_reports.append({"type": report_type, "attachment_id": attachment_id, "id": message_id})
 
-    available_reports = []
-    for message_info in messages:
-        message_id = message_info["id"]
-        message = service.users().messages().get(userId="me", id=message_id).execute()
+        return available_reports
 
-        # get download url
-        download_url = None
-        message_data = base64.urlsafe_b64decode(message["payload"]["body"]["data"])
-        for link in BeautifulSoup(message_data, "html.parser", parse_only=SoupStrainer("a")):
-            if link.text == "Download Completed Report":
-                download_url = link["href"]
-                break
-        if download_url is None:
-            raise AirflowException(f"Can't find download link for report in e-mail, message snippet: {message.snippet}")
+    @staticmethod
+    def download_report(message_id: str, attachment_id, download_path: str) -> None:
+        """Download report from url to a file.
 
-        # get filename and extension from head
-        filename, extension = get_header_info(download_url)
+        :param message_id: The ID of the gmail message
+        :param attachment_id: The ID of the attachment
+        :param download_path: Path to download data to
+        """
+        logging.info(f"Downloading report: {message_id} to: {download_path}")
+        service = create_gmail_service()
+        attachment = (
+            service.users().messages().attachements().get(userId="me", messageId=message_id, id=attachment_id).execute()
+        )
+        data = attachment["data"]
+        file_data = base64.urlsafe_b64decode(data.encode("UTF-8"))
+        with open(download_path, "w") as f:
+            f.write(file_data)
 
-        # get publisher
-        report_publisher = filename.split("_")[1]
-        if report_publisher != publisher_id:
-            logging.info(
-                f"Skipping report, because the publisher id in the report's file name '{report_publisher}' "
-                f"does not match the current publisher id: {publisher_id}"
+    @staticmethod
+    def get_release_date(report_path: str) -> pendulum.DateTime:
+        """Get the release date from the report. This should be under the "Month, Year of monthdt" column
+        Also checks if the reports contains data from exactly one month.
+
+        :param report_path: The path to the JSTOR report
+        :return: The start and end of the release month
+        """
+
+        # Read report
+        with open(report_path) as f:
+            report = list(csv.DictReader(f))
+        dates = set([i["Month, Year of monthdt"] for i in report])
+
+        if len(dates) != 1:
+            raise AirflowException(f"Report contains data that is not from exactly 1 month, dates: {dates}")
+
+        month = pendulum.from_format(dates[0], "MMMM YYYY")  # eg. September 2023
+        start_date = month.start_of("month").start_of("day")
+        end_date = month.end_of("month").start_of("day")
+        return start_date, end_date
+
+    @staticmethod
+    def jstor_transform(
+        download_country, download_institution, transfrom_country, transform_institution, partition_date
+    ) -> None:
+        """Transform a Jstor release into json lines format and gzip the result._summary_
+
+        :param download_country: The path to the country download report
+        :param download_institution: The path to the institution download report
+        :param transfrom_country: The path to write the transformed country file to
+        :param transform_institution: The path to write the transformed institution file to
+        :param partition_date: The partition/release date of this report
+        """
+        for download_file, transform_file in (
+            [download_country, transfrom_country],
+            [download_institution, transform_institution],
+        ):
+            results = []
+            with open(download_file, "r") as csv_file:
+                csv_reader = csv.DictReader(csv_file)
+
+            for row in csv_reader:
+                transformed_row = OrderedDict((convert(k), v) for k, v in row.items())
+                transformed_row.pop("Month, Year of monthdt", None)
+                results.append(transformed_row)
+
+            results = add_partition_date(
+                results, partition_date, TimePartitioningType.MONTH, partition_field="release_date"
             )
-            continue
+            save_jsonl_gz(transform_file, results)
 
-        # get report_type
-        report_mapping = {"PUBBCU": "country", "PUBBIU": "institution"}
-        report_type = report_mapping.get(filename.split("_")[2])
-        if report_type is None:
-            logging.info(f"Skipping unrecognized report type, filename {filename}")
 
-        # check format
-        original_email = f"https://mail.google.com/mail/u/0/#all/{message_id}"
-        if extension == "tsv":
-            # add report info
-            logging.info(
-                f"Adding report. Report type: {report_type}, url: {download_url}, " f"original email: {original_email}."
+class Publisher:
+    """Stores functions specific to the publisher use-case"""
+
+    @staticmethod
+    def list_reports(service: Resource, publisher_id: str) -> List[dict]:
+        """List the available releases by going through the messages of a gmail account and looking for a specific pattern.
+
+        If a message has been processed previously it has a specific label, messages with this label will be skipped.
+        The message should include a download url. The head of this download url contains the filename, from which the
+        release date and publisher can be derived.
+
+        :param service: Gmail service
+        :param publisher_id: Id of the publisher
+        :return: A list if dictionaries representing the messages with reports. Each has keys "type", "url" and "id".
+        """
+        # List messages with specific query
+        list_params = {
+            "userId": "me",
+            "q": f'-label:{JstorTelescope.PROCESSED_LABEL_NAME} subject:"JSTOR Publisher Report Available" from:no-reply@ithaka.org',
+            "labelIds": ["INBOX"],
+            "maxResults": 500,
+        }
+        available_reports = []
+        for message_info in get_messages(service, list_params):
+            message_id = message_info["id"]
+            message = service.users().messages().get(userId="me", id=message_id).execute()
+
+            # get download url
+            download_url = None
+            message_data = base64.urlsafe_b64decode(message["payload"]["body"]["data"])
+            for link in BeautifulSoup(message_data, "html.parser", parse_only=SoupStrainer("a")):
+                if link.text == "Download Completed Report":
+                    download_url = link["href"]
+                    break
+            if download_url is None:
+                raise AirflowException(
+                    f"Can't find download link for report in e-mail, message snippet: {message.snippet}"
+                )
+
+            # Get filename and extension from head
+            filename, extension = Publisher.get_header_info(download_url)
+
+            # Get publisher
+            report_publisher = filename.split("_")[1]
+            if report_publisher != publisher_id:
+                logging.info(
+                    f"Skipping report, because the publisher id in the report's file name '{report_publisher}' "
+                    f"does not match the current publisher id: {publisher_id}"
+                )
+                continue
+
+            # get report_type
+            report_mapping = {"PUBBCU": "country", "PUBBIU": "institution"}
+            report_type = report_mapping.get(filename.split("_")[2])
+            if report_type is None:
+                logging.info(f"Skipping unrecognized report type, filename {filename}")
+
+            # check format
+            original_email = f"https://mail.google.com/mail/u/0/#all/{message_id}"
+            if extension == "tsv":
+                # add report info
+                logging.info(
+                    f"Adding report. Report type: {report_type}, url: {download_url}, "
+                    f"original email: {original_email}."
+                )
+                available_reports.append({"type": report_type, "url": download_url, "id": message_id})
+            else:
+                logging.warning(
+                    f'Excluding file "{filename}.{extension}", as it does not have ".tsv" extension. '
+                    f"Original email: {original_email}"
+                )
+
+        return available_reports
+
+    @staticmethod
+    def download_report(url: str, download_path: str) -> None:
+        """Download report from url to a file.
+
+        :param url: Download url
+        :param download_path: Path to download data to
+        """
+        logging.info(f"Downloading report: {url} to: {download_path}")
+        headers = {"User-Agent": get_user_agent(package_name="oaebu_workflows")}
+
+        response = retry_get_url(url, headers=headers, wait=WAIT_FN, num_retries=JstorTelescope.MAX_ATTEMPTS)
+        content = response.content.decode("utf-8")
+        with open(download_path, "w") as f:
+            f.write(content)
+
+    @staticmethod
+    @retry(stop=stop_after_attempt(JstorTelescope.MAX_ATTEMPTS), reraise=True, wait=WAIT_FN)
+    def get_header_info(url: str) -> List[str, str]:
+        """Get header info from url and parse for filename and extension of file.
+
+        :param url: Download url
+        :return: Filename and file extension
+        """
+        logging.info(
+            f"Getting HEAD of report: {url}, "
+            f'attempt: {Publisher.get_header_info.retry.statistics["attempt_number"]}, '
+            f'idle for: {Publisher.get_header_info.retry.statistics["idle_for"]}'
+        )
+        headers = {"User-Agent": get_user_agent(package_name="oaebu_workflows")}
+        response = requests.head(url, allow_redirects=True, headers=headers)
+        if response.status_code != 200:
+            raise AirflowException(
+                f"Could not get HEAD of report download url, reason: {response.reason}, "
+                f"status_code: {response.status_code}"
             )
-            available_reports.append({"type": report_type, "url": download_url, "id": message_id})
-        else:
-            logging.warning(
-                f'Excluding file "{filename}.{extension}", as it does not have ".tsv" extension. '
-                f"Original email: {original_email}"
+        filename, extension = response.headers["Content-Disposition"].split("=")[1].split(".")
+        return filename, extension
+
+    @staticmethod
+    def get_release_date(report_path: str) -> pendulum.DateTime:
+        """Get the release date from the "Reporting_Period" part of the header.
+        Also checks if the reports contains data from exactly one month.
+
+        :param report_path: The path to the JSTOR report
+        :return: The start and end of the release month
+        """
+
+        # Check if report has header in old or new format based on the first line
+        with open(report_path, "r") as tsv_file:
+            first_line = tsv_file.readline()
+
+        # Process report with the old header
+        if not "Report_Name" in first_line:
+            return Publisher.get_release_date_deprecated(report_path)
+
+        # Process report with new header
+        with open(report_path, "r") as tsv_file:
+            for line in tsv_file:
+                line = line.strip("\n").split("\t")
+                if line[0] == "Reporting_Period":
+                    start_date = pendulum.parse(line[1].split(" ")[0])
+                    end_date = pendulum.parse(line[1].split(" ")[-1])
+                    break
+
+        # Check that month of start and end date are the same
+        if start_date.end_of("month").start_of("day") != end_date:
+            raise AirflowException(
+                f"Report contains data that is not from exactly 1 month, start date: {start_date}, end date: {end_date}"
+            )
+        return start_date, end_date
+
+    @staticmethod
+    def get_release_date_deprecated(report_path: str) -> pendulum.DateTime:
+        """This function is deprecated, because the headers for the reports have changed since 2021-10-01.
+        It might still be used for reports that were created before this date and have not been processed yet.
+        Get the release date from the "Usage Month" column in the first row of the report.
+        Also checks if the reports contains data from the same month only.
+
+        :param report_path: The path to the JSTOR report
+        :return: The start and end dates
+        """
+        # Load report data into list of dicts
+        with open(report_path) as tsv_file:
+            csv_list = list(csv.DictReader(tsv_file, delimiter="\t"))
+
+        # get the first and last usage month
+        first_usage_month = csv_list[0]["Usage Month"]
+        last_usage_month = csv_list[-1]["Usage Month"]
+
+        # check that month in first and last row are the same
+        if first_usage_month != last_usage_month:
+            raise AirflowException(
+                f"Report contains data from more than 1 month, start month: {first_usage_month}, "
+                f"end month: {last_usage_month}"
             )
 
-    return available_reports
+        # get the release date from the last usage month
+        start_date = pendulum.from_format(first_usage_month, "YYYY-MM").start_of("month").start_of("day")
+        end_date = pendulum.from_format(last_usage_month, "YYYY-MM").end_of("month").start_of("day")
+
+        return start_date, end_date
+
+    @staticmethod
+    def jstor_transform(
+        download_country, download_institution, transfrom_country, transform_institution, partition_date
+    ) -> None:
+        """Transform a Jstor release into json lines format and gzip the result._summary_
+
+        :param download_country: The path to the country download report
+        :param download_institution: The path to the institution download report
+        :param transfrom_country: The path to write the transformed country file to
+        :param transform_institution: The path to write the transformed institution file to
+        :param partition_date: The partition/release date of this report
+        """
+        for download_file, transform_file in (
+            [download_country, transfrom_country],
+            [download_institution, transform_institution],
+        ):
+            release_column = partition_date.strftime("%b-%Y")  # e.g. Jan-2020
+            usage_month = partition_date.strftime("%Y-%m")
+            results = []
+            # Check if report has header in old or new format based on the first line
+            with open(download_file, "r") as tsv_file:
+                first_line = tsv_file.readline()
+                tsv_file.seek(0)
+                if "Report_Name" in first_line:
+                    line = None
+                    while line != "\n":
+                        line = next(tsv_file)
+                csv_reader = csv.DictReader(tsv_file, delimiter="\t")
+                for row in csv_reader:
+                    transformed_row = OrderedDict((convert(k), v) for k, v in row.items())
+                    transformed_row.pop(release_column, None)
+                    if "Usage_Month" not in transformed_row:  # Newwer reports name it by month name
+                        transformed_row["Usage_Month"] = usage_month
+                    if "Total_Item_Requests" not in transformed_row:  # Newer reports name it "Reporting_Period_Total"
+                        transformed_row["Total_Item_Requests"] = transformed_row.pop("Reporting_Period_Total")
+                    results.append(transformed_row)
+
+            results = add_partition_date(
+                results, partition_date, TimePartitioningType.MONTH, partition_field="release_date"
+            )
+            save_jsonl_gz(transform_file, results)
