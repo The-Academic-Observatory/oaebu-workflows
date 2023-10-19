@@ -249,11 +249,13 @@ class JstorTelescope(Workflow):
         with TemporaryDirectory() as reports_folder:
             for report in available_reports:
                 # Download report to temporary file
-                tmp_download_path = os.path.join(reports_folder, "report.tsv")
+
                 if self.collection:
+                    tmp_download_path = os.path.join(reports_folder, "report.csv")
                     Collection.download_report(report["id"], report["attachment_id"], tmp_download_path)
                     start_date, end_date = Collection.get_release_date(tmp_download_path)
                 else:
+                    tmp_download_path = os.path.join(reports_folder, "report.tsv")
                     Publisher.download_report(report["url"], tmp_download_path)
                     start_date, end_date = Publisher.get_release_date(tmp_download_path)
 
@@ -338,6 +340,7 @@ class JstorTelescope(Workflow):
                 )
                 uri = gcs_blob_uri(self.cloud_workspace.transform_bucket, gcs_blob_name_from_path(file_path))
                 table_id = bq_table_id(self.cloud_workspace.project_id, partner.bq_dataset_id, partner.bq_table_name)
+                print(f"################# {partner.schema_path}")
                 state = bq_load_table(
                     uri=uri,
                     table_id=table_id,
@@ -494,11 +497,11 @@ class Collection:
         logging.info(f"Downloading report: {message_id} to: {download_path}")
         service = create_gmail_service()
         attachment = (
-            service.users().messages().attachements().get(userId="me", messageId=message_id, id=attachment_id).execute()
+            service.users().messages().attachments().get(userId="me", messageId=message_id, id=attachment_id).execute()
         )
         data = attachment["data"]
         file_data = base64.urlsafe_b64decode(data.encode("UTF-8"))
-        with open(download_path, "w") as f:
+        with open(download_path, "wb") as f:
             f.write(file_data)
 
     @staticmethod
@@ -513,7 +516,7 @@ class Collection:
         # Read report
         with open(report_path) as f:
             report = list(csv.DictReader(f))
-        dates = set([i["Month, Year of monthdt"] for i in report])
+        dates = list(set([i["Month, Year of monthdt"] for i in report]))
 
         if len(dates) != 1:
             raise AirflowException(f"Report contains data that is not from exactly 1 month, dates: {dates}")
@@ -535,22 +538,30 @@ class Collection:
         :param transform_institution: The path to write the transformed institution file to
         :param partition_date: The partition/release date of this report
         """
-        for download_file, transform_file in (
-            [download_country, transfrom_country],
-            [download_institution, transform_institution],
+        for entity, download_file, transform_file in (
+            ["Country", download_country, transfrom_country],
+            ["Institution", download_institution, transform_institution],
         ):
             results = []
             with open(download_file, "r") as csv_file:
-                csv_reader = csv.DictReader(csv_file)
+                report = list(csv.DictReader(csv_file))
 
-            for row in csv_reader:
+            for row in report:
+                row.pop("Month, Year of monthdt")
+                row["Publihser"] = row.pop("publisher")
+                row["Book_ID"] = row.pop("item_doi")
+                row[entity] = row.pop("\ufeffentity_name")
+                row["Book_Title"] = row.pop("book_title")
+                row["Authors"] = row.pop("authors")
+                row["ISBN"] = row.pop("eisbn")
+                row["Total_Item_Requests"] = row.pop("total_item_requests")
                 transformed_row = OrderedDict((convert(k), v) for k, v in row.items())
-                transformed_row.pop("Month, Year of monthdt", None)
                 results.append(transformed_row)
 
             results = add_partition_date(
                 results, partition_date, TimePartitioningType.MONTH, partition_field="release_date"
             )
+            print(results[0].keys())
             save_jsonl_gz(transform_file, results)
 
 
@@ -638,13 +649,15 @@ class Publisher:
         logging.info(f"Downloading report: {url} to: {download_path}")
         headers = {"User-Agent": get_user_agent(package_name="oaebu_workflows")}
 
-        response = retry_get_url(url, headers=headers, wait=WAIT_FN, num_retries=JstorTelescope.MAX_ATTEMPTS)
+        response = retry_get_url(
+            url, headers=headers, wait=JstorTelescope.WAIT_FN, num_retries=JstorTelescope.MAX_ATTEMPTS
+        )
         content = response.content.decode("utf-8")
         with open(download_path, "w") as f:
             f.write(content)
 
     @staticmethod
-    @retry(stop=stop_after_attempt(JstorTelescope.MAX_ATTEMPTS), reraise=True, wait=WAIT_FN)
+    @retry(stop=stop_after_attempt(JstorTelescope.MAX_ATTEMPTS), reraise=True, wait=JstorTelescope.WAIT_FN)
     def get_header_info(url: str) -> List[str, str]:
         """Get header info from url and parse for filename and extension of file.
 
@@ -757,15 +770,15 @@ class Publisher:
                     line = None
                     while line != "\n":
                         line = next(tsv_file)
-                csv_reader = csv.DictReader(tsv_file, delimiter="\t")
-                for row in csv_reader:
-                    transformed_row = OrderedDict((convert(k), v) for k, v in row.items())
-                    transformed_row.pop(release_column, None)
-                    if "Usage_Month" not in transformed_row:  # Newwer reports name it by month name
-                        transformed_row["Usage_Month"] = usage_month
-                    if "Total_Item_Requests" not in transformed_row:  # Newer reports name it "Reporting_Period_Total"
-                        transformed_row["Total_Item_Requests"] = transformed_row.pop("Reporting_Period_Total")
-                    results.append(transformed_row)
+                report = list(csv.DictReader(tsv_file, delimiter="\t"))
+            for row in report:
+                transformed_row = OrderedDict((convert(k), v) for k, v in row.items())
+                transformed_row.pop(release_column, None)
+                if "Usage_Month" not in transformed_row:  # Newwer reports name it by month name
+                    transformed_row["Usage_Month"] = usage_month
+                if "Total_Item_Requests" not in transformed_row:  # Institution report names it "Reporting_Period_Total"
+                    transformed_row["Total_Item_Requests"] = transformed_row.pop("Reporting_Period_Total")
+                results.append(transformed_row)
 
             results = add_partition_date(
                 results, partition_date, TimePartitioningType.MONTH, partition_field="release_date"
