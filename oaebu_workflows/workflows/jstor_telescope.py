@@ -173,7 +173,7 @@ class JstorTelescope(Workflow):
         self.add_task(self.upload_transformed)
         self.add_task(self.bq_load)
         self.add_task(self.add_new_dataset_releases)
-        # self.add_task(self.cleanup) TODO: replace
+        self.add_task(self.cleanup)
 
     def make_release(self, **kwargs) -> List[JstorRelease]:
         """Make release instances. The release is passed as an argument to the function (TelescopeFunction) that is
@@ -340,7 +340,6 @@ class JstorTelescope(Workflow):
                 )
                 uri = gcs_blob_uri(self.cloud_workspace.transform_bucket, gcs_blob_name_from_path(file_path))
                 table_id = bq_table_id(self.cloud_workspace.project_id, partner.bq_dataset_id, partner.bq_table_name)
-                print(f"################# {partner.schema_path}")
                 state = bq_load_table(
                     uri=uri,
                     table_id=table_id,
@@ -473,8 +472,14 @@ class Collection:
             message_id = message_info["id"]
             message = service.users().messages().get(userId="me", id=message_id).execute()
 
+            # Messages without payloads should be ignored
+            try:
+                attachments = message["payload"]["parts"]
+            except KeyError:
+                continue
+
             # Get download filenames
-            for attachment in message["payload"]["parts"]:
+            for attachment in attachments:
                 if re.match(country_regex, attachment["filename"]):
                     report_type = "country"
                 elif re.match(institution_regex, attachment["filename"]):
@@ -528,7 +533,11 @@ class Collection:
 
     @staticmethod
     def jstor_transform(
-        download_country, download_institution, transfrom_country, transform_institution, partition_date
+        download_country: List[dict],
+        download_institution: List[dict],
+        transfrom_country: str,
+        transform_institution: str,
+        partition_date: pendulum.DateTime,
     ) -> None:
         """Transform a Jstor release into json lines format and gzip the result._summary_
 
@@ -539,7 +548,7 @@ class Collection:
         :param partition_date: The partition/release date of this report
         """
         for entity, download_file, transform_file in (
-            ["Country", download_country, transfrom_country],
+            ["Country_Name", download_country, transfrom_country],
             ["Institution", download_institution, transform_institution],
         ):
             results = []
@@ -548,12 +557,14 @@ class Collection:
 
             for row in report:
                 row.pop("Month, Year of monthdt")
-                row["Publihser"] = row.pop("publisher")
+                row["Publisher"] = row.pop("publisher")
                 row["Book_ID"] = row.pop("item_doi")
+                row["Usage_Month"] = partition_date.strftime("%Y-%m")
                 row[entity] = row.pop("\ufeffentity_name")
                 row["Book_Title"] = row.pop("book_title")
                 row["Authors"] = row.pop("authors")
                 row["ISBN"] = row.pop("eisbn")
+                row["eISBN"] = row["ISBN"]
                 row["Total_Item_Requests"] = row.pop("total_item_requests")
                 transformed_row = OrderedDict((convert(k), v) for k, v in row.items())
                 results.append(transformed_row)
@@ -745,7 +756,11 @@ class Publisher:
 
     @staticmethod
     def jstor_transform(
-        download_country, download_institution, transfrom_country, transform_institution, partition_date
+        download_country: List[dict],
+        download_institution: List[dict],
+        transfrom_country: str,
+        transform_institution: str,
+        partition_date: pendulum.DateTime,
     ) -> None:
         """Transform a Jstor release into json lines format and gzip the result._summary_
 

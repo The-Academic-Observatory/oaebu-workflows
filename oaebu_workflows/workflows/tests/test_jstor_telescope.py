@@ -30,7 +30,7 @@ from googleapiclient.http import HttpMockSequence
 
 from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.oaebu_partners import partner_from_str
-from oaebu_workflows.workflows.jstor_telescope import JstorRelease, JstorTelescope, get_label_id, get_release_date
+from oaebu_workflows.workflows.jstor_telescope import JstorRelease, JstorTelescope, Publisher, Collection, get_label_id
 from observatory.platform.observatory_environment import ObservatoryEnvironment, ObservatoryTestCase, find_free_port
 from observatory.platform.observatory_config import Workflow
 from observatory.platform.gcs import gcs_blob_name_from_path
@@ -38,7 +38,54 @@ from observatory.platform.bigquery import bq_table_id
 from observatory.platform.api import get_dataset_releases
 
 
-class TestJstorTelescope(ObservatoryTestCase):
+class TestTelescopeSetup(ObservatoryTestCase):
+    def __init__(self, *args, **kwargs):
+        super(TestTelescopeSetup, self).__init__(*args, **kwargs)
+        self.publisher_id = "anupress"
+
+    def test_dag_structure(self):
+        """Test that the Jstor DAG has the correct structure."""
+        for collection in [False, True]:
+            dag = JstorTelescope(
+                "jstor",
+                cloud_workspace=self.fake_cloud_workspace,
+                publisher_id=self.publisher_id,
+                collection=collection,
+            ).make_dag()
+            self.assert_dag_structure(
+                {
+                    "check_dependencies": ["list_reports"],
+                    "list_reports": ["download_reports"],
+                    "download_reports": ["upload_downloaded"],
+                    "upload_downloaded": ["transform"],
+                    "transform": ["upload_transformed"],
+                    "upload_transformed": ["bq_load"],
+                    "bq_load": ["add_new_dataset_releases"],
+                    "add_new_dataset_releases": ["cleanup"],
+                    "cleanup": [],
+                },
+                dag,
+            )
+
+    def test_dag_load(self):
+        """Test that the Jstor DAG can be loaded from a DAG bag."""
+        for collection in [False, True]:
+            env = ObservatoryEnvironment(
+                workflows=[
+                    Workflow(
+                        dag_id="jstor_test_telescope",
+                        name="My JSTOR Workflow",
+                        class_name="oaebu_workflows.workflows.jstor_telescope.JstorTelescope",
+                        cloud_workspace=self.fake_cloud_workspace,
+                        kwargs=dict(publisher_id=self.publisher_id, collection=collection),
+                    )
+                ],
+            )
+            with env.create():
+                self.assert_dag_load_from_config("jstor_test_telescope")
+
+
+class TestJstorTelescopePublisher(ObservatoryTestCase):
     """Tests for the Jstor telescope"""
 
     def __init__(self, *args, **kwargs):
@@ -47,7 +94,7 @@ class TestJstorTelescope(ObservatoryTestCase):
         :param args: arguments.
         :param kwargs: keyword arguments.
         """
-        super(TestJstorTelescope, self).__init__(*args, **kwargs)
+        super(TestJstorTelescopePublisher, self).__init__(*args, **kwargs)
         self.project_id = os.getenv("TEST_GCP_PROJECT_ID")
         self.data_location = os.getenv("TEST_GCP_DATA_LOCATION")
         self.publisher_id = "anupress"
@@ -84,46 +131,9 @@ class TestJstorTelescope(ObservatoryTestCase):
             },
         }
 
-    def test_dag_structure(self):
-        """Test that the Jstor DAG has the correct structure."""
-        dag = JstorTelescope(
-            "jstor", cloud_workspace=self.fake_cloud_workspace, publisher_id=self.publisher_id
-        ).make_dag()
-        self.assert_dag_structure(
-            {
-                "check_dependencies": ["list_reports"],
-                "list_reports": ["download_reports"],
-                "download_reports": ["upload_downloaded"],
-                "upload_downloaded": ["transform"],
-                "transform": ["upload_transformed"],
-                "upload_transformed": ["bq_load"],
-                "bq_load": ["add_new_dataset_releases"],
-                "add_new_dataset_releases": ["cleanup"],
-                "cleanup": [],
-            },
-            dag,
-        )
-
-    def test_dag_load(self):
-        """Test that the Jstor DAG can be loaded from a DAG bag."""
-
-        env = ObservatoryEnvironment(
-            workflows=[
-                Workflow(
-                    dag_id="jstor_test_telescope",
-                    name="My JSTOR Workflow",
-                    class_name="oaebu_workflows.workflows.jstor_telescope.JstorTelescope",
-                    cloud_workspace=self.fake_cloud_workspace,
-                    kwargs=dict(publisher_id=self.publisher_id),
-                )
-            ],
-        )
-        with env.create():
-            self.assert_dag_load_from_config("jstor_test_telescope")
-
     @patch("oaebu_workflows.workflows.jstor_telescope.build")
     @patch("oaebu_workflows.workflows.jstor_telescope.Credentials")
-    def test_telescope(self, mock_account_credentials, mock_build):
+    def test_telescope_publisher(self, mock_account_credentials, mock_build):
         """Test the Jstor telescope end to end."""
 
         mock_account_credentials.from_json_keyfile_dict.return_value = ""
@@ -292,60 +302,220 @@ class TestJstorTelescope(ObservatoryTestCase):
                 self.assertEqual(ti.state, State.SUCCESS)
                 self.assert_cleanup(release.workflow_folder)
 
-    def test_get_label_id(self):
-        """Test getting label id both when label already exists and does not exist yet."""
-        list_labels_no_match = {
-            "labels": [
-                {
-                    "id": "CHAT",
-                    "name": "CHAT",
-                    "messageListVisibility": "hide",
-                    "labelListVisibility": "labelHide",
-                    "type": "system",
-                },
-                {"id": "SENT", "name": "SENT", "type": "system"},
+    def test_get_release_date(self):
+        """Test that the get_release_date returns the correct release date and raises an exception when dates are
+        incorrect"""
+        with CliRunner().isolated_filesystem():
+            # Test reports in new format with header
+            new_report_content = (
+                "Report_Name\tBook Usage by Country\nReport_ID\tPUB_BCU\nReport_Description\t"
+                "Usage of your books on JSTOR by country.\nPublisher_Name\tPublisher 1\nReporting_Period\t"
+                "{start_date} to {end_date}\nCreated\t2021-10-01\nCreated_By\tJSTOR"
+            )
+            old_report_content = (
+                "Book Title\tUsage Month\nAddress source war after\t{start_date}\nNote spend " "government\t{end_date}"
+            )
+            reports = [
+                {"file": "new_success.tsv", "start": "2020-01-01", "end": "2020-01-31"},
+                {"file": "new_fail.tsv", "start": "2020-01-01", "end": "2020-02-01"},
+                {"file": "old_success.tsv", "start": "2020-01", "end": "2020-01"},
+                {"file": "old_fail.tsv", "start": "2020-01", "end": "2020-02"},
             ]
-        }
-        create_label = {
-            "id": "created_label",
-            "name": JstorTelescope.PROCESSED_LABEL_NAME,
-            "messageListVisibility": "show",
-            "labelListVisibility": "labelShow",
-        }
-        list_labels_match = {
-            "labels": [
-                {
-                    "id": "CHAT",
-                    "name": "CHAT",
-                    "messageListVisibility": "hide",
-                    "labelListVisibility": "labelHide",
-                    "type": "system",
-                },
-                {
-                    "id": "existing_label",
-                    "name": JstorTelescope.PROCESSED_LABEL_NAME,
-                    "messageListVisibility": "show",
-                    "labelListVisibility": "labelShow",
-                    "type": "user",
-                },
-            ]
-        }
-        http = HttpMockSequence(
-            [
-                ({"status": "200"}, json.dumps(list_labels_no_match)),
-                ({"status": "200"}, json.dumps(create_label)),
-                ({"status": "200"}, json.dumps(list_labels_match)),
-            ]
+
+            for report in reports:
+                with open(report["file"], "w") as f:
+                    if report == reports[0] or report == reports[1]:
+                        f.write(new_report_content.format(start_date=report["start"], end_date=report["end"]))
+                    else:
+                        f.write(old_report_content.format(start_date=report["start"], end_date=report["end"]))
+
+            # Test new report is successful
+            start_date, end_date = Publisher.get_release_date(reports[0]["file"])
+            self.assertEqual(pendulum.parse(reports[0]["start"]), start_date)
+            self.assertEqual(pendulum.parse(reports[0]["end"]), end_date)
+            # Test new report fails
+            with self.assertRaises(AirflowException):
+                Publisher.get_release_date(reports[1]["file"])
+            # Test old report is successful
+            start_date, end_date = Publisher.get_release_date(reports[2]["file"])
+            self.assertEqual(pendulum.parse(reports[2]["start"]).start_of("month").start_of("day"), start_date)
+            self.assertEqual(pendulum.parse(reports[2]["end"]).end_of("month").start_of("day"), end_date)
+            # Test old report fails
+            with self.assertRaises(AirflowException):
+                Publisher.get_release_date(reports[3]["file"])
+
+
+class TestJstorTelescopeCollection(ObservatoryTestCase):
+    """Tests for the Jstor telescope"""
+
+    def __init__(self, *args, **kwargs):
+        super(TestJstorTelescopeCollection, self).__init__(*args, **kwargs)
+        self.project_id = os.getenv("TEST_GCP_PROJECT_ID")
+        self.data_location = os.getenv("TEST_GCP_DATA_LOCATION")
+        self.publisher_id = "BTAA"
+        self.release_date = pendulum.parse("20220901").end_of("month")
+
+    @patch("oaebu_workflows.workflows.jstor_telescope.build")
+    @patch("oaebu_workflows.workflows.jstor_telescope.Credentials")
+    def test_telescope_collecion(self, mock_account_credentials, mock_build):
+        """Test the Jstor telescope end to end."""
+
+        mock_account_credentials.from_json_keyfile_dict.return_value = ""
+        http = HttpMockSequence(create_http_mock_sequence())
+        mock_build.return_value = build("gmail", "v1", http=http)
+
+        # Setup Observatory environment
+        env = ObservatoryEnvironment(
+            self.project_id, self.data_location, api_host="localhost", api_port=find_free_port()
         )
-        service = build("gmail", "v1", http=http)
+        dataset_id = env.add_dataset()
 
-        # call function without match for label, so label is created
-        label_id = get_label_id(service, JstorTelescope.PROCESSED_LABEL_NAME)
-        self.assertEqual("created_label", label_id)
+        # Setup Telescope
+        execution_date = pendulum.datetime(year=2023, month=10, day=4)
+        country_partner = partner_from_str("jstor_country_collection")
+        country_partner.bq_dataset_id = dataset_id
+        institution_partner = partner_from_str("jstor_institution_collection")
+        institution_partner.bq_dataset_id = dataset_id
+        telescope = JstorTelescope(
+            dag_id="jstor_test_telescope",
+            cloud_workspace=env.cloud_workspace,
+            publisher_id=self.publisher_id,
+            collection=True,
+            country_partner=country_partner,
+            institution_partner=institution_partner,
+        )
+        dag = telescope.make_dag()
 
-        # call function with match for label
-        label_id = get_label_id(service, JstorTelescope.PROCESSED_LABEL_NAME)
-        self.assertEqual("existing_label", label_id)
+        # Create the Observatory environment and run tests
+        with env.create(task_logging=True):
+            with env.create_dag_run(dag, execution_date):
+                # add gmail connection
+                conn = Connection(
+                    conn_id="gmail_api",
+                    uri="google-cloud-platform://?token=123&refresh_token=123"
+                    "&client_id=123.apps.googleusercontent.com&client_secret=123",
+                )
+                env.add_connection(conn)
+
+                # Test that all dependencies are specified: no error should be thrown
+                ti = env.run_task(telescope.check_dependencies.__name__)
+                self.assertEqual(ti.state, State.SUCCESS)
+
+                # Test list releases task with files available
+                ti = env.run_task(telescope.list_reports.__name__)
+                self.assertEqual(ti.state, State.SUCCESS)
+                available_reports = ti.xcom_pull(
+                    key=JstorTelescope.REPORTS_INFO, task_ids=telescope.list_reports.__name__, include_prior_dates=False
+                )
+                self.assertIsInstance(available_reports, list)
+                expected_reports_info = [
+                    {"type": "country", "attachment_id": "2", "id": "18af0b40b64fe408"},
+                    {"type": "institution", "attachment_id": "3", "id": "18af0b40b64fe408"},
+                ]
+                self.assertListEqual(expected_reports_info, available_reports)
+
+                # Test download_reports task
+                with httpretty.enabled():
+                    for report in available_reports:
+                        self.setup_mock_file_download(report["url"], report["path"], headers=report["headers"])
+                    ti = env.run_task(telescope.download_reports.__name__)
+                    self.assertEqual(ti.state, State.SUCCESS)
+
+                # use release info for other tasks
+                available_releases = ti.xcom_pull(
+                    key=JstorTelescope.RELEASE_INFO,
+                    task_ids=telescope.download_reports.__name__,
+                    include_prior_dates=False,
+                )
+                self.assertIsInstance(available_releases, dict)
+                self.assertEqual(1, len(available_releases))
+                for release_date, reports_info in available_releases.items():
+                    self.assertEqual(self.release_date.date(), pendulum.parse(release_date).date())
+                    self.assertIsInstance(reports_info, list)
+                    self.assertListEqual(expected_reports_info, reports_info)
+                release = JstorRelease(
+                    dag_id=telescope.dag_id,
+                    run_id=env.dag_run.run_id,
+                    data_interval_start=pendulum.parse(release_date).start_of("month"),
+                    data_interval_end=pendulum.parse(release_date).add(days=1).start_of("month"),
+                    partition_date=pendulum.parse(release_date),
+                    reports_info=reports_info,
+                )
+
+                self.assertTrue(os.path.exists(release.download_country_path))
+                self.assertTrue(os.path.exists(release.download_institution_path))
+                self.assert_file_integrity(release.download_country_path, self.country_report["download_hash"], "md5")
+                self.assert_file_integrity(
+                    release.download_institution_path, self.institution_report["download_hash"], "md5"
+                )
+                # Test that file uploaded
+                ti = env.run_task(telescope.upload_downloaded.__name__)
+                self.assertEqual(ti.state, State.SUCCESS)
+                self.assert_blob_integrity(
+                    env.download_bucket,
+                    gcs_blob_name_from_path(release.download_country_path),
+                    release.download_country_path,
+                )
+                self.assert_blob_integrity(
+                    env.download_bucket,
+                    gcs_blob_name_from_path(release.download_institution_path),
+                    release.download_institution_path,
+                )
+
+                # Test that file transformed
+                ti = env.run_task(telescope.transform.__name__)
+                self.assertEqual(ti.state, State.SUCCESS)
+                self.assertTrue(os.path.exists(release.transform_country_path))
+                self.assertTrue(os.path.exists(release.transform_institution_path))
+                self.assert_file_integrity(
+                    release.transform_country_path, self.country_report["transform_hash"], "gzip_crc"
+                )
+                self.assert_file_integrity(
+                    release.transform_institution_path, self.institution_report["transform_hash"], "gzip_crc"
+                )
+
+                # Test that transformed file uploaded
+                ti = env.run_task(telescope.upload_transformed.__name__)
+                self.assertEqual(ti.state, State.SUCCESS)
+                self.assert_blob_integrity(
+                    env.transform_bucket,
+                    gcs_blob_name_from_path(release.transform_country_path),
+                    release.transform_country_path,
+                )
+                self.assert_blob_integrity(
+                    env.transform_bucket,
+                    gcs_blob_name_from_path(release.transform_institution_path),
+                    release.transform_institution_path,
+                )
+
+                # Test that data loaded into BigQuery
+                ti = env.run_task(telescope.bq_load.__name__)
+                self.assertEqual(ti.state, State.SUCCESS)
+                country_table_id = bq_table_id(
+                    telescope.cloud_workspace.project_id,
+                    telescope.country_partner.bq_dataset_id,
+                    telescope.country_partner.bq_table_name,
+                )
+                institution_table_id = bq_table_id(
+                    telescope.cloud_workspace.project_id,
+                    telescope.institution_partner.bq_dataset_id,
+                    telescope.institution_partner.bq_table_name,
+                )
+                self.assert_table_integrity(country_table_id, self.country_report["table_rows"])
+                self.assert_table_integrity(institution_table_id, self.institution_report["table_rows"])
+
+                # Add_dataset_release_task
+                dataset_releases = get_dataset_releases(dag_id=telescope.dag_id, dataset_id=telescope.api_dataset_id)
+                self.assertEqual(len(dataset_releases), 0)
+                ti = env.run_task(telescope.add_new_dataset_releases.__name__)
+                self.assertEqual(ti.state, State.SUCCESS)
+                dataset_releases = get_dataset_releases(dag_id=telescope.dag_id, dataset_id=telescope.api_dataset_id)
+                self.assertEqual(len(dataset_releases), 1)
+
+                # Test that all telescope data deleted
+                ti = env.run_task(telescope.cleanup.__name__)
+                self.assertEqual(ti.state, State.SUCCESS)
+                self.assert_cleanup(release.workflow_folder)
 
     def test_get_release_date(self):
         """Test that the get_release_date returns the correct release date and raises an exception when dates are
@@ -375,23 +545,92 @@ class TestJstorTelescope(ObservatoryTestCase):
                         f.write(old_report_content.format(start_date=report["start"], end_date=report["end"]))
 
             # Test new report is successful
-            start_date, end_date = get_release_date(reports[0]["file"])
+            start_date, end_date = Publisher.get_release_date(reports[0]["file"])
             self.assertEqual(pendulum.parse(reports[0]["start"]), start_date)
             self.assertEqual(pendulum.parse(reports[0]["end"]), end_date)
             # Test new report fails
             with self.assertRaises(AirflowException):
-                get_release_date(reports[1]["file"])
+                Publisher.get_release_date(reports[1]["file"])
             # Test old report is successful
-            start_date, end_date = get_release_date(reports[2]["file"])
+            start_date, end_date = Publisher.get_release_date(reports[2]["file"])
             self.assertEqual(pendulum.parse(reports[2]["start"]).start_of("month").start_of("day"), start_date)
             self.assertEqual(pendulum.parse(reports[2]["end"]).end_of("month").start_of("day"), end_date)
             # Test old report fails
             with self.assertRaises(AirflowException):
-                get_release_date(reports[3]["file"])
+                Publisher.get_release_date(reports[3]["file"])
+
+
+@patch("oaebu_workflows.workflows.jstor_telescope.build")
+@patch("oaebu_workflows.workflows.jstor_telescope.Credentials")
+def test_get_label_id(self, mock_account_credentials, mock_build):
+    """Test getting label id both when label already exists and does not exist yet."""
+    mock_account_credentials.from_json_keyfile_dict.return_value = ""
+
+    http = HttpMockSequence(
+        create_http_mock_sequence(
+            self.country_report["url"], self.institution_report["url"], self.wrong_publisher_report["url"]
+        )
+    )
+    mock_build.return_value = build("gmail", "v1", http=http)
+
+    list_labels_no_match = {
+        "labels": [
+            {
+                "id": "CHAT",
+                "name": "CHAT",
+                "messageListVisibility": "hide",
+                "labelListVisibility": "labelHide",
+                "type": "system",
+            },
+            {"id": "SENT", "name": "SENT", "type": "system"},
+        ]
+    }
+    create_label = {
+        "id": "created_label",
+        "name": JstorTelescope.PROCESSED_LABEL_NAME,
+        "messageListVisibility": "show",
+        "labelListVisibility": "labelShow",
+    }
+    list_labels_match = {
+        "labels": [
+            {
+                "id": "CHAT",
+                "name": "CHAT",
+                "messageListVisibility": "hide",
+                "labelListVisibility": "labelHide",
+                "type": "system",
+            },
+            {
+                "id": "existing_label",
+                "name": JstorTelescope.PROCESSED_LABEL_NAME,
+                "messageListVisibility": "show",
+                "labelListVisibility": "labelShow",
+                "type": "user",
+            },
+        ]
+    }
+    http = HttpMockSequence(
+        [
+            ({"status": "200"}, json.dumps(list_labels_no_match)),
+            ({"status": "200"}, json.dumps(create_label)),
+            ({"status": "200"}, json.dumps(list_labels_match)),
+        ]
+    )
+    service = build("gmail", "v1", http=http)
+
+    # call function without match for label, so label is created
+    label_id = get_label_id(service, JstorTelescope.PROCESSED_LABEL_NAME)
+    self.assertEqual("created_label", label_id)
+
+    # call function with match for label
+    label_id = get_label_id(service, JstorTelescope.PROCESSED_LABEL_NAME)
+    self.assertEqual("existing_label", label_id)
 
 
 def create_http_mock_sequence(
-    country_report_url: str, institution_report_url: str, wrong_publisher_report_url: str
+    country_report_url: str = "https://www.jstor.org/admin/reports/download/249192019",
+    institution_report_url: str = "https://www.jstor.org/admin/reports/download/129518301",
+    wrong_publisher_report_url: str = "https://www.jstor.org/admin/reports/download/12345",
 ) -> list:
     """Create a list with mocked http responses
 
@@ -421,6 +660,7 @@ def create_http_mock_sequence(
     list_messages1 = {
         "messages": [
             {"id": "1788ec9e91f3de62", "threadId": "1788e9b0a848236a"},
+            {"id": "18af0b40b64fe408", "threadId": "18af0b3f613c3f95"},
         ],
         "resultSizeEstimate": 2,
         "nextPageToken": 1234,
@@ -501,6 +741,29 @@ def create_http_mock_sequence(
         "historyId": "2302",
         "internalDate": "1617303299000",
     }
+    # Collections
+    get_message4 = {
+        "id": "18af0b40b64fe408",
+        "threadId": "18af0b3f613c3f95",
+        "labelIds": ["CATEGORY_PERSONAL", "INBOX"],
+        "snippet": "Monthly Usage of books by Country and Institution made available through the Big Ten Academic Alliance (BTAA) on JSTOR General Report Notes: Views and downloads of front matter, back matter, and table",
+        "payload": {
+            "partId": "",
+            "mimeType": "multipart/mixed",
+            "filename": "",
+            "headers": [{"name": "Delivered-To", "value": "accountname@gmail.com"}],
+            "body": {"size": 0},
+            "parts": [
+                {"partId": "0", "filename": "", "body": {"attachmentId": "0"}},
+                {"partId": "1", "filename": "BTAA_Overall_Open_Usage.xlsx", "body": {"attachmentId": "1"}},
+                {"partId": "2", "filename": "BTAA_Open_Country_Usage.csv", "body": {"attachmentId": "2"}},
+                {"partId": "3", "filename": "BTAA_Open_Institution_Usage.csv", "body": {"attachmentId": "3"}},
+            ],
+        },
+        "sizeEstimate": 355380,
+        "historyId": "49808",
+        "internalDate": "1696255445000",
+    }
     modify_message1 = {
         "id": "1788ec9e91f3de62",
         "threadId": "1788e9b0a848236a",
@@ -517,6 +780,7 @@ def create_http_mock_sequence(
         ({"status": "200"}, json.dumps(get_message1)),
         ({"status": "200"}, json.dumps(get_message2)),
         ({"status": "200"}, json.dumps(get_message3)),
+        ({"status": "200"}, json.dumps(get_message4)),
         ({"status": "200"}, json.dumps(list_labels)),
         ({"status": "200"}, json.dumps(modify_message1)),
         ({"status": "200"}, json.dumps(modify_message2)),
