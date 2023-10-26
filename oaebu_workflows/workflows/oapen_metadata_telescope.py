@@ -18,15 +18,10 @@ from __future__ import annotations
 
 import logging
 import os
-import shutil
-import json
-import jsonlines
 import requests
 import xmltodict
-from copy import deepcopy
 from xml.parsers.expat import ExpatError
-from tempfile import TemporaryDirectory
-from typing import Union, List
+from typing import Union
 
 import pendulum
 from airflow.exceptions import AirflowException
@@ -41,20 +36,11 @@ from tenacity import (
 
 from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from oaebu_workflows.config import schema_folder
-from oaebu_workflows.onix import (
-    onix_parser_download,
-    onix_parser_execute,
-    onix_create_personname_fields,
-    elevate_related_products,
-    filter_through_schema,
-    remove_invalid_products,
-    fix_related_products,
-)
+from oaebu_workflows.onix import OnixTransformer
 from observatory.api.client.model.dataset_release import DatasetRelease
 from observatory.platform.api import make_observatory_api
 from observatory.platform.airflow import AirflowConns
-from observatory.platform.files import save_jsonl_gz, load_jsonl
-from observatory.platform.utils.url_utils import get_user_agent
+from observatory.platform.utils.url_utils import get_user_agent, retry_get_url
 from observatory.platform.observatory_config import CloudWorkspace
 from observatory.platform.gcs import (
     gcs_upload_files,
@@ -111,7 +97,7 @@ class OapenMetadataTelescope(Workflow):
         observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
         catchup: bool = False,
         start_date: pendulum.DateTime = pendulum.datetime(2018, 5, 14),
-        schedule: str = "@weekly",
+        schedule: str = "0 12 * * Sun",  # Midday every sunday
     ):
         """Construct a OapenMetadataTelescope instance.
         :param dag_id: The ID of the DAG
@@ -194,9 +180,7 @@ class OapenMetadataTelescope(Workflow):
     def transform(self, release: OapenMetadataRelease, **kwargs) -> None:
         """Transform the oapen metadata XML file into a valid ONIX file"""
         # Parse the downloaded metadata through the schema to extract relevant fields only
-        transformer = MetadataTransformer(
-            release.download_path, release.transform_folder, filter_schema=self.oapen_schema
-        )
+        transformer = OnixTransformer(release.download_path, release.transform_folder, filter_schema=self.oapen_schema)
         out_file = transformer.transform()
         if release.transform_path != out_file:
             raise FileNotFoundError(f"Expected file {release.transform_path} not equal to transformed file: {out_file}")
@@ -256,149 +240,6 @@ class OapenMetadataTelescope(Workflow):
             execution_date=kwargs["execution_date"],
             workflow_folder=release.workflow_folder,
         )
-
-
-class MetadataTransformer:
-    def __init__(
-        self,
-        input_path: str,
-        output_dir: str,
-        filter_products: bool = True,
-        error_removal: bool = True,
-        fix_related_products: bool = True,
-        elevate_related_products: bool = True,
-        use_parser: bool = True,
-        add_name_fields: bool = True,
-        filter_schema: str = os.path.join(schema_folder(), "oapen_metadata_filter.json"),
-        invalid_products_name: str = "invalid_products.xml",
-    ) -> None:
-        """
-        Constructor for the MetadataTransformer class.
-
-        :param input_path: The path to the metadata file
-        :param output_dir: The directory to output the transformed metadata
-        :param filter_products: Whether to filter the metadata through a filter schema
-        :param error_removal: Whether to remove products containing errors
-        :param fix_related_products: Whether to fix imporperly formatted related products
-        :param use_parser: Whether to use the java parser to transform the metadata
-        :param add_name_fields: Whether the Contributor.PersonName and Contributor.InvertedPersonName fields where possible
-        :param filter_schema: The filter schema to use. Required if filter_products is True
-        :param invalid_products_name: The name of the invalid products file.
-        """
-        self.input_path = input_path
-        self.output_dir = output_dir
-        self.filter_products = filter_products
-        self.error_removal = error_removal
-        self.fix_related_products = fix_related_products
-        self.elevate_related_products = elevate_related_products
-        self.use_parser = use_parser
-        self.add_name_fields = add_name_fields
-        self.filter_schema = filter_schema
-        self.invalid_products_name = invalid_products_name
-
-        if self.filter_products and not self.filter_schema:
-            raise ValueError("filter_products requires a provided filter_schema")
-
-        # Use this attribute to keep track of the last modified .xml
-        self._current_md_path = input_path
-
-    @property
-    def current_metadata(self) -> List[dict]:
-        if self._current_md_path.endswith("xml"):
-            with open(self._current_md_path, "rb") as f:
-                metadata = xmltodict.parse(f)
-        elif self._current_md_path.endswith("jsonl"):
-            metadata = load_jsonl(self._current_md_path)
-        else:
-            raise ValueError(f"Unsupported file type: {self._current_md_path}")
-        return metadata
-
-    def transform(self):
-        """
-        Transform the oapen metadata XML file based on the supplied options.
-
-        The transformations will be done in the following order. Transforms not included will be skipped:
-        1) Filter the XML metadata using a schema to keep the desired fields only
-        2) Remove remaining products containing errors
-        3) Fix incorrectly formatted related products
-        4) Elevate related products to the product level
-        5) Parse through the java parser to return .jsonl format
-        6) Construct the Contributor.PersonName and Contributor.InvertedPersonName fields where possible
-        """
-        if self.filter_products:
-            self._filter_products()
-        if self.error_removal:
-            self._remove_errors()
-        if self.fix_related_products:
-            self._fix_related_products()
-        if self.elevate_related_products:
-            self._elevate_related_products()
-        if self.use_parser:
-            self._apply_parser()
-        if self.add_name_fields:
-            self._apply_name_fields()
-        self._save_metadata(self.current_metadata, "transformed.json.gz", "jsonl.gz")
-        return self._current_md_path
-
-    def _save_metadata(self, metadata: List[dict], file_name: str, format: str = "xml"):
-        save_path = os.path.join(self.output_dir, file_name)
-        with open(save_path, "w") as f:
-            if format == "xml":
-                xmltodict.unparse(metadata, output=f, pretty=True)
-            elif format == "jsonl":
-                with jsonlines.open(file_name, "w") as writer:
-                    for item in metadata:
-                        writer.write(item)
-            elif format == "jsonl.gz":
-                save_jsonl_gz(file_name, metadata)
-            else:
-                raise ValueError(f"Unsupported format: {format}")
-        self._current_md_path = save_path
-
-    def _filter_products(self):
-        with open(self.filter_schema, "r") as f:
-            schema = json.load(f)
-        filtered_metadata = filter_through_schema(self.current_metadata, schema)
-        self._save_metadata(filtered_metadata, "filtered.xml")
-
-    def _remove_errors(self):
-        save_path = os.path.join(self.output_dir, "errors_removed.xml")
-        invalid_products_path = os.path.join(self.output_dir, self.invalid_products_name)
-        remove_invalid_products(self._current_md_path, save_path, invalid_products_path)
-        self._current_md_path = save_path
-
-    def _fix_related_products(self):
-        metadata = deepcopy(self.current_metadata)
-        fixed_products = fix_related_products(metadata["ONIXMessage"]["Product"])
-        metadata["ONIXMessage"]["Product"] = fixed_products
-        self._save_metadata(metadata, "fixed_related.xml")
-
-    def _elevate_related_products(self):
-        products = deepcopy(self.current_metadata["ONIXMessage"]["Product"])
-        elevated = elevate_related_products(products)
-        products["ONIXMessage"]["Product"] = elevated
-        self._save_metadata(products, "elevated_related.xml")
-
-    def _apply_parser(self):
-        success, parser_path = onix_parser_download()
-        if not success:
-            raise RuntimeError("Failed to download parser")
-
-        with TemporaryDirectory() as tmp_dir:
-            shutil.copy(self._current_md_path, os.path.join(tmp_dir, "input.xml"))
-            success = onix_parser_execute(parser_path, input_dir=tmp_dir, output_dir=self.output_dir)
-        if not success:
-            raise RuntimeError("Failed to execute parser")
-
-        self._current_md_path = os.path.join(self.output_dir, "full.jsonl")
-
-    def _apply_name_fields(self):
-        if self.current_metadata.get("ONIXMessage"):
-            products = deepcopy(self.current_metadata["ONIXMessage"]["Product"])
-        else:
-            products = deepcopy(self.current_metadata)
-        products = onix_create_personname_fields(products)
-        self._save_metadata(products, "onix_fields_named.jsonl", format="jsonl")
 
 
 @retry(
