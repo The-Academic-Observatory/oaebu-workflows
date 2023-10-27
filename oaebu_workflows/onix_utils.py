@@ -292,8 +292,13 @@ def onix_parser_execute(parser_path: str, input_dir: str, output_dir: str) -> bo
     stdout, stderr = wait_for_process(process)
     if stdout:
         logging.info(stdout)
+    if stderr:
+        logging.info(stderr)
     if process.returncode != 0:
         logging.error(f"Bash command failed `{cmd}`: {stderr}")
+        return False
+    if not os.path.exists(os.path.join(output_dir, "full.jsonl")):  # May fail to produce file even with returncode=0
+        logging.error(f"No .jsonl file found in output directory: {output_dir}")
         return False
 
     return True
@@ -389,7 +394,6 @@ def elevate_product_identifiers(related_product: dict) -> List[dict]:
     :param related_product: The single <RelatedProduct> element with product identifiers to elevate
     :return: A list of <RelatedProduct> elements
     """
-    # If only one exists, it's stored as a single ordered dict
     product_identifiers = _get_product_identifiers(related_product)
 
     # Find all unique <ProductIdentifier> elements. Elements with same ID and different ID types will be put in the
@@ -426,6 +430,9 @@ def normalise_related_products(onix_products: List[dict]) -> List[dict]:
     return_products = deepcopy(onix_products)
     for product in return_products:
         related_products = _get_related_products(product)
+        if not related_products:
+            continue
+
         new_related_products = []
         for related_product in related_products:
             new_related_products.extend(elevate_product_identifiers(related_product))
@@ -445,7 +452,10 @@ def deduplicate_related_products(onix_products: List[dict]) -> List[dict]:
         seen_ids = {}
         product_isbn = _get_product_isbn(product)
         related_products = _get_related_products(product)
+        if not related_products:
+            continue
 
+        # Find all unique <RelatedProduct> elements
         for related_product in related_products:
             relation_code = related_product["ProductRelationCode"]
             for product_identifier in _get_product_identifiers(related_product):
@@ -475,17 +485,6 @@ def elevate_related_products(onix_products: List[dict]) -> List[dict]:
     This "elevates" all related products to the product level.
     Note that if the product identifier for the related product is not an ISBN, it will not be elevated
 
-    Example:
-    Input:
-        {"id": "1", "related_ids": ["5", "10", "15"]}
-    Output:[
-        {"id": "1", "related_ids": ["5", "10", "15"]},
-        {"id": "5", "related_ids": ["1", "10", "15"]},
-        {"id": "10", "related_ids": ["5", "1", "15"]},
-        {"id": "15", "related_ids": ["5", "10", "1"]}
-    ]
-    Note: the above input format is for demonstration purposes. ONIX products have a different format.
-
     Related Product Structure:
     <RelatedProduct>
         <ProductRelationCode></ProductRelationCode>
@@ -506,7 +505,7 @@ def elevate_related_products(onix_products: List[dict]) -> List[dict]:
     return_products = deepcopy(onix_products)
 
     # Get a list of product ISBNS
-    original_isbns = [_get_product_isbn(product) for product in return_products]
+    parent_isbns = [_get_product_isbn(product) for product in return_products]
 
     # Get the original product ISBN
     added_products = []
@@ -526,7 +525,7 @@ def elevate_related_products(onix_products: List[dict]) -> List[dict]:
             rp_isbn = _get_product_isbn(related_product)
             if not rp_isbn:
                 continue  # No ISBNs in related product
-            if rp_isbn in original_isbns:
+            if rp_isbn in parent_isbns:
                 continue  # No need to elevate as this is a duplicate of one of the original ISBNs
 
             # Copy & make modifications to product
@@ -542,6 +541,7 @@ def elevate_related_products(onix_products: List[dict]) -> List[dict]:
                     rp["ProductIdentifier"] = {"ProductIDType": "15", "IDValue": product_isbn}
 
             added_products.append(new_product)
+            parent_isbns.append(rp_isbn)
     return return_products + added_products
 
 
