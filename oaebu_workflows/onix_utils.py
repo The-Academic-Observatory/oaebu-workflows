@@ -62,6 +62,7 @@ class OnixTransformer:
         deduplicate_related_products: bool = False,
         elevate_related_products: bool = False,
         add_name_fields: bool = False,
+        collapse_subjects: bool = False,
         filter_schema: str = os.path.join(schema_folder(), "oapen_metadata_filter.json"),
         invalid_products_name: str = "invalid_products.xml",
         save_format: Literal["json", "jsonl", "jsonl.gz"] = "jsonl.gz",
@@ -72,15 +73,16 @@ class OnixTransformer:
 
         :param input_path: The path to the metadata file
         :param output_dir: The directory to output the transformed metadata
-        :param filter_products: Whether to filter the metadata through a filter schema
-        :param error_removal: Whether to remove products containing errors
-        :param normalise_related_products: Whether to fix imporperly formatted related products
-        :param deduplicate_related_products: Whether to deduplicate related products
-        :param add_name_fields: Whether the Contributor.PersonName and Contributor.InvertedPersonName fields where possible
+        :param filter_products: Filter the metadata through a filter schema
+        :param error_removal: Remove products containing errors
+        :param normalise_related_products: Fix imporperly formatted related products
+        :param deduplicate_related_products: Deduplicate related products
+        :param add_name_fields: Add the Contributor.PersonName and Contributor.InvertedPersonName fields where possible
+        :param collapse_subjects: Collapse subjects into semicolon-separated strings
         :param filter_schema: The filter schema to use. Required if filter_products is True
         :param invalid_products_name: The name of the invalid products file.
         :param save_format: The format to save the transformed metadata in - json, jsonl, or jsonl.gz
-        :param keep_intermediate: Whether to keep the intermediate files
+        :param keep_intermediate: Keep the intermediate files
         """
         self.input_path = input_path
         self.output_dir = output_dir
@@ -90,19 +92,20 @@ class OnixTransformer:
         self.deduplicate_related_products = deduplicate_related_products
         self.elevate_related_products = elevate_related_products
         self.add_name_fields = add_name_fields
+        self.collapse_subjects = collapse_subjects
         self.filter_schema = filter_schema
         self.invalid_products_name = invalid_products_name
         self.save_format = save_format
         self.keep_intermediate = keep_intermediate
 
         if self.filter_products and not self.filter_schema:
-            raise ValueError("filter_products requires a provided filter_schema")
+            raise ValueError("Product filtering requires a provided filter_schema")
 
-        # Use this attribute to keep track of the last modified .xml
+        # Use this attribute to keep track of the last modified metadata file
         self._current_md_path = input_path
 
         # Temp directory for working in
-        self.work_dir = tempfile.mkdtemp()
+        self._work_dir = tempfile.mkdtemp()
 
     @property
     def current_metadata(self) -> List[dict]:
@@ -110,8 +113,8 @@ class OnixTransformer:
 
     def __del__(self):
         # Remove the temporary directory
-        if hasattr(self, "work_dir") and self.work_dir:
-            shutil.rmtree(self.work_dir, ignore_errors=True)
+        if hasattr(self, "_work_dir") and self._work_dir:
+            shutil.rmtree(self._work_dir, ignore_errors=True)
 
     def transform(self):
         """
@@ -124,6 +127,7 @@ class OnixTransformer:
         4) Elevate related products to the product level
         5) Construct the Contributor.PersonName and Contributor.InvertedPersonName fields where possible
         6) Parse through the java parser to return .jsonl format - This is always done
+        7) Collapse subjects into semicolon-separated strings
         """
         settings = []
         if self.filter_products:
@@ -139,6 +143,8 @@ class OnixTransformer:
         if self.add_name_fields:
             settings.append("Add Name Fields")
         settings.append("Parse ONIX")
+        if self.collapse_subjects:
+            settings.append("Collapse Subjects")
         logging.info("Applying transformation in the following order:")
         logging.info(" | ".join(settings))
 
@@ -155,16 +161,18 @@ class OnixTransformer:
         if self.add_name_fields:
             self._apply_name_fields()
         self._apply_parser()
+        if self.collapse_subjects:
+            self._collapse_subjects()
         self._save_metadata(self.current_metadata, os.path.join(self.output_dir, f"transformed.{self.save_format}"))
         logging.info(f"Saved transformed metadata to {self._current_md_path}")
         return self._current_md_path
 
     def _intermediate_file_path(self, file_name):
-        dir_ = self.work_dir if self.keep_intermediate else self.output_dir
+        dir_ = self._work_dir if self.keep_intermediate else self.output_dir
         return os.path.join(dir_, file_name)
 
     def _save_metadata(self, metadata: List[dict], file_path: str):
-        save_path = os.path.join(self.work_dir, file_path)
+        save_path = os.path.join(self._work_dir, file_path)
         format = re.search(r"\.(.*)$", file_path).group(1)
         with open(save_path, "w") as f:
             if format == "xml":
@@ -224,9 +232,9 @@ class OnixTransformer:
 
     def _elevate_related_products(self):
         metadata = deepcopy(self.current_metadata)
-        logging.info(f"Products before elevating related products: {len(metadata['ONIXMessage']['Product'])}")
+        logging.info(f"Original product count: {len(metadata['ONIXMessage']['Product'])}")
         elevated = elevate_related_products(metadata["ONIXMessage"]["Product"])
-        logging.info(f"Products after elevating related products: {len(elevated)}")
+        logging.info(f"Product count after elevating related products: {len(elevated)}")
         metadata["ONIXMessage"]["Product"] = elevated
         self._save_metadata(metadata, self._intermediate_file_path("elevated.xml"))
 
@@ -248,6 +256,11 @@ class OnixTransformer:
             raise RuntimeError("Failed to execute parser")
 
         self._current_md_path = os.path.join(self.output_dir, "full.jsonl")
+
+    def _collapse_subjects(self):
+        metadata = deepcopy(self.current_metadata)
+        metadata = collapse_subjects(metadata)
+        self._save_metadata(metadata, self._intermediate_file_path("collapsed.jsonl"))
 
 
 def onix_parser_download(download_dir: str = observatory_home("bin")) -> Tuple[bool, str]:
@@ -286,7 +299,7 @@ def onix_parser_execute(parser_path: str, input_dir: str, output_dir: str) -> bo
     return True
 
 
-def onix_collapse_subjects(onix: List[dict]) -> List[dict]:
+def collapse_subjects(onix: List[dict]) -> List[dict]:  # TODO: alter this to work with pre-parsed onix (.xml)
     """The book product table creation requires the keywords (under Subjects.SubjectHeadingText) to occur only once
     Some ONIX feeds return all keywords as separate entires. This function finds and collapses each keyword into a
     semi-colon separated string. Other common separators will be replaced with semi-colons.

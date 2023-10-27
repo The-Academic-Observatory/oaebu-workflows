@@ -36,11 +36,11 @@ from tenacity import (
 
 from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from oaebu_workflows.config import schema_folder
-from oaebu_workflows.onix import OnixTransformer
+from oaebu_workflows.onix_utils import OnixTransformer
 from observatory.api.client.model.dataset_release import DatasetRelease
 from observatory.platform.api import make_observatory_api
 from observatory.platform.airflow import AirflowConns
-from observatory.platform.utils.url_utils import get_user_agent, retry_get_url
+from observatory.platform.utils.url_utils import get_user_agent
 from observatory.platform.observatory_config import CloudWorkspace
 from observatory.platform.gcs import (
     gcs_upload_files,
@@ -180,7 +180,18 @@ class OapenMetadataTelescope(Workflow):
     def transform(self, release: OapenMetadataRelease, **kwargs) -> None:
         """Transform the oapen metadata XML file into a valid ONIX file"""
         # Parse the downloaded metadata through the schema to extract relevant fields only
-        transformer = OnixTransformer(release.download_path, release.transform_folder, filter_schema=self.oapen_schema)
+        transformer = OnixTransformer(
+            input_path=release.download_path,
+            output_dir=release.transform_folder,
+            filter_products=True,
+            error_removal=True,
+            normalise_related_products=True,
+            deduplicate_related_products=True,
+            elevate_related_products=True,
+            add_name_fields=True,
+            filter_schema=self.oapen_schema,
+            keep_intermediate=True,
+        )
         out_file = transformer.transform()
         if release.transform_path != out_file:
             raise FileNotFoundError(f"Expected file {release.transform_path} not equal to transformed file: {out_file}")

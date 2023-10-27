@@ -21,9 +21,9 @@ import json
 import unittest
 from unittest.mock import patch
 
-from oaebu_workflows.onix import (
-    onix_collapse_subjects,
-    onix_create_personname_fields,
+from oaebu_workflows.onix_utils import (
+    collapse_subjects,
+    create_personname_fields,
     onix_parser_download,
     onix_parser_execute,
     elevate_related_products,
@@ -76,20 +76,20 @@ class TestOnixFunctions(ObservatoryTestCase):
             self.assertTrue(os.path.isfile(output_file))
             self.assert_file_integrity(output_file, "84d46e2942df615f18d270e18e0ebb26", "md5")
 
-    def test_onix_collapse_subjects(self):
+    def test_collapse_subjects(self):
         """Tests the thoth_collapse_subjects function"""
         test_subjects_input = os.path.join(test_fixtures_folder("onix"), "test_subjects_input.json")
         test_subjects_expected = os.path.join(test_fixtures_folder("onix"), "test_subjects_expected.json")
         with open(test_subjects_input, "r") as f:
             onix = json.load(f)
-        actual_onix = onix_collapse_subjects(onix)
+        actual_onix = collapse_subjects(onix)
         with open(test_subjects_expected, "r") as f:
             expected_onix = json.load(f)
 
         self.assertEqual(len(actual_onix), len(expected_onix))
         self.assertEqual(json.dumps(actual_onix, sort_keys=True), json.dumps(expected_onix, sort_keys=True))
 
-    def test_onix_create_personname_fields(self):
+    def test_create_personname_fields(self):
         """Tests the function that creates the personname field"""
         input_onix = [
             {
@@ -147,7 +147,7 @@ class TestOnixFunctions(ObservatoryTestCase):
             },
             {"empty": "empty"},
         ]
-        output_onix = onix_create_personname_fields(input_onix)
+        output_onix = create_personname_fields(input_onix)
         self.assertEqual(len(output_onix), len(expected_out))
         for actual, expected in zip(output_onix, expected_out):
             self.assertDictEqual(actual, expected)

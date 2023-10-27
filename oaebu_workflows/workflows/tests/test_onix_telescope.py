@@ -56,8 +56,8 @@ class TestOnixTelescope(ObservatoryTestCase):
         self.sftp_port = find_free_port()
 
         # Test file
-        self.onix_xml_path = test_fixtures_folder("onix", "20210330_CURTINPRESS_ONIX.xml")
-        self.onix_json_path = test_fixtures_folder("onix", "20210330_CURTINPRESS_ONIX.json")
+        self.onix_xml_path = test_fixtures_folder("onix_telescope", "20210330_CURTINPRESS_ONIX.xml")
+        self.onix_json_path = test_fixtures_folder("onix_telescope", "20210330_CURTINPRESS_ONIX.json")
 
     def test_dag_structure(self):
         """Test that the ONIX DAG has the correct structure."""
