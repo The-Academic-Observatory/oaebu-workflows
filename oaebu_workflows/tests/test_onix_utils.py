@@ -214,44 +214,36 @@ class TestCreatePersonnameFields(unittest.TestCase):
         and also populate the PersonNameInverted field with the concatenation of KeyNames and NamesBeforeKey"""
         input_onix = [
             {
-                "DescriptiveDetail": {
-                    "Contributor": [
-                        {"PersonName": None, "PersonNameInverted": None, "KeyNames": "Doe", "NamesBeforeKey": "John"}
-                    ]
-                }
+                "Contributors": [
+                    {"PersonName": None, "PersonNameInverted": None, "KeyNames": "Doe", "NamesBeforeKey": "John"}
+                ]
             },
             {
-                "DescriptiveDetail": {
-                    "Contributor": [
-                        {"PersonName": None, "PersonNameInverted": None, "KeyNames": "Smith", "NamesBeforeKey": "Jane"}
-                    ]
-                }
+                "Contributors": [
+                    {"PersonName": None, "PersonNameInverted": None, "KeyNames": "Smith", "NamesBeforeKey": "Jane"}
+                ]
             },
         ]
         expected_output = [
             {
-                "DescriptiveDetail": {
-                    "Contributor": [
-                        {
-                            "PersonName": "John Doe",
-                            "PersonNameInverted": "Doe, John",
-                            "KeyNames": "Doe",
-                            "NamesBeforeKey": "John",
-                        }
-                    ]
-                }
+                "Contributors": [
+                    {
+                        "PersonName": "John Doe",
+                        "PersonNameInverted": "Doe, John",
+                        "KeyNames": "Doe",
+                        "NamesBeforeKey": "John",
+                    }
+                ]
             },
             {
-                "DescriptiveDetail": {
-                    "Contributor": [
-                        {
-                            "PersonName": "Jane Smith",
-                            "PersonNameInverted": "Smith, Jane",
-                            "KeyNames": "Smith",
-                            "NamesBeforeKey": "Jane",
-                        }
-                    ]
-                }
+                "Contributors": [
+                    {
+                        "PersonName": "Jane Smith",
+                        "PersonNameInverted": "Smith, Jane",
+                        "KeyNames": "Smith",
+                        "NamesBeforeKey": "Jane",
+                    }
+                ]
             },
         ]
         output_onix = create_personname_fields(input_onix)

@@ -140,9 +140,9 @@ class OnixTransformer:
             settings.append("Deduplicate Related Products")
         if self.elevate_related_products:
             settings.append("Elevate Related Products")
+        settings.append("Parse ONIX")
         if self.add_name_fields:
             settings.append("Add Name Fields")
-        settings.append("Parse ONIX")
         if self.collapse_subjects:
             settings.append("Collapse Subjects")
         logging.info("Applying transformation in the following order:")
@@ -158,9 +158,9 @@ class OnixTransformer:
             self._deduplicate_related_products()
         if self.elevate_related_products:
             self._elevate_related_products()
+        self._apply_parser()
         if self.add_name_fields:
             self._apply_name_fields()
-        self._apply_parser()
         if self.collapse_subjects:
             self._collapse_subjects()
         self._save_metadata(self.current_metadata, os.path.join(self.output_dir, f"transformed.{self.save_format}"))
@@ -238,12 +238,6 @@ class OnixTransformer:
         metadata["ONIXMessage"]["Product"] = elevated
         self._save_metadata(metadata, self._intermediate_file_path("elevated.xml"))
 
-    def _apply_name_fields(self):
-        metadata = deepcopy(self.current_metadata)
-        products = create_personname_fields(metadata["ONIXMessage"]["Product"])
-        metadata["ONIXMessage"]["Product"] = products
-        self._save_metadata(metadata, self._intermediate_file_path("name_applied.xml"))
-
     def _apply_parser(self):
         success, parser_path = onix_parser_download()
         if not success:
@@ -256,6 +250,11 @@ class OnixTransformer:
             raise RuntimeError("Failed to execute parser")
 
         self._current_md_path = os.path.join(self.output_dir, "full.jsonl")
+
+    def _apply_name_fields(self):
+        metadata = deepcopy(self.current_metadata)
+        metadata = create_personname_fields(metadata)
+        self._save_metadata(metadata, self._intermediate_file_path("name_applied.jsonl"))
 
     def _collapse_subjects(self):
         metadata = deepcopy(self.current_metadata)
@@ -362,7 +361,7 @@ def create_personname_fields(onix_products: List[dict]) -> List[dict]:
     return_products = deepcopy(onix_products)
     for product in return_products:
         try:
-            contributors = product["DescriptiveDetail"]["Contributor"]
+            contributors = product["Contributors"]
         except KeyError:
             continue
 

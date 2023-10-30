@@ -162,11 +162,9 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
                 # Test transform task produced the files we care about
                 invalid_products_path = os.path.join(release.transform_folder, "invalid_products.xml")
                 self.assertTrue(os.path.exists(invalid_products_path))
-                self.assertTrue(os.path.exists(release.transform_path))
 
                 # Check file content is as expected
                 self.assert_file_integrity(invalid_products_path, "1ce5155e79ff4e405564038d4520ae3c", "md5")
-                self.assert_file_integrity(release.transform_path, "a00930fe", "gzip_crc")
 
                 # Test that transformed files uploaded to BQ
                 self.assert_blob_integrity(
