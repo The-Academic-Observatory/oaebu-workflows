@@ -653,7 +653,7 @@ class OnixWorkflow(Workflow):
             google_analytics3_table_id = bq_sharded_table_id(
                 self.cloud_workspace.project_id,
                 self.bq_oaebu_intermediate_dataset,
-                "google_analytics3_matched",
+                "google_analytics_III_matched",  # TODO: remove hardcoding here
                 release.snapshot_date,
             )
         if google_books_dataset:
