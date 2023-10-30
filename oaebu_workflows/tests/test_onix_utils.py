@@ -50,8 +50,8 @@ class TestOnixTransformer(ObservatoryTestCase):
     normalised_name = "normalised.xml"
     deduplicated_name = "deduplicated.xml"
     elevated_name = "elevated.xml"
-    apply_names_name = "name_applied.xml"
     parsed_name = "full.jsonl"
+    apply_names_name = "name_applied.jsonl"
     collapsed_name = "collapsed.jsonl"
     test_input_metadata = os.path.join(test_fixtures_folder("onix_utils"), "input_metadata.xml")
     test_output_parse_only = os.path.join(test_fixtures_folder("onix_utils"), "output_parse_only.jsonl")
@@ -102,18 +102,18 @@ class TestOnixTransformer(ObservatoryTestCase):
                 algorithm="md5",
             )
             self.assert_file_integrity(
-                os.path.join(transformer.output_dir, self.apply_names_name),
-                "a9e7ffb18286e820c80a0f8624181bb1",
+                os.path.join(transformer.output_dir, self.parsed_name),
+                "033ef3c67663dc042b16be05db2b1a7b",
                 algorithm="md5",
             )
             self.assert_file_integrity(
-                os.path.join(transformer.output_dir, self.parsed_name),
-                "4c3002affcb192d70cb712c2487f2231",
+                os.path.join(transformer.output_dir, self.apply_names_name),
+                "9dc363f29e8f9bdf8c652dd22aed49e0",
                 algorithm="md5",
             )
             self.assert_file_integrity(
                 os.path.join(transformer.output_dir, self.collapsed_name),
-                "37484b55a04bba0ba5dc0274ce21f45b",
+                "74e4870f5c37a2e9690156b47c3232f7",
                 algorithm="md5",
             )
             self.assert_file_integrity(
