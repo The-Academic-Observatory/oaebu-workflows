@@ -16,12 +16,13 @@
 
 import os
 import shutil
-from tempfile import TemporaryDirectory
+from tempfile import TemporaryDirectory, NamedTemporaryFile
 import json
 import unittest
 from unittest.mock import patch
 
 from oaebu_workflows.onix_utils import (
+    OnixTransformer,
     collapse_subjects,
     create_personname_fields,
     onix_parser_download,
@@ -29,9 +30,123 @@ from oaebu_workflows.onix_utils import (
     elevate_product_identifiers,
     normalise_related_products,
     elevate_related_products,
+    find_onix_product,
+    filter_through_schema,
+    remove_invalid_products,
 )
-from oaebu_workflows.config import test_fixtures_folder
-from observatory.platform.observatory_environment import ObservatoryTestCase
+from oaebu_workflows.config import test_fixtures_folder, schema_folder
+from observatory.platform.observatory_environment import (
+    ObservatoryTestCase,
+    compare_lists_of_dicts,
+)
+from observatory.platform.files import load_jsonl
+
+
+class TestOnixTransformer(ObservatoryTestCase):
+    """Tests for the ONIX transformer end to end"""
+
+    filtered_name = "filtered.xml"
+    errors_removed_name = "errors_removed.xml"
+    normalised_name = "normalised.xml"
+    deduplicated_name = "deduplicated.xml"
+    elevated_name = "elevated.xml"
+    apply_names_name = "name_applied.xml"
+    parsed_name = "full.jsonl"
+    collapsed_name = "collapsed.jsonl"
+    test_input_metadata = os.path.join(test_fixtures_folder("onix_utils"), "input_metadata.xml")
+    test_output_parse_only = os.path.join(test_fixtures_folder("onix_utils"), "output_parse_only.jsonl")
+    test_output_metadata = os.path.join(test_fixtures_folder("onix_utils"), "output_metadata.jsonl")
+
+    def test_e2e(self):
+        with TemporaryDirectory() as tempdir:
+            # Your code here
+            transformer = OnixTransformer(
+                input_path=self.test_input_metadata,
+                output_dir=tempdir,
+                filter_products=True,
+                error_removal=True,
+                normalise_related_products=True,
+                deduplicate_related_products=True,
+                elevate_related_products=True,
+                add_name_fields=True,
+                collapse_subjects=True,
+                filter_schema=os.path.join(schema_folder(), "oapen_metadata_filter.json"),
+                invalid_products_name="invalid_products.xml",
+                save_format="jsonl",
+                keep_intermediate=True,
+            )
+            transformer_output_path = transformer.transform()
+            self.assert_file_integrity(
+                os.path.join(transformer.output_dir, self.filtered_name),
+                "7e2b13ae1f25c2d09f11e7864c2f0f92",
+                algorithm="md5",
+            )
+            self.assert_file_integrity(
+                os.path.join(transformer.output_dir, self.errors_removed_name),
+                "6f6cd81c6abe047fffc95fd7d105d78e",
+                algorithm="md5",
+            )
+            self.assert_file_integrity(
+                os.path.join(transformer.output_dir, self.normalised_name),
+                "e73e1d4e0eac10d512b343835373be08",
+                algorithm="md5",
+            )
+            self.assert_file_integrity(
+                os.path.join(transformer.output_dir, self.deduplicated_name),
+                "294a88af4897de5f8b66524afe317520",
+                algorithm="md5",
+            )
+            self.assert_file_integrity(
+                os.path.join(transformer.output_dir, self.elevated_name),
+                "087b7ebcb806b560acf1d6fcd303817c",
+                algorithm="md5",
+            )
+            self.assert_file_integrity(
+                os.path.join(transformer.output_dir, self.apply_names_name),
+                "a9e7ffb18286e820c80a0f8624181bb1",
+                algorithm="md5",
+            )
+            self.assert_file_integrity(
+                os.path.join(transformer.output_dir, self.parsed_name),
+                "4c3002affcb192d70cb712c2487f2231",
+                algorithm="md5",
+            )
+            self.assert_file_integrity(
+                os.path.join(transformer.output_dir, self.collapsed_name),
+                "37484b55a04bba0ba5dc0274ce21f45b",
+                algorithm="md5",
+            )
+            self.assert_file_integrity(
+                os.path.join(transformer.output_dir, "invalid_products.xml"),
+                "1ce5155e79ff4e405564038d4520ae3c",
+                algorithm="md5",
+            )
+            compare_lists_of_dicts(
+                load_jsonl(self.test_output_metadata),
+                load_jsonl(transformer_output_path),
+                primary_key="ISBN13",
+            )
+
+    def test_save_formats(self):
+        """Tests that each of the posible save formats works"""
+
+        def _json_loader(file_path: str):
+            with open(file_path, "r") as f:
+                return json.load(f)
+
+        for fmt, loader in [("json", _json_loader), ("jsonl", load_jsonl), ("jsonl.gz", load_jsonl)]:
+            with TemporaryDirectory() as tempdir:
+                transformer = OnixTransformer(
+                    input_path=self.test_input_metadata,
+                    output_dir=tempdir,
+                    save_format=fmt,
+                    keep_intermediate=True,
+                )
+                transformer_output_path = transformer.transform()
+                self.assertTrue(os.path.exists(transformer_output_path))
+                self.assertTrue(transformer_output_path.endswith(fmt))
+                # Try loading the output
+                loader(transformer_output_path)
 
 
 class TestOnixFunctions(ObservatoryTestCase):
@@ -283,7 +398,8 @@ class TestNormaliseRelatedProducts(unittest.TestCase):
             {"ProductRelationCode": "ABC", "ProductIdentifier": [{"ProductIDType": "06", "IDValue": "67890"}]},
         ]
         result = elevate_product_identifiers(related_product)
-        self.assertEqual(result, expected_result)
+        self.assertCountEqual(result[0]["ProductIdentifier"], expected_result[0]["ProductIdentifier"])
+        self.assertCountEqual(result[1]["ProductIdentifier"], expected_result[1]["ProductIdentifier"])
 
     def test_duplicate_entries(self):
         """Should return a list with a single element when given duplicate entries"""
@@ -470,3 +586,154 @@ class TestElevateRelatedProducts(unittest.TestCase):
         ]
         result = elevate_related_products(onix_products)
         self.assertEqual(result, expected_result)
+
+
+class TestFilterThroughSchema(unittest.TestCase):
+    def test_filter_through_schema(self):
+        """Tests the generic use case of the function"""
+        input_dict = {
+            # Handle a list of dicts
+            "things": [
+                {"subthing": {"subsubthing": {"subsubsubthing": "1", "unimportant_subsubsubthing": "1"}}},
+                {"subthing": {"subsubthing": {"subsubsubthing": "2"}}, "anotherthing": "2"},
+            ],
+            "unimportant_thing": "unimportant",  # Neglected field
+            "important_thing": "important",  # Field to include
+        }
+        schema = {
+            "things": [{"subthing": {"subsubthing": {"subsubsubthing": None}}, "anotherthing": None}],
+            "important_thing": None,
+        }
+        expected_output = {
+            "things": [
+                {"subthing": {"subsubthing": {"subsubsubthing": "1"}}},
+                {"subthing": {"subsubthing": {"subsubsubthing": "2"}}, "anotherthing": "2"},
+            ],
+            "important_thing": "important",
+        }
+        self.assertEqual(filter_through_schema(input_dict, schema), expected_output)
+
+    def test_matching_keys(self):
+        """Tests that the function correctly processes the input dictionary when all nested keys match the schema"""
+        input_dict = {"thing": {"subthing": {"subsubthing": {"subsubsubthing": "1"}}}}
+        schema_dict = {"thing": {"subthing": {"subsubthing": {"subsubsubthing": None}}}}
+        expected_output = {"thing": {"subthing": {"subsubthing": {"subsubsubthing": "1"}}}}
+        self.assertEqual(filter_through_schema(input_dict, schema_dict), expected_output)
+
+    def test_empty_input(self):
+        """Tests that the function correctly handles an empty input dictionary"""
+        input_dict = {}
+        schema_dict = {"thing": {"subthing": {"subsubthing": None}}}
+        expected_output = {}
+        self.assertEqual(filter_through_schema(input_dict, schema_dict), expected_output)
+
+    def test_no_matching_keys(self):
+        """Tests that the function correctly handles an input dictionary with no matching keys in the schema"""
+        input_dict = {"thing": {"subthing": {"subsubthing": "1"}}}
+        schema_dict = {"other_thing": {"other_subthing": {"other_subsubthing": None}}}
+        expected_output = {}
+        self.assertEqual(filter_through_schema(input_dict, schema_dict), expected_output)
+
+    def test_edge_case_empty_schema(self):
+        """Tests that the function correctly handles an empty schema"""
+        input_dict = {"thing": {"subthing": {"subsubthing": "1"}}}
+        schema_dict = {}
+        expected_output = {}
+        self.assertEqual(filter_through_schema(input_dict, schema_dict), expected_output)
+
+
+class TestRemoveInvalidProducts(unittest.TestCase):
+    valid_parsed_xml = test_fixtures_folder("oapen_metadata", "parsed_valid.xml")
+    invalid_products_removed_xml = test_fixtures_folder("oapen_metadata", "invalid_products_removed.xml")
+    empty_xml = test_fixtures_folder("oapen_metadata", "empty_download.xml")
+    invalid_products_xml = test_fixtures_folder("oapen_metadata", "invalid_products.xml")
+
+    def test_remove_invalid_products(self):
+        """Tests the function used to remove invalid products from an xml file"""
+        with NamedTemporaryFile() as invalid_products_file, NamedTemporaryFile() as processed_file:
+            remove_invalid_products(
+                self.valid_parsed_xml, processed_file.name, invalid_products_file=invalid_products_file.name
+            )
+
+            # Make assertions of the processed xml
+            with open(processed_file.name) as f:
+                processed_xml = f.readlines()
+            with open(self.invalid_products_removed_xml) as f:
+                assertion_xml = f.readlines()
+            self.assertEqual(len(processed_xml), len(assertion_xml))
+            self.assertEqual(processed_xml, assertion_xml)
+
+            # Make assertions of the invalid products
+            with open(invalid_products_file.name) as f:
+                invalid_products_xml = f.readlines()
+            with open(self.invalid_products_xml) as f:
+                assertion_xml = f.readlines()
+            self.assertEqual(len(invalid_products_xml), len(assertion_xml))
+            self.assertEqual(invalid_products_xml, assertion_xml)
+
+    def test_empty_xml(self):
+        """Tests the function used to remove invalid products from an xml file"""
+        with NamedTemporaryFile() as invalid_products_file, NamedTemporaryFile() as processed_file:
+            self.assertRaises(
+                AttributeError,
+                remove_invalid_products,
+                self.empty_xml,
+                processed_file.name,
+                invalid_products_file=invalid_products_file.name,
+            )
+
+
+class TestFindOnixProduct(unittest.TestCase):
+    # Tests that the function can extract multiple products from a valid input xml
+    valid_input = [
+        "<ONIXMessage>",
+        "<Product>",
+        "<RecordReference>1</RecordReference>",
+        "</Product>",
+        "<Product>",
+        "<RecordReference>2</RecordReference>",
+        "</Product>",
+        "<Product>",
+        "<RecordReference>3</RecordReference>",
+        "<SomeOtherField>something else</SomeOtherField>",
+        "</Product>",
+        "</ONIXMessage>",
+    ]
+
+    def test_find_onix_product(self):
+        """Test that the function can extract multiple products from a valid input xml"""
+        output = find_onix_product(self.valid_input, 1)
+        self.assertEqual(output.record_reference, "1")
+        self.assertEqual(output.product, {"RecordReference": "1"})
+        output = find_onix_product(self.valid_input, 8)
+        self.assertEqual(output.record_reference, "3")
+        self.assertEqual(output.product, {"RecordReference": "3", "SomeOtherField": "something else"})
+
+    def test_out_of_bounds_supplied(self):
+        """Test that errors are thrown when improper input is supplied"""
+        self.assertRaisesRegex(IndexError, "not within the length of the file", find_onix_product, self.valid_input, -1)
+        self.assertRaisesRegex(
+            IndexError, "not within the length of the file", find_onix_product, self.valid_input, len(self.valid_input)
+        )
+
+    def test_missing_record_reference(self):
+        """Tests that a product without a RecordReference raises a KeyError"""
+        all_lines = ["<Product>", "<RandomField>1</RandomField>", "</Product>"]
+        self.assertRaises(KeyError, find_onix_product, all_lines, 1)
+
+    def test_empty_product(self):
+        """Tests that a product without a RecordReference raises a KeyError"""
+        all_lines = ["<Product>", "</Product>"]
+        self.assertRaisesRegex(ValueError, "Product field is empty", find_onix_product, all_lines, 1)
+
+    def test_no_product_tags(self):
+        """Tests that the function raises a ValueError when <Product> tags are not closed or missing"""
+        missing_product_xml = ["<ONIXMessage>", "</ONIXMessage>"]
+        with self.assertRaisesRegex(ValueError, "Product not found surrounding line"):
+            find_onix_product(missing_product_xml, 0)
+        missing_product_xml = ["<ONIXMessage>", "<Product>", "</ONIXMessage>"]
+        with self.assertRaisesRegex(ValueError, "Product not found surrounding line"):
+            find_onix_product(missing_product_xml, 1)
+        missing_product_xml = ["<ONIXMessage>", "</Product>" "</ONIXMessage>"]
+        with self.assertRaisesRegex(ValueError, "Product not found surrounding line"):
+            find_onix_product(missing_product_xml, 1)

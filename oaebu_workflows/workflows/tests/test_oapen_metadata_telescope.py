@@ -28,13 +28,7 @@ from tenacity import stop_after_attempt
 
 from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.oaebu_partners import partner_from_str
-from oaebu_workflows.workflows.oapen_metadata_telescope import (
-    OapenMetadataTelescope,
-    download_metadata,
-    remove_invalid_products,
-    find_onix_product,
-    filter_through_schema,
-)
+from oaebu_workflows.workflows.oapen_metadata_telescope import OapenMetadataTelescope, download_metadata
 from observatory.platform.api import get_dataset_releases
 from observatory.platform.observatory_config import Workflow
 from observatory.platform.gcs import gcs_blob_name_from_path
@@ -165,42 +159,21 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
                     env.download_bucket, gcs_blob_name_from_path(release.download_path), release.download_path
                 )
 
-                # Test transform task
-                self.assertTrue(os.path.exists(release.filtered_metadata))
-                self.assertTrue(os.path.exists(release.validated_onix))
-                self.assertTrue(os.path.exists(release.invalid_products_path))
-                self.assertTrue(os.path.exists(release.elevated_products_path))
-                self.assertTrue(os.path.exists(release.parsed_onix))
+                # Test transform task produced the files we care about
+                invalid_products_path = os.path.join(release.transform_folder, "invalid_products.xml")
+                self.assertTrue(os.path.exists(invalid_products_path))
                 self.assertTrue(os.path.exists(release.transform_path))
 
                 # Check file content is as expected
-                self.assert_file_integrity(release.filtered_metadata, "7e2b13ae1f25c2d09f11e7864c2f0f92", "md5")
-                self.assert_file_integrity(release.validated_onix, "6f6cd81c6abe047fffc95fd7d105d78e", "md5")
-                self.assert_file_integrity(release.invalid_products_path, "1ce5155e79ff4e405564038d4520ae3c", "md5")
-                self.assert_file_integrity(release.elevated_products_path, "f092a28a8e719f7fe101eb25d09505e8", "md5")
-                self.assert_file_integrity(release.parsed_onix, "3b0656629154aa1c376c1078a079e9da", "md5")
-                self.assert_file_integrity(release.transform_path, "4b2074e7", "gzip_crc")
-
-                from observatory.platform.files import crc32c_base64_hash, get_file_hash, gzip_file_crc, save_jsonl_gz
-
-                print(get_file_hash(file_path=release.filtered_metadata, algorithm="md5"))
-                print(get_file_hash(file_path=release.validated_onix, algorithm="md5"))
-                print(get_file_hash(file_path=release.invalid_products_path, algorithm="md5"))
-                print(get_file_hash(file_path=release.elevated_products_path, algorithm="md5"))
-                print(get_file_hash(file_path=release.parsed_onix, algorithm="md5"))
-                print(gzip_file_crc(release.transform_path))
+                self.assert_file_integrity(invalid_products_path, "1ce5155e79ff4e405564038d4520ae3c", "md5")
+                self.assert_file_integrity(release.transform_path, "a00930fe", "gzip_crc")
 
                 # Test that transformed files uploaded to BQ
                 self.assert_blob_integrity(
                     env.transform_bucket, gcs_blob_name_from_path(release.transform_path), release.transform_path
                 )
                 self.assert_blob_integrity(
-                    env.transform_bucket,
-                    gcs_blob_name_from_path(release.invalid_products_path),
-                    release.invalid_products_path,
-                )
-                self.assert_blob_integrity(
-                    env.transform_bucket, gcs_blob_name_from_path(release.parsed_onix), release.parsed_onix
+                    env.transform_bucket, gcs_blob_name_from_path(invalid_products_path), invalid_products_path
                 )
 
                 # Test that table is loaded to BQ
@@ -251,7 +224,7 @@ class TestDownloadMetadata(unittest.TestCase):
                 download_metadata(self.uri, download_file.name)
                 with open(download_file.name, "r") as f:
                     downloaded_xml = f.readlines()
-        with open(self.valid_download_xml, "r") as f:
+        with open(self.valid_download_xml, "r") as f:  # Note - do not format this file or this test will fail
             assertion_xml = f.readlines()
         self.assertEqual(len(downloaded_xml), len(assertion_xml))
         self.assertEqual(downloaded_xml, assertion_xml)
@@ -290,154 +263,3 @@ class TestDownloadMetadata(unittest.TestCase):
                 self.assertRaisesRegex(
                     ConnectionError, "Expected status code 200", download_metadata, self.uri, download_file.name
                 )
-
-
-class TestFilterThroughSchema(unittest.TestCase):
-    def test_filter_through_schema(self):
-        """Tests the generic use case of the function"""
-        input_dict = {
-            # Handle a list of dicts
-            "things": [
-                {"subthing": {"subsubthing": {"subsubsubthing": "1", "unimportant_subsubsubthing": "1"}}},
-                {"subthing": {"subsubthing": {"subsubsubthing": "2"}}, "anotherthing": "2"},
-            ],
-            "unimportant_thing": "unimportant",  # Neglected field
-            "important_thing": "important",  # Field to include
-        }
-        schema = {
-            "things": [{"subthing": {"subsubthing": {"subsubsubthing": None}}, "anotherthing": None}],
-            "important_thing": None,
-        }
-        expected_output = {
-            "things": [
-                {"subthing": {"subsubthing": {"subsubsubthing": "1"}}},
-                {"subthing": {"subsubthing": {"subsubsubthing": "2"}}, "anotherthing": "2"},
-            ],
-            "important_thing": "important",
-        }
-        self.assertEqual(filter_through_schema(input_dict, schema), expected_output)
-
-    def test_matching_keys(self):
-        """Tests that the function correctly processes the input dictionary when all nested keys match the schema"""
-        input_dict = {"thing": {"subthing": {"subsubthing": {"subsubsubthing": "1"}}}}
-        schema_dict = {"thing": {"subthing": {"subsubthing": {"subsubsubthing": None}}}}
-        expected_output = {"thing": {"subthing": {"subsubthing": {"subsubsubthing": "1"}}}}
-        self.assertEqual(filter_through_schema(input_dict, schema_dict), expected_output)
-
-    def test_empty_input(self):
-        """Tests that the function correctly handles an empty input dictionary"""
-        input_dict = {}
-        schema_dict = {"thing": {"subthing": {"subsubthing": None}}}
-        expected_output = {}
-        self.assertEqual(filter_through_schema(input_dict, schema_dict), expected_output)
-
-    def test_no_matching_keys(self):
-        """Tests that the function correctly handles an input dictionary with no matching keys in the schema"""
-        input_dict = {"thing": {"subthing": {"subsubthing": "1"}}}
-        schema_dict = {"other_thing": {"other_subthing": {"other_subsubthing": None}}}
-        expected_output = {}
-        self.assertEqual(filter_through_schema(input_dict, schema_dict), expected_output)
-
-    def test_edge_case_empty_schema(self):
-        """Tests that the function correctly handles an empty schema"""
-        input_dict = {"thing": {"subthing": {"subsubthing": "1"}}}
-        schema_dict = {}
-        expected_output = {}
-        self.assertEqual(filter_through_schema(input_dict, schema_dict), expected_output)
-
-
-class TestRemoveInvalidProducts(unittest.TestCase):
-    valid_parsed_xml = test_fixtures_folder("oapen_metadata", "parsed_valid.xml")
-    invalid_products_removed_xml = test_fixtures_folder("oapen_metadata", "invalid_products_removed.xml")
-    empty_xml = test_fixtures_folder("oapen_metadata", "empty_download.xml")
-    invalid_products_xml = test_fixtures_folder("oapen_metadata", "invalid_products.xml")
-
-    def test_remove_invalid_products(self):
-        """Tests the function used to remove invalid products from an xml file"""
-        with NamedTemporaryFile() as invalid_products_file, NamedTemporaryFile() as processed_file:
-            remove_invalid_products(
-                self.valid_parsed_xml, processed_file.name, invalid_products_file=invalid_products_file.name
-            )
-
-            # Make assertions of the processed xml
-            with open(processed_file.name) as f:
-                processed_xml = f.readlines()
-            with open(self.invalid_products_removed_xml) as f:
-                assertion_xml = f.readlines()
-            self.assertEqual(len(processed_xml), len(assertion_xml))
-            self.assertEqual(processed_xml, assertion_xml)
-
-            # Make assertions of the invalid products
-            with open(invalid_products_file.name) as f:
-                invalid_products_xml = f.readlines()
-            with open(self.invalid_products_xml) as f:
-                assertion_xml = f.readlines()
-            self.assertEqual(len(invalid_products_xml), len(assertion_xml))
-            self.assertEqual(invalid_products_xml, assertion_xml)
-
-    def test_empty_xml(self):
-        """Tests the function used to remove invalid products from an xml file"""
-        with NamedTemporaryFile() as invalid_products_file, NamedTemporaryFile() as processed_file:
-            self.assertRaises(
-                AttributeError,
-                remove_invalid_products,
-                self.empty_xml,
-                processed_file.name,
-                invalid_products_file=invalid_products_file.name,
-            )
-
-
-class TestFindOnixProduct(unittest.TestCase):
-    # Tests that the function can extract multiple products from a valid input xml
-    valid_input = [
-        "<ONIXMessage>",
-        "<Product>",
-        "<RecordReference>1</RecordReference>",
-        "</Product>",
-        "<Product>",
-        "<RecordReference>2</RecordReference>",
-        "</Product>",
-        "<Product>",
-        "<RecordReference>3</RecordReference>",
-        "<SomeOtherField>something else</SomeOtherField>",
-        "</Product>",
-        "</ONIXMessage>",
-    ]
-
-    def test_find_onix_product(self):
-        """Test that the function can extract multiple products from a valid input xml"""
-        output = find_onix_product(self.valid_input, 1)
-        self.assertEqual(output.record_reference, "1")
-        self.assertEqual(output.product, {"RecordReference": "1"})
-        output = find_onix_product(self.valid_input, 8)
-        self.assertEqual(output.record_reference, "3")
-        self.assertEqual(output.product, {"RecordReference": "3", "SomeOtherField": "something else"})
-
-    def test_out_of_bounds_supplied(self):
-        """Test that errors are thrown when improper input is supplied"""
-        self.assertRaisesRegex(IndexError, "not within the length of the file", find_onix_product, self.valid_input, -1)
-        self.assertRaisesRegex(
-            IndexError, "not within the length of the file", find_onix_product, self.valid_input, len(self.valid_input)
-        )
-
-    def test_missing_record_reference(self):
-        """Tests that a product without a RecordReference raises a KeyError"""
-        all_lines = ["<Product>", "<RandomField>1</RandomField>", "</Product>"]
-        self.assertRaises(KeyError, find_onix_product, all_lines, 1)
-
-    def test_empty_product(self):
-        """Tests that a product without a RecordReference raises a KeyError"""
-        all_lines = ["<Product>", "</Product>"]
-        self.assertRaisesRegex(ValueError, "Product field is empty", find_onix_product, all_lines, 1)
-
-    def test_no_product_tags(self):
-        """Tests that the function raises a ValueError when <Product> tags are not closed or missing"""
-        missing_product_xml = ["<ONIXMessage>", "</ONIXMessage>"]
-        with self.assertRaisesRegex(ValueError, "Product not found surrounding line"):
-            find_onix_product(missing_product_xml, 0)
-        missing_product_xml = ["<ONIXMessage>", "<Product>", "</ONIXMessage>"]
-        with self.assertRaisesRegex(ValueError, "Product not found surrounding line"):
-            find_onix_product(missing_product_xml, 1)
-        missing_product_xml = ["<ONIXMessage>", "</Product>" "</ONIXMessage>"]
-        with self.assertRaisesRegex(ValueError, "Product not found surrounding line"):
-            find_onix_product(missing_product_xml, 1)

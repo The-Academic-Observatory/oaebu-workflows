@@ -168,7 +168,7 @@ class OnixTransformer:
         return self._current_md_path
 
     def _intermediate_file_path(self, file_name):
-        dir_ = self._work_dir if self.keep_intermediate else self.output_dir
+        dir_ = self.output_dir if self.keep_intermediate else self._work_dir
         return os.path.join(dir_, file_name)
 
     def _save_metadata(self, metadata: List[dict], file_path: str):

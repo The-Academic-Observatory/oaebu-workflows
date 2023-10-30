@@ -76,7 +76,8 @@ class OapenMetadataRelease(SnapshotRelease):
 
     @property
     def transform_files(self):
-        return os.listdir(self.transform_folder)
+        files = os.listdir(self.transform_folder)
+        return [os.path.join(self.transform_folder, f) for f in files]
 
 
 class OapenMetadataTelescope(Workflow):
@@ -189,6 +190,7 @@ class OapenMetadataTelescope(Workflow):
             deduplicate_related_products=True,
             elevate_related_products=True,
             add_name_fields=True,
+            collapse_subjects=True,
             filter_schema=self.oapen_schema,
             keep_intermediate=True,
         )
