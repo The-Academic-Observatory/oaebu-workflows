@@ -31,7 +31,12 @@ from googleapiclient.http import HttpMockSequence
 from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.oaebu_partners import partner_from_str
 from oaebu_workflows.workflows.jstor_telescope import JstorRelease, JstorTelescope, Publisher, Collection, get_label_id
-from observatory.platform.observatory_environment import ObservatoryEnvironment, ObservatoryTestCase, find_free_port
+from observatory.platform.observatory_environment import (
+    ObservatoryEnvironment,
+    ObservatoryTestCase,
+    find_free_port,
+    load_and_parse_json,
+)
 from observatory.platform.observatory_config import Workflow
 from observatory.platform.gcs import gcs_blob_name_from_path
 from observatory.platform.bigquery import bq_table_id
@@ -139,7 +144,7 @@ class TestJstorTelescopePublisher(ObservatoryTestCase):
         mock_account_credentials.from_json_keyfile_dict.return_value = ""
 
         http = HttpMockSequence(
-            create_http_mock_sequence(
+            publisher_http_mock_sequence(
                 self.country_report["url"], self.institution_report["url"], self.wrong_publisher_report["url"]
             )
         )
@@ -302,48 +307,6 @@ class TestJstorTelescopePublisher(ObservatoryTestCase):
                 self.assertEqual(ti.state, State.SUCCESS)
                 self.assert_cleanup(release.workflow_folder)
 
-    def test_get_release_date(self):
-        """Test that the get_release_date returns the correct release date and raises an exception when dates are
-        incorrect"""
-        with CliRunner().isolated_filesystem():
-            # Test reports in new format with header
-            new_report_content = (
-                "Report_Name\tBook Usage by Country\nReport_ID\tPUB_BCU\nReport_Description\t"
-                "Usage of your books on JSTOR by country.\nPublisher_Name\tPublisher 1\nReporting_Period\t"
-                "{start_date} to {end_date}\nCreated\t2021-10-01\nCreated_By\tJSTOR"
-            )
-            old_report_content = (
-                "Book Title\tUsage Month\nAddress source war after\t{start_date}\nNote spend " "government\t{end_date}"
-            )
-            reports = [
-                {"file": "new_success.tsv", "start": "2020-01-01", "end": "2020-01-31"},
-                {"file": "new_fail.tsv", "start": "2020-01-01", "end": "2020-02-01"},
-                {"file": "old_success.tsv", "start": "2020-01", "end": "2020-01"},
-                {"file": "old_fail.tsv", "start": "2020-01", "end": "2020-02"},
-            ]
-
-            for report in reports:
-                with open(report["file"], "w") as f:
-                    if report == reports[0] or report == reports[1]:
-                        f.write(new_report_content.format(start_date=report["start"], end_date=report["end"]))
-                    else:
-                        f.write(old_report_content.format(start_date=report["start"], end_date=report["end"]))
-
-            # Test new report is successful
-            start_date, end_date = Publisher.get_release_date(reports[0]["file"])
-            self.assertEqual(pendulum.parse(reports[0]["start"]), start_date)
-            self.assertEqual(pendulum.parse(reports[0]["end"]), end_date)
-            # Test new report fails
-            with self.assertRaises(AirflowException):
-                Publisher.get_release_date(reports[1]["file"])
-            # Test old report is successful
-            start_date, end_date = Publisher.get_release_date(reports[2]["file"])
-            self.assertEqual(pendulum.parse(reports[2]["start"]).start_of("month").start_of("day"), start_date)
-            self.assertEqual(pendulum.parse(reports[2]["end"]).end_of("month").start_of("day"), end_date)
-            # Test old report fails
-            with self.assertRaises(AirflowException):
-                Publisher.get_release_date(reports[3]["file"])
-
 
 class TestJstorTelescopeCollection(ObservatoryTestCase):
     """Tests for the Jstor telescope"""
@@ -353,15 +316,34 @@ class TestJstorTelescopeCollection(ObservatoryTestCase):
         self.project_id = os.getenv("TEST_GCP_PROJECT_ID")
         self.data_location = os.getenv("TEST_GCP_DATA_LOCATION")
         self.publisher_id = "BTAA"
-        self.release_date = pendulum.parse("20220901").end_of("month")
+        self.release_date = pendulum.parse("20230901").end_of("month")
+
+        self.country_report = {
+            "path": test_fixtures_folder("jstor", "collection_country.json"),
+            "table": test_fixtures_folder("jstor", "collection_country_table.json"),
+            "url": "https://www.jstor.org/admin/reports/download/249192019",
+            "download_hash": "8b03d0353ac258bfca48c9347dab76af",
+            "transform_hash": "885bf71d",
+            "table_rows": 3,
+        }
+        self.institution_report = {
+            "path": test_fixtures_folder("jstor", "collection_institution.json"),
+            "table": test_fixtures_folder("jstor", "collection_institution_table.json"),
+            "url": "https://www.jstor.org/admin/reports/download/129518301",
+            "download_hash": "1507899df3b3937d6fc20cbe007c882f",
+            "transform_hash": "6ff261d4",
+            "table_rows": 6,
+        }
 
     @patch("oaebu_workflows.workflows.jstor_telescope.build")
     @patch("oaebu_workflows.workflows.jstor_telescope.Credentials")
-    def test_telescope_collecion(self, mock_account_credentials, mock_build):
+    def test_telescope_collection(self, mock_account_credentials, mock_build):
         """Test the Jstor telescope end to end."""
 
         mock_account_credentials.from_json_keyfile_dict.return_value = ""
-        http = HttpMockSequence(create_http_mock_sequence())
+        http = HttpMockSequence(
+            collection_http_mock_sequence(self.country_report["path"], self.institution_report["path"])
+        )
         mock_build.return_value = build("gmail", "v1", http=http)
 
         # Setup Observatory environment
@@ -404,6 +386,7 @@ class TestJstorTelescopeCollection(ObservatoryTestCase):
                 # Test list releases task with files available
                 ti = env.run_task(telescope.list_reports.__name__)
                 self.assertEqual(ti.state, State.SUCCESS)
+
                 available_reports = ti.xcom_pull(
                     key=JstorTelescope.REPORTS_INFO, task_ids=telescope.list_reports.__name__, include_prior_dates=False
                 )
@@ -415,11 +398,8 @@ class TestJstorTelescopeCollection(ObservatoryTestCase):
                 self.assertListEqual(expected_reports_info, available_reports)
 
                 # Test download_reports task
-                with httpretty.enabled():
-                    for report in available_reports:
-                        self.setup_mock_file_download(report["url"], report["path"], headers=report["headers"])
-                    ti = env.run_task(telescope.download_reports.__name__)
-                    self.assertEqual(ti.state, State.SUCCESS)
+                ti = env.run_task(telescope.download_reports.__name__)
+                self.assertEqual(ti.state, State.SUCCESS)
 
                 # use release info for other tasks
                 available_releases = ti.xcom_pull(
@@ -433,6 +413,7 @@ class TestJstorTelescopeCollection(ObservatoryTestCase):
                     self.assertEqual(self.release_date.date(), pendulum.parse(release_date).date())
                     self.assertIsInstance(reports_info, list)
                     self.assertListEqual(expected_reports_info, reports_info)
+
                 release = JstorRelease(
                     dag_id=telescope.dag_id,
                     run_id=env.dag_run.run_id,
@@ -442,12 +423,14 @@ class TestJstorTelescopeCollection(ObservatoryTestCase):
                     reports_info=reports_info,
                 )
 
+                # Test that files download
                 self.assertTrue(os.path.exists(release.download_country_path))
                 self.assertTrue(os.path.exists(release.download_institution_path))
                 self.assert_file_integrity(release.download_country_path, self.country_report["download_hash"], "md5")
                 self.assert_file_integrity(
                     release.download_institution_path, self.institution_report["download_hash"], "md5"
                 )
+
                 # Test that file uploaded
                 ti = env.run_task(telescope.upload_downloaded.__name__)
                 self.assertEqual(ti.state, State.SUCCESS)
@@ -503,6 +486,10 @@ class TestJstorTelescopeCollection(ObservatoryTestCase):
                 )
                 self.assert_table_integrity(country_table_id, self.country_report["table_rows"])
                 self.assert_table_integrity(institution_table_id, self.institution_report["table_rows"])
+                expected = load_and_parse_json(self.country_report["table"], date_fields=["release_date"])
+                self.assert_table_content(country_table_id, expected, primary_key="ISBN")
+                expected = load_and_parse_json(self.institution_report["table"], date_fields=["release_date"])
+                self.assert_table_content(institution_table_id, expected, primary_key="ISBN")
 
                 # Add_dataset_release_task
                 dataset_releases = get_dataset_releases(dag_id=telescope.dag_id, dataset_id=telescope.api_dataset_id)
@@ -567,7 +554,7 @@ def test_get_label_id(self, mock_account_credentials, mock_build):
     mock_account_credentials.from_json_keyfile_dict.return_value = ""
 
     http = HttpMockSequence(
-        create_http_mock_sequence(
+        publisher_http_mock_sequence(
             self.country_report["url"], self.institution_report["url"], self.wrong_publisher_report["url"]
         )
     )
@@ -627,10 +614,8 @@ def test_get_label_id(self, mock_account_credentials, mock_build):
     self.assertEqual("existing_label", label_id)
 
 
-def create_http_mock_sequence(
-    country_report_url: str = "https://www.jstor.org/admin/reports/download/249192019",
-    institution_report_url: str = "https://www.jstor.org/admin/reports/download/129518301",
-    wrong_publisher_report_url: str = "https://www.jstor.org/admin/reports/download/12345",
+def publisher_http_mock_sequence(
+    country_report_url: str, institution_report_url: str, wrong_publisher_report_url: str
 ) -> list:
     """Create a list with mocked http responses
 
@@ -660,7 +645,6 @@ def create_http_mock_sequence(
     list_messages1 = {
         "messages": [
             {"id": "1788ec9e91f3de62", "threadId": "1788e9b0a848236a"},
-            {"id": "18af0b40b64fe408", "threadId": "18af0b3f613c3f95"},
         ],
         "resultSizeEstimate": 2,
         "nextPageToken": 1234,
@@ -741,8 +725,47 @@ def create_http_mock_sequence(
         "historyId": "2302",
         "internalDate": "1617303299000",
     }
-    # Collections
-    get_message4 = {
+    modify_message1 = {
+        "id": "1788ec9e91f3de62",
+        "threadId": "1788e9b0a848236a",
+        "labelIds": ["Label_1", "CATEGORY_PERSONAL", "INBOX"],
+    }
+    modify_message2 = {
+        "id": "1788ebe4ecbab055",
+        "threadId": "1788e9b0a848236a",
+        "labelIds": ["Label_1", "CATEGORY_PERSONAL", "INBOX"],
+    }
+    http_mock_sequence = [
+        ({"status": "200"}, json.dumps(list_messages1)),
+        ({"status": "200"}, json.dumps(list_messages2)),
+        ({"status": "200"}, json.dumps(get_message1)),
+        ({"status": "200"}, json.dumps(get_message2)),
+        ({"status": "200"}, json.dumps(get_message3)),
+        ({"status": "200"}, json.dumps(list_labels)),
+        ({"status": "200"}, json.dumps(modify_message1)),
+        ({"status": "200"}, json.dumps(modify_message2)),
+    ]
+
+    return http_mock_sequence
+
+
+def collection_http_mock_sequence(country_json: str, institution_json: str) -> list:
+    """Create a list with mocked http responses for the collection workflow of the telescope
+
+
+    :param country_json: The path to the JSON file containing the data for the country message.
+    :param institution_json: The path to the JSON file containing the data for the institution message.
+    :returns: A list of tuples representing the HTTP mock responses
+    """
+    list_messages = {
+        "messages": [
+            {"id": "18af0b40b64fe408", "threadId": "18af0b3f613c3f95"},
+            {"id": "18af0b3f613c3f95", "threadId": "18af0b3f613c3f95"},
+        ],
+        "resultSizeEstimate": 2,
+    }
+
+    get_message1 = {
         "id": "18af0b40b64fe408",
         "threadId": "18af0b3f613c3f95",
         "labelIds": ["CATEGORY_PERSONAL", "INBOX"],
@@ -764,26 +787,34 @@ def create_http_mock_sequence(
         "historyId": "49808",
         "internalDate": "1696255445000",
     }
-    modify_message1 = {
-        "id": "1788ec9e91f3de62",
-        "threadId": "1788e9b0a848236a",
-        "labelIds": ["Label_1", "CATEGORY_PERSONAL", "INBOX"],
+    get_message2 = {
+        "id": "18af0b3f613c3f95",
+        "threadId": "18af0b3f613c3f95",
+        "labelIds": ["CATEGORY_PERSONAL", "INBOX"],
+        "snippet": "Monthly Usage of books by Country and Institution made available through the Big Ten Academic Alliance (BTAA) on JSTOR General Report Notes: Views and downloads of front matter, back matter, and table",
+        "payload": {
+            "partId": "",
+            "mimeType": "multipart/mixed",
+            "filename": "",
+            "headers": [{"name": "Delivered-To", "value": "accountname@gmail.com"}],
+            "body": {"size": 0},
+            # no "parts", this message should be ignored by the telescope
+        },
+        "sizeEstimate": 355380,
+        "historyId": "49808",
+        "internalDate": "1696255445000",
     }
-    modify_message2 = {
-        "id": "1788ebe4ecbab055",
-        "threadId": "1788e9b0a848236a",
-        "labelIds": ["Label_1", "CATEGORY_PERSONAL", "INBOX"],
-    }
+    with open(country_json, "rb") as f:
+        data_return1 = json.load(f)
+        data_return1["data"] = base64.urlsafe_b64encode(data_return1["data"].encode()).decode()
+    with open(institution_json, "rb") as f:
+        data_return2 = json.load(f)
+        data_return2["data"] = base64.urlsafe_b64encode(data_return2["data"].encode()).decode()
     http_mock_sequence = [
-        ({"status": "200"}, json.dumps(list_messages1)),
-        ({"status": "200"}, json.dumps(list_messages2)),
+        ({"status": "200"}, json.dumps(list_messages)),
         ({"status": "200"}, json.dumps(get_message1)),
         ({"status": "200"}, json.dumps(get_message2)),
-        ({"status": "200"}, json.dumps(get_message3)),
-        ({"status": "200"}, json.dumps(get_message4)),
-        ({"status": "200"}, json.dumps(list_labels)),
-        ({"status": "200"}, json.dumps(modify_message1)),
-        ({"status": "200"}, json.dumps(modify_message2)),
+        ({"status": "200"}, json.dumps(data_return1)),
+        ({"status": "200"}, json.dumps(data_return2)),
     ]
-
     return http_mock_sequence

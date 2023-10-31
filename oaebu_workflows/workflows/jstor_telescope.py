@@ -252,7 +252,8 @@ class JstorTelescope(Workflow):
 
                 if self.collection:
                     tmp_download_path = os.path.join(reports_folder, "report.csv")
-                    Collection.download_report(report["id"], report["attachment_id"], tmp_download_path)
+                    service = create_gmail_service()
+                    Collection.download_report(service, report["id"], report["attachment_id"], tmp_download_path)
                     start_date, end_date = Collection.get_release_date(tmp_download_path)
                 else:
                     tmp_download_path = os.path.join(reports_folder, "report.tsv")
@@ -492,7 +493,7 @@ class Collection:
         return available_reports
 
     @staticmethod
-    def download_report(message_id: str, attachment_id, download_path: str) -> None:
+    def download_report(service: Resource, message_id: str, attachment_id, download_path: str) -> None:
         """Download report from url to a file.
 
         :param message_id: The ID of the gmail message
@@ -500,12 +501,11 @@ class Collection:
         :param download_path: Path to download data to
         """
         logging.info(f"Downloading report: {message_id} to: {download_path}")
-        service = create_gmail_service()
         attachment = (
             service.users().messages().attachments().get(userId="me", messageId=message_id, id=attachment_id).execute()
         )
         data = attachment["data"]
-        file_data = base64.urlsafe_b64decode(data.encode("UTF-8"))
+        file_data = base64.urlsafe_b64decode(data)
         with open(download_path, "wb") as f:
             f.write(file_data)
 
