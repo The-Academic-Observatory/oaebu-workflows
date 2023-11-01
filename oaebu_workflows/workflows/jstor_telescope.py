@@ -372,14 +372,19 @@ class JstorTelescope(Workflow):
     def cleanup(self, releases: List[JstorRelease], **kwargs) -> None:
         """Delete all files, folders and XComs associated with this release.
         Assign a label to the gmail messages that have been processed."""
+        service = create_gmail_service()
+        label_id = get_label_id(service, JstorTelescope.PROCESSED_LABEL_NAME)
         for release in releases:
             cleanup(
                 dag_id=self.dag_id, execution_date=kwargs["execution_date"], workflow_folder=release.workflow_folder
             )
-            service = create_gmail_service()
-            label_id = get_label_id(service, JstorTelescope.PROCESSED_LABEL_NAME)
-            for report in release.reports_info:
-                message_id = report["id"]
+            if self.collection:
+                message_ids = [release.reports_info[0]["id"]]  # One message per release
+            else:
+                message_ids = [report["id"] for report in release.reports_info]  # Multiple messages per release
+
+            # Add labels to messages (emails)
+            for message_id in message_ids:
                 body = {"addLabelIds": [label_id]}
                 response = service.users().messages().modify(userId="me", id=message_id, body=body).execute()
                 try:

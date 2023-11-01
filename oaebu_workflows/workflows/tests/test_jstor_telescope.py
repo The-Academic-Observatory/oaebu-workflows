@@ -307,6 +307,48 @@ class TestJstorTelescopePublisher(ObservatoryTestCase):
                 self.assertEqual(ti.state, State.SUCCESS)
                 self.assert_cleanup(release.workflow_folder)
 
+    def test_get_release_date(self):
+        """Test that the get_release_date returns the correct release date and raises an exception when dates are
+        incorrect"""
+        with CliRunner().isolated_filesystem():
+            # Test reports in new format with header
+            new_report_content = (
+                "Report_Name\tBook Usage by Country\nReport_ID\tPUB_BCU\nReport_Description\t"
+                "Usage of your books on JSTOR by country.\nPublisher_Name\tPublisher 1\nReporting_Period\t"
+                "{start_date} to {end_date}\nCreated\t2021-10-01\nCreated_By\tJSTOR"
+            )
+            old_report_content = (
+                "Book Title\tUsage Month\nAddress source war after\t{start_date}\nNote spend " "government\t{end_date}"
+            )
+            reports = [
+                {"file": "new_success.tsv", "start": "2020-01-01", "end": "2020-01-31"},
+                {"file": "new_fail.tsv", "start": "2020-01-01", "end": "2020-02-01"},
+                {"file": "old_success.tsv", "start": "2020-01", "end": "2020-01"},
+                {"file": "old_fail.tsv", "start": "2020-01", "end": "2020-02"},
+            ]
+
+            for report in reports:
+                with open(report["file"], "w") as f:
+                    if report == reports[0] or report == reports[1]:
+                        f.write(new_report_content.format(start_date=report["start"], end_date=report["end"]))
+                    else:
+                        f.write(old_report_content.format(start_date=report["start"], end_date=report["end"]))
+
+            # Test new report is successful
+            start_date, end_date = Publisher.get_release_date(reports[0]["file"])
+            self.assertEqual(pendulum.parse(reports[0]["start"]), start_date)
+            self.assertEqual(pendulum.parse(reports[0]["end"]), end_date)
+            # Test new report fails
+            with self.assertRaises(AirflowException):
+                Publisher.get_release_date(reports[1]["file"])
+            # Test old report is successful
+            start_date, end_date = Publisher.get_release_date(reports[2]["file"])
+            self.assertEqual(pendulum.parse(reports[2]["start"]).start_of("month").start_of("day"), start_date)
+            self.assertEqual(pendulum.parse(reports[2]["end"]).end_of("month").start_of("day"), end_date)
+            # Test old report fails
+            with self.assertRaises(AirflowException):
+                Publisher.get_release_date(reports[3]["file"])
+
 
 class TestJstorTelescopeCollection(ObservatoryTestCase):
     """Tests for the Jstor telescope"""
@@ -510,41 +552,28 @@ class TestJstorTelescopeCollection(ObservatoryTestCase):
         with CliRunner().isolated_filesystem():
             # Test reports in new format with header
             new_report_content = (
-                "Report_Name\tBook Usage by Country\nReport_ID\tPUB_BCU\nReport_Description\t"
-                "Usage of your books on JSTOR by country.\nPublisher_Name\tPublisher 1\nReporting_Period\t"
-                "{start_date} to {end_date}\nCreated\t2021-10-01\nCreated_By\tJSTOR"
-            )
-            old_report_content = (
-                "Book Title\tUsage Month\nAddress source war after\t{start_date}\nNote spend " "government\t{end_date}"
+                'entity_name,book_title,item_doi,publisher,"Month, Year of monthdt"\n'
+                "Entity,Book 1,10/1001,Publisher 1,{month_1}\n"  # Start date eg. September 2023
+                "Entity,Book 2,10/1002,Publisher 1,{month_2}\n"
             )
             reports = [
-                {"file": "new_success.tsv", "start": "2020-01-01", "end": "2020-01-31"},
-                {"file": "new_fail.tsv", "start": "2020-01-01", "end": "2020-02-01"},
-                {"file": "old_success.tsv", "start": "2020-01", "end": "2020-01"},
-                {"file": "old_fail.tsv", "start": "2020-01", "end": "2020-02"},
+                {"file": "new_success.tsv", "report_month_1": "January 2020", "report_month_2": "January 2020"},
+                {"file": "new_fail.tsv", "report_month_1": "January 2020", "report_month_2": "February 2020"},
             ]
 
             for report in reports:
                 with open(report["file"], "w") as f:
-                    if report == reports[0] or report == reports[1]:
-                        f.write(new_report_content.format(start_date=report["start"], end_date=report["end"]))
-                    else:
-                        f.write(old_report_content.format(start_date=report["start"], end_date=report["end"]))
+                    f.write(
+                        new_report_content.format(month_1=report["report_month_1"], month_2=report["report_month_2"])
+                    )
 
             # Test new report is successful
-            start_date, end_date = Publisher.get_release_date(reports[0]["file"])
-            self.assertEqual(pendulum.parse(reports[0]["start"]), start_date)
-            self.assertEqual(pendulum.parse(reports[0]["end"]), end_date)
+            start_date, end_date = Collection.get_release_date(reports[0]["file"])
+            self.assertEqual(pendulum.parse("2020-01-01"), start_date)
+            self.assertEqual(pendulum.parse("2020-01-31"), end_date)
             # Test new report fails
             with self.assertRaises(AirflowException):
-                Publisher.get_release_date(reports[1]["file"])
-            # Test old report is successful
-            start_date, end_date = Publisher.get_release_date(reports[2]["file"])
-            self.assertEqual(pendulum.parse(reports[2]["start"]).start_of("month").start_of("day"), start_date)
-            self.assertEqual(pendulum.parse(reports[2]["end"]).end_of("month").start_of("day"), end_date)
-            # Test old report fails
-            with self.assertRaises(AirflowException):
-                Publisher.get_release_date(reports[3]["file"])
+                Collection.get_release_date(reports[1]["file"])
 
 
 @patch("oaebu_workflows.workflows.jstor_telescope.build")
@@ -810,11 +839,39 @@ def collection_http_mock_sequence(country_json: str, institution_json: str) -> l
     with open(institution_json, "rb") as f:
         data_return2 = json.load(f)
         data_return2["data"] = base64.urlsafe_b64encode(data_return2["data"].encode()).decode()
+
+    list_labels = {
+        "labels": [
+            {
+                "id": "CHAT",
+                "name": "CHAT",
+                "messageListVisibility": "hide",
+                "labelListVisibility": "labelHide",
+                "type": "system",
+            },
+            {
+                "id": "Label_1",
+                "name": JstorTelescope.PROCESSED_LABEL_NAME,
+                "messageListVisibility": "show",
+                "labelListVisibility": "labelShow",
+                "type": "user",
+            },
+        ]
+    }
+
+    modify_message1 = {
+        "id": "18af0b40b64fe408",
+        "threadId": "18af0b3f613c3f95",
+        "labelIds": ["Label_1", "CATEGORY_PERSONAL", "INBOX"],
+    }
+
     http_mock_sequence = [
         ({"status": "200"}, json.dumps(list_messages)),
         ({"status": "200"}, json.dumps(get_message1)),
         ({"status": "200"}, json.dumps(get_message2)),
         ({"status": "200"}, json.dumps(data_return1)),
         ({"status": "200"}, json.dumps(data_return2)),
+        ({"status": "200"}, json.dumps(list_labels)),
+        ({"status": "200"}, json.dumps(modify_message1)),
     ]
     return http_mock_sequence
