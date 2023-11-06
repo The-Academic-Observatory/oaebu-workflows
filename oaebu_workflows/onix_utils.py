@@ -176,8 +176,8 @@ class OnixTransformer:
         save_path = os.path.join(self._work_dir, file_path)
         format = re.search(r"\.(.*)$", file_path).group(1)
         if format == "xml":
-            if not type(metadata) == Mapping:
-                raise TypeError(f"Metadata must be of type OrderedDict, instead got type {type(metadata)}")
+            if not isinstance(metadata, Mapping):
+                raise TypeError(f"Metadata must be of type Mapping, instead got type {type(metadata)}")
             with open(save_path, "w") as f:
                 xmltodict.unparse(metadata, output=f, pretty=True)
         elif format == "json":
@@ -225,7 +225,7 @@ class OnixTransformer:
     def _normalise_related_products(self):
         metadata = deepcopy(self.current_metadata)
         if not isinstance(metadata, Mapping):
-            raise TypeError(f"Metadata must be of Mapping type, instead is type {type(metadata)}")
+            raise TypeError(f"Metadata must be of type Mapping, instead is type {type(metadata)}")
         fixed_products = normalise_related_products(metadata["ONIXMessage"]["Product"])
         metadata["ONIXMessage"]["Product"] = fixed_products
 
@@ -234,7 +234,7 @@ class OnixTransformer:
     def _deduplicate_related_products(self):
         metadata = deepcopy(self.current_metadata)
         if not isinstance(metadata, Mapping):
-            raise TypeError(f"Metadata must be of Mapping type, instead is type {type(metadata)}")
+            raise TypeError(f"Metadata must be of type Mapping, instead is type {type(metadata)}")
         deduplicated_products = deduplicate_related_products(metadata["ONIXMessage"]["Product"])
         metadata["ONIXMessage"]["Product"] = deduplicated_products
         self._save_metadata(metadata, self._intermediate_file_path("deduplicated.xml"))
@@ -242,7 +242,7 @@ class OnixTransformer:
     def _elevate_related_products(self):
         metadata = deepcopy(self.current_metadata)
         if not isinstance(metadata, Mapping):
-            raise TypeError(f"Metadata must be of Mapping type, instead is type {type(metadata)}")
+            raise TypeError(f"Metadata must be of type Mapping, instead is type {type(metadata)}")
         logging.info(f"Original product count: {len(metadata['ONIXMessage']['Product'])}")
         elevated = elevate_related_products(metadata["ONIXMessage"]["Product"])
         logging.info(f"Product count after elevating related products: {len(elevated)}")
