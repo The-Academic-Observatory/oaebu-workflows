@@ -24,7 +24,7 @@ import xmltodict
 import tempfile
 from tempfile import TemporaryDirectory
 from glob import glob
-from typing import List, Tuple, Literal, Union
+from typing import List, Tuple, Literal, Union, Mapping, Any
 from dataclasses import dataclass
 from copy import deepcopy
 
@@ -109,7 +109,7 @@ class OnixTransformer:
         self._work_dir = tempfile.mkdtemp()
 
     @property
-    def current_metadata(self) -> List[dict]:
+    def current_metadata(self) -> Union[List[dict], Mapping[str, Any]]:
         return self._load_metadata(self._current_md_path)
 
     def __del__(self):
@@ -172,24 +172,28 @@ class OnixTransformer:
         dir_ = self.output_dir if self.keep_intermediate else self._work_dir
         return os.path.join(dir_, file_name)
 
-    def _save_metadata(self, metadata: List[dict], file_path: str):
+    def _save_metadata(self, metadata: Union[List[dict], Mapping[str, Any]], file_path: str):
         save_path = os.path.join(self._work_dir, file_path)
         format = re.search(r"\.(.*)$", file_path).group(1)
-        with open(save_path, "w") as f:
-            if format == "xml":
+        if format == "xml":
+            if not type(metadata) == Mapping:
+                raise TypeError(f"Metadata must be of type OrderedDict, instead got type {type(metadata)}")
+            with open(save_path, "w") as f:
                 xmltodict.unparse(metadata, output=f, pretty=True)
-            elif format == "json":
-                with open(save_path, "w") as f:
-                    json.dump(metadata, f)
-            elif format == "jsonl":
-                with open(save_path, "w") as f:
-                    for m in metadata:
-                        json.dump(m, f)
-                        f.write("\n")
-            elif format == "jsonl.gz":
-                save_jsonl_gz(save_path, metadata)
-            else:
-                raise ValueError(f"Unsupported format: {format}")
+        elif format == "json":
+            with open(save_path, "w") as f:
+                json.dump(metadata, f)
+        elif format == "jsonl":
+            with open(save_path, "w") as f:
+                for m in metadata:
+                    json.dump(m, f)
+                    f.write("\n")
+        elif format == "jsonl.gz":
+            if not type(metadata) == list:
+                raise TypeError(f"Metadata must be of type list, instead got type {type(metadata)}")
+            save_jsonl_gz(save_path, metadata)
+        else:
+            raise ValueError(f"Unsupported format: {format}")
         self._current_md_path = save_path
 
     def _load_metadata(self, file_path: str):
@@ -220,6 +224,8 @@ class OnixTransformer:
 
     def _normalise_related_products(self):
         metadata = deepcopy(self.current_metadata)
+        if not isinstance(metadata, Mapping):
+            raise TypeError(f"Metadata must be of Mapping type, instead is type {type(metadata)}")
         fixed_products = normalise_related_products(metadata["ONIXMessage"]["Product"])
         metadata["ONIXMessage"]["Product"] = fixed_products
 
@@ -227,12 +233,16 @@ class OnixTransformer:
 
     def _deduplicate_related_products(self):
         metadata = deepcopy(self.current_metadata)
+        if not isinstance(metadata, Mapping):
+            raise TypeError(f"Metadata must be of Mapping type, instead is type {type(metadata)}")
         deduplicated_products = deduplicate_related_products(metadata["ONIXMessage"]["Product"])
         metadata["ONIXMessage"]["Product"] = deduplicated_products
         self._save_metadata(metadata, self._intermediate_file_path("deduplicated.xml"))
 
     def _elevate_related_products(self):
         metadata = deepcopy(self.current_metadata)
+        if not isinstance(metadata, Mapping):
+            raise TypeError(f"Metadata must be of Mapping type, instead is type {type(metadata)}")
         logging.info(f"Original product count: {len(metadata['ONIXMessage']['Product'])}")
         elevated = elevate_related_products(metadata["ONIXMessage"]["Product"])
         logging.info(f"Product count after elevating related products: {len(elevated)}")
@@ -254,11 +264,15 @@ class OnixTransformer:
 
     def _apply_name_fields(self):
         metadata = deepcopy(self.current_metadata)
+        if not isinstance(metadata, list):
+            raise TypeError(f"Metadata must be of type list, instead is type {type(metadata)}")
         metadata = create_personname_fields(metadata)
         self._save_metadata(metadata, self._intermediate_file_path("name_applied.jsonl"))
 
     def _collapse_subjects(self):
         metadata = deepcopy(self.current_metadata)
+        if not isinstance(metadata, list):
+            raise TypeError(f"Metadata must be of type list, instead is type {type(metadata)}")
         metadata = collapse_subjects(metadata)
         self._save_metadata(metadata, self._intermediate_file_path("collapsed.jsonl"))
 
@@ -353,10 +367,10 @@ def create_personname_fields(onix_products: List[dict]) -> List[dict]:
     :return: The onix feed with the additional fields populated where possible
     """
 
-    def _can_make_personname(contributor: dict) -> bool:
+    def _can_make_personname(contributor: dict) -> Union[bool, None]:
         return contributor.get("KeyNames") and contributor.get("NamesBeforeKey")
 
-    def _can_make_personname_inverted(contributor: dict) -> bool:
+    def _can_make_personname_inverted(contributor: dict) -> Union[bool, None]:
         return contributor.get("NamesBeforeKey") and contributor.get("KeyNames")
 
     return_products = deepcopy(onix_products)
@@ -450,6 +464,7 @@ def deduplicate_related_products(onix_products: List[dict]) -> List[dict]:
     return_products = deepcopy(onix_products)
     for product in return_products:
         seen_ids = {}
+        id_relation_codes = {}
         product_isbn = _get_product_isbn(product)
         related_products = _get_related_products(product)
         if not related_products:
@@ -457,7 +472,6 @@ def deduplicate_related_products(onix_products: List[dict]) -> List[dict]:
 
         # Find all unique <RelatedProduct> elements
         for related_product in related_products:
-            relation_code = related_product["ProductRelationCode"]
             for product_identifier in _get_product_identifiers(related_product):
                 rp_id = product_identifier["IDValue"]
                 rp_id_type = product_identifier["ProductIDType"]
@@ -466,11 +480,12 @@ def deduplicate_related_products(onix_products: List[dict]) -> List[dict]:
                 if rp_id not in seen_ids.keys():
                     seen_ids[rp_id] = set()
                 seen_ids[rp_id].add(rp_id_type)
+                id_relation_codes[rp_id] = related_product["ProductRelationCode"]
 
         # Rebuild the related products
         new_related_products = []
         for id, id_types in seen_ids.items():
-            related_product = {"ProductRelationCode": relation_code, "ProductIdentifier": []}
+            related_product = {"ProductRelationCode": id_relation_codes[id], "ProductIdentifier": []}
             for id_type in id_types:
                 related_product["ProductIdentifier"].append({"ProductIDType": id_type, "IDValue": id})
             new_related_products.append(related_product)
@@ -669,7 +684,7 @@ def remove_invalid_products(input_xml: str, output_xml: str, invalid_products_fi
         logging.info(f"Invalid products written to {invalid_products_file}")
 
 
-def filter_through_schema(input: dict, schema: dict):
+def filter_through_schema(input: Union[dict, list], schema: dict):
     """
     This function recursively traverses the input dictionary and compares it to the provided schema.
     It retains only the fields and values that exist in the schema structure, and discards

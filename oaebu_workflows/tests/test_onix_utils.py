@@ -33,6 +33,7 @@ from oaebu_workflows.onix_utils import (
     find_onix_product,
     filter_through_schema,
     remove_invalid_products,
+    deduplicate_related_products,
 )
 from oaebu_workflows.config import test_fixtures_folder, schema_folder
 from observatory.platform.observatory_environment import (
@@ -729,3 +730,83 @@ class TestFindOnixProduct(unittest.TestCase):
         missing_product_xml = ["<ONIXMessage>", "</Product>" "</ONIXMessage>"]
         with self.assertRaisesRegex(ValueError, "Product not found surrounding line"):
             find_onix_product(missing_product_xml, 1)
+
+
+class TestDeduplicateRelatedProducts(unittest.TestCase):
+    def test_no_duplicated_related_products(self):
+        """Should return the same list if there are no duplicated related products in any of the products"""
+        onix_products = [
+            {
+                "ProductIdentifier": [{"ProductIDType": "03", "IDValue": "1234567890"}],
+                "RelatedMaterial": {
+                    "RelatedProduct": [
+                        {
+                            "ProductRelationCode": "01",
+                            "ProductIdentifier": [{"ProductIDType": "03", "IDValue": "0987654321"}],
+                        },
+                        {
+                            "ProductRelationCode": "02",
+                            "ProductIdentifier": [{"ProductIDType": "03", "IDValue": "1357924680"}],
+                        },
+                    ]
+                },
+            },
+            {
+                "ProductIdentifier": [{"ProductIDType": "03", "IDValue": "2468135790"}],
+                "RelatedMaterial": {
+                    "RelatedProduct": [
+                        {
+                            "ProductRelationCode": "03",
+                            "ProductIdentifier": [{"ProductIDType": "03", "IDValue": "9876543210"}],
+                        },
+                        {
+                            "ProductRelationCode": "04",
+                            "ProductIdentifier": [{"ProductIDType": "03", "IDValue": "0246813579"}],
+                        },
+                    ]
+                },
+            },
+        ]
+        result = deduplicate_related_products(onix_products)
+        self.assertEqual(result, onix_products)
+
+    def test_remove_duplicated_related_products_fixed(self):
+        """Should remove duplicated related products from a single product"""
+        onix_products = [
+            {
+                "ProductIdentifier": [{"ProductIDType": "03", "IDValue": "1234567890"}],
+                "RelatedMaterial": {
+                    "RelatedProduct": [
+                        {
+                            "ProductRelationCode": "01",
+                            "ProductIdentifier": [{"ProductIDType": "03", "IDValue": "0987654321"}],
+                        },
+                        {
+                            "ProductRelationCode": "02",
+                            "ProductIdentifier": [{"ProductIDType": "03", "IDValue": "0987654321"}],
+                        },
+                    ]
+                },
+            }
+        ]
+        expected_result = [
+            {
+                "ProductIdentifier": [{"ProductIDType": "03", "IDValue": "1234567890"}],
+                "RelatedMaterial": {
+                    "RelatedProduct": [
+                        {
+                            "ProductRelationCode": "02",
+                            "ProductIdentifier": [{"ProductIDType": "03", "IDValue": "0987654321"}],
+                        }
+                    ]
+                },
+            }
+        ]
+        result = deduplicate_related_products(onix_products)
+        self.assertEqual(result, expected_result)
+
+    def test_empty_input_list(self):
+        """Should return an empty list if the input list is empty"""
+        onix_products = []
+        result = deduplicate_related_products(onix_products)
+        self.assertEqual(result, [])
