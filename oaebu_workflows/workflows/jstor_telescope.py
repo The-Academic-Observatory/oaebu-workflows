@@ -24,11 +24,10 @@ import shutil
 import re
 from collections import OrderedDict
 from typing import List, Union, Tuple, Literal, Optional, Any
-from tempfile import TemporaryFile
+from tempfile import NamedTemporaryFile
 from abc import ABC, abstractmethod
 
 import pendulum
-from pendulum import DateTime
 import requests
 from airflow.exceptions import AirflowException
 from airflow.hooks.base import BaseHook
@@ -63,9 +62,9 @@ class JstorRelease(PartitionRelease):
         self,
         dag_id: str,
         run_id: str,
-        data_interval_start: DateTime,
-        data_interval_end: DateTime,
-        partition_date: DateTime,
+        data_interval_start: pendulum.DateTime,
+        data_interval_end: pendulum.DateTime,
+        partition_date: pendulum.DateTime,
         reports_info: List[dict],
     ):
         """Construct a JstorRelease.
@@ -122,7 +121,7 @@ class JstorTelescope(Workflow):
         catchup: bool = False,
         max_active_runs: int = 1,
         schedule: str = "0 0 4 * *",  # 4th day of every month
-        start_date: DateTime = DateTime(2016, 10, 1),
+        start_date: pendulum.DateTime = pendulum.datetime(2016, 10, 1),
     ):
         """Construct a JstorTelescope instance.
         :param dag_id: The ID of the DAG
@@ -255,7 +254,7 @@ class JstorTelescope(Workflow):
         available_releases = {}
         for report in available_reports:
             # Download report to temporary file
-            tmp_download_path = TemporaryFile(delete=False).name
+            tmp_download_path = NamedTemporaryFile().name
             self.jstor_api.download_report(report, download_path=tmp_download_path)
             start_date, end_date = self.jstor_api.get_release_date(tmp_download_path)
 
@@ -437,7 +436,7 @@ class JstorAPI(ABC):
         pass
 
     @abstractmethod
-    def get_release_date(self, report_path: str) -> tuple[DateTime, DateTime]:
+    def get_release_date(self, report_path: str) -> tuple[pendulum.DateTime, pendulum.DateTime]:
         pass
 
     @abstractmethod
@@ -566,7 +565,7 @@ class JstorPublishersAPI(JstorAPI):
         filename, extension = response.headers["Content-Disposition"].split("=")[1].split(".")
         return filename, extension
 
-    def get_release_date(self, report_path: str) -> Tuple[DateTime, DateTime]:
+    def get_release_date(self, report_path: str) -> Tuple[pendulum.DateTime, pendulum.DateTime]:
         """Get the release date from the "Reporting_Period" part of the header.
         Also checks if the reports contains data from exactly one month.
 
@@ -603,7 +602,7 @@ class JstorPublishersAPI(JstorAPI):
             )
         return start_date, end_date
 
-    def get_release_date_deprecated(self, report_path: str) -> Tuple[DateTime, DateTime]:
+    def get_release_date_deprecated(self, report_path: str) -> Tuple[pendulum.DateTime, pendulum.DateTime]:
         """This function is deprecated, because the headers for the reports have changed since 2021-10-01.
         It might still be used for reports that were created before this date and have not been processed yet.
         Get the release date from the "Usage Month" column in the first row of the report.
@@ -639,7 +638,7 @@ class JstorPublishersAPI(JstorAPI):
         download_institution: List[dict],
         transfrom_country: str,
         transform_institution: str,
-        partition_date: DateTime,
+        partition_date: pendulum.DateTime,
     ) -> None:
         """Transform a Jstor release into json lines format and gzip the result._summary_
 
@@ -767,7 +766,7 @@ class JstorCollectionsAPI(JstorAPI):
         with open(download_path, "wb") as f:
             f.write(file_data)
 
-    def get_release_date(self, report_path: str) -> Tuple[DateTime, DateTime]:
+    def get_release_date(self, report_path: str) -> Tuple[pendulum.DateTime, pendulum.DateTime]:
         """Get the release date from the report. This should be under the "Month, Year of monthdt" column
         Also checks if the reports contains data from exactly one month.
 
@@ -792,7 +791,7 @@ class JstorCollectionsAPI(JstorAPI):
         download_institution: List[dict],
         transfrom_country: str,
         transform_institution: str,
-        partition_date: DateTime,
+        partition_date: pendulum.DateTime,
     ) -> None:
         """Transform a Jstor release into json lines format and gzip the result._summary_
 

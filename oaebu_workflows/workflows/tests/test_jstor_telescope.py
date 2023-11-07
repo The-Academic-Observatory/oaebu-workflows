@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Author: Aniek Roelofs
+# Author: Aniek Roelofs, Keegan Smith
 
 import base64
 import json
 import os
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import httpretty
 import pendulum
@@ -30,7 +30,13 @@ from googleapiclient.http import HttpMockSequence
 
 from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.oaebu_partners import partner_from_str
-from oaebu_workflows.workflows.jstor_telescope import JstorRelease, JstorTelescope, Publisher, Collection, get_label_id
+from oaebu_workflows.workflows.jstor_telescope import (
+    JstorRelease,
+    JstorTelescope,
+    JstorPublishersAPI,
+    JstorCollectionsAPI,
+    create_gmail_service,
+)
 from observatory.platform.observatory_environment import (
     ObservatoryEnvironment,
     ObservatoryTestCase,
@@ -43,38 +49,49 @@ from observatory.platform.bigquery import bq_table_id
 from observatory.platform.api import get_dataset_releases
 
 
+def dummy_gmail_connection() -> Connection:
+    return Connection(
+        conn_id="gmail_api",
+        uri="google-cloud-platform://?token=123&refresh_token=123"
+        "&client_id=123.apps.googleusercontent.com&client_secret=123",
+    )
+
+
 class TestTelescopeSetup(ObservatoryTestCase):
     def __init__(self, *args, **kwargs):
         super(TestTelescopeSetup, self).__init__(*args, **kwargs)
-        self.publisher_id = "anupress"
+        self.entity_id = "anupress"
 
     def test_dag_structure(self):
         """Test that the Jstor DAG has the correct structure."""
-        for collection in [False, True]:
-            dag = JstorTelescope(
-                "jstor",
-                cloud_workspace=self.fake_cloud_workspace,
-                publisher_id=self.publisher_id,
-                collection=collection,
-            ).make_dag()
-            self.assert_dag_structure(
-                {
-                    "check_dependencies": ["list_reports"],
-                    "list_reports": ["download_reports"],
-                    "download_reports": ["upload_downloaded"],
-                    "upload_downloaded": ["transform"],
-                    "transform": ["upload_transformed"],
-                    "upload_transformed": ["bq_load"],
-                    "bq_load": ["add_new_dataset_releases"],
-                    "add_new_dataset_releases": ["cleanup"],
-                    "cleanup": [],
-                },
-                dag,
-            )
+        env = ObservatoryEnvironment()
+        with env.create():
+            env.add_connection(dummy_gmail_connection())
+            for entity_type in ["publisher", "collection"]:
+                dag = JstorTelescope(
+                    "jstor",
+                    cloud_workspace=self.fake_cloud_workspace,
+                    entity_id=self.entity_id,
+                    entity_type=entity_type,
+                ).make_dag()
+                self.assert_dag_structure(
+                    {
+                        "check_dependencies": ["list_reports"],
+                        "list_reports": ["download_reports"],
+                        "download_reports": ["upload_downloaded"],
+                        "upload_downloaded": ["transform"],
+                        "transform": ["upload_transformed"],
+                        "upload_transformed": ["bq_load"],
+                        "bq_load": ["add_new_dataset_releases"],
+                        "add_new_dataset_releases": ["cleanup"],
+                        "cleanup": [],
+                    },
+                    dag,
+                )
 
     def test_dag_load(self):
         """Test that the Jstor DAG can be loaded from a DAG bag."""
-        for collection in [False, True]:
+        for entity_type in ["publisher", "collection"]:
             env = ObservatoryEnvironment(
                 workflows=[
                     Workflow(
@@ -82,12 +99,26 @@ class TestTelescopeSetup(ObservatoryTestCase):
                         name="My JSTOR Workflow",
                         class_name="oaebu_workflows.workflows.jstor_telescope.JstorTelescope",
                         cloud_workspace=self.fake_cloud_workspace,
-                        kwargs=dict(publisher_id=self.publisher_id, collection=collection),
+                        kwargs=dict(entity_id=self.entity_id, entity_type=entity_type),
                     )
                 ],
             )
+
             with env.create():
+                env.add_connection(dummy_gmail_connection())
                 self.assert_dag_load_from_config("jstor_test_telescope")
+
+    def test_entity_type(self):
+        env = ObservatoryEnvironment()
+        with env.create():
+            env.add_connection(dummy_gmail_connection())
+            with self.assertRaisesRegex(AirflowException, "Entity type must be"):
+                JstorTelescope(
+                    "jstor",
+                    cloud_workspace=self.fake_cloud_workspace,
+                    entity_id=self.entity_id,
+                    entity_type="unknown",
+                )
 
 
 class TestJstorTelescopePublisher(ObservatoryTestCase):
@@ -102,14 +133,14 @@ class TestJstorTelescopePublisher(ObservatoryTestCase):
         super(TestJstorTelescopePublisher, self).__init__(*args, **kwargs)
         self.project_id = os.getenv("TEST_GCP_PROJECT_ID")
         self.data_location = os.getenv("TEST_GCP_DATA_LOCATION")
-        self.publisher_id = "anupress"
+        self.entity_id = "anupress"
 
         self.release_date = pendulum.parse("20220701").end_of("month")
         self.country_report = {
             "path": test_fixtures_folder("jstor", "country_20220801.tsv"),
             "url": "https://www.jstor.org/admin/reports/download/249192019",
             "headers": {
-                "Content-Disposition": f"attachment; filename=PUB_{self.publisher_id}_PUBBCU_"
+                "Content-Disposition": f"attachment; filename=PUB_{self.entity_id}_PUBBCU_"
                 f'{self.release_date.strftime("%Y%m%d")}.tsv'
             },
             "download_hash": "9330cc71f8228838ac84abb33cedb3b8",
@@ -120,7 +151,7 @@ class TestJstorTelescopePublisher(ObservatoryTestCase):
             "path": test_fixtures_folder("jstor", "institution_20220801.tsv"),
             "url": "https://www.jstor.org/admin/reports/download/129518301",
             "headers": {
-                "Content-Disposition": f"attachment; filename=PUB_{self.publisher_id}_PUBBIU_"
+                "Content-Disposition": f"attachment; filename=PUB_{self.entity_id}_PUBBIU_"
                 f'{self.release_date.strftime("%Y%m%d")}.tsv'
             },
             "download_hash": "1c78c316766a3f7306d6c19440250484",
@@ -156,32 +187,29 @@ class TestJstorTelescopePublisher(ObservatoryTestCase):
         )
         dataset_id = env.add_dataset()
 
-        # Setup Telescope
-        execution_date = pendulum.datetime(year=2020, month=11, day=1)
-        country_partner = partner_from_str("jstor_country")
-        country_partner.bq_dataset_id = dataset_id
-        institution_partner = partner_from_str("jstor_institution")
-        institution_partner.bq_dataset_id = dataset_id
-        telescope = JstorTelescope(
-            dag_id="jstor_test_telescope",
-            cloud_workspace=env.cloud_workspace,
-            publisher_id=self.publisher_id,
-            country_partner=country_partner,
-            institution_partner=institution_partner,
-        )
-        dag = telescope.make_dag()
-
         # Create the Observatory environment and run tests
         with env.create(task_logging=True):
-            with env.create_dag_run(dag, execution_date):
-                # add gmail connection
-                conn = Connection(
-                    conn_id="gmail_api",
-                    uri="google-cloud-platform://?token=123&refresh_token=123"
-                    "&client_id=123.apps.googleusercontent.com&client_secret=123",
-                )
-                env.add_connection(conn)
+            # Add gmail connection
+            env.add_connection(dummy_gmail_connection())
 
+            # Setup Telescope
+            execution_date = pendulum.datetime(year=2020, month=11, day=1)
+            country_partner = partner_from_str("jstor_country")
+            country_partner.bq_dataset_id = dataset_id
+            institution_partner = partner_from_str("jstor_institution")
+            institution_partner.bq_dataset_id = dataset_id
+            telescope = JstorTelescope(
+                dag_id="jstor_test_telescope",
+                cloud_workspace=env.cloud_workspace,
+                entity_id=self.entity_id,
+                entity_type="publisher",
+                country_partner=country_partner,
+                institution_partner=institution_partner,
+            )
+            dag = telescope.make_dag()
+
+            # Begin DAG run
+            with env.create_dag_run(dag, execution_date):
                 # Test that all dependencies are specified: no error should be thrown
                 ti = env.run_task(telescope.check_dependencies.__name__)
                 self.assertEqual(ti.state, State.SUCCESS)
@@ -335,19 +363,23 @@ class TestJstorTelescopePublisher(ObservatoryTestCase):
                         f.write(old_report_content.format(start_date=report["start"], end_date=report["end"]))
 
             # Test new report is successful
-            start_date, end_date = Publisher.get_release_date(reports[0]["file"])
+            api = JstorPublishersAPI(Mock(), self.entity_id)
+            start_date, end_date = api.get_release_date(reports[0]["file"])
             self.assertEqual(pendulum.parse(reports[0]["start"]), start_date)
             self.assertEqual(pendulum.parse(reports[0]["end"]), end_date)
+
             # Test new report fails
             with self.assertRaises(AirflowException):
-                Publisher.get_release_date(reports[1]["file"])
+                api.get_release_date(reports[1]["file"])
+
             # Test old report is successful
-            start_date, end_date = Publisher.get_release_date(reports[2]["file"])
+            start_date, end_date = api.get_release_date(reports[2]["file"])
             self.assertEqual(pendulum.parse(reports[2]["start"]).start_of("month").start_of("day"), start_date)
             self.assertEqual(pendulum.parse(reports[2]["end"]).end_of("month").start_of("day"), end_date)
+
             # Test old report fails
             with self.assertRaises(AirflowException):
-                Publisher.get_release_date(reports[3]["file"])
+                api.get_release_date(reports[3]["file"])
 
 
 class TestJstorTelescopeCollection(ObservatoryTestCase):
@@ -357,7 +389,7 @@ class TestJstorTelescopeCollection(ObservatoryTestCase):
         super(TestJstorTelescopeCollection, self).__init__(*args, **kwargs)
         self.project_id = os.getenv("TEST_GCP_PROJECT_ID")
         self.data_location = os.getenv("TEST_GCP_DATA_LOCATION")
-        self.publisher_id = "BTAA"
+        self.entity_id = "BTAA"
         self.release_date = pendulum.parse("20230901").end_of("month")
 
         self.country_report = {
@@ -394,33 +426,29 @@ class TestJstorTelescopeCollection(ObservatoryTestCase):
         )
         dataset_id = env.add_dataset()
 
-        # Setup Telescope
-        execution_date = pendulum.datetime(year=2023, month=10, day=4)
-        country_partner = partner_from_str("jstor_country_collection")
-        country_partner.bq_dataset_id = dataset_id
-        institution_partner = partner_from_str("jstor_institution_collection")
-        institution_partner.bq_dataset_id = dataset_id
-        telescope = JstorTelescope(
-            dag_id="jstor_test_telescope",
-            cloud_workspace=env.cloud_workspace,
-            publisher_id=self.publisher_id,
-            collection=True,
-            country_partner=country_partner,
-            institution_partner=institution_partner,
-        )
-        dag = telescope.make_dag()
-
         # Create the Observatory environment and run tests
         with env.create(task_logging=True):
-            with env.create_dag_run(dag, execution_date):
-                # add gmail connection
-                conn = Connection(
-                    conn_id="gmail_api",
-                    uri="google-cloud-platform://?token=123&refresh_token=123"
-                    "&client_id=123.apps.googleusercontent.com&client_secret=123",
-                )
-                env.add_connection(conn)
+            # Add gmail connection
+            env.add_connection(dummy_gmail_connection())
 
+            # Setup Telescope
+            execution_date = pendulum.datetime(year=2023, month=10, day=4)
+            country_partner = partner_from_str("jstor_country_collection")
+            country_partner.bq_dataset_id = dataset_id
+            institution_partner = partner_from_str("jstor_institution_collection")
+            institution_partner.bq_dataset_id = dataset_id
+            telescope = JstorTelescope(
+                dag_id="jstor_test_telescope",
+                cloud_workspace=env.cloud_workspace,
+                entity_id=self.entity_id,
+                entity_type="collection",
+                country_partner=country_partner,
+                institution_partner=institution_partner,
+            )
+            dag = telescope.make_dag()
+
+            # Begin DAG run
+            with env.create_dag_run(dag, execution_date):
                 # Test that all dependencies are specified: no error should be thrown
                 ti = env.run_task(telescope.check_dependencies.__name__)
                 self.assertEqual(ti.state, State.SUCCESS)
@@ -568,12 +596,13 @@ class TestJstorTelescopeCollection(ObservatoryTestCase):
                     )
 
             # Test new report is successful
-            start_date, end_date = Collection.get_release_date(reports[0]["file"])
+            api = JstorCollectionsAPI(Mock(), self.entity_id)
+            start_date, end_date = api.get_release_date(reports[0]["file"])
             self.assertEqual(pendulum.parse("2020-01-01"), start_date)
             self.assertEqual(pendulum.parse("2020-01-31"), end_date)
             # Test new report fails
             with self.assertRaises(AirflowException):
-                Collection.get_release_date(reports[1]["file"])
+                api.get_release_date(reports[1]["file"])
 
 
 @patch("oaebu_workflows.workflows.jstor_telescope.build")
@@ -633,13 +662,14 @@ def test_get_label_id(self, mock_account_credentials, mock_build):
         ]
     )
     service = build("gmail", "v1", http=http)
+    api = JstorPublishersAPI(service, self.entity_id)
 
     # call function without match for label, so label is created
-    label_id = get_label_id(service, JstorTelescope.PROCESSED_LABEL_NAME)
+    label_id = api.get_label_id(service, JstorTelescope.PROCESSED_LABEL_NAME)
     self.assertEqual("created_label", label_id)
 
     # call function with match for label
-    label_id = get_label_id(service, JstorTelescope.PROCESSED_LABEL_NAME)
+    label_id = api.get_label_id(service, JstorTelescope.PROCESSED_LABEL_NAME)
     self.assertEqual("existing_label", label_id)
 
 
