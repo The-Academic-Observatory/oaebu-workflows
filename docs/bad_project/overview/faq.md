@@ -19,7 +19,7 @@ You may view the [BAD template Dashboard](https://template.book-analytics.org/),
 ## How should I interpret the data from the Dashboard?
 Presenting a holistic view of usage information can be difficult, because ebooks can be hosted in multiple repositories and platforms, in different file formats (PDF, EPUB, MOBI, HTML), and in different levels (whole book or by chapter). Each repository provides book content to different audiences in different ways.
 
-Before studying data from the Dashboard, we suggest that you take some time to understand the [data sources](dashboard_data.md), including the limitations of comparing different data sources.
+Before studying data from the Dashboard, we suggest that you take some time to understand the [data sources](dashboard_data.md), including the limitations of comparing different data sources. Learn more about how usage is influenced by the language of the work, its subject, its platform, and seasonal differences in Ronald’s [blog post](https://oapen.hypotheses.org/714) and research paper, “[Measured in a context: making sense of open access book data](https://doi.org/10.1629/uksg.627)”.
 
 Caveats:
 * For publishers with a smaller number of titles, it’s harder to see a pattern and understand why some get more downloads than others
