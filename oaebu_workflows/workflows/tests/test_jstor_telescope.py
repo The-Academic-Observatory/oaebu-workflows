@@ -35,7 +35,7 @@ from oaebu_workflows.workflows.jstor_telescope import (
     JstorTelescope,
     JstorPublishersAPI,
     JstorCollectionsAPI,
-    create_gmail_service,
+    make_jstor_api,
 )
 from observatory.platform.observatory_environment import (
     ObservatoryEnvironment,
@@ -112,13 +112,10 @@ class TestTelescopeSetup(ObservatoryTestCase):
         env = ObservatoryEnvironment()
         with env.create():
             env.add_connection(dummy_gmail_connection())
+            for entity_type in ["collection", "publisher"]:
+                make_jstor_api(entity_type, self.entity_id)
             with self.assertRaisesRegex(AirflowException, "Entity type must be"):
-                JstorTelescope(
-                    "jstor",
-                    cloud_workspace=self.fake_cloud_workspace,
-                    entity_id=self.entity_id,
-                    entity_type="unknown",
-                )
+                make_jstor_api("invalid", self.entity_id)
 
 
 class TestJstorTelescopePublisher(ObservatoryTestCase):
@@ -247,17 +244,17 @@ class TestJstorTelescopePublisher(ObservatoryTestCase):
                 )
                 self.assertIsInstance(available_releases, dict)
                 self.assertEqual(1, len(available_releases))
-                for release_date, reports_info in available_releases.items():
+                for release_date, reports in available_releases.items():
                     self.assertEqual(self.release_date.date(), pendulum.parse(release_date).date())
-                    self.assertIsInstance(reports_info, list)
-                    self.assertListEqual(expected_reports_info, reports_info)
+                    self.assertIsInstance(reports, list)
+                    self.assertListEqual(expected_reports_info, reports)
                 release = JstorRelease(
                     dag_id=telescope.dag_id,
                     run_id=env.dag_run.run_id,
                     data_interval_start=pendulum.parse(release_date).start_of("month"),
                     data_interval_end=pendulum.parse(release_date).add(days=1).start_of("month"),
                     partition_date=pendulum.parse(release_date),
-                    reports_info=reports_info,
+                    reports=reports,
                 )
 
                 self.assertTrue(os.path.exists(release.download_country_path))
@@ -479,10 +476,10 @@ class TestJstorTelescopeCollection(ObservatoryTestCase):
                 )
                 self.assertIsInstance(available_releases, dict)
                 self.assertEqual(1, len(available_releases))
-                for release_date, reports_info in available_releases.items():
+                for release_date, reports in available_releases.items():
                     self.assertEqual(self.release_date.date(), pendulum.parse(release_date).date())
-                    self.assertIsInstance(reports_info, list)
-                    self.assertListEqual(expected_reports_info, reports_info)
+                    self.assertIsInstance(reports, list)
+                    self.assertListEqual(expected_reports_info, reports)
 
                 release = JstorRelease(
                     dag_id=telescope.dag_id,
@@ -490,7 +487,7 @@ class TestJstorTelescopeCollection(ObservatoryTestCase):
                     data_interval_start=pendulum.parse(release_date).start_of("month"),
                     data_interval_end=pendulum.parse(release_date).add(days=1).start_of("month"),
                     partition_date=pendulum.parse(release_date),
-                    reports_info=reports_info,
+                    reports=reports,
                 )
 
                 # Test that files download

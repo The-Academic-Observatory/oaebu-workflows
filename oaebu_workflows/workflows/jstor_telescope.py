@@ -65,7 +65,7 @@ class JstorRelease(PartitionRelease):
         data_interval_start: pendulum.DateTime,
         data_interval_end: pendulum.DateTime,
         partition_date: pendulum.DateTime,
-        reports_info: List[dict],
+        reports: List[dict],
     ):
         """Construct a JstorRelease.
 
@@ -74,14 +74,14 @@ class JstorRelease(PartitionRelease):
         :param data_interval_start: The beginning of the data interval
         :param data_interval_end: The end of the data interval
         :param partition_date: the partition date, corresponds to the last day of the month being processed.
-        :param reports_info: list with report_type (country or institution) and url of reports
+        :param reports: list with report_type (country or institution) and url of reports
         """
         super().__init__(
             dag_id=dag_id,
             run_id=run_id,
             partition_date=partition_date,
         )
-        self.reports_info = reports_info
+        self.reports = reports
         self.data_interval_start = data_interval_start
         self.data_interval_end = data_interval_end
         self.download_country_path = os.path.join(self.download_folder, "country.tsv")
@@ -93,7 +93,7 @@ class JstorRelease(PartitionRelease):
 class JstorTelescope(Workflow):
     """The JSTOR telescope."""
 
-    REPORTS_INFO = "reports_info"
+    REPORTS_INFO = "reports"
     PROCESSED_LABEL_NAME = "processed_report"
 
     # download settings
@@ -191,7 +191,7 @@ class JstorTelescope(Workflow):
         )
         releases = []
         for release_date in available_releases:
-            reports_info = available_releases[release_date]
+            reports = available_releases[release_date]
             partition_date = pendulum.parse(release_date)
             data_interval_start = partition_date.start_of("month")
             data_interval_end = partition_date.add(days=1).start_of("month")
@@ -202,7 +202,7 @@ class JstorTelescope(Workflow):
                     partition_date=partition_date,
                     data_interval_start=data_interval_start,
                     data_interval_end=data_interval_end,
-                    reports_info=reports_info,
+                    reports=reports,
                 )
             )
         return releases
@@ -236,11 +236,12 @@ class JstorTelescope(Workflow):
             key=JstorTelescope.REPORTS_INFO, task_ids=self.list_reports.__name__, include_prior_dates=False
         )
         available_releases = {}
+        api = make_jstor_api(self.entity_type, self.entity_id)
         for report in available_reports:
             # Download report to temporary file
             tmp_download_path = NamedTemporaryFile().name
-            self.jstor_api.download_report(report, download_path=tmp_download_path)
-            start_date, end_date = self.jstor_api.get_release_date(tmp_download_path)
+            api.download_report(report, download_path=tmp_download_path)
+            start_date, end_date = api.get_release_date(tmp_download_path)
 
             # Create temporary release and move report to correct path
             release = JstorRelease(
@@ -249,7 +250,7 @@ class JstorTelescope(Workflow):
                 data_interval_start=start_date,
                 data_interval_end=end_date.add(days=1).start_of("month"),
                 partition_date=end_date,
-                reports_info=[report],
+                reports=[report],
             )
             download_path = (
                 release.download_country_path if report["type"] == "country" else release.download_institution_path
@@ -347,11 +348,12 @@ class JstorTelescope(Workflow):
         """Delete all files, folders and XComs associated with this release.
         Assign a label to the gmail messages that have been processed."""
 
+        api = make_jstor_api(self.entity_type, self.entity_id)
         for release in releases:
             cleanup(
                 dag_id=self.dag_id, execution_date=kwargs["execution_date"], workflow_folder=release.workflow_folder
             )
-            success = self.jstor_api.add_labels(release.reports_info)
+            success = api.add_labels(release.reports)
             set_task_state(success, kwargs["ti"].task_id, release=release)
 
 
@@ -455,7 +457,6 @@ class JstorAPI(ABC):
         transform_institution: str,
         partition_date: pendulum.DateTime,
     ) -> None:
-        pass
         pass
 
     @abstractmethod
