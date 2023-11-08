@@ -535,7 +535,7 @@ class JstorPublishersAPI(JstorAPI):
 
         return available_reports
 
-    def download_report(self, report: str, download_path: str) -> None:
+    def download_report(self, report: dict, download_path: str) -> None:
         """Download report from url to a file.
 
         :param report: The report info. Should contain the "url" key
@@ -645,8 +645,8 @@ class JstorPublishersAPI(JstorAPI):
 
     def transform_reports(
         self,
-        download_country: List[dict],
-        download_institution: List[dict],
+        download_country: str,
+        download_institution: str,
         transform_country: str,
         transform_institution: str,
         partition_date: pendulum.DateTime,
@@ -690,7 +690,7 @@ class JstorPublishersAPI(JstorAPI):
             )
             save_jsonl_gz(transform_file, results)
 
-    def add_labels(self, reports: List[str]) -> bool:
+    def add_labels(self, reports: List[dict]) -> bool:
         """Adds the label name to all messages in the report
 
         :param reports: List of report info
@@ -798,8 +798,8 @@ class JstorCollectionsAPI(JstorAPI):
 
     def transform_reports(
         self,
-        download_country: List[dict],
-        download_institution: List[dict],
+        download_country: str,
+        download_institution: str,
         transform_country: str,
         transform_institution: str,
         partition_date: pendulum.DateTime,
@@ -839,7 +839,7 @@ class JstorCollectionsAPI(JstorAPI):
             )
             save_jsonl_gz(transform_file, results)
 
-    def add_labels(self, reports: List[str]) -> bool:
+    def add_labels(self, reports: List[dict]) -> bool:
         """Adds the label name to all messages in the report
 
         :param reports: List of report info
