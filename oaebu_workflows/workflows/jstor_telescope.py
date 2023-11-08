@@ -127,7 +127,7 @@ class JstorTelescope(Workflow):
         :param dag_id: The ID of the DAG
         :param cloud_workspace: The CloudWorkspace object for this DAG
         :param entity_id: The ID of the publisher for this DAG
-        :param collection: Whether this entity should be treated as a publisher or a collection
+        :param entity_type: Whether this entity should be treated as a publisher or a collection
         :param country_partner: The name of the country partner
         :param institution_partner: The name of the institution partner
         :param bq_dataset_description: Description for the BigQuery dataset
