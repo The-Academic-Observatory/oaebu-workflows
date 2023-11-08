@@ -447,7 +447,15 @@ class JstorAPI(ABC):
         pass
 
     @abstractmethod
-    def transform_reports(self, *args, **kwargs) -> None:
+    def transform_reports(
+        self,
+        download_country: str,
+        download_institution: str,
+        transform_country: str,
+        transform_institution: str,
+        partition_date: pendulum.DateTime,
+    ) -> None:
+        pass
         pass
 
     @abstractmethod
