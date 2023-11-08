@@ -164,15 +164,6 @@ class JstorTelescope(Workflow):
         self.gmail_api_conn_id = gmail_api_conn_id
         self.observatory_api_conn_id = observatory_api_conn_id
 
-        # Create the Jstor API Instance
-        service = create_gmail_service()
-        if entity_type == "publisher":
-            self.jstor_api = JstorPublishersAPI(service, self.entity_id)
-        elif entity_type == "collection":
-            self.jstor_api = JstorCollectionsAPI(service, self.entity_id)
-        else:
-            raise AirflowException(f"Entity type must be 'publisher' or 'collection', got {entity_type}.")
-
         check_workflow_inputs(self)
 
         self.add_setup_task(self.check_dependencies)
@@ -216,21 +207,14 @@ class JstorTelescope(Workflow):
             )
         return releases
 
-    def check_dependencies(self, **kwargs) -> bool:
-        """Check dependencies of DAG. Add to parent method to additionally check for a publisher id
-
-        :return: True if dependencies are valid.
-        """
-        super().check_dependencies()
-        return True
-
     def list_reports(self, **kwargs) -> bool:
         """Lists all Jstor releases for a given month and publishes their report_type, download_url and
         release_date's as an XCom.
 
         :return: Whether to continue the DAG
         """
-        available_reports = self.jstor_api.list_reports()
+        api = make_jstor_api(self.entity_type, self.entity_id)
+        available_reports = api.list_reports()
         continue_dag = len(available_reports) > 0
         if continue_dag:
             # Push messages
@@ -296,11 +280,12 @@ class JstorTelescope(Workflow):
 
     def transform(self, releases: List[JstorRelease], **kwargs):
         """Task to transform the Jstor releases for a given month."""
+        api = make_jstor_api(self.entity_type, self.entity_id)
         for release in releases:
-            self.jstor_api.transform_reports(
+            api.transform_reports(
                 download_country=release.download_country_path,
                 download_institution=release.download_institution_path,
-                transfrom_country=release.transform_country_path,
+                transform_country=release.transform_country_path,
                 transform_institution=release.transform_institution_path,
                 partition_date=release.partition_date,
             )
@@ -382,6 +367,24 @@ def create_gmail_service() -> Resource:
     service = build("gmail", "v1", credentials=creds, cache_discovery=False)
 
     return service
+
+
+def make_jstor_api(entity_type: Literal["publisher", "collection"], entity_id: str):
+    """Create the Jstor API Instance.
+
+    :param entity_type: The entity type. Should be either 'publisher' or 'collection'.
+    :param entity_id: The entity id.
+    :return: The Jstor API instance
+    """
+
+    service = create_gmail_service()
+    if entity_type == "publisher":
+        jstor_api = JstorPublishersAPI(service, entity_id)
+    elif entity_type == "collection":
+        jstor_api = JstorCollectionsAPI(service, entity_id)
+    else:
+        raise AirflowException(f"Entity type must be 'publisher' or 'collection', got {entity_type}.")
+    return jstor_api
 
 
 class JstorAPI(ABC):
@@ -636,7 +639,7 @@ class JstorPublishersAPI(JstorAPI):
         self,
         download_country: List[dict],
         download_institution: List[dict],
-        transfrom_country: str,
+        transform_country: str,
         transform_institution: str,
         partition_date: pendulum.DateTime,
     ) -> None:
@@ -644,12 +647,12 @@ class JstorPublishersAPI(JstorAPI):
 
         :param download_country: The path to the country download report
         :param download_institution: The path to the institution download report
-        :param transfrom_country: The path to write the transformed country file to
+        :param transform_country: The path to write the transformed country file to
         :param transform_institution: The path to write the transformed institution file to
         :param partition_date: The partition/release date of this report
         """
         for download_file, transform_file in (
-            [download_country, transfrom_country],
+            [download_country, transform_country],
             [download_institution, transform_institution],
         ):
             release_column = partition_date.strftime("%b-%Y")  # e.g. Jan-2020
@@ -789,7 +792,7 @@ class JstorCollectionsAPI(JstorAPI):
         self,
         download_country: List[dict],
         download_institution: List[dict],
-        transfrom_country: str,
+        transform_country: str,
         transform_institution: str,
         partition_date: pendulum.DateTime,
     ) -> None:
@@ -797,12 +800,12 @@ class JstorCollectionsAPI(JstorAPI):
 
         :param download_country: The path to the country download report
         :param download_institution: The path to the institution download report
-        :param transfrom_country: The path to write the transformed country file to
+        :param transform_country: The path to write the transformed country file to
         :param transform_institution: The path to write the transformed institution file to
         :param partition_date: The partition/release date of this report
         """
         for entity, download_file, transform_file in (
-            ["Country_Name", download_country, transfrom_country],
+            ["Country_Name", download_country, transform_country],
             ["Institution", download_institution, transform_institution],
         ):
             results = []
