@@ -55,7 +55,7 @@ def generate_csv(*, schema_dir):
     :param schema_dir: Path to schema directory.
     """
 
-    schema_files = glob(os.path.join(schema_dir, "*.json"))
+    schema_files = glob(os.path.join(schema_dir, "**", "*.json"), recursive=True)
     dst_dir = "schemas"
 
     if os.path.exists(dst_dir):

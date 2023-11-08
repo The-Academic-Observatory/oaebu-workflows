@@ -2,7 +2,7 @@
 
 UCL Discovery is UCL's open access repository, showcasing and providing access to the full texts of UCL research publications.
 
-## [The Google Sheet](https://docs.google.com/spreadsheets/d/1YqU8m3xY4QvjmUhx215VtWr-HZ7NEAOHjYMEMEkN89A/edit#gid=614610019)
+## The Google Sheet
 UCL's titles are referenced via their identifier - the eprint ID. Their metadata maps the eprint ID to an ISBN13, but not consistently. For this reason, we forgo the use of their metadata and instead employ a semi-manual process to reliably map the two identifiers. 
 The telescope references a Google sheet that contains all of the titles available in the UCL Discovery repository under the following headings: 
 
@@ -46,7 +46,7 @@ Acquires the eprint IDs, ISBN13s and titles from [the Google Sheet](#the-google-
 Load the table into BigQuery and partition on the *release_date*.
 
 
-# Run Summary
+### Run Summary
 
 The corresponding table in BigQuery is `ucl.ucl_discoveryYYYYMMDD`. 
 
