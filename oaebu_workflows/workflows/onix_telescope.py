@@ -25,7 +25,7 @@ from airflow.models.taskinstance import TaskInstance
 from google.cloud.bigquery import SourceFormat
 
 from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
-from oaebu_workflows.onix import onix_collapse_subjects, onix_parser_download, onix_parser_execute
+from oaebu_workflows.onix_utils import collapse_subjects, onix_parser_download, onix_parser_execute
 from observatory.api.client.model.dataset_release import DatasetRelease
 from observatory.platform.api import make_observatory_api
 from observatory.platform.airflow import AirflowConns
@@ -210,13 +210,14 @@ class OnixTelescope(Workflow):
 
     def transform(self, releases: List[OnixRelease], **kwargs):
         """Task to transform the ONIX releases."""
+
         success, parser_path = onix_parser_download()
         set_task_state(success, kwargs["ti"].task_id)
         for release in releases:
             onix_parser_execute(
                 parser_path=parser_path, input_dir=release.download_folder, output_dir=release.transform_folder
             )
-            onix = onix_collapse_subjects(load_jsonl(release.parsed_path))
+            onix = collapse_subjects(load_jsonl(release.parsed_path))
             save_jsonl_gz(release.transform_path, onix)
 
     def upload_transformed(self, releases: List[OnixRelease], **kwargs):

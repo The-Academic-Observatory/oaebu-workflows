@@ -22,11 +22,11 @@ import pendulum
 from airflow.exceptions import AirflowException
 from google.cloud.bigquery import SourceFormat
 
-from oaebu_workflows.onix import (
+from oaebu_workflows.onix_utils import (
     onix_parser_download,
     onix_parser_execute,
-    onix_collapse_subjects,
-    onix_create_personname_fields,
+    collapse_subjects,
+    create_personname_fields,
 )
 from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from observatory.api.client.model.dataset_release import DatasetRelease
@@ -168,8 +168,8 @@ class ThothTelescope(Workflow):
             parser_path, input_dir=release.download_folder, output_dir=release.transform_folder
         )
         set_task_state(success, task_id=kwargs["ti"].task_id, release=release)
-        transformed = onix_collapse_subjects(load_jsonl(os.path.join(release.transform_folder, "full.jsonl")))
-        transformed = onix_create_personname_fields(transformed)
+        transformed = collapse_subjects(load_jsonl(os.path.join(release.transform_folder, "full.jsonl")))
+        transformed = create_personname_fields(transformed)
         save_jsonl_gz(release.transform_path, transformed)
 
     def upload_transformed(self, release: ThothRelease, **kwargs) -> None:

@@ -18,18 +18,13 @@ from __future__ import annotations
 
 import logging
 import os
-import shutil
-import json
 import requests
 import xmltodict
 from xml.parsers.expat import ExpatError
-from tempfile import TemporaryDirectory
-from dataclasses import dataclass
 from typing import Union
 
 import pendulum
 from airflow.exceptions import AirflowException
-from onixcheck import validate as validate_onix
 from google.cloud.bigquery import SourceFormat
 from tenacity import (
     retry,
@@ -41,15 +36,10 @@ from tenacity import (
 
 from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from oaebu_workflows.config import schema_folder
-from oaebu_workflows.onix import (
-    onix_parser_download,
-    onix_parser_execute,
-    onix_create_personname_fields,
-)
+from oaebu_workflows.onix_utils import OnixTransformer
 from observatory.api.client.model.dataset_release import DatasetRelease
 from observatory.platform.api import make_observatory_api
 from observatory.platform.airflow import AirflowConns
-from observatory.platform.files import save_jsonl_gz, load_jsonl
 from observatory.platform.utils.url_utils import get_user_agent
 from observatory.platform.observatory_config import CloudWorkspace
 from observatory.platform.gcs import (
@@ -82,12 +72,12 @@ class OapenMetadataRelease(SnapshotRelease):
         """
         super().__init__(dag_id=dag_id, run_id=run_id, snapshot_date=snapshot_date)
         self.download_path = os.path.join(self.download_folder, f"metadata_{snapshot_date.format('YYYYMMDD')}.xml")
-        # Transform step outputs
-        self.filtered_metadata = os.path.join(self.transform_folder, "filtered_metadata.xml")  # After schema parse
-        self.validated_onix = os.path.join(self.transform_folder, "validated_onix.xml")  # After removal of errors
-        self.invalid_products_path = os.path.join(self.transform_folder, "onix_invalid_products.xml")  # Errors
-        self.parsed_onix = os.path.join(self.transform_folder, "full.jsonl")  # The result of the java parser
-        self.transform_path = os.path.join(self.transform_folder, "onix.jsonl.gz")  # Final onix file
+        self.transform_path = os.path.join(self.transform_folder, "transformed.jsonl.gz")  # Final onix file
+
+    @property
+    def transform_files(self):
+        files = os.listdir(self.transform_folder)
+        return [os.path.join(self.transform_folder, f) for f in files]
 
 
 class OapenMetadataTelescope(Workflow):
@@ -99,19 +89,25 @@ class OapenMetadataTelescope(Workflow):
         cloud_workspace: CloudWorkspace,
         metadata_uri: str,
         metadata_partner: Union[str, OaebuPartner] = "oapen_metadata",
+        elevate_related_products: bool = False,
+        bq_dataset_id: str = "onix",
+        bq_table_name: str = "onix",
         bq_dataset_description: str = "OAPEN Metadata converted to ONIX",
         bq_table_description: str = None,
         api_dataset_id: str = "oapen",
         observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
         catchup: bool = False,
         start_date: pendulum.DateTime = pendulum.datetime(2018, 5, 14),
-        schedule: str = "@weekly",
+        schedule: str = "0 12 * * Sun",  # Midday every sunday
     ):
         """Construct a OapenMetadataTelescope instance.
         :param dag_id: The ID of the DAG
         :param cloud_workspace: The CloudWorkspace object for this DAG
         :param metadata_uri: The URI of the metadata XML file
         :param metadata_partner: The metadata partner name
+        :param elevate_related_products: Whether to pull out the related products to the product level.
+        :param bq_dataset_id: The BigQuery dataset ID
+        :param bq_table_name: The BigQuery table name
         :param bq_dataset_description: Description for the BigQuery dataset
         :param bq_table_description: Description for the biguery table
         :param api_dataset_id: The ID to store the dataset release in the API
@@ -132,6 +128,9 @@ class OapenMetadataTelescope(Workflow):
         self.cloud_workspace = cloud_workspace
         self.metadata_uri = metadata_uri
         self.metadata_partner = partner_from_str(metadata_partner, metadata_partner=True)
+        self.elevate_related_products = elevate_related_products
+        self.bq_dataset_id = bq_dataset_id
+        self.bq_table_name = bq_table_name
         self.bq_dataset_description = bq_dataset_description
         self.bq_table_description = bq_table_description
         self.api_dataset_id = api_dataset_id
@@ -180,58 +179,30 @@ class OapenMetadataTelescope(Workflow):
         set_task_state(success, kwargs["ti"].task_id, release=release)
 
     def transform(self, release: OapenMetadataRelease, **kwargs) -> None:
-        """Transform the oapen metadata XML file into a valid ONIX file
-        This involves several steps
-        1) Parse the XML metadata to keep our desired fields
-        2) Remove products containing errors
-        3) Parse the validated ONIX file through the java parser to return .jsonl format
-        4) Add the contributor.personname field
-        """
+        """Transform the oapen metadata XML file into a valid ONIX file"""
         # Parse the downloaded metadata through the schema to extract relevant fields only
-        with open(self.oapen_schema) as f:
-            oapen_schema = json.load(f)
-        with open(release.download_path, "rb") as f:
-            metadata = xmltodict.parse(f)
-        metadata = filter_through_schema(metadata, oapen_schema)
-        with open(release.filtered_metadata, "w") as f:
-            xmltodict.unparse(metadata, output=f, pretty=True)
-
-        # Remove any products with errors in them
-        remove_invalid_products(
-            release.filtered_metadata,
-            release.validated_onix,
-            invalid_products_file=release.invalid_products_path,
+        transformer = OnixTransformer(
+            input_path=release.download_path,
+            output_dir=release.transform_folder,
+            filter_products=True,
+            error_removal=True,
+            normalise_related_products=True,
+            deduplicate_related_products=True,
+            elevate_related_products=True,
+            add_name_fields=True,
+            collapse_subjects=True,
+            filter_schema=self.oapen_schema,
+            keep_intermediate=True,
         )
-
-        # Assert that the new onix file is valid
-        if validate_onix(release.validated_onix):
-            raise AirflowException("Errors found in processed ONIX file. Cannot proceed without valid ONIX.")
-
-        # Parse the onix file through the Java parser - should result in release.parsed_onix file
-        success, parser_path = onix_parser_download()
-        set_task_state(success, task_id=kwargs["ti"].task_id, release=release)
-        with TemporaryDirectory() as tmp_dir:
-            shutil.copy(release.validated_onix, os.path.join(tmp_dir, "input.xml"))
-            success = onix_parser_execute(parser_path, input_dir=tmp_dir, output_dir=release.transform_folder)
-            set_task_state(success, task_id=kwargs["ti"].task_id, release=release)
-
-        # Add the Contributors.PersonName field
-        onix = onix_create_personname_fields(load_jsonl(release.parsed_onix))
-        save_jsonl_gz(release.transform_path, onix)
+        out_file = transformer.transform()
+        if release.transform_path != out_file:
+            raise FileNotFoundError(f"Expected file {release.transform_path} not equal to transformed file: {out_file}")
 
     def upload_transformed(self, release: OapenMetadataRelease, **kwargs) -> None:
         """Task to upload the transformed OAPEN metadata"""
-        transform_files = [
-            release.transform_path,
-            release.invalid_products_path,
-            release.parsed_onix,
-        ]
-        for expected_file in transform_files:
-            if not os.path.exists(expected_file):
-                raise FileNotFoundError(f"Expected file not present: {expected_file}")
         success = gcs_upload_files(
             bucket_name=self.cloud_workspace.transform_bucket,
-            file_paths=transform_files,
+            file_paths=release.transform_files,
         )
         set_task_state(success, kwargs["ti"].task_id, release=release)
 
@@ -319,139 +290,3 @@ def download_metadata(uri: str, download_path: str) -> None:
     # Check that more than just the header is returned
     if "<Product>" not in response.content.decode("utf-8"):
         raise AirflowException("No products found in metadata")
-
-
-def filter_through_schema(input: dict, schema: dict):
-    """
-    This function recursively traverses the input dictionary and compares it to the provided schema.
-    It retains only the fields and values that exist in the schema structure, and discards
-    any fields that do not match the schema.
-
-    # Example usage with a dictionary and schema:
-        input_dict = {
-            "name": "John",
-            "age": 30,
-            "address": {
-                "street": "123 Main St",
-                "city": "New York",
-                "zip": "10001"
-            }
-        }
-        schema = {
-            "name": null,
-            "age": null,
-            "address": {
-                "street": null,
-                "city": null
-            }
-        }
-        filtered_dict = filter_dict_by_schema(input_dict, schema)
-        filtered_dict will be:
-        {
-            "name": "John",
-            "age": 30,
-            "address": {
-                "street": "123 Main St",
-                "city": "New York"
-            }
-        }
-
-    :param input: The dictionary to filter
-    :param schema: The schema describing the desired structure of the dictionary
-    """
-    if isinstance(input, dict) and isinstance(schema, dict):
-        return {key: filter_through_schema(value, schema.get(key)) for key, value in input.items() if key in schema}
-    elif isinstance(input, list) and isinstance(schema, list):
-        return [filter_through_schema(item, schema[0]) for item in input]
-    else:
-        return input
-
-
-def remove_invalid_products(input_xml: str, output_xml: str, invalid_products_file: str = None) -> None:
-    """Attempts to validate the input xml as an ONIX file. Will remove any products that contain errors.
-
-    :param input_xml: The filepath of the xml file to validate
-    :param output_xml: The output filepath
-    :param invalid_products_file: The filepath to write the invalid products to. Ignored if unsupplied.
-    """
-    # Get the line numbers of any errors
-    errors = validate_onix(input_xml)
-    error_lines = [int(e.location.split(":")[-2]) - 1 for e in errors]
-
-    # Ingest the file into a list and find onix products with errors
-    with open(input_xml, "r") as f:
-        metadata = f.readlines()
-
-    invalid_products = [find_onix_product(metadata, line_number) for line_number in error_lines]
-    invalid_references = set([product.record_reference for product in invalid_products])
-    logging.info(
-        f"Metadata feed has been trimmed and {len(invalid_references)} errors remain. Products with errors will be removed"
-    )
-
-    # Parse the xml to dictionary
-    with open(input_xml, "rb") as f:
-        metadata = xmltodict.parse(f)
-
-    # Remove products matching the record references
-    metadata["ONIXMessage"]["Product"] = [
-        p for p in metadata["ONIXMessage"]["Product"] if p["RecordReference"] not in invalid_references
-    ]
-
-    # Create the clean XML file
-    with open(output_xml, "w") as f:
-        xmltodict.unparse(metadata, output=f, pretty=True)
-
-    # Create the invalid product file
-    if invalid_products_file:
-        with open(invalid_products_file, "w") as f:
-            metadata["ONIXMessage"]["Product"] = [p.product for p in invalid_products]
-            xmltodict.unparse(metadata, output=f, pretty=True)
-        logging.info(f"Invalid products written to {invalid_products_file}")
-
-
-def find_onix_product(all_lines: list, line_index: int) -> OnixProduct:
-    """Finds the range of lines encompassing a <Product> tag, given a line_number that is contained in the product
-
-    :param all_lines: All lines in the onix file
-    :param line_number: The line number associated with the product
-    :return: A two-tuple of the start and end line numbers of the product
-    :raises ValueError: Raised if the return would encompass a negative index, indicating the input line was not in a product
-    """
-    if line_index < 0 or line_index >= len(all_lines):
-        raise IndexError(f"Supplied line index {line_index} is not within the length of the file: {len(all_lines)}")
-
-    # Go up until we find <Product>
-    begin_index = line_index
-    begin_content = all_lines[begin_index]
-    while not "<Product>" in begin_content:
-        begin_index -= 1
-        if begin_index < 0:
-            raise ValueError(f"Product not found surrounding line {line_index}")
-        begin_content = all_lines[begin_index]
-
-    # Go up until we find </Product>
-    finish_index = line_index
-    finish_content = all_lines[finish_index]
-    while not "</Product>" in finish_content:
-        finish_index += 1
-        if finish_index >= len(all_lines):
-            raise ValueError(f"Product not found surrounding line {line_index}")
-        finish_content = all_lines[finish_index]
-
-    product_str = "".join(all_lines[begin_index : finish_index + 1])
-    product = xmltodict.parse(product_str)["Product"]
-    if not product:
-        raise ValueError(f"Product field is empty for product at line {begin_index}")
-    record_reference = product.get("RecordReference")
-    if not record_reference:
-        raise KeyError(f"No RecordReference for product: {product_str}")
-
-    return OnixProduct(product, record_reference)
-
-
-@dataclass
-class OnixProduct:
-    """Represents a single ONIX product and its identifying reference for simplicity"""
-
-    product: dict
-    record_reference: str
