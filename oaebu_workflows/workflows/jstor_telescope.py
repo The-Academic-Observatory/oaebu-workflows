@@ -459,7 +459,7 @@ class JstorAPI(ABC):
         pass
 
     @abstractmethod
-    def add_labels(self, report_info: List[dict]) -> bool:
+    def add_labels(self, reports: List[dict]) -> bool:
         pass
 
 
