@@ -92,9 +92,9 @@ class IrusOapenTelescope(Workflow):
     FUNCTION_REGION = "europe-west1"  # Region of the google cloud function
     FUNCTION_SOURCE_URL = (
         "https://github.com/The-Academic-Observatory/oapen-irus-uk-cloud-function/releases/"
-        "download/v1.1.8/oapen-irus-uk-cloud-function.zip"
+        "download/v1.1.9/oapen-irus-uk-cloud-function.zip"
     )  # URL to the zipped source code of the cloud function
-    FUNCTION_MD5_HASH = "4bb8ab4ad8f31c93039f234b4d91cf3a"  # MD5 hash of the zipped source code
+    FUNCTION_MD5_HASH = "946bb4d7ca229b15aba36ad7b5ed56d0"  # MD5 hash of the zipped source code
     FUNCTION_BLOB_NAME = "cloud_function_source_code.zip"  # blob name of zipped source code
     FUNCTION_TIMEOUT = 1500  # Timeout of cloud function in seconds. Maximum of 60 minutes,
     # see https://cloud.google.com/functions/docs/2nd-gen/overview#enhanced_infrastructure
