@@ -54,9 +54,11 @@ class TestOnixTransformer(ObservatoryTestCase):
     parsed_name = "full.jsonl"
     apply_names_name = "name_applied.jsonl"
     collapsed_name = "collapsed.jsonl"
-    test_input_metadata = os.path.join(test_fixtures_folder("onix_utils"), "input_metadata.xml")
-    test_output_parse_only = os.path.join(test_fixtures_folder("onix_utils"), "output_parse_only.jsonl")
-    test_output_metadata = os.path.join(test_fixtures_folder("onix_utils"), "output_metadata.jsonl")
+
+    fixtures_folder = os.path.join(test_fixtures_folder(), "onix_utils")
+    test_input_metadata = os.path.join(fixtures_folder, "input_metadata.xml")
+    test_output_parse_only = os.path.join(fixtures_folder, "output_parse_only.jsonl")
+    test_output_metadata = os.path.join(fixtures_folder, "output_metadata.jsonl")
 
     def test_e2e(self):
         with TemporaryDirectory() as tempdir:
@@ -179,7 +181,8 @@ class TestOnixFunctions(ObservatoryTestCase):
             self.assertEqual(success, False)
 
             ### Test parser_execute: nonzero returncode ###
-            shutil.copy(test_fixtures_folder("onix_telescope", "20210330_CURTINPRESS_ONIX.xml"), input_dir)
+            onix_fixtures = test_fixtures_folder(workflow_module="onix_telescope")
+            shutil.copy(os.path.join(onix_fixtures, "20210330_CURTINPRESS_ONIX.xml"), input_dir)
             with patch("oaebu_workflows.onix_utils.wait_for_process") as mock_wfp:
                 mock_wfp.return_value = ("stdout", "stderr")
                 with patch("oaebu_workflows.onix_utils.subprocess.Popen") as mock_popen:
@@ -196,8 +199,8 @@ class TestOnixFunctions(ObservatoryTestCase):
 
     def test_collapse_subjects(self):
         """Tests the thoth_collapse_subjects function"""
-        test_subjects_input = os.path.join(test_fixtures_folder("onix_utils"), "test_subjects_input.json")
-        test_subjects_expected = os.path.join(test_fixtures_folder("onix_utils"), "test_subjects_expected.json")
+        test_subjects_input = os.path.join(self.fixtures_folder, "test_subjects_input.json")
+        test_subjects_expected = os.path.join(self.fixtures_folder, "test_subjects_expected.json")
         with open(test_subjects_input, "r") as f:
             onix = json.load(f)
         actual_onix = collapse_subjects(onix)
@@ -636,10 +639,11 @@ class TestFilterThroughSchema(unittest.TestCase):
 
 
 class TestRemoveInvalidProducts(unittest.TestCase):
-    valid_parsed_xml = test_fixtures_folder("oapen_metadata", "parsed_valid.xml")
-    invalid_products_removed_xml = test_fixtures_folder("oapen_metadata", "invalid_products_removed.xml")
-    empty_xml = test_fixtures_folder("oapen_metadata", "empty_download.xml")
-    invalid_products_xml = test_fixtures_folder("oapen_metadata", "invalid_products.xml")
+    oapen_metadata_fixtures = test_fixtures_folder(workflow_module="oapen_metadata_telescope")
+    valid_parsed_xml = os.path.join(oapen_metadata_fixtures, "parsed_valid.xml")
+    invalid_products_removed_xml = os.path.join(oapen_metadata_fixtures, "invalid_products_removed.xml")
+    empty_xml = os.path.join(oapen_metadata_fixtures, "empty_download.xml")
+    invalid_products_xml = os.path.join(oapen_metadata_fixtures, "invalid_products.xml")
 
     def test_remove_invalid_products(self):
         """Tests the function used to remove invalid products from an xml file"""

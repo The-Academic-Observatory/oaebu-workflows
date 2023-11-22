@@ -1,0 +1,616 @@
+[
+    {
+        "CountryOfManufacture": null,
+        "RecordSourceName": null,
+        "RecordSourceType": "Publisher",
+        "LCCN": null,
+        "Collections": [],
+        "EditionNumber": null,
+        "RecordRef": "urn:uuid:a28326e3-e86b-4e6c-8538-4ed0306d4259",
+        "RelatedWorks": [],
+        "TextContent": [
+            {
+                "TextType": "Description",
+                "Text": [
+                    "This edited collection proposes a common good approach to development theory and practice. Rather than focusing on the outcomes or conditions of development, the contributors concentrate on the quality of development processes, suggesting that a common good dynamic is key in order to trigger development.\n\nResulting from more than three years of research by an international group of over fifty scholars, the volume advocates for a modern understanding of the common good—rather than a theological or metaphysical good—in societies by emphasising the social practice of ‘commoning’ at its core. It suggests that the dynamic equilibrium of common goods in a society should be at the centre of development efforts. For this purpose, it develops a matrix of common good dynamics, accounting for how institutions, social norms and common practices interconnect by identifying five key drivers not only of development, but human development (agency, governance, justice, stability, humanity). Based on this matrix, the contributors suggest a possible metric for measuring the quality of these dynamics. The last section of the book highlights the possibilities enabled by this approach through a series of case studies.\n\nThe concept of the common good has recently enjoyed a revival and inspired practitioners keen to look beyond the shortcomings of political and economic liberalism. This book builds on those efforts to think beyond the agenda of twentieth-century development policies, and will be of interest to those working in the fields of development, economics, sociology, philosophy and political science."
+                ]
+            }
+        ],
+        "CityOfPublications": [
+            "Cambridge, UK"
+        ],
+        "DOI": "10.11647/OBP.0290",
+        "EditionType": [],
+        "Imprints": [
+            {
+                "ImprintIdentifiers": [],
+                "ImprintName": "Open Book Publishers"
+            }
+        ],
+        "Publishers": [
+            {
+                "PublisherName": "Open Book Publishers",
+                "Websites": [],
+                "PublishingRole": "Publisher"
+            }
+        ],
+        "RelatedProducts": [
+            {
+                "ISBN13": "9781800644045",
+                "ProductForm": null,
+                "DOI": null,
+                "GTIN_13": null,
+                "ProductRelationCodes": [
+                    "Alternative format"
+                ],
+                "PID_Proprietary": null
+            },
+            {
+                "ISBN13": "9781800644052",
+                "ProductForm": null,
+                "DOI": null,
+                "GTIN_13": null,
+                "ProductRelationCodes": [
+                    "Alternative format"
+                ],
+                "PID_Proprietary": null
+            },
+            {
+                "ISBN13": "9781800644069",
+                "ProductForm": null,
+                "DOI": null,
+                "GTIN_13": null,
+                "ProductRelationCodes": [
+                    "Alternative format"
+                ],
+                "PID_Proprietary": null
+            },
+            {
+                "ISBN13": "9781800646742",
+                "ProductForm": null,
+                "DOI": null,
+                "GTIN_13": null,
+                "ProductRelationCodes": [
+                    "Alternative format"
+                ],
+                "PID_Proprietary": null
+            },
+            {
+                "ISBN13": "9781800644090",
+                "ProductForm": null,
+                "DOI": null,
+                "GTIN_13": null,
+                "ProductRelationCodes": [
+                    "Alternative format"
+                ],
+                "PID_Proprietary": null
+            },
+            {
+                "ISBN13": "9781800644076",
+                "ProductForm": null,
+                "DOI": null,
+                "GTIN_13": null,
+                "ProductRelationCodes": [
+                    "Alternative format"
+                ],
+                "PID_Proprietary": null
+            },
+            {
+                "ISBN13": "9781800644083",
+                "ProductForm": null,
+                "DOI": null,
+                "GTIN_13": null,
+                "ProductRelationCodes": [
+                    "Alternative format"
+                ],
+                "PID_Proprietary": null
+            }
+        ],
+        "PID_Proprietary": "urn:uuid:a28326e3-e86b-4e6c-8538-4ed0306d4259",
+        "ISBN10": null,
+        "ISBN13": "9781800644069",
+        "TitleDetails": [
+            {
+                "TitleElements": [
+                    {
+                        "TitleWithoutPrefix_TextCaseFlags": null,
+                        "TitleText_TextCaseFlags": null,
+                        "Subtitle_TextCaseFlags": null,
+                        "TitleText": "A Common Good Approach to Development",
+                        "TitleText_Language": null,
+                        "TitleElementLevel": "Product",
+                        "Subtitle": "Collective Dynamics of Development Processes",
+                        "SequenceNumber": null,
+                        "TitleWithoutPrefix": null,
+                        "Subtitle_Language": null,
+                        "TitlePrefix": null
+                    }
+                ],
+                "TitleType": "Distinctive title (book); Cover title (serial); Title on item (serial content item or reviewed resource)",
+                "TitleStatement": null
+            }
+        ],
+        "PublishingDates": [
+            {
+                "PublishingDateRole": "Publication date of print counterpart",
+                "Date": 2022
+            }
+        ],
+        "GTIN_13": null,
+        "Languages": [
+            {
+                "CountryCode": null,
+                "LanguageRole": "Language of text",
+                "LanguageCode": "eng"
+            }
+        ],
+        "ProductForm": "Digital download and online",
+        "Contributors": [
+            {
+                "LettersAfterNames": null,
+                "Gender": null,
+                "Proprietary": null,
+                "NameType": null,
+                "ProfessionalAffiliations": [],
+                "ORCID": "0000-0003-1718-2608",
+                "BiographicalNotes": [],
+                "TitlesBeforeNames": null,
+                "Roles": [
+                    "Edited by"
+                ],
+                "Websites": [],
+                "PersonNameInverted": "Nebel, Mathias",
+                "Dates": [],
+                "SequenceNumber": 1,
+                "PrefixToKey": null,
+                "KeyNames": "Nebel",
+                "TitlesAfterNames": null,
+                "AlternativeNames": [],
+                "NamesBeforeKey": "Mathias",
+                "Places": [],
+                "PersonName": "Mathias Nebel",
+                "ISNI": null,
+                "CorprorateName": null
+            },
+            {
+                "LettersAfterNames": null,
+                "Gender": null,
+                "Proprietary": null,
+                "NameType": null,
+                "ProfessionalAffiliations": [],
+                "ORCID": null,
+                "BiographicalNotes": [],
+                "TitlesBeforeNames": null,
+                "Roles": [
+                    "Edited by"
+                ],
+                "Websites": [],
+                "PersonNameInverted": "Garza-Vázquez, Oscar",
+                "Dates": [],
+                "SequenceNumber": 2,
+                "PrefixToKey": null,
+                "KeyNames": "Garza-Vázquez",
+                "TitlesAfterNames": null,
+                "AlternativeNames": [],
+                "NamesBeforeKey": "Oscar",
+                "Places": [],
+                "PersonName": "Oscar Garza-Vázquez",
+                "ISNI": null,
+                "CorprorateName": null
+            },
+            {
+                "LettersAfterNames": null,
+                "Gender": null,
+                "Proprietary": null,
+                "NameType": null,
+                "ProfessionalAffiliations": [],
+                "ORCID": null,
+                "BiographicalNotes": [],
+                "TitlesBeforeNames": null,
+                "Roles": [
+                    "Edited by"
+                ],
+                "Websites": [],
+                "PersonNameInverted": null,
+                "Dates": [],
+                "SequenceNumber": 3,
+                "PrefixToKey": null,
+                "KeyNames": "Sedmak",
+                "TitlesAfterNames": null,
+                "AlternativeNames": [],
+                "NamesBeforeKey": null,
+                "Places": [],
+                "PersonName": null,
+                "ISNI": null,
+                "CorprorateName": null
+            }
+        ],
+        "COKI_ID": null,
+        "Subjects": [
+            {
+                "SubjectHeadingText": [
+                    "development theory; development practice; common good; society; human development; quality measurement"
+                ],
+                "SubjectSchemeIdentifier": "Keywords",
+                "SubjectSchemeVersion": null,
+                "SubjectSchemeName": null,
+                "SubjectCode": null,
+                "MainSubject": false
+            },
+            {
+                "SubjectHeadingText": [],
+                "SubjectSchemeIdentifier": "LC_subject_heading",
+                "SubjectSchemeVersion": null,
+                "SubjectSchemeName": null,
+                "SubjectCode": "HN49.C6",
+                "MainSubject": false
+            },
+            {
+                "SubjectHeadingText": [],
+                "SubjectSchemeIdentifier": "BIC_subject_category",
+                "SubjectSchemeVersion": null,
+                "SubjectSchemeName": null,
+                "SubjectCode": "KCR",
+                "MainSubject": false
+            },
+            {
+                "SubjectHeadingText": [],
+                "SubjectSchemeIdentifier": "BISAC_Subject_Heading",
+                "SubjectSchemeVersion": null,
+                "SubjectSchemeName": null,
+                "SubjectCode": "SOC045000",
+                "MainSubject": false
+            },
+            {
+                "SubjectHeadingText": [],
+                "SubjectSchemeIdentifier": "BIC_subject_category",
+                "SubjectSchemeVersion": null,
+                "SubjectSchemeName": null,
+                "SubjectCode": "KCP",
+                "MainSubject": false
+            },
+            {
+                "SubjectHeadingText": [],
+                "SubjectSchemeIdentifier": "BISAC_Subject_Heading",
+                "SubjectSchemeVersion": null,
+                "SubjectSchemeName": null,
+                "SubjectCode": "SOC053000",
+                "MainSubject": false
+            },
+            {
+                "SubjectHeadingText": [],
+                "SubjectSchemeIdentifier": "BIC_subject_category",
+                "SubjectSchemeVersion": null,
+                "SubjectSchemeName": null,
+                "SubjectCode": "JHBC",
+                "MainSubject": false
+            },
+            {
+                "SubjectHeadingText": [],
+                "SubjectSchemeIdentifier": "BISAC_Subject_Heading",
+                "SubjectSchemeVersion": null,
+                "SubjectSchemeName": null,
+                "SubjectCode": "SOC050000",
+                "MainSubject": false
+            },
+            {
+                "SubjectHeadingText": [],
+                "SubjectSchemeIdentifier": "BIC_subject_category",
+                "SubjectSchemeVersion": null,
+                "SubjectSchemeName": null,
+                "SubjectCode": "JHBL",
+                "MainSubject": false
+            },
+            {
+                "SubjectHeadingText": [],
+                "SubjectSchemeIdentifier": "BISAC_Subject_Heading",
+                "SubjectSchemeVersion": null,
+                "SubjectSchemeName": null,
+                "SubjectCode": "POL024000",
+                "MainSubject": false
+            },
+            {
+                "SubjectHeadingText": [],
+                "SubjectSchemeIdentifier": "BIC_subject_category",
+                "SubjectSchemeVersion": null,
+                "SubjectSchemeName": null,
+                "SubjectCode": "HPS",
+                "MainSubject": false
+            },
+            {
+                "SubjectHeadingText": [],
+                "SubjectSchemeIdentifier": "BISAC_Subject_Heading",
+                "SubjectSchemeVersion": null,
+                "SubjectSchemeName": null,
+                "SubjectCode": "POL029000",
+                "MainSubject": false
+            },
+            {
+                "SubjectHeadingText": [],
+                "SubjectSchemeIdentifier": "BIC_subject_category",
+                "SubjectSchemeVersion": null,
+                "SubjectSchemeName": null,
+                "SubjectCode": "HPQ",
+                "MainSubject": false
+            }
+        ],
+        "Extent": [
+            {
+                "ExtentType": "Main content page count",
+                "ExtentValue": 400,
+                "ExtentUnit": "Pages",
+                "ExtentValueRoman": null
+            }
+        ]
+    },
+    {
+        "CountryOfManufacture": null,
+        "RecordSourceName": null,
+        "RecordSourceType": "Publisher",
+        "LCCN": null,
+        "Collections": [],
+        "EditionNumber": null,
+        "RecordRef": "urn:uuid:5fb9a23a-bf8e-4527-9c9c-3786b7219285",
+        "RelatedWorks": [],
+        "TextContent": [
+            {
+                "TextType": "Description",
+                "Text": [
+                    "Since the revival of maggot therapy in Western wound care approximately thirty years ago, there has been no comprehensive synthesis of what is known about its clinical practice, supply chain management, and social dimensions. This edited volume fills the information vacuum and, importantly, makes the current state of knowledge freely accessible. It is the first to provide sound, evidence-based information and guidance covering the entire supply chain from production to treatment.\n\nThe chapters are arranged in five parts presenting the latest on clinical practice, the principles of therapeutic action, medicinal maggot production, distribution logistics, and the ethical dimensions of maggot therapy. The contributors have paid particular attention to the challenges encountered in compromised, low-resource healthcare settings such as disasters, conflict, and poverty.\n\nThere are still many barriers to the widespread uptake of maggot therapy in healthcare settings. This book will be essential reading for a global audience of doctors, nurses, allied healthcare providers, students, and entrepreneurs with an interest in maggot-assisted wound care. It will be the go-to reference for those who plan, regulate, and coordinate healthcare, and want to establish a maggot therapy program, particularly in low- and middle-income and other compromised healthcare settings where maggot therapy can provide much-needed, affordable, and efficacious wound care."
+                ]
+            }
+        ],
+        "CityOfPublications": [
+            "Cambridge, UK"
+        ],
+        "DOI": "10.11647/obp.0300",
+        "EditionType": [],
+        "Imprints": [
+            {
+                "ImprintIdentifiers": [],
+                "ImprintName": "Open Book Publishers"
+            }
+        ],
+        "Publishers": [
+            {
+                "PublisherName": "Open Book Publishers",
+                "Websites": [],
+                "PublishingRole": "Publisher"
+            },
+            {
+                "PublisherName": "Griffith University",
+                "Websites": [],
+                "PublishingRole": "Funding body"
+            },
+            {
+                "PublisherName": "BioTherapeutics, Education & Research (BTER) Foundation",
+                "Websites": [],
+                "PublishingRole": "Funding body"
+            }
+        ],
+        "RelatedProducts": [
+            {
+                "ISBN13": "9781800647282",
+                "ProductForm": null,
+                "DOI": null,
+                "GTIN_13": null,
+                "ProductRelationCodes": [
+                    "Alternative format"
+                ],
+                "PID_Proprietary": null
+            },
+            {
+                "ISBN13": "9781800647299",
+                "ProductForm": null,
+                "DOI": null,
+                "GTIN_13": null,
+                "ProductRelationCodes": [
+                    "Alternative format"
+                ],
+                "PID_Proprietary": null
+            },
+            {
+                "ISBN13": "9781800647305",
+                "ProductForm": null,
+                "DOI": null,
+                "GTIN_13": null,
+                "ProductRelationCodes": [
+                    "Alternative format"
+                ],
+                "PID_Proprietary": null
+            },
+            {
+                "ISBN13": "9781800647343",
+                "ProductForm": null,
+                "DOI": null,
+                "GTIN_13": null,
+                "ProductRelationCodes": [
+                    "Alternative format"
+                ],
+                "PID_Proprietary": null
+            },
+            {
+                "ISBN13": "9781800647336",
+                "ProductForm": null,
+                "DOI": null,
+                "GTIN_13": null,
+                "ProductRelationCodes": [
+                    "Alternative format"
+                ],
+                "PID_Proprietary": null
+            },
+            {
+                "ISBN13": "9781800647312",
+                "ProductForm": null,
+                "DOI": null,
+                "GTIN_13": null,
+                "ProductRelationCodes": [
+                    "Alternative format"
+                ],
+                "PID_Proprietary": null
+            },
+            {
+                "ISBN13": "9781800647329",
+                "ProductForm": null,
+                "DOI": null,
+                "GTIN_13": null,
+                "ProductRelationCodes": [
+                    "Alternative format"
+                ],
+                "PID_Proprietary": null
+            }
+        ],
+        "PID_Proprietary": "urn:uuid:5fb9a23a-bf8e-4527-9c9c-3786b7219285",
+        "ISBN10": null,
+        "ISBN13": "9781800647305",
+        "TitleDetails": [
+            {
+                "TitleElements": [
+                    {
+                        "TitleWithoutPrefix_TextCaseFlags": null,
+                        "TitleText_TextCaseFlags": null,
+                        "Subtitle_TextCaseFlags": null,
+                        "TitleText": "A Complete Guide to Maggot Therapy",
+                        "TitleText_Language": null,
+                        "TitleElementLevel": "Product",
+                        "Subtitle": "Clinical Practice, Therapeutic Principles, Production, Distribution, and Ethics",
+                        "SequenceNumber": null,
+                        "TitleWithoutPrefix": null,
+                        "Subtitle_Language": null,
+                        "TitlePrefix": null
+                    }
+                ],
+                "TitleType": "Distinctive title (book); Cover title (serial); Title on item (serial content item or reviewed resource)",
+                "TitleStatement": null
+            }
+        ],
+        "PublishingDates": [
+            {
+                "PublishingDateRole": "Publication date of print counterpart",
+                "Date": 2022
+            }
+        ],
+        "GTIN_13": null,
+        "Languages": [
+            {
+                "CountryCode": null,
+                "LanguageRole": "Language of text",
+                "LanguageCode": "eng"
+            }
+        ],
+        "ProductForm": "Digital download and online",
+        "Contributors": [
+            {
+                "LettersAfterNames": null,
+                "Gender": null,
+                "Proprietary": null,
+                "NameType": null,
+                "ProfessionalAffiliations": [],
+                "ORCID": "0000-0002-9158-2792",
+                "BiographicalNotes": [],
+                "TitlesBeforeNames": null,
+                "Roles": [
+                    "Edited by"
+                ],
+                "Websites": [],
+                "PersonNameInverted": "Stadler, Frank",
+                "Dates": [],
+                "SequenceNumber": 1,
+                "PrefixToKey": null,
+                "KeyNames": "Stadler",
+                "TitlesAfterNames": null,
+                "AlternativeNames": [],
+                "NamesBeforeKey": "Frank",
+                "Places": [],
+                "PersonName": "Frank Stadler",
+                "ISNI": null,
+                "CorprorateName": null
+            }
+        ],
+        "COKI_ID": null,
+        "Subjects": [
+            {
+                "SubjectHeadingText": [
+                    "maggot therapy; clinical practice; supply chain management; social dimensions; principles of therapeutic action; medicinal maggot production; distribution logistics; ethical dimensions"
+                ],
+                "SubjectSchemeIdentifier": "Keywords",
+                "SubjectSchemeVersion": null,
+                "SubjectSchemeName": null,
+                "SubjectCode": null,
+                "MainSubject": false
+            },
+            {
+                "SubjectHeadingText": [],
+                "SubjectSchemeIdentifier": "BIC_subject_category",
+                "SubjectSchemeVersion": null,
+                "SubjectSchemeName": null,
+                "SubjectCode": "MB",
+                "MainSubject": false
+            },
+            {
+                "SubjectHeadingText": [],
+                "SubjectSchemeIdentifier": "BISAC_Subject_Heading",
+                "SubjectSchemeVersion": null,
+                "SubjectSchemeName": null,
+                "SubjectCode": "MED000000",
+                "MainSubject": false
+            },
+            {
+                "SubjectHeadingText": [],
+                "SubjectSchemeIdentifier": "LC_subject_heading",
+                "SubjectSchemeVersion": null,
+                "SubjectSchemeName": null,
+                "SubjectCode": "TP248.27.I56",
+                "MainSubject": false
+            },
+            {
+                "SubjectHeadingText": [],
+                "SubjectSchemeIdentifier": "BIC_subject_category",
+                "SubjectSchemeVersion": null,
+                "SubjectSchemeName": null,
+                "SubjectCode": "MBNH",
+                "MainSubject": false
+            },
+            {
+                "SubjectHeadingText": [],
+                "SubjectSchemeIdentifier": "BISAC_Subject_Heading",
+                "SubjectSchemeVersion": null,
+                "SubjectSchemeName": null,
+                "SubjectCode": "MED022000",
+                "MainSubject": false
+            },
+            {
+                "SubjectHeadingText": [],
+                "SubjectSchemeIdentifier": "BIC_subject_category",
+                "SubjectSchemeVersion": null,
+                "SubjectSchemeName": null,
+                "SubjectCode": "MBN",
+                "MainSubject": false
+            },
+            {
+                "SubjectHeadingText": [],
+                "SubjectSchemeIdentifier": "BISAC_Subject_Heading",
+                "SubjectSchemeVersion": null,
+                "SubjectSchemeName": null,
+                "SubjectCode": "MED050000",
+                "MainSubject": false
+            },
+            {
+                "SubjectHeadingText": [],
+                "SubjectSchemeIdentifier": "BIC_subject_category",
+                "SubjectSchemeVersion": null,
+                "SubjectSchemeName": null,
+                "SubjectCode": "MMZ",
+                "MainSubject": false
+            }
+        ],
+        "Extent": [
+            {
+                "ExtentType": "Main content page count",
+                "ExtentValue": 468,
+                "ExtentUnit": "Pages",
+                "ExtentValueRoman": null
+            }
+        ]
+    }
+]

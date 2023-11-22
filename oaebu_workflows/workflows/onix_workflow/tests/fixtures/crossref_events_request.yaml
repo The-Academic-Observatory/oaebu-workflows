@@ -1,0 +1,266 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      User-Agent:
+      - 'oaebu_workflows v2022.3.1.dev39 (+https://github.com/The-Academic-Observatory/oaebu-workflows;
+        mailto: agent@observatory.academy)'
+    method: GET
+    uri: https://api.eventdata.crossref.org/v1/events?mailto=agent@observatory.academy&from-collected-date=2018-05-14&until-collected-date=2021-05-21&rows=1000&obj-id=10.4444/111.4444444444444
+  response:
+    body:
+      string: '{"status":"ok","message-type":"event-list","message":{"next-cursor":"4e7f158d-fdcb-4573-a259-ce2c87a23c86","total-results":1,"items-per-page":1000,"events":[{"license":"my.url/fake","obj_id":"https:\/\/doi.org\/10.4444\/111.4444444444444","source_token":"random string","occurred_at":"2019-09-19T14:27:19Z","subj_id":"my.url/fake","id":"111-111-111","evidence_record":"my.url/fake","terms":"my.url/fake","action":"add","subj":{"pid":"my.url/fake","url":"my.url/fake","title":"A book title","work_type_id":"entry-encyclopedia","api-url":"my.url/fake"},"source_id":"wikipedia","obj":{"pid":"https:\/\/doi.org\/10.4444\/111.4444444444444","url":"my.url/fake","method":"doi-literal","verification":"literal"},"timestamp":"2020-02-07T14:29:53Z","relation_type_id":"references"}]}}'
+    headers:
+      Access-Control-Allow-Origin:
+      - '*'
+      Content-Length:
+      - '15120'
+      Content-Type:
+      - application/json;charset=UTF-8
+      Date:
+      - Wed, 17 Aug 2022 03:45:54 GMT
+      Server:
+      - http-kit
+      Vary:
+      - Accept
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      User-Agent:
+      - 'oaebu_workflows v2022.3.1.dev39 (+https://github.com/The-Academic-Observatory/oaebu-workflows;
+        mailto: agent@observatory.academy)'
+    method: GET
+    uri: https://api.eventdata.crossref.org/v1/events?mailto=agent@observatory.academy&from-collected-date=2018-05-14&until-collected-date=2021-05-21&rows=1000&obj-id=10.4444/111.4444444444444&cursor=4e7f158d-fdcb-4573-a259-ce2c87a23c86
+  response:
+    body:
+      string: '{"status":"ok","message-type":"event-list","message":{"next-cursor":null,"total-results":1,"items-per-page":1000,"events":[]}}'
+    headers:
+      Access-Control-Allow-Origin:
+      - '*'
+      Content-Length:
+      - '127'
+      Content-Type:
+      - application/json;charset=UTF-8
+      Date:
+      - Wed, 17 Aug 2022 03:45:56 GMT
+      Server:
+      - http-kit
+      Vary:
+      - Accept
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      User-Agent:
+      - 'oaebu_workflows v2022.3.1.dev39 (+https://github.com/The-Academic-Observatory/oaebu-workflows;
+        mailto: agent@observatory.academy)'
+    method: GET
+    uri: https://api.eventdata.crossref.org/v1/events?mailto=agent@observatory.academy&from-collected-date=2018-05-14&until-collected-date=2021-05-21&rows=1000&obj-id=10.2222/111.2222222222222
+  response:
+    body:
+      string: '{"status":"ok","message-type":"event-list","message":{"next-cursor":"9d45f1ae-8077-4dad-8b8e-273eaa65032e","total-results":1,"items-per-page":1000,"events":[{"license":"my.url/fake","obj_id":"https:\/\/doi.org/10.2222\/111.2222222222222","source_token":"random string","occurred_at":"2020-08-25T17:07:30Z","subj_id":"my.url/fake","id":"222-222-222","evidence_record":"my.url/fake","terms":"my.url/fake","action":"add","subj":{"pid":"my.url/fake","url":"my.url/fake","title":"A book title","work_type_id":"entry-encyclopedia","api-url":"my.url/fake"},"source_id":"wikipedia","obj":{"pid":"https:\/\/doi.org/10.2222\/111.2222222222222","url":"my.url/fake","method":"doi-literal","verification":"literal"},"timestamp":"2021-04-25T12:45:54Z","relation_type_id":"references"}]}}'
+    headers:
+      Access-Control-Allow-Origin:
+      - '*'
+      Content-Length:
+      - '84298'
+      Content-Type:
+      - application/json;charset=UTF-8
+      Date:
+      - Wed, 17 Aug 2022 03:45:58 GMT
+      Server:
+      - http-kit
+      Vary:
+      - Accept
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      User-Agent:
+      - 'oaebu_workflows v2022.3.1.dev39 (+https://github.com/The-Academic-Observatory/oaebu-workflows;
+        mailto: agent@observatory.academy)'
+    method: GET
+    uri: https://api.eventdata.crossref.org/v1/events?mailto=agent@observatory.academy&from-collected-date=2018-05-14&until-collected-date=2021-05-21&rows=1000&obj-id=10.2222/111.2222222222222&cursor=9d45f1ae-8077-4dad-8b8e-273eaa65032e
+  response:
+    body:
+      string: '{"status":"ok","message-type":"event-list","message":{"next-cursor":null,"total-results":1,"items-per-page":1000,"events":[]}}'
+    headers:
+      Access-Control-Allow-Origin:
+      - '*'
+      Content-Length:
+      - '127'
+      Content-Type:
+      - application/json;charset=UTF-8
+      Date:
+      - Wed, 17 Aug 2022 03:46:00 GMT
+      Server:
+      - http-kit
+      Vary:
+      - Accept
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      User-Agent:
+      - 'oaebu_workflows v2022.3.1.dev39 (+https://github.com/The-Academic-Observatory/oaebu-workflows;
+        mailto: agent@observatory.academy)'
+    method: GET
+    uri: https://api.eventdata.crossref.org/v1/events?mailto=agent@observatory.academy&from-collected-date=2018-05-14&until-collected-date=2021-05-21&rows=1000&obj-id=10.6666/111.6666666666666
+  response:
+    body:
+      string: '{"status":"ok","message-type":"event-list","message":{"next-cursor":"4939d774-00f1-4452-ac41-7ddd999d2460","total-results":1,"items-per-page":1000,"events":[{"license":"my.url/fake","obj_id":"https:\/\/doi.org\/10.6666\/111.6666666666666","source_token":"random string","occurred_at":"2019-12-17T07:53:38Z","subj_id":"my.url/fake","id":"333-333-333","evidence_record":"my.url/fake","terms":"my.url/fake","action":"add","subj":{"pid":"my.url/fake","url":"my.url/fake","title":"A book title","work_type_id":"entry-encyclopedia","api-url":"my.url/fake"},"source_id":"wikipedia","obj":{"pid":"https:\/\/doi.org\/10.6666\/111.6666666666666","url":"my.url/fake","method":"doi-literal","verification":"literal"},"timestamp":"2020-10-17T02:33:47Z","relation_type_id":"references"}]}}'
+    headers:
+      Access-Control-Allow-Origin:
+      - '*'
+      Content-Length:
+      - '17992'
+      Content-Type:
+      - application/json;charset=UTF-8
+      Date:
+      - Wed, 17 Aug 2022 03:46:02 GMT
+      Server:
+      - http-kit
+      Vary:
+      - Accept
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      User-Agent:
+      - 'oaebu_workflows v2022.3.1.dev39 (+https://github.com/The-Academic-Observatory/oaebu-workflows;
+        mailto: agent@observatory.academy)'
+    method: GET
+    uri: https://api.eventdata.crossref.org/v1/events?mailto=agent@observatory.academy&from-collected-date=2018-05-14&until-collected-date=2021-05-21&rows=1000&obj-id=10.6666/111.6666666666666&cursor=4939d774-00f1-4452-ac41-7ddd999d2460
+  response:
+    body:
+      string: '{"status":"ok","message-type":"event-list","message":{"next-cursor":null,"total-results":1,"items-per-page":1000,"events":[]}}'
+    headers:
+      Access-Control-Allow-Origin:
+      - '*'
+      Content-Length:
+      - '127'
+      Content-Type:
+      - application/json;charset=UTF-8
+      Date:
+      - Wed, 17 Aug 2022 03:46:04 GMT
+      Server:
+      - http-kit
+      Vary:
+      - Accept
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      User-Agent:
+      - 'oaebu_workflows v2022.3.1.dev39 (+https://github.com/The-Academic-Observatory/oaebu-workflows;
+        mailto: agent@observatory.academy)'
+    method: GET
+    uri: https://api.eventdata.crossref.org/v1/events?mailto=agent@observatory.academy&from-collected-date=2018-05-14&until-collected-date=2021-05-21&rows=1000&obj-id=10.112/111.112
+  response:
+    body:
+      string: '{"status":"ok","message-type":"event-list","message":{"next-cursor":"4939d774-00f1-4452-ac41-7ddd999d2112","total-results":1,"items-per-page":1000,"events":[{"license":"my.url/fake","obj_id":"https:\/\/doi.org\/10.112\/111.112","source_token":"random string","occurred_at":"2019-12-17T07:53:38Z","subj_id":"my.url/fake","id":"112-112-112","evidence_record":"my.url/fake","terms":"my.url/fake","action":"add","subj":{"pid":"my.url/fake","url":"my.url/fake","title":"A book title","work_type_id":"entry-encyclopedia","api-url":"my.url/fake"},"source_id":"wikipedia","obj":{"pid":"https:\/\/doi.org\/10.112\/111.112","url":"my.url/fake","method":"doi-literal","verification":"literal"},"timestamp":"2020-10-17T02:33:47Z","relation_type_id":"references"}]}}'
+    headers:
+      Access-Control-Allow-Origin:
+      - '*'
+      Content-Length:
+      - '17992'
+      Content-Type:
+      - application/json;charset=UTF-8
+      Date:
+      - Wed, 17 Aug 2022 03:46:02 GMT
+      Server:
+      - http-kit
+      Vary:
+      - Accept
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      User-Agent:
+      - 'oaebu_workflows v2022.3.1.dev39 (+https://github.com/The-Academic-Observatory/oaebu-workflows;
+        mailto: agent@observatory.academy)'
+    method: GET
+    uri: https://api.eventdata.crossref.org/v1/events?mailto=agent@observatory.academy&from-collected-date=2018-05-14&until-collected-date=2021-05-21&rows=1000&obj-id=10.112/111.112&cursor=4939d774-00f1-4452-ac41-7ddd999d2112
+  response:
+    body:
+      string: '{"status":"ok","message-type":"event-list","message":{"next-cursor":null,"total-results":1,"items-per-page":1000,"events":[]}}'
+    headers:
+      Access-Control-Allow-Origin:
+      - '*'
+      Content-Length:
+      - '127'
+      Content-Type:
+      - application/json;charset=UTF-8
+      Date:
+      - Wed, 17 Aug 2022 03:46:04 GMT
+      Server:
+      - http-kit
+      Vary:
+      - Accept
+    status:
+      code: 200
+      message: OK
+version: 1

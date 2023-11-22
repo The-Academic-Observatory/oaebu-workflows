@@ -1,0 +1,47 @@
+[
+    {
+        "Country_Name": "Country1",
+        "Book_Title": "Book1",
+        "Book_ID": "Doi1",
+        "Publisher": "Publisher",
+        "Authors": "Author1",
+        "ISBN": "ISBN1",
+        "eISBN": "ISBN1",
+        "Copyright_Year": null,
+        "Disciplines": null,
+        "Usage_Type": null,
+        "Usage_Month": "2023-09",
+        "Total_Item_Requests": 1,
+        "release_date": "2023-09-30"
+    },
+    {
+        "Country_Name": "Country1",
+        "Book_Title": "Book title 3",
+        "Book_ID": "Doi3",
+        "Publisher": "Publisher",
+        "Authors": "Author3",
+        "ISBN": "ISBN3",
+        "eISBN": "ISBN3",
+        "Copyright_Year": null,
+        "Disciplines": null,
+        "Usage_Type": null,
+        "Usage_Month": "2023-09",
+        "Total_Item_Requests": 1,
+        "release_date": "2023-09-30"
+    },
+    {
+        "Country_Name": "Country2",
+        "Book_Title": "Book2",
+        "Book_ID": "Doi2",
+        "Publisher": "Publisher",
+        "Authors": "Author2",
+        "ISBN": "ISBN2",
+        "eISBN": "ISBN2",
+        "Copyright_Year": null,
+        "Disciplines": null,
+        "Usage_Type": null,
+        "Usage_Month": "2023-09",
+        "Total_Item_Requests": 1,
+        "release_date": "2023-09-30"
+    }
+]

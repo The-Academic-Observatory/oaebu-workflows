@@ -1,0 +1,4 @@
+{
+    "size": 0,
+    "data": "\ufeffentity_name,book_title,item_doi,publisher,authors,eisbn,\"Month, Year of monthdt\",total_item_requests\nCountry1,Book1,Doi1,Publisher,Author1,ISBN1,September 2023,1\nCountry2,Book2,Doi2,Publisher,Author2,ISBN2,September 2023,1\nCountry1,Book title 3,Doi3,Publisher,Author3,ISBN3,September 2023,1\n"
+}

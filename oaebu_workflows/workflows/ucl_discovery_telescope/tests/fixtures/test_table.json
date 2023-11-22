@@ -1,0 +1,86 @@
+[
+    {
+        "ISBN": "ISBN_1",
+        "title": "title1",
+        "eprint_id": "eprint_id1",
+        "timescale": {
+            "format": "YYYYMMDD",
+            "from": "20230601",
+            "to": "20230630"
+        },
+        "origin": {
+            "url": "https://discovery.ucl.ac.uk",
+            "name": "UCL Discovery"
+        },
+        "total_downloads": 30,
+        "country": [
+            {
+                "value": "GB",
+                "count": 14
+            },
+            {
+                "value": "US",
+                "count": 6
+            },
+            {
+                "value": "IT",
+                "count": 4
+            },
+            {
+                "value": "DE",
+                "count": 2
+            },
+            {
+                "value": "AU",
+                "count": 2
+            },
+            {
+                "value": "HU",
+                "count": 1
+            },
+            {
+                "value": "IN",
+                "count": 1
+            },
+            {
+                "value": "PT",
+                "count": 1
+            }
+        ],
+        "release_date": "2023-06-30"
+    },
+    {
+        "ISBN": "ISBN_5",
+        "title": "title5",
+        "eprint_id": "eprint_id5",
+        "timescale": {
+            "format": "YYYYMMDD",
+            "from": "20230601",
+            "to": "20230630"
+        },
+        "origin": {
+            "url": "https://discovery.ucl.ac.uk",
+            "name": "UCL Discovery"
+        },
+        "total_downloads": 1012,
+        "country": [
+            {
+                "value": "AU",
+                "count": 999
+            },
+            {
+                "value": "US",
+                "count": 6
+            },
+            {
+                "value": "IT",
+                "count": 4
+            },
+            {
+                "value": "DE",
+                "count": 2
+            }
+        ],
+        "release_date": "2023-06-30"
+    }
+]

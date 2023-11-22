@@ -23,3 +23,4 @@ ChangeLog
 docs/schemas
 *.Rhistory
 .env
+__pycache__

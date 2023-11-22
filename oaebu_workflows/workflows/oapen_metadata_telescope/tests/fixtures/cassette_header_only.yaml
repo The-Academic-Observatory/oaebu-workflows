@@ -1,0 +1,49 @@
+interactions:
+    - request:
+          body: null
+          headers:
+              Accept:
+                  - "*/*"
+              Accept-Encoding:
+                  - gzip, deflate
+              Connection:
+                  - keep-alive
+              User-Agent:
+                  - "oaebu_workflows v0.0.1 (+https://github.com/The-Academic-Observatory/oaebu-workflows;
+                    mailto: agent@observatory.academy)"
+          method: GET
+          uri: https://library.oapen.org/download-export?format=onix
+      response:
+          body:
+              string:
+                  "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ONIXMessage xmlns=\"http://ns.editeur.org/onix/3.0/reference\"\
+                  \ release=\"3.0\">\n<Header>\n <Sender>\n <SenderName>OAPEN Foundation</SenderName>\n\
+                  \ <EmailAddress>info@oapen.org</EmailAddress>\n </Sender>\n <SentDateTime>20221130</SentDateTime>\n\
+                  </Header></ONIXMessage>"
+          headers:
+              Connection:
+                  - Keep-Alive
+              Content-Disposition:
+                  - attachment; filename=repository-export.onix_3.0.xml
+              Content-Language:
+                  - en-US
+              Content-Length:
+                  - "171475394"
+              Content-Type:
+                  - application/text;charset=UTF-8
+              Date:
+                  - Wed, 30 Nov 2022 07:12:10 GMT
+              Keep-Alive:
+                  - timeout=5, max=100
+              Server:
+                  - Apache/2.4.46 () OpenSSL/1.0.2k-fips
+              Set-Cookie:
+                  - JSESSIONID=FCF97B140F37FB95A07790E3A00E049B; Path=/; Secure; HttpOnly
+              Strict-Transport-Security:
+                  - max-age=63072000
+              X-Cocoon-Version:
+                  - 2.2.0
+          status:
+              code: 200
+              message: OK
+version: 1

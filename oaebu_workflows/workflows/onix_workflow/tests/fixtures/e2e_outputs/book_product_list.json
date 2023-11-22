@@ -1,0 +1,78 @@
+[
+    {
+        "product_id": "2222222222222",
+        "work_id": "2222222222222",
+        "work_family_id": "2222222222222",
+        "ProductForm": "Digital download and online",
+        "usage_flag": true,
+        "EditionNumber": null,
+        "published_year": null,
+        "published_date": null,
+        "title": null,
+        "bic_subjects": [],
+        "bisac_subjects": [],
+        "thema_subjects": [],
+        "keywords": [],
+        "authors": [
+            {
+                "PersonName": "John Doe",
+                "PersonNameInverted": "Doe, John",
+                "ORCID": null
+            }
+        ]
+    },
+    {
+        "product_id": "1111111111111",
+        "work_id": "2222222222222",
+        "work_family_id": "2222222222222",
+        "ProductForm": "Digital download",
+        "usage_flag": true,
+        "EditionNumber": null,
+        "published_year": 2020,
+        "published_date": null,
+        "title": null,
+        "bic_subjects": [],
+        "bisac_subjects": [],
+        "thema_subjects": [],
+        "keywords": [],
+        "authors": []
+    },
+    {
+        "product_id": "6666666666666",
+        "work_id": "6666666666666",
+        "work_family_id": "6666666666666",
+        "ProductForm": "Hardback",
+        "usage_flag": true,
+        "EditionNumber": null,
+        "published_year": null,
+        "published_date": null,
+        "title": null,
+        "bic_subjects": [],
+        "bisac_subjects": [],
+        "thema_subjects": [],
+        "keywords": [],
+        "authors": []
+    },
+    {
+        "product_id": "4444444444444",
+        "work_id": "4444444444444",
+        "work_family_id": "4444444444444",
+        "ProductForm": "Digital download",
+        "usage_flag": true,
+        "EditionNumber": null,
+        "published_year": 2020,
+        "published_date": "20200101",
+        "title": null,
+        "bic_subjects": [],
+        "bisac_subjects": [],
+        "thema_subjects": [],
+        "keywords": [],
+        "authors": [
+            {
+                "PersonName": "John Doe",
+                "PersonNameInverted": "Doe, John",
+                "ORCID": null
+            }
+        ]
+    }
+]

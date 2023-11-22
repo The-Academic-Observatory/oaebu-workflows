@@ -1,0 +1,188 @@
+[
+    {
+        "url": "/base/path/151420",
+        "title": "Anything public program drive north.",
+        "publication_id": "1234567890123",
+        "publication_type": "book",
+        "publication_imprint": "imprint",
+        "publication_group": "group",
+        "publication_whole_or_part": "whole",
+        "publication_format": "PDF",
+        "start_date": "2022-06-01",
+        "end_date": "2022-06-30",
+        "average_time": 59.5,
+        "unique_views": {
+            "country": [
+                {
+                    "name": "country 1",
+                    "value": 3
+                },
+                {
+                    "name": "country 2",
+                    "value": 3
+                }
+            ],
+            "referrer": [
+                {
+                    "name": "referrer 1",
+                    "value": 3
+                },
+                {
+                    "name": "referrer 2",
+                    "value": 3
+                }
+            ],
+            "social_network": [
+                {
+                    "name": "social_network 1",
+                    "value": 3
+                },
+                {
+                    "name": "social_network 2",
+                    "value": 3
+                }
+            ]
+        },
+        "page_views": {
+            "country": [
+                {
+                    "name": "country 1",
+                    "value": 4
+                },
+                {
+                    "name": "country 2",
+                    "value": 4
+                }
+            ],
+            "referrer": [
+                {
+                    "name": "referrer 1",
+                    "value": 4
+                },
+                {
+                    "name": "referrer 2",
+                    "value": 4
+                }
+            ],
+            "social_network": [
+                {
+                    "name": "social_network 1",
+                    "value": 4
+                },
+                {
+                    "name": "social_network 2",
+                    "value": 4
+                }
+            ]
+        },
+        "sessions": {
+            "country": [
+                {
+                    "name": "country 1",
+                    "value": 1
+                },
+                {
+                    "name": "country 2",
+                    "value": 1
+                }
+            ],
+            "source": [
+                {
+                    "name": "source 1",
+                    "value": 1
+                },
+                {
+                    "name": "source 2",
+                    "value": 1
+                }
+            ]
+        },
+        "release_date": "2022-06-30"
+    },
+    {
+        "url": "/base/path/833557",
+        "title": "Standard current never no.",
+        "publication_id": "1234567891234",
+        "publication_type": "book",
+        "publication_imprint": "imprint",
+        "publication_group": "(none)",
+        "publication_whole_or_part": "part",
+        "publication_format": "HTML",
+        "start_date": "2022-06-01",
+        "end_date": "2022-06-30",
+        "average_time": 49.6,
+        "unique_views": {
+            "country": [],
+            "referrer": [],
+            "social_network": []
+        },
+        "page_views": {
+            "country": [],
+            "referrer": [],
+            "social_network": []
+        },
+        "sessions": {
+            "country": [],
+            "source": []
+        },
+        "release_date": "2022-06-30"
+    },
+    {
+        "url": "/base/path/833557?fbclid=123",
+        "title": "Standard current never no.",
+        "publication_id": "1234567891234",
+        "publication_type": "book",
+        "publication_imprint": "imprint",
+        "publication_group": "(none)",
+        "publication_whole_or_part": "part",
+        "publication_format": "HTML",
+        "start_date": "2022-06-01",
+        "end_date": "2022-06-30",
+        "average_time": 38.8,
+        "unique_views": {
+            "country": [
+                {
+                    "name": "country 2",
+                    "value": 2
+                }
+            ],
+            "referrer": [
+                {
+                    "name": "referrer 2",
+                    "value": 2
+                }
+            ],
+            "social_network": [
+                {
+                    "name": "social_network 2",
+                    "value": 2
+                }
+            ]
+        },
+        "page_views": {
+            "country": [
+                {
+                    "name": "country 2",
+                    "value": 4
+                }
+            ],
+            "referrer": [
+                {
+                    "name": "referrer 2",
+                    "value": 4
+                }
+            ],
+            "social_network": [
+                {
+                    "name": "social_network 2",
+                    "value": 4
+                }
+            ]
+        },
+        "sessions": {
+            "country": [],
+            "source": []
+        },
+        "release_date": "2022-06-30"
+    }
+]

@@ -1,0 +1,5 @@
+[
+    {
+        "Error": "Product ISBN13:6666666666666 is a manifestation of ISBN13:111, which is not given as a product identifier in any ONIX product record."
+    }
+]

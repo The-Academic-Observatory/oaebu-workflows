@@ -1,0 +1,122 @@
+[
+    {
+        "Subjects": [
+            {
+                "SubjectHeadingText": [
+                    "A; B; C; D; E; F; G; this is a sentence"
+                ],
+                "SubjectSchemeIdentifier": "Keywords",
+                "SubjectSchemeVersion": null,
+                "SubjectSchemeName": null,
+                "SubjectCode": null,
+                "MainSubject": "false"
+            },
+            {
+                "SubjectHeadingText": [],
+                "SubjectSchemeIdentifier": "BIC_subject_category",
+                "SubjectSchemeVersion": null,
+                "SubjectSchemeName": null,
+                "SubjectCode": "MB",
+                "MainSubject": "false"
+            },
+            {
+                "SubjectHeadingText": [],
+                "SubjectSchemeIdentifier": "BISAC_Subject_Heading",
+                "SubjectSchemeVersion": null,
+                "SubjectSchemeName": null,
+                "SubjectCode": "MED000000",
+                "MainSubject": "false"
+            },
+            {
+                "SubjectHeadingText": [],
+                "SubjectSchemeIdentifier": "LC_subject_heading",
+                "SubjectSchemeVersion": null,
+                "SubjectSchemeName": null,
+                "SubjectCode": "TP248.27.I56",
+                "MainSubject": "false"
+            },
+            {
+                "SubjectHeadingText": [],
+                "SubjectSchemeIdentifier": "BIC_subject_category",
+                "SubjectSchemeVersion": null,
+                "SubjectSchemeName": null,
+                "SubjectCode": "MBNH",
+                "MainSubject": "false"
+            },
+            {
+                "SubjectHeadingText": [],
+                "SubjectSchemeIdentifier": "BISAC_Subject_Heading",
+                "SubjectSchemeVersion": null,
+                "SubjectSchemeName": null,
+                "SubjectCode": "MED022000",
+                "MainSubject": "false"
+            },
+            {
+                "SubjectHeadingText": [],
+                "SubjectSchemeIdentifier": "BIC_subject_category",
+                "SubjectSchemeVersion": null,
+                "SubjectSchemeName": null,
+                "SubjectCode": "MBN",
+                "MainSubject": "false"
+            },
+            {
+                "SubjectHeadingText": [],
+                "SubjectSchemeIdentifier": "BISAC_Subject_Heading",
+                "SubjectSchemeVersion": null,
+                "SubjectSchemeName": null,
+                "SubjectCode": "MED050000",
+                "MainSubject": "false"
+            },
+            {
+                "SubjectHeadingText": [],
+                "SubjectSchemeIdentifier": "BIC_subject_category",
+                "SubjectSchemeVersion": null,
+                "SubjectSchemeName": null,
+                "SubjectCode": "MMZ",
+                "MainSubject": "false"
+            }
+        ]
+    },
+    {
+        "Subjects": [
+            {
+                "SubjectHeadingText": [
+                    "A; B1; B2; C1; C2; D1; D2"
+                ],
+                "SubjectSchemeIdentifier": "Keywords",
+                "SubjectSchemeVersion": null,
+                "SubjectSchemeName": null,
+                "SubjectCode": null,
+                "MainSubject": "false"
+            }
+        ]
+    },
+    {
+        "Subjects": [
+            {
+                "SubjectHeadingText": [
+                    ""
+                ],
+                "SubjectSchemeIdentifier": "Keywords",
+                "SubjectSchemeVersion": null,
+                "SubjectSchemeName": null,
+                "SubjectCode": null,
+                "MainSubject": "false"
+            }
+        ]
+    },
+    {
+        "Subjects": [
+            {
+                "SubjectHeadingText": [
+                    ""
+                ],
+                "SubjectSchemeIdentifier": "Keywords",
+                "SubjectSchemeVersion": null,
+                "SubjectSchemeName": null,
+                "SubjectCode": null,
+                "MainSubject": "false"
+            }
+        ]
+    }
+]

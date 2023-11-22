@@ -1,0 +1,150 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      User-Agent:
+      - python-requests/2.28.1
+    method: GET
+    uri: https://discovery.ucl.ac.uk/cgi/stats/get?from=20230601&to=20230630&irs2report=eprint&set_name=eprint&set_value=eprint_id1&datatype=countries&top=countries&view=Table&limit=all&export=JSON
+  response:
+    body:
+      string: '{"timescale":{"format":"YYYYMMDD","to":"20230630","from":"20230601"},"records":[{"value":"GB","count":"14"},{"count":"6","value":"US"},{"count":"4","value":"IT"},{"value":"DE","count":"2"},{"count":"2","value":"AU"},{"value":"HU","count":"1"},{"value":"IN","count":"1"},{"value":"PT","count":"1"}],"origin":{"name":"UCL
+        Discovery","url":"https://discovery.ucl.ac.uk"},"set":{"name":"eprint","value":"eprint_id1"}}'
+    headers:
+      Cache-Control:
+      - no-store, no-cache, must-revalidate
+      Connection:
+      - close
+      Content-Disposition:
+      - attachment; filename=report_2023-07-19.json
+      Content-Type:
+      - application/json
+      Date:
+      - Wed, 19 Jul 2023 08:34:03 GMT
+      Server:
+      - Apache/2.4.37 (Red Hat Enterprise Linux)
+      Vary:
+      - Accept-Encoding
+      content-length:
+      - '411'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      User-Agent:
+      - python-requests/2.28.1
+    method: GET
+    uri: https://discovery.ucl.ac.uk/cgi/stats/get?from=20230601&to=20230630&irs2report=eprint&set_name=eprint&set_value=eprint_id1&datatype=downloads&graph_type=column&view=Google%3A%3AGraph&date_resolution=month&title=Download+activity+-+last+12+months&export=JSON
+  response:
+    body:
+      string: '{"timescale":{"to":"20230630","format":"YYYYMMDD","from":"20230601"},"records":[{"count":"30","datestamp":"202305","description":"May
+        2023"}],"origin":{"url":"https://discovery.ucl.ac.uk","name":"UCL Discovery"},"set":{"name":"eprint","value":"eprint_id1"}}'
+    headers:
+      Cache-Control:
+      - no-store, no-cache, must-revalidate
+      Connection:
+      - close
+      Content-Disposition:
+      - attachment; filename=report_2023-07-19.json
+      Content-Type:
+      - application/json
+      Date:
+      - Wed, 19 Jul 2023 08:34:04 GMT
+      Server:
+      - Apache/2.4.37 (Red Hat Enterprise Linux)
+      Vary:
+      - Accept-Encoding
+      content-length:
+      - '255'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      User-Agent:
+      - python-requests/2.28.1
+    method: GET
+    uri: https://discovery.ucl.ac.uk/cgi/stats/get?from=20230601&to=20230630&irs2report=eprint&set_name=eprint&set_value=eprint_id5&datatype=countries&top=countries&view=Table&limit=all&export=JSON
+  response:
+    body:
+      string: '{"timescale":{"format":"YYYYMMDD","to":"20230630","from":"20230601"},"records":[{"value":"AU","count":"999"},{"count":"6","value":"US"},{"count":"4","value":"IT"},{"value":"DE","count":"2"}],"origin":{"name":"UCL
+       Discovery","url":"https://discovery.ucl.ac.uk"},"set":{"name":"eprint","value":"eprint_id5"}}'
+    headers:
+      Cache-Control:
+      - no-store, no-cache, must-revalidate
+      Connection:
+      - close
+      Content-Disposition:
+      - attachment; filename=report_2023-07-19.json
+      Content-Type:
+      - application/json
+      Date:
+      - Wed, 19 Jul 2023 08:34:03 GMT
+      Server:
+      - Apache/2.4.37 (Red Hat Enterprise Linux)
+      Vary:
+      - Accept-Encoding
+      content-length:
+      - '411'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      User-Agent:
+      - python-requests/2.28.1
+    method: GET
+    uri: https://discovery.ucl.ac.uk/cgi/stats/get?from=20230601&to=20230630&irs2report=eprint&set_name=eprint&set_value=eprint_id5&datatype=downloads&graph_type=column&view=Google%3A%3AGraph&date_resolution=month&title=Download+activity+-+last+12+months&export=JSON
+  response:
+    body:
+      string: '{"timescale":{"to":"20230630","format":"YYYYMMDD","from":"20230601"},"records":[{"count":"1012","datestamp":"202305","description":"May
+        2023"}],"origin":{"url":"https://discovery.ucl.ac.uk","name":"UCL Discovery"},"set":{"name":"eprint","value":"eprint_id5"}}'
+    headers:
+      Cache-Control:
+      - no-store, no-cache, must-revalidate
+      Connection:
+      - close
+      Content-Disposition:
+      - attachment; filename=report_2023-07-19.json
+      Content-Type:
+      - application/json
+      Date:
+      - Wed, 19 Jul 2023 08:34:04 GMT
+      Server:
+      - Apache/2.4.37 (Red Hat Enterprise Linux)
+      Vary:
+      - Accept-Encoding
+      content-length:
+      - '255'
+    status:
+      code: 200
+      message: OK
+version: 1

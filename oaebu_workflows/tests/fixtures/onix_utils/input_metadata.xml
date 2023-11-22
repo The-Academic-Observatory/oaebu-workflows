@@ -1,0 +1,596 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ONIXMessage xmlns="http://ns.editeur.org/onix/3.0/reference" release="3.0">
+    <Header>
+        <Sender>
+            <SenderName>OAPEN Foundation</SenderName>
+            <EmailAddress>info@oapen.org</EmailAddress>
+        </Sender>
+        <SentDateTime>20221130</SentDateTime>
+    </Header>
+    <Product>
+        <RecordReference>OAPEN-ID_5fd15d8e-628e-4e16-9dd8-f1b07b37efa7</RecordReference>
+        <NotificationType>03</NotificationType>
+        <RecordSourceType>00</RecordSourceType>
+        <ProductIdentifier>
+            <ProductIDType>01</ProductIDType>
+            <IDTypeName>OAPEN Library ID</IDTypeName>
+            <IDValue>ONIX_20201001_9783653064650_196</IDValue>
+        </ProductIdentifier>
+        <ProductIdentifier>
+            <ProductIDType>15</ProductIDType>
+            <IDValue>9783653064650</IDValue>
+        </ProductIdentifier>
+        <ProductIdentifier>
+            <ProductIDType>06</ProductIDType>
+            <IDValue>10.3726/978-3-653-06465-0</IDValue>
+        </ProductIdentifier>
+        <DescriptiveDetail>
+            <ProductComposition>00</ProductComposition>
+            <ProductForm>EB</ProductForm>
+            <ProductFormDetail>E107</ProductFormDetail>
+            <PrimaryContentType>10</PrimaryContentType>
+            <EpubLicense>
+                <EpubLicenseName>Open license</EpubLicenseName>
+                <EpubLicenseExpression>
+                    <EpubLicenseExpressionType>02</EpubLicenseExpressionType>
+                    <EpubLicenseExpressionLink>https://creativecommons.org/licenses/by-nc-nd/4.0</EpubLicenseExpressionLink>
+                </EpubLicenseExpression>
+            </EpubLicense>
+            <Collection>
+                <CollectionType>10</CollectionType>
+                <TitleDetail>
+                    <TitleType>01</TitleType>
+                    <TitleElement>
+                        <TitleElementLevel>02</TitleElementLevel>
+                        <TitleText>Études luxembourgeoises / Luxemburg-Studien</TitleText>
+                    </TitleElement>
+                </TitleDetail>
+            </Collection>
+            <TitleDetail>
+                <TitleType>01</TitleType>
+                <TitleElement>
+                    <TitleElementLevel>This should be removed after processing</TitleElementLevel>
+                    <TitleText>Identitaetsbildung und Partizipation im 19. und 20. Jahrhundert</TitleText>
+                    <Subtitle>Luxemburg im europaeischen Kontext</Subtitle>
+                </TitleElement>
+            </TitleDetail>
+            <Contributor>
+                <SequenceNumber>1</SequenceNumber>
+                <ContributorRole>B01</ContributorRole>
+                <NamesBeforeKey>Norbert</NamesBeforeKey>
+                <KeyNames>Franz</KeyNames>
+            </Contributor>
+            <Contributor>
+                <SequenceNumber>2</SequenceNumber>
+                <ContributorRole>B01</ContributorRole>
+                <NamesBeforeKey>Thorsten</NamesBeforeKey>
+                <KeyNames>Fuchshuber</KeyNames>
+            </Contributor>
+            <Contributor>
+                <SequenceNumber>3</SequenceNumber>
+                <ContributorRole>B01</ContributorRole>
+                <NamesBeforeKey>Sonja</NamesBeforeKey>
+                <KeyNames>Kmec</KeyNames>
+            </Contributor>
+            <Contributor>
+                <SequenceNumber>4</SequenceNumber>
+                <ContributorRole>B01</ContributorRole>
+                <NamesBeforeKey>Jean-Paul</NamesBeforeKey>
+                <KeyNames>Lehners</KeyNames>
+            </Contributor>
+            <Contributor>
+                <SequenceNumber>5</SequenceNumber>
+                <ContributorRole>B01</ContributorRole>
+                <NamesBeforeKey>Renée</NamesBeforeKey>
+                <KeyNames>Wagener</KeyNames>
+            </Contributor>
+            <Language>
+                <LanguageRole>01</LanguageRole>
+                <LanguageCode>ger</LanguageCode>
+            </Language>
+            <Extent>
+                <ExtentType>00</ExtentType>
+                <ExtentValue>455</ExtentValue>
+                <ExtentUnit>03</ExtentUnit>
+            </Extent>
+            <Subject>
+                <SubjectSchemeIdentifier>12</SubjectSchemeIdentifier>
+                <SubjectCode>HBTB</SubjectCode>
+            </Subject>
+            <Subject>
+                <SubjectSchemeIdentifier>12</SubjectSchemeIdentifier>
+                <SubjectCode>HD</SubjectCode>
+            </Subject>
+            <Subject>
+                <SubjectSchemeIdentifier>12</SubjectSchemeIdentifier>
+                <SubjectCode>JFSJ1</SubjectCode>
+            </Subject>
+            <Subject>
+                <SubjectSchemeIdentifier>12</SubjectSchemeIdentifier>
+                <SubjectCode>JPA</SubjectCode>
+            </Subject>
+            <Subject>
+                <SubjectSchemeIdentifier>20</SubjectSchemeIdentifier>
+                <SubjectCode>European history</SubjectCode>
+            </Subject>
+            <Subject>
+                <SubjectSchemeIdentifier>20</SubjectSchemeIdentifier>
+                <SubjectCode>Biography: general</SubjectCode>
+            </Subject>
+            <Subject>
+                <SubjectSchemeIdentifier>20</SubjectSchemeIdentifier>
+                <SubjectCode>Language teaching and learning</SubjectCode>
+            </Subject>
+            <Subject>
+                <SubjectSchemeIdentifier>20</SubjectSchemeIdentifier>
+                <SubjectCode>History</SubjectCode>
+            </Subject>
+            <Subject>
+                <SubjectSchemeIdentifier>20</SubjectSchemeIdentifier>
+                <SubjectCode>Social and cultural history</SubjectCode>
+            </Subject>
+            <Subject>
+                <SubjectSchemeIdentifier>20</SubjectSchemeIdentifier>
+                <SubjectCode>General and world history</SubjectCode>
+            </Subject>
+            <Subject>
+                <SubjectSchemeIdentifier>20</SubjectSchemeIdentifier>
+                <SubjectCode>Literature: history and criticism</SubjectCode>
+            </Subject>
+            <Subject>
+                <SubjectSchemeIdentifier>20</SubjectSchemeIdentifier>
+                <SubjectCode>Literary studies: ancient, classical and medieval</SubjectCode>
+            </Subject>
+            <Subject>
+                <SubjectSchemeIdentifier>20</SubjectSchemeIdentifier>
+                <SubjectCode>Literary theory</SubjectCode>
+            </Subject>
+            <Subject>
+                <SubjectSchemeIdentifier>20</SubjectSchemeIdentifier>
+                <SubjectCode>Philosophy</SubjectCode>
+            </Subject>
+            <Subject>
+                <SubjectSchemeIdentifier>20</SubjectSchemeIdentifier>
+                <SubjectCode>Politics and government</SubjectCode>
+            </Subject>
+            <Subject>
+                <SubjectSchemeIdentifier>20</SubjectSchemeIdentifier>
+                <SubjectCode>Civics and citizenship</SubjectCode>
+            </Subject>
+            <Subject>
+                <SubjectSchemeIdentifier>20</SubjectSchemeIdentifier>
+                <SubjectCode>Political science and theory</SubjectCode>
+            </Subject>
+            <Subject>
+                <SubjectSchemeIdentifier>20</SubjectSchemeIdentifier>
+                <SubjectCode>Political control and freedoms</SubjectCode>
+            </Subject>
+            <Subject>
+                <SubjectSchemeIdentifier>20</SubjectSchemeIdentifier>
+                <SubjectCode>Anthropology</SubjectCode>
+            </Subject>
+            <Subject>
+                <SubjectSchemeIdentifier>20</SubjectSchemeIdentifier>
+                <SubjectCode>Social and cultural anthropology</SubjectCode>
+            </Subject>
+            <Subject>
+                <SubjectSchemeIdentifier>20</SubjectSchemeIdentifier>
+                <SubjectCode>Ethnic studies</SubjectCode>
+            </Subject>
+            <Subject>
+                <SubjectSchemeIdentifier>20</SubjectSchemeIdentifier>
+                <SubjectCode>Gender studies: women and girls</SubjectCode>
+            </Subject>
+            <Audience>
+                <AudienceCodeType>01</AudienceCodeType>
+                <AudienceCodeValue>06</AudienceCodeValue>
+            </Audience>
+        </DescriptiveDetail>
+        <CollateralDetail>
+            <TextContent>
+                <TextType>03</TextType>
+                <ContentAudience>03</ContentAudience>
+                <Text>Gesellschaften mit starker Einwanderung kennzeichnen vielfältige Formen von Identitätsbildung und das Ringen um politische und zivilgesellschaftliche Partizipation. Dies gilt in besonderer Weise für Luxemburg im 19. und 20. Jahrhundert. Hier entstand in einem Kleinstaat eine der jüngeren Nationen Europas und zugleich eine besonders offene, plurikulturelle Einwanderungsgesellschaft. Ziel dieses Bandes ist es, die Entstehung dieser Mehr-Kulturen-Gesellschaft im europäischen Zusammenhang zu verstehen. Die einzelnen Beiträge analysieren mit Hilfe unterschiedlicher sozial- und kulturwissenschaftlicher Annäherungen exemplarische Konfliktlinien der Identitätsbildung und des Kampfes um Partizipation.</Text>
+            </TextContent>
+            <SupportingResource>
+                <ResourceContentType>01</ResourceContentType>
+                <ContentAudience>00</ContentAudience>
+                <ResourceMode>03</ResourceMode>
+                <ResourceVersion>
+                    <ResourceForm>01</ResourceForm>
+                    <ResourceLink>https://library.oapen.org/bitstream/handle/20.500.12657/42289/9783653064650.pdf.jpg?sequence=3</ResourceLink>
+                </ResourceVersion>
+            </SupportingResource>
+        </CollateralDetail>
+        <PublishingDetail>
+            <Publisher>
+                <PublishingRole>01</PublishingRole>
+                <PublisherName>Peter Lang International Academic Publishers</PublisherName>
+            </Publisher>
+            <Publisher>
+                <PublishingRole>16</PublishingRole>
+                <PublisherName>NOT AVAILABLE</PublisherName>
+                <Funding>
+                    <FundingIdentifier>
+                        <FundingIDType>01</FundingIDType>
+                        <IDTypeName>programname</IDTypeName>
+                        <IDValue>NOT AVAILABLE</IDValue>
+                    </FundingIdentifier>
+                    <FundingIdentifier>
+                        <FundingIDType>01</FundingIDType>
+                        <IDTypeName>projectname</IDTypeName>
+                        <IDValue>NOT AVAILABLE</IDValue>
+                    </FundingIdentifier>
+                    <FundingIdentifier>
+                        <FundingIDType>01</FundingIDType>
+                        <IDTypeName>grantnumber</IDTypeName>
+                        <IDValue>NOT AVAILABLE</IDValue>
+                    </FundingIdentifier>
+                </Funding>
+            </Publisher>
+            <CityOfPublication>Bern</CityOfPublication>
+            <PublishingStatus>00</PublishingStatus>
+            <PublishingDate>
+                <PublishingDateRole>01</PublishingDateRole>
+                <Date dateformat="05">2016</Date>
+            </PublishingDate>
+        </PublishingDetail>
+        <RelatedMaterial>
+            <RelatedProduct>
+                <ProductRelationCode>06</ProductRelationCode>
+                <ProductIdentifier>
+                    <ProductIDType>15</ProductIDType>
+                    <IDValue>9783653064650</IDValue>
+                </ProductIdentifier>
+            </RelatedProduct>
+        </RelatedMaterial>
+        <ProductSupply>
+            <SupplyDetail>
+                <Supplier>
+                    <SupplierRole>11</SupplierRole>
+                    <SupplierName>OAPEN Library</SupplierName>
+                    <Website>
+                        <WebsiteRole>05</WebsiteRole>
+                        <WebsiteDescription>OAPEN Library: download the title</WebsiteDescription>
+                        <WebsiteLink>https://library.oapen.org/bitstream/handle/20.500.12657/42289/9783653064650.pdf?sequence=1</WebsiteLink>
+                    </Website>
+                </Supplier>
+                <ProductAvailability>99</ProductAvailability>
+                <UnpricedItemType>04</UnpricedItemType>
+            </SupplyDetail>
+        </ProductSupply>
+    </Product>
+
+    <Product>
+        <RecordReference>OAPEN-ID_42606b1b-876f-427d-b8ec-91f9bcaa2a4e</RecordReference>
+        <NotificationType>03</NotificationType>
+        <RecordSourceType>00</RecordSourceType>
+        <ProductIdentifier>
+            <ProductIDType>01</ProductIDType>
+            <IDTypeName>OAPEN Library ID</IDTypeName>
+            <IDValue>ONIX_20200527_9781912250134_11</IDValue>
+        </ProductIdentifier>
+        <ProductIdentifier>
+            <ProductIDType>15</ProductIDType>
+            <IDValue>9781912250134</IDValue>
+        </ProductIdentifier>
+        <ProductIdentifier>
+            <ProductIDType>06</ProductIDType>
+            <IDValue>10.14296/518.9781912250134</IDValue>
+        </ProductIdentifier>
+        <DescriptiveDetail>
+            <ProductComposition>00</ProductComposition>
+            <ProductForm>EB</ProductForm>
+            <ProductFormDetail>E107</ProductFormDetail>
+            <PrimaryContentType>10</PrimaryContentType>
+            <EpubLicense>
+                <EpubLicenseName>Open license</EpubLicenseName>
+                <EpubLicenseExpression>
+                    <EpubLicenseExpressionType>02</EpubLicenseExpressionType>
+                    <EpubLicenseExpressionLink>https://creativecommons.org/licenses/by-by-nc-nd/4.0/</EpubLicenseExpressionLink>
+                </EpubLicenseExpression>
+            </EpubLicense>
+            <TitleDetail>
+                <TitleType>01</TitleType>
+                <TitleElement>
+                    <TitleElementLevel>01</TitleElementLevel>
+                    <TitleText>Human Rights, Sexual Orientation and Gender Identity in The Commonwealth</TitleText>
+                </TitleElement>
+            </TitleDetail>
+            <Contributor>
+                <SequenceNumber>1</SequenceNumber>
+                <ContributorRole>B01</ContributorRole>
+                <NamesBeforeKey>Corinne</NamesBeforeKey>
+                <KeyNames>Lennox</KeyNames>
+            </Contributor>
+            <Contributor>
+                <SequenceNumber>2</SequenceNumber>
+                <ContributorRole>B01</ContributorRole>
+                <NamesBeforeKey>Matthew</NamesBeforeKey>
+                <KeyNames>Waites</KeyNames>
+            </Contributor>
+            <Language>
+                <LanguageRole>01</LanguageRole>
+                <LanguageCode>eng</LanguageCode>
+            </Language>
+            <Extent>
+                <ExtentType>00</ExtentType>
+                <ExtentValue>572</ExtentValue>
+                <ExtentUnit>03</ExtentUnit>
+            </Extent>
+            <Subject>
+                <SubjectSchemeIdentifier>12</SubjectSchemeIdentifier>
+                <SubjectCode>JFSC</SubjectCode>
+            </Subject>
+            <Subject>
+                <SubjectSchemeIdentifier>20</SubjectSchemeIdentifier>
+                <SubjectCode>Social classes</SubjectCode>
+            </Subject>
+            <Audience>
+                <AudienceCodeType>01</AudienceCodeType>
+                <AudienceCodeValue>06</AudienceCodeValue>
+            </Audience>
+        </DescriptiveDetail>
+        <CollateralDetail>
+            <TextContent>
+                <TextType>03</TextType>
+                <ContentAudience>03</ContentAudience>
+                <Text>Human rights in relation to sexual orientation and gender identity are at last reaching the heart of global debates. Yet 78 states worldwide continue to criminalise same-sex sexual behaviour, and due to the legal legacies of the British Empire, 42 of these - more than half - are in the Commonwealth of Nations. In recent years many states have seen the emergence of new sexual nationalisms, leading to increased enforcement of colonial sodomy laws against men, new criminalisations of sex between women and discrimination against transgender people. Human Rights, Sexual Orientation and Gender Identity in The Commonwealth: Struggles for Decriminalisation and Change challenges these developments as the first book to focus on experiences of lesbian, gay, bisexual, transgender and intersex (LGBTI) and all non-heterosexual people in the Commonwealth. The volume offers the most internationally extensive analysis to date of the global struggle for decriminalisation of same-sex sexual behaviour and relationships. The book includes: The first quantitative analysis of legal change related to sexual orientation and gender identity across all the Commonwealth.</Text>
+            </TextContent>
+            <SupportingResource>
+                <ResourceContentType>01</ResourceContentType>
+                <ContentAudience>00</ContentAudience>
+                <ResourceMode>03</ResourceMode>
+                <ResourceVersion>
+                    <ResourceForm>01</ResourceForm>
+                    <ResourceLink>https://library.oapen.org/bitstream/handle/20.500.12657/39385/9781912250134.pdf.jpg?sequence=3</ResourceLink>
+                </ResourceVersion>
+            </SupportingResource>
+        </CollateralDetail>
+        <PublishingDetail>
+            <Publisher>
+                <PublishingRole>01</PublishingRole>
+                <PublisherName>University of London Press</PublisherName>
+            </Publisher>
+            <Publisher>
+                <PublishingRole>16</PublishingRole>
+                <PublisherName>NOT AVAILABLE</PublisherName>
+                <Funding>
+                    <FundingIdentifier>
+                        <FundingIDType>01</FundingIDType>
+                        <IDTypeName>programname</IDTypeName>
+                        <IDValue>NOT AVAILABLE</IDValue>
+                    </FundingIdentifier>
+                    <FundingIdentifier>
+                        <FundingIDType>01</FundingIDType>
+                        <IDTypeName>projectname</IDTypeName>
+                        <IDValue>NOT AVAILABLE</IDValue>
+                    </FundingIdentifier>
+                    <FundingIdentifier>
+                        <FundingIDType>01</FundingIDType>
+                        <IDTypeName>grantnumber</IDTypeName>
+                        <IDValue>NOT AVAILABLE</IDValue>
+                    </FundingIdentifier>
+                </Funding>
+            </Publisher>
+            <CityOfPublication>London</CityOfPublication>
+            <PublishingStatus>00</PublishingStatus>
+            <PublishingDate>
+                <PublishingDateRole>01</PublishingDateRole>
+                <Date dateformat="05">2013</Date>
+            </PublishingDate>
+        </PublishingDetail>
+        <RelatedMaterial>
+            <RelatedProduct>
+                <ProductRelationCode>06</ProductRelationCode>
+                <ProductIdentifier>
+                    <ProductIDType>15</ProductIDType>
+                    <IDValue>9781912250134</IDValue>
+                </ProductIdentifier>
+                <ProductIdentifier>
+                    <ProductIDType>15</ProductIDType>
+                    <IDValue>9781912250135</IDValue>
+                </ProductIdentifier>
+                <ProductIdentifier>
+                    <ProductIDType>15</ProductIDType>
+                    <IDValue>9781912250136</IDValue>
+                </ProductIdentifier>
+            </RelatedProduct>
+        </RelatedMaterial>
+        <ProductSupply>
+            <SupplyDetail>
+                <Supplier>
+                    <SupplierRole>11</SupplierRole>
+                    <SupplierName>OAPEN Library</SupplierName>
+                    <Website>
+                        <WebsiteRole>05</WebsiteRole>
+                        <WebsiteDescription>OAPEN Library: download the title</WebsiteDescription>
+                        <WebsiteLink>https://library.oapen.org/bitstream/handle/20.500.12657/39385/9781912250134.pdf?sequence=1</WebsiteLink>
+                    </Website>
+                </Supplier>
+                <ProductAvailability>99</ProductAvailability>
+                <UnpricedItemType>04</UnpricedItemType>
+            </SupplyDetail>
+        </ProductSupply>
+    </Product>
+
+    <Product>
+        <RecordReference>OAPEN-ID_8b00e3bf-495a-41c7-b65e-e327853b87bd</RecordReference>
+        <NotificationType>03</NotificationType>
+        <RecordSourceType>00</RecordSourceType>
+        <ProductIdentifier>
+            <ProductIDType>01</ProductIDType>
+            <IDTypeName>OAPEN Library ID</IDTypeName>
+            <IDValue>ONIX_20200515_9789004400658_11</IDValue>
+        </ProductIdentifier>
+        <ProductIdentifier>
+            <ProductIDType>15</ProductIDType>
+            <IDValue>9789004400658</IDValue>
+        </ProductIdentifier>
+        <ProductIdentifier>
+            <ProductIDType>06</ProductIDType>
+            <IDValue>10.1163/9789004400658</IDValue>
+        </ProductIdentifier>
+        <DescriptiveDetail>
+            <ProductComposition>00</ProductComposition>
+            <ProductForm>EB</ProductForm>
+            <ProductFormDetail>E107</ProductFormDetail>
+            <PrimaryContentType>10</PrimaryContentType>
+            <EpubLicense>
+                <EpubLicenseName>Open license</EpubLicenseName>
+                <EpubLicenseExpression>
+                    <EpubLicenseExpressionType>02</EpubLicenseExpressionType>
+                    <EpubLicenseExpressionLink>https://creativecommons.org/licenses/by-nc/4.0/</EpubLicenseExpressionLink>
+                </EpubLicenseExpression>
+            </EpubLicense>
+            <Collection>
+                <CollectionType>10</CollectionType>
+                <TitleDetail>
+                    <TitleType>01</TitleType>
+                    <TitleElement>
+                        <TitleElementLevel>02</TitleElementLevel>
+                        <TitleText>Asian Yearbook of International Law</TitleText>
+                    </TitleElement>
+                </TitleDetail>
+            </Collection>
+            <TitleDetail>
+                <TitleType>01</TitleType>
+                <TitleElement>
+                    <TitleElementLevel>01</TitleElementLevel>
+                    <TitleText>Asian Yearbook of International Law, Volume 6 (1996)</TitleText>
+                </TitleElement>
+            </TitleDetail>
+            <Contributor>
+                <SequenceNumber>1</SequenceNumber>
+                <ContributorRole>B01</ContributorRole>
+                <NamesBeforeKey>Ko</NamesBeforeKey>
+                <KeyNames>Swan Sik</KeyNames>
+            </Contributor>
+            <Contributor>
+                <SequenceNumber>2</SequenceNumber>
+                <ContributorRole>B01</ContributorRole>
+                <NamesBeforeKey>J.J.G.</NamesBeforeKey>
+                <KeyNames>Syatauw</KeyNames>
+            </Contributor>
+            <Contributor>
+                <SequenceNumber>3</SequenceNumber>
+                <ContributorRole>B01</ContributorRole>
+                <NamesBeforeKey>M.C.W.</NamesBeforeKey>
+                <KeyNames>Pinto</KeyNames>
+            </Contributor>
+            <Language>
+                <LanguageRole>01</LanguageRole>
+                <LanguageCode>eng</LanguageCode>
+            </Language>
+            <Extent>
+                <ExtentType>00</ExtentType>
+                <ExtentValue>558</ExtentValue>
+                <ExtentUnit>03</ExtentUnit>
+            </Extent>
+            <Subject>
+                <SubjectSchemeIdentifier>12</SubjectSchemeIdentifier>
+                <SubjectCode>LB</SubjectCode>
+            </Subject>
+            <Subject>
+                <SubjectSchemeIdentifier>20</SubjectSchemeIdentifier>
+                <SubjectCode>International law</SubjectCode>
+            </Subject>
+            <Audience>
+                <AudienceCodeType>01</AudienceCodeType>
+                <AudienceCodeValue>06</AudienceCodeValue>
+            </Audience>
+        </DescriptiveDetail>
+        <CollateralDetail>
+            <TextContent>
+                <TextType>03</TextType>
+                <ContentAudience>03</ContentAudience>
+                <Text>The Asian Yearbook of International Law is a major refereed publication dedicated to international law issues as seen primarily from an Asian perspective. Readership: Academics and practitioners who deal with international public law in Asia will appreciate this unique, complete resource. The Asian Yearbook of International Law provides insight into Asian views and practices, especially for non-Asian readers, and also promotes the dissemination of knowledge of international law in Asia.</Text>
+            </TextContent>
+            <SupportingResource>
+                <ResourceContentType>01</ResourceContentType>
+                <ContentAudience>00</ContentAudience>
+                <ResourceMode>03</ResourceMode>
+                <ResourceVersion>
+                    <ResourceForm>01</ResourceForm>
+                    <ResourceLink>https://library.oapen.org/bitstream/handle/20.500.12657/38065/9789004400658_webready_content_text.pdf.jpg?sequence=3</ResourceLink>
+                </ResourceVersion>
+            </SupportingResource>
+        </CollateralDetail>
+        <PublishingDetail>
+            <Imprint>
+                <ImprintName>Brill | Nijhoff</ImprintName>
+            </Imprint>
+            <Publisher>
+                <PublishingRole>01</PublishingRole>
+                <PublisherName>Brill</PublisherName>
+            </Publisher>
+            <Publisher>
+                <PublishingRole>16</PublishingRole>
+                <PublisherName>NOT AVAILABLE</PublisherName>
+                <Funding>
+                    <FundingIdentifier>
+                        <FundingIDType>01</FundingIDType>
+                        <IDTypeName>programname</IDTypeName>
+                        <IDValue>NOT AVAILABLE</IDValue>
+                    </FundingIdentifier>
+                    <FundingIdentifier>
+                        <FundingIDType>01</FundingIDType>
+                        <IDTypeName>projectname</IDTypeName>
+                        <IDValue>NOT AVAILABLE</IDValue>
+                    </FundingIdentifier>
+                    <FundingIdentifier>
+                        <FundingIDType>01</FundingIDType>
+                        <IDTypeName>grantnumber</IDTypeName>
+                        <IDValue>NOT AVAILABLE</IDValue>
+                    </FundingIdentifier>
+                </Funding>
+            </Publisher>
+            <PublishingStatus>00</PublishingStatus>
+            <PublishingDate>
+                <PublishingDateRole>01</PublishingDateRole>
+                <Date dateformat="05">1998</Date>
+            </PublishingDate>
+        </PublishingDetail>
+        <RelatedMaterial>
+            <RelatedProduct>
+                <ProductRelationCode>06</ProductRelationCode>
+                <ProductIdentifier>
+                    <ProductIDType>15</ProductIDType>
+                    <IDValue>9789004400658</IDValue>
+                </ProductIdentifier>
+                <ProductIdentifier>
+                    <ProductIDType>15</ProductIDType>
+                    <IDValue>9789004400659</IDValue>
+                </ProductIdentifier>
+            </RelatedProduct>
+        </RelatedMaterial>
+        <ProductSupply>
+            <SupplyDetail>
+                <Supplier>
+                    <SupplierRole>11</SupplierRole>
+                    <SupplierName>OAPEN Library</SupplierName>
+                    <Website>
+                        <WebsiteRole>05</WebsiteRole>
+                        <WebsiteDescription>OAPEN Library: download the title</WebsiteDescription>
+                        <WebsiteLink>https://library.oapen.org/bitstream/handle/20.500.12657/38065/9789004400658_webready_content_text.pdf?sequence=1</WebsiteLink>
+                    </Website>
+                </Supplier>
+                <ProductAvailability>99</ProductAvailability>
+                <UnpricedItemType>04</UnpricedItemType>
+            </SupplyDetail>
+            <SupplyDetail>
+                <Supplier>
+                    <SupplierRole>09</SupplierRole>
+                    <SupplierName>Brill</SupplierName>
+                    <Website>
+                        <WebsiteRole>01</WebsiteRole>
+                        <WebsiteDescription>Publisher's website: web shop</WebsiteDescription>
+                        <WebsiteLink>https://brill.com/abstract/title/10557</WebsiteLink>
+                    </Website>
+                </Supplier>
+                <ProductAvailability>99</ProductAvailability>
+                <UnpricedItemType>04</UnpricedItemType>
+            </SupplyDetail>
+        </ProductSupply>
+    </Product>
+</ONIXMessage>
