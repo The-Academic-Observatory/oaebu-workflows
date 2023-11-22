@@ -47,6 +47,7 @@ countries as (
         alpha2,
         iso_name,
         wikipedia_name,
+        jstor_name
     FROM `{{ country_table_id }}`
 ),
 
@@ -61,7 +62,8 @@ month_country as (
         alpha2,
         iso_name as country_name,
         iso_name as country_iso_name,
-        wikipedia_name as country_wikipedia_name
+        wikipedia_name as country_wikipedia_name,
+        jstor_name as country_jstor_name
     FROM months
     CROSS JOIN countries
 ),
@@ -79,7 +81,7 @@ jstor_month_country as (
     SELECT
         ISBN13,
         month,
-        Country_name as alpha2,
+        Country_name as alpha2, -- for jstor collections, country_name is the full name not the alpha2 code. This is accounted for in the join to month_country.country_jstor_name instead of month_country.alpha2
         total_item_requests
     FROM months, UNNEST(jstor)
 ),
@@ -302,7 +304,8 @@ SELECT
     STRUCT(ucl_discovery.download_count ) as ucl_discovery,
     STRUCT(worldreader.download_count) as worldreader
 FROM month_country
-LEFT JOIN jstor_month_country as jstor ON month_country.ISBN13 = jstor.ISBN13 AND month_country.month = jstor.month AND month_country.alpha2 = jstor.alpha2
+-- for jstor collections, the alpha2 value is the full country name and needs to be matched on country_jstor_name 
+LEFT JOIN jstor_month_country as jstor ON month_country.ISBN13 = jstor.ISBN13 AND month_country.month = jstor.month AND (month_country.alpha2 = jstor.alpha2 OR month_country.country_jstor_name = jstor.alpha2)
 LEFT JOIN irus_oapen_month_country as irus_oapen ON month_country.ISBN13 = irus_oapen.ISBN13 AND month_country.month = irus_oapen.month AND month_country.alpha2 = irus_oapen.alpha2
 LEFT JOIN irus_fulcrum_month_country as irus_fulcrum on month_country.ISBN13 = irus_fulcrum.ISBN13 AND month_country.month = irus_fulcrum.month AND month_country.alpha2 = irus_fulcrum.alpha2
 LEFT JOIN google_analytics_page_views_month_country as google_page_views ON month_country.ISBN13 = google_page_views.ISBN13 AND month_country.month = google_page_views.month AND month_country.alpha2 = google_page_views.country_code
