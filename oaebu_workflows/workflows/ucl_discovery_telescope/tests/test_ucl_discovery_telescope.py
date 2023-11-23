@@ -143,9 +143,9 @@ class TestUclDiscoveryTelescope(ObservatoryTestCase):
 
             # download
             cassette = vcr.VCR(record_mode="none")
-            sa_patch = patch("oaebu_workflows.workflows.ucl_discovery_telescope.service_account")
-            conn_patch = patch("oaebu_workflows.workflows.ucl_discovery_telescope.BaseHook.get_connection")
-            build_patch = patch("oaebu_workflows.workflows.ucl_discovery_telescope.discovery.build")
+            sa_patch = patch("oaebu_workflows.workflows.ucl_discovery_telescope.ucl_discovery_telescope.service_account")
+            conn_patch = patch("oaebu_workflows.workflows.ucl_discovery_telescope.ucl_discovery_telescope.BaseHook.get_connection")
+            build_patch = patch("oaebu_workflows.workflows.ucl_discovery_telescope.ucl_discovery_telescope.discovery.build")
             with sa_patch, conn_patch, build_patch as mock_build, cassette.use_cassette(self.download_cassette):
                 mock_service = mock_build.return_value.spreadsheets.return_value.values.return_value.get.return_value
                 mock_service.execute.return_value = {"values": sheet_return}

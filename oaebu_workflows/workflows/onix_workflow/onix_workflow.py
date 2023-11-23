@@ -543,7 +543,7 @@ class OnixWorkflow(Workflow):
             release.snapshot_date,
         )
         sql = render_template(
-            os.path.join(sql_folder(worklfow_module="onix_workflow"), "create_book.sql.jinja2"),
+            os.path.join(sql_folder(workflow_module="onix_workflow"), "create_book.sql.jinja2"),
             crossref_events_table_id=crossref_events_table_id,
             crossref_metadata_table_id=crossref_metadata_table_id,
         )
