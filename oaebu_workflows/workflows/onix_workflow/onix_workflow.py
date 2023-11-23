@@ -586,7 +586,7 @@ class OnixWorkflow(Workflow):
         )
         output_table_name = f"{orig_table}{self.oaebu_intermediate_match_suffix}"
         template_path = os.path.join(
-            sql_folder(worklfow_module="onix_workflow"), "assign_workid_workfamilyid.sql.jinja2"
+            sql_folder(workflow_module="onix_workflow"), "assign_workid_workfamilyid.sql.jinja2"
         )
         output_table_id = bq_sharded_table_id(
             self.cloud_workspace.project_id,
@@ -741,7 +741,7 @@ class OnixWorkflow(Workflow):
             release.onix_snapshot_date,
         )
         country_table_id = bq_table_id(self.bq_country_project_id, self.bq_country_dataset_id, "country")
-        template_path = os.path.join(sql_folder(worklfow_module="onix_workflow"), "create_book_products.sql.jinja2")
+        template_path = os.path.join(sql_folder(workflow_module="onix_workflow"), "create_book_products.sql.jinja2")
         sql = render_template(
             template_path,
             onix_table_id=onix_table_id,
@@ -790,7 +790,7 @@ class OnixWorkflow(Workflow):
         output_table_id = bq_sharded_table_id(
             self.cloud_workspace.project_id, self.bq_oaebu_export_dataset, output_table_name, release.snapshot_date
         )
-        template_path = os.path.join(sql_folder(worklfow_module="onix_workflow"), query_template)
+        template_path = os.path.join(sql_folder(workflow_module="onix_workflow"), query_template)
         schema_file_path = bq_find_schema(
             path=self.schema_folder,
             table_name=output_table,
@@ -907,7 +907,7 @@ class OnixWorkflow(Workflow):
             f"{self.cloud_workspace.project_id.replace('-', '_')}_unmatched_book_metrics",
             release.snapshot_date,
         )
-        template_path = os.path.join(sql_folder(worklfow_module="onix_workflow"), "export_unmatched_metrics.sql.jinja2")
+        template_path = os.path.join(sql_folder(workflow_module="onix_workflow"), "export_unmatched_metrics.sql.jinja2")
         sql = render_template(
             template_path,
             google_analytics3_unmatched_table_id=google_analytics3_unmatched_table_id,
@@ -1077,7 +1077,7 @@ class OnixWorkflow(Workflow):
             output_table_name,
             release.snapshot_date,
         )
-        template_path = os.path.join(sql_folder(worklfow_module="onix_workflow"), "onix_aggregate_metrics.sql.jinja2")
+        template_path = os.path.join(sql_folder(workflow_module="onix_workflow"), "onix_aggregate_metrics.sql.jinja2")
         sql = render_template(template_path, table_id=onix_table_id, isbn="ISBN13")
         bq_create_dataset(
             project_id=self.cloud_workspace.project_id,
@@ -1138,7 +1138,7 @@ class OnixWorkflow(Workflow):
             location=self.cloud_workspace.data_location,
             description="OAEBU Quality Analysis Tables",
         )
-        sql_template = os.path.join(sql_folder(worklfow_module="onix_workflow"), "validate_isbn.sql.jinja2")
+        sql_template = os.path.join(sql_folder(workflow_module="onix_workflow"), "validate_isbn.sql.jinja2")
         sql = get_isbn_utils_sql_string() + render_template(sql_template, table_id=orig_table_id, isbn=isbn)
         status = bq_create_table_from_query(sql=sql, table_id=output_table_id, schema_file_path=schema_file_path)
         return status
@@ -1205,7 +1205,7 @@ class OnixWorkflow(Workflow):
             description="OAEBU Quality Analysis Tables",
         )
         template_path = os.path.join(
-            sql_folder(worklfow_module="onix_workflow"), "oaebu_intermediate_metrics.sql.jinja2"
+            sql_folder(workflow_module="onix_workflow"), "oaebu_intermediate_metrics.sql.jinja2"
         )
         intermediate_table_id = bq_sharded_table_id(
             self.cloud_workspace.project_id,
@@ -1464,7 +1464,7 @@ def get_isbn_utils_sql_string() -> str:
     """
 
     isbn_utils_file = "isbn_utils.sql"
-    isbn_utils_path = os.path.join(sql_folder(worklfow_module="onix_workflow"), isbn_utils_file)
+    isbn_utils_path = os.path.join(sql_folder(workflow_module="onix_workflow"), isbn_utils_file)
     with open(isbn_utils_path, "r") as f:
         isbn_utils_sql = f.read()
 
