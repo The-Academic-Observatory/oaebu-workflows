@@ -1163,13 +1163,13 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     ("institution_list", 1),
                     ("book_product_metrics_city", 26),
                     ("book_product_metrics_events", 3),
-                    ("book_product_publisher_metrics", 1),
+                    ("book_product_publisher_metrics", 4),
                     ("book_product_subject_bic_metrics", 0),
                     ("book_product_subject_bisac_metrics", 0),
                     ("book_product_subject_thema_metrics", 0),
-                    ("book_product_year_metrics", 2),
+                    ("book_product_year_metrics", 5),
                     ("book_product_subject_year_metrics", 0),
-                    ("book_product_author_metrics", 1),
+                    ("book_product_author_metrics", 3),
                 ]
 
                 export_prefix = self.gcp_project_id.replace("-", "_")
