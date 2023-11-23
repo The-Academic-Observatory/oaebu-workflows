@@ -90,7 +90,7 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
                 Workflow(
                     dag_id="oapen_metadata",
                     name="OAPEN Metadata Telescope",
-                    class_name="oaebu_workflows.workflows.oapen_metadata_telescope.OapenMetadataTelescope",
+                    class_name="oaebu_workflows.workflows.oapen_metadata_telescope.oapen_metadata_telescope.OapenMetadataTelescope",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(metadata_uri=""),
                 )

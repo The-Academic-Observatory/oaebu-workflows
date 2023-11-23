@@ -136,7 +136,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         # vcrpy cassettes for http request mocking
         self.events_cassette = os.path.join(self.fixtures_folder, "crossref_events_request.yaml")
 
-    @patch("oaebu_workflows.workflows.onix_workflow.bq_select_table_shard_dates")
+    @patch("oaebu_workflows.workflows.onix_workflow.onix_workflow.bq_select_table_shard_dates")
     def test_make_release(self, mock_sel_table_suffixes):
         """Tests that the make_release function works as intended"""
         # Use a different onix snapshot date for testing purposes
@@ -233,7 +233,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 Workflow(
                     dag_id="onix_workflow_test_dag_load",
                     name="Onix Workflow Test Dag Load",
-                    class_name="oaebu_workflows.workflows.onix_workflow.OnixWorkflow",
+                    class_name="oaebu_workflows.workflows.onix_workflow.onix_workflow.OnixWorkflow",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(
                         sensor_dag_ids=[
@@ -381,7 +381,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
             }
             self.assert_dag_structure(expected_dag_structure, dag)
 
-    @patch("oaebu_workflows.workflows.onix_workflow.bq_run_query")
+    @patch("oaebu_workflows.workflows.onix_workflow.onix_workflow.bq_run_query")
     def test_create_and_load_aggregate_works_table(self, mock_bq_query):
         mock_bq_query.return_value = TestOnixWorkflow.onix_data
         workslookup_expected = [
@@ -1291,7 +1291,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
 
         self.run_telescope_tests(include_google_analytics3=True)
 
-    @patch("oaebu_workflows.workflows.onix_workflow.bq_run_query")
+    @patch("oaebu_workflows.workflows.onix_workflow.onix_workflow.bq_run_query")
     def test_get_onix_records(self, mock_bq_query):
         mock_bq_query.return_value = TestOnixWorkflow.onix_data
         records = get_onix_records("test_table_id")

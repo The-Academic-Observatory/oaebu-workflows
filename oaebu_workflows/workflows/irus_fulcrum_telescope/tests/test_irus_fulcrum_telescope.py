@@ -91,7 +91,7 @@ class TestIrusFulcrumTelescope(ObservatoryTestCase):
                 Workflow(
                     dag_id="fulcrum_test",
                     name="Fulcrum Telescope",
-                    class_name="oaebu_workflows.workflows.irus_fulcrum_telescope.IrusFulcrumTelescope",
+                    class_name="oaebu_workflows.workflows.irus_fulcrum_telescope.irus_fulcrum_telescope.IrusFulcrumTelescope",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(publishers=[FAKE_PUBLISHERS]),
                 )

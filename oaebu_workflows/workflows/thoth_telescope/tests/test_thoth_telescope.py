@@ -93,7 +93,7 @@ class TestThothTelescope(ObservatoryTestCase):
                 Workflow(
                     dag_id="thoth_telescope_test",
                     name="Thoth Telescope",
-                    class_name="oaebu_workflows.workflows.thoth_telescope.ThothTelescope",
+                    class_name="oaebu_workflows.workflows.thoth_telescope.thoth_telescope.ThothTelescope",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(publisher_id=FAKE_PUBLISHER_ID, format_specification="onix::oapen"),
                 )

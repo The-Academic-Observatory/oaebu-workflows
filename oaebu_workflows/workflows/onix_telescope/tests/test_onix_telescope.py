@@ -92,7 +92,7 @@ class TestOnixTelescope(ObservatoryTestCase):
                 Workflow(
                     dag_id="onix",
                     name="ONIX Telescope",
-                    class_name="oaebu_workflows.workflows.onix_telescope.OnixTelescope",
+                    class_name="oaebu_workflows.workflows.onix_telescope.onix_telescope.OnixTelescope",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(date_regex=self.date_regex),
                 )

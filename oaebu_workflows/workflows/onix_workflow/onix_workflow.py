@@ -151,7 +151,7 @@ class OnixWorkflow(Workflow):
         # Run parameters
         data_partners: List[Union[str, OaebuPartner]] = None,
         ga3_views_field="page_views",
-        schema_folder: str = default_schema_folder(),
+        schema_folder: str = default_schema_folder(workflow_module="onix_workflow"),
         mailto: str = "agent@observatory.academy",
         crossref_start_date: pendulum.DateTime = pendulum.datetime(2018, 5, 14),
         api_dataset_id: str = "onix_workflow",

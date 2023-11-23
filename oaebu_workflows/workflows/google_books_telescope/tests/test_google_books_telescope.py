@@ -89,7 +89,7 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
                 Workflow(
                     dag_id="google_books",
                     name="My Google Books Telescope",
-                    class_name="oaebu_workflows.workflows.google_books_telescope.GoogleBooksTelescope",
+                    class_name="oaebu_workflows.workflows.google_books_telescope.google_books_telescope.GoogleBooksTelescope",
                     cloud_workspace=self.fake_cloud_workspace,
                 )
             ]
@@ -99,7 +99,7 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
 
     def test_telescope(self):
         """Test the Google Books telescope end to end."""
-        fixtures_folder = test_fixtures_folder(workflow_module="google_books")
+        fixtures_folder = test_fixtures_folder(workflow_module="google_books_telescope")
         params = {
             "no_download_files": 2,
             "bq_rows": 4,

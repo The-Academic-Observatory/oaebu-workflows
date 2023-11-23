@@ -42,6 +42,8 @@ from observatory.platform.observatory_environment import (
 )
 from observatory.platform.files import load_jsonl
 
+FIXTURES_FOLDER = os.path.join(test_fixtures_folder(), "onix_utils")
+
 
 class TestOnixTransformer(ObservatoryTestCase):
     """Tests for the ONIX transformer end to end"""
@@ -55,10 +57,9 @@ class TestOnixTransformer(ObservatoryTestCase):
     apply_names_name = "name_applied.jsonl"
     collapsed_name = "collapsed.jsonl"
 
-    fixtures_folder = os.path.join(test_fixtures_folder(), "onix_utils")
-    test_input_metadata = os.path.join(fixtures_folder, "input_metadata.xml")
-    test_output_parse_only = os.path.join(fixtures_folder, "output_parse_only.jsonl")
-    test_output_metadata = os.path.join(fixtures_folder, "output_metadata.jsonl")
+    test_input_metadata = os.path.join(FIXTURES_FOLDER, "input_metadata.xml")
+    test_output_parse_only = os.path.join(FIXTURES_FOLDER, "output_parse_only.jsonl")
+    test_output_metadata = os.path.join(FIXTURES_FOLDER, "output_metadata.jsonl")
 
     def test_e2e(self):
         with TemporaryDirectory() as tempdir:
@@ -73,7 +74,9 @@ class TestOnixTransformer(ObservatoryTestCase):
                 elevate_related_products=True,
                 add_name_fields=True,
                 collapse_subjects=True,
-                filter_schema=os.path.join(schema_folder(), "oapen_metadata_filter.json"),
+                filter_schema=os.path.join(
+                    schema_folder(workflow_module="oapen_metadata_telescope"), "oapen_metadata_filter.json"
+                ),
                 invalid_products_name="invalid_products.xml",
                 save_format="jsonl",
                 keep_intermediate=True,
@@ -199,8 +202,8 @@ class TestOnixFunctions(ObservatoryTestCase):
 
     def test_collapse_subjects(self):
         """Tests the thoth_collapse_subjects function"""
-        test_subjects_input = os.path.join(self.fixtures_folder, "test_subjects_input.json")
-        test_subjects_expected = os.path.join(self.fixtures_folder, "test_subjects_expected.json")
+        test_subjects_input = os.path.join(FIXTURES_FOLDER, "test_subjects_input.json")
+        test_subjects_expected = os.path.join(FIXTURES_FOLDER, "test_subjects_expected.json")
         with open(test_subjects_input, "r") as f:
             onix = json.load(f)
         actual_onix = collapse_subjects(onix)
