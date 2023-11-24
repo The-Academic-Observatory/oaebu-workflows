@@ -112,7 +112,6 @@ class TestOnixWorkflow(ObservatoryTestCase):
         super().__init__(*args, **kwargs)
 
         self.timestamp = pendulum.now()
-        self.schema_path = default_schema_folder()
         self.onix_table_id = "onix"
         self.test_onix_folder = random_id()  # "onix_workflow_test_onix_table"
 
@@ -587,7 +586,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         fake_doi_isbn_dataset_id = env.add_dataset(prefix="doi_isbn_test")
         fake_sharded_dataset = env.add_dataset(prefix="sharded_data")
         fake_view_dataset = env.add_dataset(prefix="views")
-        fake_table_schema = os.path.join(self.schema_path, "onix", "onix.json")
+        fake_table_schema = os.path.join(default_schema_folder(workflow_module="onix_telescope"), "onix.json")
         with env.create():
             doi_table_file = os.path.join(self.fixtures_folder, "doi_isbn_query_test.jsonl")
 
