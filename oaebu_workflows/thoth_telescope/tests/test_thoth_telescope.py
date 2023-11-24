@@ -22,7 +22,7 @@ import vcr
 from airflow.utils.state import State
 
 from oaebu_workflows.oaebu_partners import partner_from_str
-from oaebu_workflows.workflows.thoth_telescope.thoth_telescope import (
+from oaebu_workflows.thoth_telescope.thoth_telescope import (
     ThothTelescope,
     thoth_download_onix,
     DEFAULT_HOST_NAME,
@@ -93,7 +93,7 @@ class TestThothTelescope(ObservatoryTestCase):
                 Workflow(
                     dag_id="thoth_telescope_test",
                     name="Thoth Telescope",
-                    class_name="oaebu_workflows.workflows.thoth_telescope.thoth_telescope.ThothTelescope",
+                    class_name="oaebu_workflows.thoth_telescope.thoth_telescope.ThothTelescope",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(publisher_id=FAKE_PUBLISHER_ID, format_specification="onix::oapen"),
                 )

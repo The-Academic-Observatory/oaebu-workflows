@@ -25,7 +25,7 @@ from airflow.utils.state import State
 from googleapiclient.discovery import build
 from googleapiclient.http import HttpMockSequence
 
-from oaebu_workflows.workflows.google_analytics3_telescope.google_analytics3_telescope import GoogleAnalytics3Telescope
+from oaebu_workflows.google_analytics3_telescope.google_analytics3_telescope import GoogleAnalytics3Telescope
 from oaebu_workflows.oaebu_partners import partner_from_str
 from oaebu_workflows.config import test_fixtures_folder
 from observatory.platform.api import get_dataset_releases
@@ -90,7 +90,7 @@ class TestGoogleAnalytics3Telescope(ObservatoryTestCase):
                 Workflow(
                     dag_id="google_analytics3",
                     name="My Google Analytics Workflow",
-                    class_name="oaebu_workflows.workflows.google_analytics3_telescope.google_analytics3_telescope.GoogleAnalytics3Telescope",
+                    class_name="oaebu_workflows.google_analytics3_telescope.google_analytics3_telescope.GoogleAnalytics3Telescope",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(organisation_name="My Organisation", pagepath_regex="", view_id="123456"),
                 )
@@ -110,9 +110,9 @@ class TestGoogleAnalytics3Telescope(ObservatoryTestCase):
             self.assertTrue("pagepath_regex" in msg)
             self.assertTrue("view_id" in msg)
 
-    @patch("oaebu_workflows.workflows.google_analytics3_telescope.google_analytics3_telescope.build")
+    @patch("oaebu_workflows.google_analytics3_telescope.google_analytics3_telescope.build")
     @patch(
-        "oaebu_workflows.workflows.google_analytics3_telescope.google_analytics3_telescope.ServiceAccountCredentials"
+        "oaebu_workflows.google_analytics3_telescope.google_analytics3_telescope.ServiceAccountCredentials"
     )
     def test_telescope(self, mock_account_credentials, mock_build):
         """Test the Google Analytics telescope end to end specifically for ANU Press, to test custom dimensions.

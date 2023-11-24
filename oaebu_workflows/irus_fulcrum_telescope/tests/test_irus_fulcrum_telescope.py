@@ -23,7 +23,7 @@ from airflow.models.connection import Connection
 
 from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.oaebu_partners import partner_from_str
-from oaebu_workflows.workflows.irus_fulcrum_telescope.irus_fulcrum_telescope import (
+from oaebu_workflows.irus_fulcrum_telescope.irus_fulcrum_telescope import (
     IrusFulcrumTelescope,
     download_fulcrum_month_data,
     transform_fulcrum_data,
@@ -91,7 +91,7 @@ class TestIrusFulcrumTelescope(ObservatoryTestCase):
                 Workflow(
                     dag_id="fulcrum_test",
                     name="Fulcrum Telescope",
-                    class_name="oaebu_workflows.workflows.irus_fulcrum_telescope.irus_fulcrum_telescope.IrusFulcrumTelescope",
+                    class_name="oaebu_workflows.irus_fulcrum_telescope.irus_fulcrum_telescope.IrusFulcrumTelescope",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(publishers=[FAKE_PUBLISHERS]),
                 )

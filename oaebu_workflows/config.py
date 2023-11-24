@@ -24,7 +24,7 @@ def test_fixtures_folder(workflow_module: Optional[str] = None) -> str:
     """Get the path to the OAeBU Workflows test data directory.
 
     :param workflow_module: Optional, name of the workflow. Only to be included if the schema for the workflow is in
-    the directory oaebu_workflows.workflows.{workflow_name}.tests.fixtures
+    the directory oaebu_workflows.{workflow_name}.tests.fixtures
     :return: the test fixtures directory.
     """
 
@@ -38,7 +38,7 @@ def schema_folder(workflow_module: Optional[str] = None) -> str:
     """Return the path to the schema template folder.
 
     :param workflow_module: Optional, name of the workflow. Only to be included if the schema for the workflow is in
-    the directory oaebu_workflows.workflows.{workflow_module}.schema
+    the directory oaebu_workflows.{workflow_module}.schema
     :return: the path.
     """
 
@@ -52,7 +52,7 @@ def sql_folder(workflow_module: Optional[str] = None) -> str:
     """Return the path to the workflow SQL template folder.
 
     :param workflow_module: Optional, name of the workflow. Only to be included if the sql for the workflow is in
-    the directory oaebu_workflows.workflows.{workflow_module}.sql
+    the directory oaebu_workflows.{workflow_module}.sql
     :return: the path.
     """
 

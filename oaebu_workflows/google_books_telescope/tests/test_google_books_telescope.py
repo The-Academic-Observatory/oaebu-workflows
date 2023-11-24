@@ -27,7 +27,7 @@ from click.testing import CliRunner
 
 from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.oaebu_partners import partner_from_str
-from oaebu_workflows.workflows.google_books_telescope.google_books_telescope import (
+from oaebu_workflows.google_books_telescope.google_books_telescope import (
     GoogleBooksRelease,
     GoogleBooksTelescope,
 )
@@ -89,7 +89,7 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
                 Workflow(
                     dag_id="google_books",
                     name="My Google Books Telescope",
-                    class_name="oaebu_workflows.workflows.google_books_telescope.google_books_telescope.GoogleBooksTelescope",
+                    class_name="oaebu_workflows.google_books_telescope.google_books_telescope.GoogleBooksTelescope",
                     cloud_workspace=self.fake_cloud_workspace,
                 )
             ]

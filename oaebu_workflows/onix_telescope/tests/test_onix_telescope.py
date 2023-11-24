@@ -21,7 +21,7 @@ import pendulum
 from airflow.models import Connection
 from airflow.utils.state import State
 
-from oaebu_workflows.workflows.onix_telescope.onix_telescope import OnixTelescope, OnixRelease
+from oaebu_workflows.onix_telescope.onix_telescope import OnixTelescope, OnixRelease
 from oaebu_workflows.oaebu_partners import partner_from_str
 from oaebu_workflows.config import test_fixtures_folder
 from observatory.platform.api import get_dataset_releases
@@ -92,7 +92,7 @@ class TestOnixTelescope(ObservatoryTestCase):
                 Workflow(
                     dag_id="onix",
                     name="ONIX Telescope",
-                    class_name="oaebu_workflows.workflows.onix_telescope.onix_telescope.OnixTelescope",
+                    class_name="oaebu_workflows.onix_telescope.onix_telescope.OnixTelescope",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(date_regex=self.date_regex),
                 )

@@ -30,7 +30,7 @@ from oaebu_workflows.airflow_pools import CrossrefEventsPool
 from oaebu_workflows.config import schema_folder as default_schema_folder
 from oaebu_workflows.config import sql_folder
 from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
-from oaebu_workflows.workflows.onix_workflow.onix_work_aggregation import BookWorkAggregator, BookWorkFamilyAggregator
+from oaebu_workflows.onix_workflow.onix_work_aggregation import BookWorkAggregator, BookWorkFamilyAggregator
 from observatory.api.client.model.dataset_release import DatasetRelease
 from observatory.platform.observatory_config import CloudWorkspace
 from observatory.platform.utils.dag_run_sensor import DagRunSensor

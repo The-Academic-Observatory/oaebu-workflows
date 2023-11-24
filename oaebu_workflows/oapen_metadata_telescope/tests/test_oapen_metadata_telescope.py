@@ -28,7 +28,7 @@ from tenacity import stop_after_attempt
 
 from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.oaebu_partners import partner_from_str
-from oaebu_workflows.workflows.oapen_metadata_telescope.oapen_metadata_telescope import (
+from oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope import (
     OapenMetadataTelescope,
     download_metadata,
 )
@@ -90,7 +90,7 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
                 Workflow(
                     dag_id="oapen_metadata",
                     name="OAPEN Metadata Telescope",
-                    class_name="oaebu_workflows.workflows.oapen_metadata_telescope.oapen_metadata_telescope.OapenMetadataTelescope",
+                    class_name="oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope.OapenMetadataTelescope",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(metadata_uri=""),
                 )

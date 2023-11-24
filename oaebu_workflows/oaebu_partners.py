@@ -54,7 +54,7 @@ OAEBU_METADATA_PARTNERS = dict(
         isbn_field_name="ISBN13",
         title_field_name="TitleDetails.TitleElements.TitleText",
         sharded=True,
-        schema_path=os.path.join(schema_folder(), "onix", "onix.json"),
+        schema_path=os.path.join(schema_folder(workflow_module="onix_telescope"), "onix.json"),
     ),
     thoth=OaebuPartner(
         type_id="thoth",
@@ -63,7 +63,7 @@ OAEBU_METADATA_PARTNERS = dict(
         isbn_field_name="ISBN13",
         title_field_name="TitleDetails.TitleElements.TitleText",
         sharded=True,
-        schema_path=os.path.join(schema_folder(), "onix", "onix.json"),
+        schema_path=os.path.join(schema_folder(workflow_module="onix_telescope"), "onix.json"),
     ),
     oapen_metadata=OaebuPartner(
         type_id="oapen_metadata",
@@ -72,7 +72,7 @@ OAEBU_METADATA_PARTNERS = dict(
         isbn_field_name="ISBN13",
         title_field_name="TitleDetails.TitleElements.TitleText",
         sharded=True,
-        schema_path=os.path.join(schema_folder(), "onix", "onix.json"),
+        schema_path=os.path.join(schema_folder(workflow_module="onix_telescope"), "onix.json"),
     ),
 )
 
