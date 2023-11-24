@@ -156,7 +156,7 @@ OAEBU_DATA_PARTNERS = dict(
         isbn_field_name="ISBN",
         title_field_name="book_title",
         sharded=False,
-        schema_path=os.path.join(schema_folder(workflow_module="irus_oapen_telescope"), "irus_fulcrum.json"),
+        schema_path=os.path.join(schema_folder(workflow_module="irus_fulcrum_telescope"), "irus_fulcrum.json"),
     ),
     ucl_discovery=OaebuPartner(
         type_id="ucl_discovery",

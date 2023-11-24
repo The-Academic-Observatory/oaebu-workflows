@@ -128,7 +128,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
             isbn_field_name="isbn",
             title_field_name="title",
             sharded=True,
-            schema_path=os.path.join(default_schema_folder(), "onix", "onix.json"),
+            schema_path=os.path.join(default_schema_folder(workflow_module="onix_telescope"), "onix.json"),
         )
 
         # fixtures folder location
