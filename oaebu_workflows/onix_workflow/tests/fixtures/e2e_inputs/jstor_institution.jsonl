@@ -1,5 +1,3 @@
-{"ISBN": "111", "Book_Title": "First book", "Institution" : null, "Book_ID": null, "Authors" : null, "eISBN": "111", "Copyright_Year": null, "Disciplines": "Magic", "Usage_Type": null, "Usage_Month": "January", "Total_Item_Requests": null, "release_date": "2022-06-13"}
-{"ISBN": "1111111111111", "Book_Title": "Second book", "Institution" : null, "Book_ID": null, "Authors" : null, "eISBN": "1111111111111", "Copyright_Year": null, "Disciplines": "Magic", "Usage_Type": null, "Usage_Month": "January", "Total_Item_Requests": null, "release_date": "2022-06-13"}
-{"ISBN": "113", "Book_Title": "First book", "Institution" : null, "Book_ID": null, "Authors" : null, "eISBN": "113", "Copyright_Year": null, "Disciplines": "Magic", "Usage_Type": null, "Usage_Month": "January", "Total_Item_Requests": null, "release_date": "2022-06-13"}
-{"ISBN": "211", "Book_Title": "Another edition", "Institution" : null, "Book_ID": null, "Authors" : null, "eISBN": null, "Copyright_Year": null, "Disciplines": "Magic", "Usage_Type": null, "Usage_Month": "January", "Total_Item_Requests": null, "release_date": "2022-06-13"}
-{"ISBN": "2222222222222", "Book_Title": "some book", "Institution" : null, "Book_ID": null, "Authors" : null, "eISBN": null, "Copyright_Year": null, "Disciplines": "Magic", "Usage_Type": null, "Usage_Month": "January", "Total_Item_Requests": null, "release_date": "2022-06-13"}
+version https://git-lfs.github.com/spec/v1
+oid sha256:d4203563586e4b1b8d38165bc57c3fdaca6ebaa8de49e83a1dfbbe27b4c38677
+size 1382
