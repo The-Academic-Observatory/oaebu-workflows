@@ -188,7 +188,7 @@ class OapenMetadataTelescope(Workflow):
             error_removal=True,
             normalise_related_products=True,
             deduplicate_related_products=True,
-            elevate_related_products=True,
+            elevate_related_products=self.elevate_related_products,
             add_name_fields=True,
             collapse_subjects=True,
             filter_schema=self.oapen_schema,
