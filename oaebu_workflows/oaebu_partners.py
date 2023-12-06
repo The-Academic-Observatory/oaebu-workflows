@@ -54,7 +54,7 @@ OAEBU_METADATA_PARTNERS = dict(
         isbn_field_name="ISBN13",
         title_field_name="TitleDetails.TitleElements.TitleText",
         sharded=True,
-        schema_path=os.path.join(schema_folder(), "onix", "onix.json"),
+        schema_path=os.path.join(schema_folder(workflow_module="onix_telescope"), "onix.json"),
     ),
     thoth=OaebuPartner(
         type_id="thoth",
@@ -63,7 +63,7 @@ OAEBU_METADATA_PARTNERS = dict(
         isbn_field_name="ISBN13",
         title_field_name="TitleDetails.TitleElements.TitleText",
         sharded=True,
-        schema_path=os.path.join(schema_folder(), "onix", "onix.json"),
+        schema_path=os.path.join(schema_folder(workflow_module="onix_telescope"), "onix.json"),
     ),
     oapen_metadata=OaebuPartner(
         type_id="oapen_metadata",
@@ -72,7 +72,7 @@ OAEBU_METADATA_PARTNERS = dict(
         isbn_field_name="ISBN13",
         title_field_name="TitleDetails.TitleElements.TitleText",
         sharded=True,
-        schema_path=os.path.join(schema_folder(), "onix", "onix.json"),
+        schema_path=os.path.join(schema_folder(workflow_module="onix_telescope"), "onix.json"),
     ),
 )
 
@@ -84,7 +84,7 @@ OAEBU_DATA_PARTNERS = dict(
         isbn_field_name="publication_id",
         title_field_name="title",
         sharded=False,
-        schema_path=os.path.join(schema_folder(), "google", "google_analytics.json"),
+        schema_path=os.path.join(schema_folder(workflow_module="google_analytics3_telescope"), "google_analytics.json"),
     ),
     google_books_sales=OaebuPartner(
         type_id="google_books_sales",
@@ -93,7 +93,7 @@ OAEBU_DATA_PARTNERS = dict(
         isbn_field_name="Primary_ISBN",
         title_field_name="Title",
         sharded=False,
-        schema_path=os.path.join(schema_folder(), "google", "google_books_sales.json"),
+        schema_path=os.path.join(schema_folder(workflow_module="google_books_telescope"), "google_books_sales.json"),
     ),
     google_books_traffic=OaebuPartner(
         type_id="google_books_traffic",
@@ -102,7 +102,7 @@ OAEBU_DATA_PARTNERS = dict(
         isbn_field_name="Primary_ISBN",
         title_field_name="Title",
         sharded=False,
-        schema_path=os.path.join(schema_folder(), "google", "google_books_traffic.json"),
+        schema_path=os.path.join(schema_folder(workflow_module="google_books_telescope"), "google_books_traffic.json"),
     ),
     jstor_country=OaebuPartner(
         type_id="jstor_country",
@@ -111,7 +111,7 @@ OAEBU_DATA_PARTNERS = dict(
         isbn_field_name="ISBN",
         title_field_name="Book_Title",
         sharded=False,
-        schema_path=os.path.join(schema_folder(), "jstor", "jstor_country.json"),
+        schema_path=os.path.join(schema_folder(workflow_module="jstor_telescope"), "jstor_country.json"),
     ),
     jstor_institution=OaebuPartner(
         type_id="jstor_institution",
@@ -120,7 +120,7 @@ OAEBU_DATA_PARTNERS = dict(
         isbn_field_name="ISBN",
         title_field_name="Book_Title",
         sharded=False,
-        schema_path=os.path.join(schema_folder(), "jstor", "jstor_institution.json"),
+        schema_path=os.path.join(schema_folder(workflow_module="jstor_telescope"), "jstor_institution.json"),
     ),
     jstor_country_collection=OaebuPartner(
         type_id="jstor_country_collection",
@@ -129,7 +129,7 @@ OAEBU_DATA_PARTNERS = dict(
         isbn_field_name="ISBN",
         title_field_name="Book_Title",
         sharded=False,
-        schema_path=os.path.join(schema_folder(), "jstor", "jstor_country_collection.json"),
+        schema_path=os.path.join(schema_folder(workflow_module="jstor_telescope"), "jstor_country_collection.json"),
     ),
     jstor_institution_collection=OaebuPartner(
         type_id="jstor_institution_collection",
@@ -138,7 +138,7 @@ OAEBU_DATA_PARTNERS = dict(
         isbn_field_name="ISBN",
         title_field_name="Book_Title",
         sharded=False,
-        schema_path=os.path.join(schema_folder(), "jstor", "jstor_institution_collection.json"),
+        schema_path=os.path.join(schema_folder(workflow_module="jstor_telescope"), "jstor_institution_collection.json"),
     ),
     irus_oapen=OaebuPartner(
         type_id="irus_oapen",
@@ -147,7 +147,7 @@ OAEBU_DATA_PARTNERS = dict(
         isbn_field_name="ISBN",
         title_field_name="book_title",
         sharded=False,
-        schema_path=os.path.join(schema_folder(), "irus", "irus_oapen.json"),
+        schema_path=os.path.join(schema_folder(workflow_module="irus_oapen_telescope"), "irus_oapen.json"),
     ),
     irus_fulcrum=OaebuPartner(
         type_id="irus_fulcrum",
@@ -156,7 +156,7 @@ OAEBU_DATA_PARTNERS = dict(
         isbn_field_name="ISBN",
         title_field_name="book_title",
         sharded=False,
-        schema_path=os.path.join(schema_folder(), "irus", "irus_fulcrum.json"),
+        schema_path=os.path.join(schema_folder(workflow_module="irus_fulcrum_telescope"), "irus_fulcrum.json"),
     ),
     ucl_discovery=OaebuPartner(
         type_id="ucl_discovery",
@@ -165,7 +165,7 @@ OAEBU_DATA_PARTNERS = dict(
         isbn_field_name="ISBN",
         title_field_name="title",
         sharded=False,
-        schema_path=os.path.join(schema_folder(), "ucl", "ucl_discovery.json"),
+        schema_path=os.path.join(schema_folder(workflow_module="ucl_discovery_telescope"), "ucl_discovery.json"),
     ),
     internet_archive=OaebuPartner(
         type_id="internet_archive",
