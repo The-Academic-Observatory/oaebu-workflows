@@ -16,9 +16,10 @@
 
 import os
 import logging
-from typing import Union
+from typing import Union, Optional
 
 import pendulum
+from pendulum.datetime import DateTime
 from airflow.exceptions import AirflowException
 from google.cloud.bigquery import SourceFormat
 
@@ -57,7 +58,7 @@ class ThothRelease(SnapshotRelease):
         *,
         dag_id: str,
         run_id: str,
-        snapshot_date: pendulum.DateTime,
+        snapshot_date: DateTime,
     ):
         """Construct a ThothRelease.
         :param dag_id: The ID of the DAG
@@ -79,12 +80,12 @@ class ThothTelescope(Workflow):
         format_specification: str,
         metadata_partner: Union[str, OaebuPartner] = "thoth",
         bq_dataset_description: str = "Thoth ONIX Feed",
-        bq_table_description: str = None,
+        bq_table_description: Optional[str] = None,
         api_dataset_id: str = "onix",
         host_name: str = "https://export.thoth.pub",
         observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
         catchup: bool = False,
-        start_date: pendulum.DateTime = pendulum.datetime(2022, 12, 1),
+        start_date: DateTime = pendulum.datetime(2022, 12, 1),
         schedule: str = "@weekly",
     ):
         """Construct an ThothOnixTelescope instance.
@@ -110,6 +111,9 @@ class ThothTelescope(Workflow):
             catchup=catchup,
             tags=["oaebu"],
         )
+
+        if bq_table_description is None:
+            bq_table_description = "Thoth ONIX Feed"
 
         self.dag_id = dag_id
         self.cloud_workspace = cloud_workspace
