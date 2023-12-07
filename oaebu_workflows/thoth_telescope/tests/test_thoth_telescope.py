@@ -215,7 +215,7 @@ class TestThothTelescope(ObservatoryTestCase):
                     format_spec="onix_3.0::oapen",
                 )
             self.assert_file_integrity(
-                os.path.join(tempdir, "fake_download.xml"), "6d0f31c315dab144054e2fde9ad7f8ab", "md5"
+                os.path.join(tempdir, "fake_download.xml"), "043e9c474e14e2776b22fc590ea1773c", "md5"
             )
 
     def test_thoth_api(self):
