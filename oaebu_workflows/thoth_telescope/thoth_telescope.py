@@ -23,12 +23,7 @@ from pendulum.datetime import DateTime
 from airflow.exceptions import AirflowException
 from google.cloud.bigquery import SourceFormat
 
-from oaebu_workflows.onix_utils import (
-    onix_parser_download,
-    onix_parser_execute,
-    collapse_subjects,
-    create_personname_fields,
-)
+from oaebu_workflows.onix_utils import OnixTransformer
 from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from observatory.api.client.model.dataset_release import DatasetRelease
 from observatory.platform.api import make_observatory_api
@@ -36,7 +31,6 @@ from observatory.platform.airflow import AirflowConns
 from observatory.platform.bigquery import bq_load_table, bq_sharded_table_id, bq_create_dataset
 from observatory.platform.observatory_config import CloudWorkspace
 from observatory.platform.utils.url_utils import retry_get_url
-from observatory.platform.files import save_jsonl_gz, load_jsonl
 from observatory.platform.gcs import gcs_upload_files, gcs_blob_name_from_path, gcs_blob_uri
 from observatory.platform.workflows.workflow import (
     Workflow,
@@ -67,7 +61,7 @@ class ThothRelease(SnapshotRelease):
         """
         super().__init__(dag_id=dag_id, run_id=run_id, snapshot_date=snapshot_date)
         self.download_path = os.path.join(self.download_folder, f"thoth_{snapshot_date.format('YYYY_MM_DD')}.xml")
-        self.transform_path = os.path.join(self.download_folder, f"thoth_{snapshot_date.format('YYYY_MM_DD')}.jsonl.gz")
+        self.transform_path = os.path.join(self.transform_folder, f"transformed.jsonl.gz")
 
 
 class ThothTelescope(Workflow):
@@ -78,6 +72,7 @@ class ThothTelescope(Workflow):
         cloud_workspace: CloudWorkspace,
         publisher_id: str,
         format_specification: str,
+        elevate_related_products: bool = False,
         metadata_partner: Union[str, OaebuPartner] = "thoth",
         bq_dataset_description: str = "Thoth ONIX Feed",
         bq_table_description: Optional[str] = None,
@@ -93,6 +88,7 @@ class ThothTelescope(Workflow):
         :param cloud_workspace: The CloudWorkspace object for this DAG
         :param publisher_id: The Thoth ID for this publisher
         :param format_specification: The Thoth ONIX/metadata format specification. e.g. "onix_3.0::oapen"
+        :param elevate_related_products: Whether to pull out the related products to the product level.
         :param metadata_partner: The metadata partner name
         :param bq_dataset_description: Description for the BigQuery dataset
         :param bq_table_description: Description for the biguery table
@@ -118,6 +114,7 @@ class ThothTelescope(Workflow):
         self.dag_id = dag_id
         self.cloud_workspace = cloud_workspace
         self.publisher_id = publisher_id
+        self.elevate_related_products = elevate_related_products
         self.metadata_partner = partner_from_str(metadata_partner, metadata_partner=True)
         self.bq_dataset_description = bq_dataset_description
         self.bq_table_description = bq_table_description
@@ -166,15 +163,17 @@ class ThothTelescope(Workflow):
 
     def transform(self, release: ThothRelease, **kwargs) -> None:
         """Task to transform the Thoth ONIX data"""
-        success, parser_path = onix_parser_download()
-        set_task_state(success, task_id=kwargs["ti"].task_id, release=release)
-        success = onix_parser_execute(
-            parser_path, input_dir=release.download_folder, output_dir=release.transform_folder
+        transformer = OnixTransformer(
+            input_path=release.download_path,
+            output_dir=release.transform_folder,
+            deduplicate_related_products=self.elevate_related_products,
+            elevate_related_products=self.elevate_related_products,
+            add_name_fields=True,
+            collapse_subjects=True,
         )
-        set_task_state(success, task_id=kwargs["ti"].task_id, release=release)
-        transformed = collapse_subjects(load_jsonl(os.path.join(release.transform_folder, "full.jsonl")))
-        transformed = create_personname_fields(transformed)
-        save_jsonl_gz(release.transform_path, transformed)
+        out_file = transformer.transform()
+        if release.transform_path != out_file:
+            raise FileNotFoundError(f"Expected file {release.transform_path} not equal to transformed file: {out_file}")
 
     def upload_transformed(self, release: ThothRelease, **kwargs) -> None:
         """Upload the downloaded thoth onix .jsonl to google cloud bucket"""
