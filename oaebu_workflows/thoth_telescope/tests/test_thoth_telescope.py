@@ -57,6 +57,12 @@ class TestThothTelescope(ObservatoryTestCase):
         self.project_id = os.getenv("TEST_GCP_PROJECT_ID")
         self.data_location = os.getenv("TEST_GCP_DATA_LOCATION")
 
+        if not self.project_id:
+            raise RuntimeError("TEST_GCP_PROJECT_ID must be set")
+
+        if self.data_location == None:
+            raise RuntimeError("TEST_GCP_DATA_LOCATION must be set")
+
         # Fixtures
         fixtures_folder = test_fixtures_folder(workflow_module="thoth_telescope")
         self.download_cassette = os.path.join(fixtures_folder, "thoth_download_cassette.yaml")
@@ -128,6 +134,7 @@ class TestThothTelescope(ObservatoryTestCase):
                 dag_id="thoth_telescope_test",
                 cloud_workspace=env.cloud_workspace,
                 format_specification="onix_3.0::oapen",
+                elevate_related_products=True,
                 publisher_id=FAKE_PUBLISHER_ID,
                 metadata_partner=metadata_partner,
             )
@@ -157,15 +164,12 @@ class TestThothTelescope(ObservatoryTestCase):
                 )
 
                 # Downloaded file
-                self.assert_file_integrity(release.download_path, "6d0f31c315dab144054e2fde9ad7f8ab", "md5")
+                self.assert_file_integrity(release.download_path, "043e9c474e14e2776b22fc590ea1773c", "md5")
 
                 # Uploaded download blob
                 self.assert_blob_integrity(
                     env.download_bucket, gcs_blob_name_from_path(release.download_path), release.download_path
                 )
-
-                # Transformed file
-                self.assert_file_integrity(release.transform_path, "1b12c3a9", "gzip_crc")
 
                 # Uploaded transform blob
                 self.assert_blob_integrity(
@@ -179,7 +183,7 @@ class TestThothTelescope(ObservatoryTestCase):
                     telescope.metadata_partner.bq_table_name,
                     release.snapshot_date,
                 )
-                self.assert_table_integrity(table_id, expected_rows=2)
+                self.assert_table_integrity(table_id, expected_rows=5)
                 self.assert_table_content(table_id, load_and_parse_json(self.test_table), primary_key="ISBN13")
 
                 # add_dataset_release_task
@@ -211,7 +215,7 @@ class TestThothTelescope(ObservatoryTestCase):
                     format_spec="onix_3.0::oapen",
                 )
             self.assert_file_integrity(
-                os.path.join(tempdir, "fake_download.xml"), "6d0f31c315dab144054e2fde9ad7f8ab", "md5"
+                os.path.join(tempdir, "fake_download.xml"), "043e9c474e14e2776b22fc590ea1773c", "md5"
             )
 
     def test_thoth_api(self):

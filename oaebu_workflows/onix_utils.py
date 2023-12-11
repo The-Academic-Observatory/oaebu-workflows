@@ -64,7 +64,9 @@ class OnixTransformer:
         elevate_related_products: bool = False,
         add_name_fields: bool = False,
         collapse_subjects: bool = False,
-        filter_schema: str = os.path.join(schema_folder(workflow_module="oapen_metadata_telescope"), "oapen_metadata_filter.json"),
+        filter_schema: str = os.path.join(
+            schema_folder(workflow_module="oapen_metadata_telescope"), "oapen_metadata_filter.json"
+        ),
         invalid_products_name: str = "invalid_products.xml",
         save_format: Literal["json", "jsonl", "jsonl.gz"] = "jsonl.gz",
         keep_intermediate: bool = False,
