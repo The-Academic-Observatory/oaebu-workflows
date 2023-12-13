@@ -1,0 +1,172 @@
+-- The purpose of this block of SQL is to organise the metrics from google analytics for easier consumption of downstream queries.
+-- Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'google_analytics3_table_id'.
+-- This will either point to 'empty_google_analytics3' (defined above as an empty row) or the name of the real data table in bigquery.
+-- The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
+-- Providng an empty row enable simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
+google_analytics3_grouped_metrics AS(
+    SELECT
+        publication_id,
+        release_date,
+        publication_whole_or_part,
+        publication_format,
+        IF (
+            publication_format = 'PDF'
+            AND publication_whole_or_part = 'whole',
+            group_items_google_analytics3(
+                ARRAY_CONCAT_AGG({ { ga3_views_field } }.country)
+            ),
+            ARRAY_AGG(
+                STRUCT(
+                    CAST(NULL as STRING) as name,
+                    CAST(null as INT64) as value
+                )
+            )
+        ) AS pdf_book_country,
+        IF (
+            publication_format = 'PDF'
+            AND publication_whole_or_part = 'part',
+            group_items_google_analytics3(
+                ARRAY_CONCAT_AGG({ { ga3_views_field } }.country)
+            ),
+            ARRAY_AGG(
+                STRUCT(
+                    CAST(NULL as STRING) as name,
+                    CAST(null as INT64) as value
+                )
+            )
+        ) AS pdf_chapter_country,
+        IF (
+            publication_format = 'HTML'
+            AND publication_whole_or_part = 'whole',
+            group_items_google_analytics3(
+                ARRAY_CONCAT_AGG({ { ga3_views_field } }.country)
+            ),
+            ARRAY_AGG(
+                STRUCT(
+                    CAST(NULL as STRING) as name,
+                    CAST(null as INT64) as value
+                )
+            )
+        ) AS html_book_country,
+        IF (
+            publication_format = 'HTML'
+            AND publication_whole_or_part = 'part',
+            group_items_google_analytics3(
+                ARRAY_CONCAT_AGG({ { ga3_views_field } }.country)
+            ),
+            ARRAY_AGG(
+                STRUCT(
+                    CAST(NULL as STRING) as name,
+                    CAST(null as INT64) as value
+                )
+            )
+        ) AS html_chapter_country,
+        IF (
+            publication_format = 'EPUB'
+            AND publication_whole_or_part = 'whole',
+            group_items_google_analytics3(
+                ARRAY_CONCAT_AGG({ { ga3_views_field } }.country)
+            ),
+            ARRAY_AGG(
+                STRUCT(
+                    CAST(NULL as STRING) as name,
+                    CAST(null as INT64) as value
+                )
+            )
+        ) AS epub_book_country,
+        IF (
+            publication_format = 'EPUB'
+            AND publication_whole_or_part = 'part',
+            group_items_google_analytics3(
+                ARRAY_CONCAT_AGG({ { ga3_views_field } }.country)
+            ),
+            ARRAY_AGG(
+                STRUCT(
+                    CAST(NULL as STRING) as name,
+                    CAST(null as INT64) as value
+                )
+            )
+        ) AS epub_chapter_country,
+        IF (
+            publication_format = 'MOBI'
+            AND publication_whole_or_part = 'whole',
+            group_items_google_analytics3(
+                ARRAY_CONCAT_AGG({ { ga3_views_field } }.country)
+            ),
+            ARRAY_AGG(
+                STRUCT(
+                    CAST(NULL as STRING) as name,
+                    CAST(null as INT64) as value
+                )
+            )
+        ) AS mobi_book_country,
+        IF (
+            publication_format = 'MOBI'
+            AND publication_whole_or_part = 'part',
+            group_items_google_analytics3(
+                ARRAY_CONCAT_AGG({ { ga3_views_field } }.country)
+            ),
+            ARRAY_AGG(
+                STRUCT(
+                    CAST(NULL as STRING) as name,
+                    CAST(null as INT64) as value
+                )
+            )
+        ) AS mobi_chapter_country,
+        IF (
+            publication_format IN ('PDF', 'HTML', 'EPUB', 'MOBI')
+            AND publication_whole_or_part IN ('whole', 'part'),
+            group_items_google_analytics3(
+                ARRAY_CONCAT_AGG({ { ga3_views_field } }.country)
+            ),
+            ARRAY_AGG(
+                STRUCT(
+                    CAST(NULL as STRING) as name,
+                    CAST(null as INT64) as value
+                )
+            )
+        ) AS downloads_total_country,
+        IF (
+            publication_whole_or_part = '(citation)',
+            group_items_google_analytics3(
+                ARRAY_CONCAT_AGG({ { ga3_views_field } }.country)
+            ),
+            ARRAY_AGG(
+                STRUCT(
+                    CAST(NULL as STRING) as name,
+                    CAST(null as INT64) as value
+                )
+            )
+        ) AS views_total_country,
+    FROM
+        `{{ google_analytics3_table_id }}`
+    WHERE
+        publication_type = "book"
+    GROUP BY
+        publication_id,
+        release_date,
+        publication_whole_or_part,
+        publication_format
+),
+google_analytics3_metrics AS (
+    SELECT
+        publication_id AS ISBN13,
+        release_date,
+        STRUCT(
+            ARRAY_CONCAT_AGG(views_total_country) AS views_total_country,
+            group_items_google_analytics3(ARRAY_CONCAT_AGG(downloads_total_country)) AS downloads_total_country,
+            ARRAY_CONCAT_AGG(pdf_book_country) AS downloads_pdf_book_country,
+            ARRAY_CONCAT_AGG(pdf_chapter_country) AS downloads_pdf_chapter_country,
+            ARRAY_CONCAT_AGG(html_book_country) AS downloads_html_book_country,
+            ARRAY_CONCAT_AGG(html_chapter_country) AS downloads_html_chapter_country,
+            ARRAY_CONCAT_AGG(epub_book_country) AS downloads_epub_book_country,
+            ARRAY_CONCAT_AGG(epub_chapter_country) AS downloads_epub_chapter_country,
+            ARRAY_CONCAT_AGG(mobi_book_country) AS downloads_mobi_book_country,
+            ARRAY_CONCAT_AGG(mobi_chapter_country) AS downloads_mobi_chapter_country
+        ) AS metrics
+    FROM
+        google_analytics3_grouped_metrics
+    GROUP BY
+        publication_id,
+        release_date
+)
