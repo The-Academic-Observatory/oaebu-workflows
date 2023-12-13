@@ -23,6 +23,12 @@ from oaebu_workflows.config import schema_folder
 
 
 @dataclass
+class BookProductSQL:
+    temp_functions: str = None
+    body: str = None
+
+
+@dataclass(kw_only=True)
 class OaebuPartner:
     """Class for storing information about data sources we are using to produce oaebu intermediate tables for.
 
@@ -32,6 +38,7 @@ class OaebuPartner:
     :param isbn_field_name: Name of the field containing the ISBN.
     :param title_field_name: Name of the field containing the Title.
     :param sharded: whether the table is sharded or not.
+    :param schema_path: The path of the partner's schema folder.
     """
 
     type_id: str
@@ -44,6 +51,18 @@ class OaebuPartner:
 
     def __str__(self):
         return self.type_id
+
+
+@dataclass(kw_only=True)
+class DataPartner(OaebuPartner):
+    """Represents a data class for an oaebu data source.
+
+    :param bp_temp_functions: The name of the book product temp functions file.
+    :param bp_body: The name of the book product body file.
+    """
+
+    bp_body: str
+    bp_temp_functions: str = None
 
 
 OAEBU_METADATA_PARTNERS = dict(
@@ -77,7 +96,7 @@ OAEBU_METADATA_PARTNERS = dict(
 )
 
 OAEBU_DATA_PARTNERS = dict(
-    google_analytics3=OaebuPartner(
+    google_analytics3=DataPartner(
         type_id="google_analytics3",
         bq_dataset_id="google",
         bq_table_name="google_analytics3",
@@ -85,8 +104,10 @@ OAEBU_DATA_PARTNERS = dict(
         title_field_name="title",
         sharded=False,
         schema_path=os.path.join(schema_folder(workflow_module="google_analytics3_telescope"), "google_analytics.json"),
+        bp_temp_functions="bp_functions_google_analytics3.sql",
+        bp_body="bp_body_google_analytics3.sql.jinja2",
     ),
-    google_books_sales=OaebuPartner(
+    google_books_sales=DataPartner(
         type_id="google_books_sales",
         bq_dataset_id="google",
         bq_table_name="google_books_sales",
@@ -94,8 +115,10 @@ OAEBU_DATA_PARTNERS = dict(
         title_field_name="Title",
         sharded=False,
         schema_path=os.path.join(schema_folder(workflow_module="google_books_telescope"), "google_books_sales.json"),
+        bp_temp_functions="bp_functions_google_books_sales.sql",
+        bp_body="bp_body_google_books_sales.sql.jinja2",
     ),
-    google_books_traffic=OaebuPartner(
+    google_books_traffic=DataPartner(
         type_id="google_books_traffic",
         bq_dataset_id="google",
         bq_table_name="google_books_traffic",
@@ -103,8 +126,9 @@ OAEBU_DATA_PARTNERS = dict(
         title_field_name="Title",
         sharded=False,
         schema_path=os.path.join(schema_folder(workflow_module="google_books_telescope"), "google_books_traffic.json"),
+        bp_body="bp_body_google_books_traffic.sql.jinja2",
     ),
-    jstor_country=OaebuPartner(
+    jstor_country=DataPartner(
         type_id="jstor_country",
         bq_dataset_id="jstor",
         bq_table_name="jstor_country",
@@ -112,8 +136,10 @@ OAEBU_DATA_PARTNERS = dict(
         title_field_name="Book_Title",
         sharded=False,
         schema_path=os.path.join(schema_folder(workflow_module="jstor_telescope"), "jstor_country.json"),
+        bp_temp_functions="bp_functions_jstor_country.sql",
+        bp_body="bp_body_jstor_country.sql.jinja2",
     ),
-    jstor_institution=OaebuPartner(
+    jstor_institution=DataPartner(
         type_id="jstor_institution",
         bq_dataset_id="jstor",
         bq_table_name="jstor_institution",
@@ -121,8 +147,10 @@ OAEBU_DATA_PARTNERS = dict(
         title_field_name="Book_Title",
         sharded=False,
         schema_path=os.path.join(schema_folder(workflow_module="jstor_telescope"), "jstor_institution.json"),
+        bp_temp_functions="bp_functions_jstor_institution.sql",
+        bp_body="bp_body_jstor_institution.sql.jinja2",
     ),
-    jstor_country_collection=OaebuPartner(
+    jstor_country_collection=DataPartner(
         type_id="jstor_country_collection",
         bq_dataset_id="jstor",
         bq_table_name="jstor_country",
@@ -130,8 +158,10 @@ OAEBU_DATA_PARTNERS = dict(
         title_field_name="Book_Title",
         sharded=False,
         schema_path=os.path.join(schema_folder(workflow_module="jstor_telescope"), "jstor_country_collection.json"),
+        bp_temp_functions="bp_functions_jstor_country_collection.sql",
+        bp_body="bp_body_jstor_country_collection.sql.jinja2",
     ),
-    jstor_institution_collection=OaebuPartner(
+    jstor_institution_collection=DataPartner(
         type_id="jstor_institution_collection",
         bq_dataset_id="jstor",
         bq_table_name="jstor_institution",
@@ -139,8 +169,10 @@ OAEBU_DATA_PARTNERS = dict(
         title_field_name="Book_Title",
         sharded=False,
         schema_path=os.path.join(schema_folder(workflow_module="jstor_telescope"), "jstor_institution_collection.json"),
+        bp_temp_functions="bp_functions_jstor_institution_collection.sql",
+        bp_body="bp_body_jstor_institution_collection.sql.jinja2",
     ),
-    irus_oapen=OaebuPartner(
+    irus_oapen=DataPartner(
         type_id="irus_oapen",
         bq_dataset_id="irus",
         bq_table_name="irus_oapen",
@@ -148,8 +180,10 @@ OAEBU_DATA_PARTNERS = dict(
         title_field_name="book_title",
         sharded=False,
         schema_path=os.path.join(schema_folder(workflow_module="irus_oapen_telescope"), "irus_oapen.json"),
+        bp_temp_functions="bp_functions_irus_oapen.sql",
+        bp_body="bp_body_irus_oapen.sql.jinja2",
     ),
-    irus_fulcrum=OaebuPartner(
+    irus_fulcrum=DataPartner(
         type_id="irus_fulcrum",
         bq_dataset_id="irus",
         bq_table_name="irus_fulcrum",
@@ -157,8 +191,10 @@ OAEBU_DATA_PARTNERS = dict(
         title_field_name="book_title",
         sharded=False,
         schema_path=os.path.join(schema_folder(workflow_module="irus_fulcrum_telescope"), "irus_fulcrum.json"),
+        bp_temp_functions="bp_functions_irus_fulcrum.sql",
+        bp_body="bp_body_irus_fulcrum.sql.jinja2",
     ),
-    ucl_discovery=OaebuPartner(
+    ucl_discovery=DataPartner(
         type_id="ucl_discovery",
         bq_dataset_id="ucl",
         bq_table_name="ucl_discovery",
@@ -166,8 +202,9 @@ OAEBU_DATA_PARTNERS = dict(
         title_field_name="title",
         sharded=False,
         schema_path=os.path.join(schema_folder(workflow_module="ucl_discovery_telescope"), "ucl_discovery.json"),
+        bp_body="bp_body_ucl_discovery.sql.jinja2",
     ),
-    internet_archive=OaebuPartner(
+    internet_archive=DataPartner(
         type_id="internet_archive",
         bq_dataset_id="internet_archive",
         bq_table_name="internet_archive",
@@ -175,8 +212,10 @@ OAEBU_DATA_PARTNERS = dict(
         title_field_name="title",
         sharded=False,
         schema_path=os.path.join(schema_folder(), "internet_archive", "internet_archive.json"),
+        bp_temp_functions="bp_functions_internet_archive.sql",
+        bp_body="bp_body_internet_archive.sql.jinja2",
     ),
-    worldreader=OaebuPartner(
+    worldreader=DataPartner(
         type_id="worldreader",
         bq_dataset_id="worldreader",
         bq_table_name="worldreader",
@@ -184,6 +223,8 @@ OAEBU_DATA_PARTNERS = dict(
         title_field_name="title",
         sharded=False,
         schema_path=os.path.join(schema_folder(), "worldreader", "worldreader.json"),
+        bp_temp_functions="bp_functions_worldreader.sql",
+        bp_body="bp_body_worldreader.sql.jinja2",
     ),
 )
 

@@ -630,95 +630,16 @@ class OnixWorkflow(Workflow):
             location=self.cloud_workspace.data_location,
             description="OAEBU Tables",
         )
-        data_partner_datasets = {data.type_id: data.bq_dataset_id for data in self.data_partners}
-        google_analytics_dataset = data_partner_datasets.get("google_analytics3")
-        google_books_dataset = data_partner_datasets.get("google_books_traffic")
-        jstor_dataset = data_partner_datasets.get("jstor_country")
-        irus_oapen_dataset = data_partner_datasets.get("irus_oapen")
-        irus_fulcrum_dataset = data_partner_datasets.get("irus_fulcrum")
-        ucl_discovery_dataset = data_partner_datasets.get("ucl_discovery")
-        internet_archive_dataset = data_partner_datasets.get("internet_archive")
-        worldreader_dataset = data_partner_datasets.get("worldreader")
 
-        # Create matched tables for supplied data partners
-        google_analytics3_table_id = "empty_google_analytics3"
-        google_books_sales_table_id = "empty_google_books_sales"
-        google_books_traffic_table_id = "empty_google_books_traffic"
-        jstor_country_table_id = "empty_jstor_country"
-        jstor_institution_table_id = "empty_jstor_institution"
-        irus_oapen_table_id = "empty_irus_oapen"
-        irus_fulcrum_table_id = "empty_irus_fulcrum"
-        ucl_discovery_table_id = "empty_ucl_discovery"
-        internet_archive_table_id = "empty_internet_archive"
-        worldreader_table_id = "empty_worldreader"
-        if google_analytics_dataset:
-            google_analytics3_table_id = bq_sharded_table_id(
+        dp_tables = {
+            f"{dp.type_id}_table_id": bq_sharded_table_id(
                 self.cloud_workspace.project_id,
                 self.bq_oaebu_intermediate_dataset,
-                "google_analytics3_matched",
+                f"{dp.type_id}_matched",
                 release.snapshot_date,
             )
-        if google_books_dataset:
-            google_books_sales_table_id = bq_sharded_table_id(
-                self.cloud_workspace.project_id,
-                self.bq_oaebu_intermediate_dataset,
-                "google_books_sales_matched",
-                release.snapshot_date,
-            )
-            google_books_traffic_table_id = bq_sharded_table_id(
-                self.cloud_workspace.project_id,
-                self.bq_oaebu_intermediate_dataset,
-                "google_books_traffic_matched",
-                release.snapshot_date,
-            )
-        if jstor_dataset:
-            jstor_country_table_id = bq_sharded_table_id(
-                self.cloud_workspace.project_id,
-                self.bq_oaebu_intermediate_dataset,
-                "jstor_country_matched",
-                release.snapshot_date,
-            )
-            jstor_institution_table_id = bq_sharded_table_id(
-                self.cloud_workspace.project_id,
-                self.bq_oaebu_intermediate_dataset,
-                "jstor_institution_matched",
-                release.snapshot_date,
-            )
-        if irus_oapen_dataset:
-            irus_oapen_table_id = bq_sharded_table_id(
-                self.cloud_workspace.project_id,
-                self.bq_oaebu_intermediate_dataset,
-                "irus_oapen_matched",
-                release.snapshot_date,
-            )
-        if ucl_discovery_dataset:
-            ucl_discovery_table_id = bq_sharded_table_id(
-                self.cloud_workspace.project_id,
-                self.bq_oaebu_intermediate_dataset,
-                "ucl_discovery_matched",
-                release.snapshot_date,
-            )
-        if irus_fulcrum_dataset:
-            irus_fulcrum_table_id = bq_sharded_table_id(
-                self.cloud_workspace.project_id,
-                self.bq_oaebu_intermediate_dataset,
-                "irus_fulcrum_matched",
-                release.snapshot_date,
-            )
-        if internet_archive_dataset:
-            internet_archive_table_id = bq_sharded_table_id(
-                self.cloud_workspace.project_id,
-                self.bq_oaebu_intermediate_dataset,
-                "internet_archive_matched",
-                release.snapshot_date,
-            )
-        if worldreader_dataset:
-            worldreader_table_id = bq_sharded_table_id(
-                self.cloud_workspace.project_id,
-                self.bq_oaebu_intermediate_dataset,
-                "worldreader_matched",
-                release.snapshot_date,
-            )
+            for dp in self.data_partners
+        }
         workid_table_id = bq_sharded_table_id(
             self.cloud_workspace.project_id,
             self.bq_onix_workflow_dataset,
@@ -745,22 +666,13 @@ class OnixWorkflow(Workflow):
         sql = render_template(
             template_path,
             onix_table_id=onix_table_id,
-            google_analytics3_table_id=google_analytics3_table_id,
-            google_books_sales_table_id=google_books_sales_table_id,
-            google_books_traffic_table_id=google_books_traffic_table_id,
-            jstor_country_table_id=jstor_country_table_id,
-            jstor_institution_table_id=jstor_institution_table_id,
-            irus_oapen_table_id=irus_oapen_table_id,
-            irus_fulcrum_table_id=irus_fulcrum_table_id,
-            ucl_discovery_table_id=ucl_discovery_table_id,
-            internet_archive_table_id=internet_archive_table_id,
-            worldreader_table_id=worldreader_table_id,
+            data_partners=self.data_partners,
             book_table_id=book_table_id,
             country_table_id=country_table_id,
             workid_table_id=workid_table_id,
             workfamilyid_table_id=workfamilyid_table_id,
             ga3_views_field=self.ga3_views_field,
-            onix_workflow=True,
+            **dp_tables,
         )
         schema_file_path = bq_find_schema(path=self.schema_folder, table_name=self.bq_book_product_table_name)
         table_id = bq_sharded_table_id(

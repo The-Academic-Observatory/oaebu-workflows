@@ -1,0 +1,37 @@
+-- The purpose of this block of SQL is to organise the metrics from google book traffic for easier consumption of downstream queries.
+-- Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'google_books_traffic_table_id'.
+-- This will either point to 'empty_google_books_traffic' (defined above as an empty row) or the name of the real data table in bigquery.
+-- The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
+-- Providng an empty row enable simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
+google_books_traffic_metrics as (
+    SELECT
+        Primary_ISBN as ISBN13,
+        release_date,
+        STRUCT(
+            SUM(Book_Visits_BV_) as Book_Visits_BV_,
+            SUM(BV_with_Pages_Viewed) as BV_with_Pages_Viewed,
+            SUM(Non_Unique_Buy_Clicks) as Non_Unique_Buy_Clicks,
+            SUM(BV_with_Buy_Clicks) as BV_with_Buy_Clicks,
+            SUM(Buy_Link_CTR) as Buy_Link_CTR,
+            SUM(Pages_Viewed) as Pages_Viewed
+        ) as metrics
+    FROM
+        `{{ google_books_traffic_table_id }}`
+    GROUP BY
+        Primary_ISBN,
+        release_date
+),
+-- The purpose of this block of SQL is to organise the Metadata from google book traffic for easier consumption of downstream queries.
+-- Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'google_books_traffic_table_id'.
+-- This will either point to 'empty_google_books_traffic' (defined above as an empty row) or the name of the real data table in bigquery.
+-- The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
+-- Providng an empty row enable simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
+google_books_traffic_metadata as (
+    SELECT
+        Primary_ISBN as ISBN13,
+        MAX(title) as Title
+    FROM
+        `{{ google_books_traffic_table_id }}`
+    GROUP BY
+        Primary_ISBN
+)
