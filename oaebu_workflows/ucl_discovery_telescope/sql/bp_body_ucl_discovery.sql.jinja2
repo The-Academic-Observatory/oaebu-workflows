@@ -1,0 +1,42 @@
+-- The purpose of this block of SQL is to organise the metrics from UCL Discovery for easier consumption of downstream queries.
+-- Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'ucl_discovery_table_id'.
+-- This will either point to 'empty_ucl_discovery' (defined above as an empty row) or the name of the real data table in bigquery.
+-- The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
+-- Providng an empty row enables simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
+ucl_discovery_metrics AS (
+    SELECT
+        ISBN as ISBN13,
+        release_date,
+        STRUCT(
+            MAX(total_downloads) AS total_downloads,
+            ARRAY_AGG(
+                STRUCT(
+                    ucl_country.value AS country_code,
+                    countries.iso_name AS country_name,
+                    ucl_country.count AS country_downloads
+                )
+            ) AS country
+        ) AS metrics
+    FROM
+        `{{ ucl_discovery_table_id }}`,
+        UNNEST(country) AS ucl_country
+        LEFT JOIN `{{ country_table_id }}` AS countries ON ucl_country.value = countries.alpha2
+    GROUP BY
+        ISBN13,
+        release_date
+),
+-- The purpose of this block of SQL is to organise the Metadata from UCL Discovery for easier consumption of downstream queries.
+-- Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'irus_fulcrum_table_id'.
+-- This will either point to 'empty_irus_oapen' (defined above as an empty row) or the name of the real data table in bigquery.
+-- The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
+-- Providng an empty row enable simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
+ucl_discovery_metadata as (
+    SELECT
+        ISBN as ISBN13,
+        eprint_id
+    FROM
+        `{{ ucl_discovery_table_id }}`
+    GROUP BY
+        ISBN13,
+        eprint_id
+),
