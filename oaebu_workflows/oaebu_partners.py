@@ -16,7 +16,7 @@
 # Author: Tuan Chien, Keegan Smith
 
 import os
-from typing import Union
+from typing import Union, Optional
 from dataclasses import dataclass
 
 from oaebu_workflows.config import schema_folder, sql_folder
@@ -217,7 +217,7 @@ OAEBU_DATA_PARTNERS = dict(
     ),
     google_books_traffic=DataPartner(
         type_id="google_books_traffic",
-        bq_dataset_id="google",
+        bq_datasetsql_id="google",
         bq_table_name="google_books_traffic",
         isbn_field_name="Primary_ISBN",
         title_field_name="Title",
