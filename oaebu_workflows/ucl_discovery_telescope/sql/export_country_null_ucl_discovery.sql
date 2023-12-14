@@ -1,0 +1,1 @@
+ucl_discovery.download_count IS NOT NULL

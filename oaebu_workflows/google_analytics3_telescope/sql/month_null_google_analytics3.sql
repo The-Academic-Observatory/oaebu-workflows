@@ -1,0 +1,1 @@
+month.google_analytics IS NOT NULL

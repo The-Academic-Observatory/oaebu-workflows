@@ -1,0 +1,1 @@
+STRUCT(jstor.Total_Item_Requests) as jstor

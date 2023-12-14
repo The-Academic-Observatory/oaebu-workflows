@@ -1,0 +1,1 @@
+STRUCT(google_books.qty as qty) as google_books_sales

@@ -1,46 +1,4 @@
-{# Copyright 2020 Curtin University
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#   http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-# Author: Richard Hosking #}
-{#
-The purpose of this script it to export the book country metrics section from the book_product table
-Primarily, the goal is to create a flat structure which is suitable for graphing in Kibana
-#}
-
-WITH months as (SELECT
-    ISBN13,
-    work_id,
-    work_family_id,
-    onix.title as title,
-    CAST(onix.published_year as INT64) as published_year,
-    month.month,
-    month.jstor_country as jstor,
-    month.irus_oapen.country as irus_oapen,
-    month.irus_fulcrum.country as irus_fulcrum,
-    month.google_analytics.views_total_country as google_analytics_page_views,
-    month.google_analytics.downloads_total_country as google_analytics_downloads,
-    month.google_analytics.downloads_pdf_book_country as google_analytics_downloads_pdf_book,
-    month.google_analytics.downloads_pdf_chapter_country as google_analytics_downloads_pdf_chapter,
-    month.google_analytics.downloads_html_chapter_country as google_analytics_downloads_html_chapter,
-    month.google_analytics.downloads_epub_book_country as google_analytics_downloads_epub_book,
-    month.google_analytics.downloads_epub_chapter_country as google_analytics_downloads_epub_chapter,
-    month.google_analytics.downloads_mobi_book_country as google_analytics_downloads_mobi_book,
-    month.google_books_sales.countries as google_books_sales,
-    month.ucl_discovery.country as ucl_discovery,
-    month.worldreader.country as worldreader
-FROM `{{ book_product_table_id }}`, UNNEST(months) as month
-WHERE ISBN13 is not null AND month.month is not null AND (month.jstor_country IS NOT NULL OR month.irus_oapen.country IS NOT NULL OR month.irus_fulcrum.country IS NOT NULL OR month.google_analytics IS NOT NULL OR month.google_books_sales IS NOT NULL OR month.ucl_discovery.country IS NOT NULL or month.worldreader.country IS NOT NULL)),
+WITH months AS (select * FROM {{ book_product_table_id }}, UNNEST(months) AS month),
 
 countries as (
     SELECT
@@ -56,8 +14,8 @@ month_country as (
         ISBN13,
         work_id,
         work_family_id,
-        title,
-        published_year,
+        onix.title,
+        CAST(onix.published_year as INT64) as published_year,
         month,
         alpha2,
         iso_name as country_name,
@@ -68,213 +26,13 @@ month_country as (
     CROSS JOIN countries
 ),
 
-google_books_month_country as (
-    SELECT
-        ISBN13,
-        month,
-        Country_of_Sale as alpha2,
-        qty
-    FROM months, UNNEST(google_books_sales)
-),
+{% for dp in data_partners %}
+    {% if dp.export_country_body %}
+        {% include dp.export_country_body %}{% if not loop.last %}, {% endif %}
+    {% endif %}
+{% endfor %}
 
-jstor_month_country as (
-    SELECT
-        ISBN13,
-        month,
-        Country_name as alpha2, -- for jstor collections, country_name is the full name not the alpha2 code. This is accounted for in the join to month_country.country_jstor_name instead of month_country.alpha2
-        total_item_requests
-    FROM months, UNNEST(jstor)
-),
 
-irus_oapen_month_country as (
-    SELECT
-        ISBN13,
-        month,
-        code as alpha2,
-        title_requests,
-        total_item_investigations,
-        total_item_requests,
-        unique_item_investigations,
-        unique_item_requests
-    FROM months, UNNEST(irus_oapen)
-),
-
-irus_fulcrum_month_country as (
-    SELECT
-        ISBN13,
-        month,
-        code as alpha2,
-        total_item_investigations,
-        total_item_requests,
-        unique_item_investigations,
-        unique_item_requests
-    FROM months, UNNEST(irus_fulcrum)
-),
-
-google_analytics_page_views_month_country as (
-    SELECT
-        ISBN13,
-        month,
-        google.country_name,
-        country.alpha2 as country_code,
-        value
-    FROM (SELECT
-            ISBN13,
-            month,
-            name as country_name,
-            value,
-        FROM months,
-        UNNEST(google_analytics_page_views)
-        )
-        as google
-    LEFT JOIN `{{ country_table_id }}` as country on country.google_analytics_name = google.country_name
-),
-google_analytics_downloads_total_month_country as (
-    SELECT
-        ISBN13,
-        month,
-        google.country_name,
-        country.alpha2 as country_code,
-        value
-    FROM (SELECT
-            ISBN13,
-            month,
-            name as country_name,
-            value,
-        FROM months,
-        UNNEST(google_analytics_downloads)
-        )
-        as google
-    LEFT JOIN `{{ country_table_id }}` as country on country.google_analytics_name = google.country_name
-),
-google_analytics_downloads_pdf_book_month_country as (
-    SELECT
-        ISBN13,
-        month,
-        google.country_name,
-        country.alpha2 as country_code,
-        value
-    FROM (SELECT
-            ISBN13,
-            month,
-            name as country_name,
-            value,
-        FROM months,
-        UNNEST(google_analytics_downloads_pdf_book)
-        )
-        as google
-    LEFT JOIN `{{ country_table_id }}` as country on country.google_analytics_name = google.country_name
-),
-google_analytics_downloads_pdf_chapter_month_country as (
-    SELECT
-        ISBN13,
-        month,
-        google.country_name,
-        country.alpha2 as country_code,
-        value
-    FROM (SELECT
-            ISBN13,
-            month,
-            name as country_name,
-            value,
-        FROM months,
-        UNNEST(google_analytics_downloads_pdf_chapter)
-        )
-        as google
-    LEFT JOIN `{{ country_table_id }}` as country on country.google_analytics_name = google.country_name
-),
-google_analytics_downloads_html_chapter_month_country as (
-    SELECT
-        ISBN13,
-        month,
-        google.country_name,
-        country.alpha2 as country_code,
-        value
-    FROM (SELECT
-            ISBN13,
-            month,
-            name as country_name,
-            value,
-        FROM months,
-        UNNEST(google_analytics_downloads_html_chapter)
-        )
-        as google
-    LEFT JOIN `{{ country_table_id }}` as country on country.google_analytics_name = google.country_name
-),
-google_analytics_downloads_epub_book_month_country as (
-    SELECT
-        ISBN13,
-        month,
-        google.country_name,
-        country.alpha2 as country_code,
-        value
-    FROM (SELECT
-            ISBN13,
-            month,
-            name as country_name,
-            value,
-        FROM months,
-        UNNEST(google_analytics_downloads_epub_book)
-        )
-        as google
-    LEFT JOIN `{{ country_table_id }}` as country on country.google_analytics_name = google.country_name
-),
-google_analytics_downloads_epub_chapter_month_country as (
-    SELECT
-        ISBN13,
-        month,
-        google.country_name,
-        country.alpha2 as country_code,
-        value
-    FROM (SELECT
-            ISBN13,
-            month,
-            name as country_name,
-            value,
-        FROM months,
-        UNNEST(google_analytics_downloads_epub_chapter)
-        )
-        as google
-    LEFT JOIN `{{ country_table_id }}` as country on country.google_analytics_name = google.country_name
-),
-google_analytics_downloads_mobi_book_month_country as (
-    SELECT
-        ISBN13,
-        month,
-        google.country_name,
-        country.alpha2 as country_code,
-        value
-    FROM (SELECT
-            ISBN13,
-            month,
-            name as country_name,
-            value,
-        FROM months,
-        UNNEST(google_analytics_downloads_mobi_book)
-        )
-        as google
-    LEFT JOIN `{{ country_table_id }}` as country on country.google_analytics_name = google.country_name
-),
-
-ucl_discovery_month_country as (
-    SELECT
-        ISBN13,
-        month,
-        country_name,
-        country_code as alpha2,
-        country_downloads AS download_count
-    FROM months, UNNEST(ucl_discovery)
-),
-
-worldreader_month_country as (
-    SELECT
-        ISBN13, 
-        month, 
-        country_name,
-        country_code, 
-        downloads AS download_count
-    FROM months, UNNEST(worldreader)
-)
 
 SELECT
     month_country.ISBN13 as product_id,
@@ -287,50 +45,20 @@ SELECT
     month_country.country_name,
     month_country.country_iso_name,
     month_country.country_wikipedia_name,
-    STRUCT(jstor.Total_Item_Requests) as jstor,
-    STRUCT(irus_oapen.title_requests, irus_oapen.total_item_investigations, irus_oapen.total_item_requests, irus_oapen.unique_item_investigations, irus_oapen.unique_item_requests) as irus_oapen,
-    STRUCT(irus_fulcrum.total_item_investigations, irus_fulcrum.total_item_requests, irus_fulcrum.unique_item_investigations, irus_fulcrum.unique_item_requests) as irus_fulcrum,
-    STRUCT(
-      google_page_views.value as page_views,
-      google_downloads.value as downloads,
-      google_downloads_pdf_book.value as downloads_pdf_book,
-      google_downloads_pdf_chapter.value as downloads_pdf_chapter,
-      google_downloads_html_chapter.value as downloads_html_chapter,
-      google_downloads_epub_book.value as downloads_epub_book,
-      google_downloads_epub_chapter.value as downloads_epub_chapter,
-      google_downloads_mobi_book.value as downloads_mobi_book
-    ) as google_analytics,
-    STRUCT(google_books.qty as qty) as google_books_sales,
-    STRUCT(ucl_discovery.download_count ) as ucl_discovery,
-    STRUCT(worldreader.download_count) as worldreader
+    {% for dp in data_partners %}
+        {% if dp.export_country_struct %}
+            {% include dp.export_country_struct %}{% if not loop.last %}, {% endif %}
+        {% endif %}
+    {% endfor %}
 FROM month_country
--- for jstor collections, the alpha2 value is the full country name and needs to be matched on country_jstor_name 
-LEFT JOIN jstor_month_country as jstor ON month_country.ISBN13 = jstor.ISBN13 AND month_country.month = jstor.month AND (month_country.alpha2 = jstor.alpha2 OR month_country.country_jstor_name = jstor.alpha2)
-LEFT JOIN irus_oapen_month_country as irus_oapen ON month_country.ISBN13 = irus_oapen.ISBN13 AND month_country.month = irus_oapen.month AND month_country.alpha2 = irus_oapen.alpha2
-LEFT JOIN irus_fulcrum_month_country as irus_fulcrum on month_country.ISBN13 = irus_fulcrum.ISBN13 AND month_country.month = irus_fulcrum.month AND month_country.alpha2 = irus_fulcrum.alpha2
-LEFT JOIN google_analytics_page_views_month_country as google_page_views ON month_country.ISBN13 = google_page_views.ISBN13 AND month_country.month = google_page_views.month AND month_country.alpha2 = google_page_views.country_code
-LEFT JOIN google_analytics_downloads_total_month_country as google_downloads ON month_country.ISBN13 = google_downloads.ISBN13 AND month_country.month = google_downloads.month AND month_country.alpha2 = google_downloads.country_code
-LEFT JOIN google_analytics_downloads_pdf_book_month_country as google_downloads_pdf_book ON month_country.ISBN13 = google_downloads_pdf_book.ISBN13 AND month_country.month = google_downloads_pdf_book.month AND month_country.alpha2 = google_downloads_pdf_book.country_code
-LEFT JOIN google_analytics_downloads_pdf_chapter_month_country as google_downloads_pdf_chapter ON month_country.ISBN13 = google_downloads_pdf_chapter.ISBN13 AND month_country.month = google_downloads_pdf_chapter.month AND month_country.alpha2 = google_downloads_pdf_chapter.country_code
-LEFT JOIN google_analytics_downloads_html_chapter_month_country as google_downloads_html_chapter ON month_country.ISBN13 = google_downloads_html_chapter.ISBN13 AND month_country.month = google_downloads_html_chapter.month AND month_country.alpha2 = google_downloads_html_chapter.country_code
-LEFT JOIN google_analytics_downloads_epub_book_month_country as google_downloads_epub_book ON month_country.ISBN13 = google_downloads_epub_book.ISBN13 AND month_country.month = google_downloads_epub_book.month AND month_country.alpha2 = google_downloads_epub_book.country_code
-LEFT JOIN google_analytics_downloads_epub_chapter_month_country as google_downloads_epub_chapter ON month_country.ISBN13 = google_downloads_epub_chapter.ISBN13 AND month_country.month = google_downloads_epub_chapter.month AND month_country.alpha2 = google_downloads_epub_chapter.country_code
-LEFT JOIN google_analytics_downloads_mobi_book_month_country as google_downloads_mobi_book ON month_country.ISBN13 = google_downloads_mobi_book.ISBN13 AND month_country.month = google_downloads_mobi_book.month AND month_country.alpha2 = google_downloads_mobi_book.country_code
-LEFT JOIN google_books_month_country as google_books ON month_country.ISBN13 = google_books.ISBN13 AND month_country.month = google_books.month AND month_country.alpha2 = google_books.alpha2
-LEFT JOIN ucl_discovery_month_country as ucl_discovery ON month_country.ISBN13 = ucl_discovery.ISBN13 AND month_country.month = ucl_discovery.month AND month_country.alpha2 = ucl_discovery.alpha2
-LEFT JOIN worldreader_month_country as worldreader ON month_country.ISBN13 = worldreader.ISBN13 AND month_country.month = worldreader.month AND month_country.alpha2 = worldreader.country_code
-WHERE jstor.total_item_requests IS NOT NULL OR
-irus_oapen.title_requests IS NOT NULL OR
-irus_oapen.total_item_requests IS NOT NULL OR
-irus_fulcrum.total_item_requests IS NOT NULL OR
-google_page_views.value IS NOT NULL OR
-google_downloads.value IS NOT NULL OR
-google_downloads_pdf_book.value IS NOT NULL OR
-google_downloads_pdf_chapter.value IS NOT NULL OR
-google_downloads_html_chapter.value IS NOT NULL OR
-google_downloads_epub_book.value IS NOT NULL OR
-google_downloads_epub_chapter.value IS NOT NULL OR
-google_downloads_mobi_book.value IS NOT NULL OR
-google_books.qty IS NOT NULL OR
-ucl_discovery.download_count IS NOT NULL OR
-worldreader.download_count IS NOT NULL
+    {% for dp in data_partners %}
+        {% if dp.export_country_join %}
+            {% include dp.export_country_join %}
+        {% endif %}
+    {% endfor %}
+WHERE 
+    {% for dp in data_partners %}
+        {% if dp.export_country_null %}
+            {% include dp.export_country_null %}{% if not loop.last %}OR {% endif %}
+        {% endif %}
+    {% endfor %}
