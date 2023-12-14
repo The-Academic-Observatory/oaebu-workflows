@@ -1,0 +1,1 @@
+STRUCT(month.ucl_discovery.total_downloads) AS ucl_discovery

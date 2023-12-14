@@ -1,0 +1,1 @@
+month.google_books_traffic IS NOT NULL
