@@ -17,19 +17,21 @@
 
 import os
 from datetime import timedelta
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union, Iterable
 import re
+import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import pendulum
 from google.cloud.bigquery import SourceFormat, Client
 from ratelimit import limits, sleep_and_retry
 from tenacity import wait_exponential_jitter
+from jinja2 import Environment, FileSystemLoader
 
 from oaebu_workflows.airflow_pools import CrossrefEventsPool
 from oaebu_workflows.config import schema_folder as default_schema_folder
 from oaebu_workflows.config import sql_folder
-from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
+from oaebu_workflows.oaebu_partners import OaebuPartner, DataPartner, partner_from_str
 from oaebu_workflows.onix_workflow.onix_work_aggregation import BookWorkAggregator, BookWorkFamilyAggregator
 from observatory.api.client.model.dataset_release import DatasetRelease
 from observatory.platform.observatory_config import CloudWorkspace
@@ -468,7 +470,7 @@ class OnixWorkflow(Workflow):
             onix_table_id=onix_table_id,
             crossref_metadata_table_id=master_crossref_metadata_table_id,
         )
-        print("Creating crossref metadata table from master table")
+        logging.info("Creating crossref metadata table from master table")
         schema_file_path = bq_find_schema(
             path=self.schema_folder, table_name=self.bq_oaebu_crossref_metadata_table_name
         )
@@ -631,6 +633,7 @@ class OnixWorkflow(Workflow):
             description="OAEBU Tables",
         )
 
+        # Data partner table names
         dp_tables = {
             f"{dp.type_id}_table_id": bq_sharded_table_id(
                 self.cloud_workspace.project_id,
@@ -640,6 +643,16 @@ class OnixWorkflow(Workflow):
             )
             for dp in self.data_partners
         }
+
+        # Metadata table name
+        onix_table_id = bq_sharded_table_id(
+            self.cloud_workspace.project_id,
+            self.metadata_partner.bq_dataset_id,
+            self.metadata_partner.bq_table_name,
+            release.onix_snapshot_date,
+        )
+
+        # ONIX WF table names
         workid_table_id = bq_sharded_table_id(
             self.cloud_workspace.project_id,
             self.bq_onix_workflow_dataset,
@@ -652,19 +665,16 @@ class OnixWorkflow(Workflow):
             self.bq_workfamilyid_table_name,
             release.snapshot_date,
         )
+        country_table_id = bq_table_id(self.bq_country_project_id, self.bq_country_dataset_id, "country")
         book_table_id = bq_sharded_table_id(
             self.cloud_workspace.project_id, self.bq_oaebu_dataset, self.bq_book_table_name, release.snapshot_date
         )
-        onix_table_id = bq_sharded_table_id(
-            self.cloud_workspace.project_id,
-            self.metadata_partner.bq_dataset_id,
-            self.metadata_partner.bq_table_name,
-            release.onix_snapshot_date,
+
+        # Render the SQL
+        env = create_data_partner_env(
+            main_template=os.path.join(sql_folder(workflow_module="onix_workflow")), data_partners=self.data_partners
         )
-        country_table_id = bq_table_id(self.bq_country_project_id, self.bq_country_dataset_id, "country")
-        template_path = os.path.join(sql_folder(workflow_module="onix_workflow"), "create_book_products.sql.jinja2")
-        sql = render_template(
-            template_path,
+        sql = env.render(
             onix_table_id=onix_table_id,
             data_partners=self.data_partners,
             book_table_id=book_table_id,
@@ -674,6 +684,9 @@ class OnixWorkflow(Workflow):
             ga3_views_field=self.ga3_views_field,
             **dp_tables,
         )
+        logging.info(f"Book Product SQL:\n{sql}")
+
+        # Create the table
         schema_file_path = bq_find_schema(path=self.schema_folder, table_name=self.bq_book_product_table_name)
         table_id = bq_sharded_table_id(
             self.cloud_workspace.project_id,
@@ -681,6 +694,8 @@ class OnixWorkflow(Workflow):
             self.bq_book_product_table_name,
             release.snapshot_date,
         )
+
+        # Run the query
         status = bq_create_table_from_query(sql=sql, table_id=table_id, schema_file_path=schema_file_path)
         set_task_state(status, kwargs["ti"].task_id, release=release)
 
@@ -1204,8 +1219,8 @@ def download_crossref_events(
         for doi in dois
     ]
 
-    print(f"Beginning crossref event data download from {len(event_urls)} URLs with {max_threads} workers")
-    print(
+    logging.info(f"Beginning crossref event data download from {len(event_urls)} URLs with {max_threads} workers")
+    logging.info(
         f"Downloading DOI data using URL: {event_url_template.format(doi='***', mailto=mailto, start_date=url_start_date, end_date=url_end_date)}"
     )
     all_events = []
@@ -1237,8 +1252,8 @@ def download_crossref_event_url(url: str, i: int = 0) -> List[dict]:
         next_cursor, page_counts, _, page_events = download_crossref_page_events(tmp_url, headers)
         total_counts += page_counts
         events.extend(page_events)
-    print(f"{i + 1}: {url} successful")
-    print(f"{i + 1}: Total no. events: {total_events}, downloaded " f"events: {total_counts}")
+    logging.info(f"{i + 1}: {url} successful")
+    logging.info(f"{i + 1}: Total no. events: {total_events}, downloaded " f"events: {total_counts}")
     return events
 
 
@@ -1276,7 +1291,7 @@ def transform_crossref_events(events: List[dict], max_threads: int = 1) -> List[
     :param max_threads: The maximum number of threads to utilise for the transforming process
     :return: transformed events, the order of the events in the input list is not preserved
     """
-    print(f"Beginning crossref event transform with {max_threads} workers")
+    logging.info(f"Beginning crossref event transform with {max_threads} workers")
     transformed_events = []
     with ThreadPoolExecutor(max_workers=max_threads) as executor:
         futures = []
@@ -1284,7 +1299,7 @@ def transform_crossref_events(events: List[dict], max_threads: int = 1) -> List[
             futures.append(executor.submit(transform_event, event))
         for future in as_completed(futures):
             transformed_events.append(future.result())
-    print("Crossref event transformation complete")
+    logging.info("Crossref event transformation complete")
     return transformed_events
 
 
@@ -1381,3 +1396,18 @@ def get_isbn_utils_sql_string() -> str:
         isbn_utils_sql = f.read()
 
     return isbn_utils_sql
+
+
+def create_data_partner_env(main_template: str, data_partners: Iterable[DataPartner]) -> Environment:
+    """Creates a jinja2 environment for any number of data partners
+
+    :param main_template: The name of the main jinja2 template
+    :param data_partners: The data partners
+    :return: Jinja2 environment with data partners sql folders loaded
+    """
+    directories = [dp.sql_directory for dp in data_partners]
+    with open(main_template) as f:
+        contents = f.read()
+    loader = FileSystemLoader(directories)
+    env = Environment(loader=loader).from_string(contents)
+    return env

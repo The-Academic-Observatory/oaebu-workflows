@@ -17,7 +17,7 @@
 # Add data partner temp functions
 {% for dp in data_partners %}
     {% if dp.bp_temp_functions %}
-        {% include dp.schema_path + "/" + dp.bp_temp_functions %}
+        {% include dp.bp_temp_functions %}
     {% endif %}
 {% endfor %}
 
@@ -33,6 +33,13 @@ CREATE TEMP FUNCTION custom_split(str STRING, sep STRING) AS (
     WHERE TRIM(word) != ''
     )
 );
+
+# Add data partner main body blocks
+{% for dp in data_partners %}
+    {% if dp.bp_temp_functions %}
+        {% include dp.bp_body %}
+    {% endif %}
+{% endfor %}
 
 {#
 This block of SQL queries data in an ONIX release, and produces a normalised and focused dataset to pass into the next step of this workflow.
@@ -172,7 +179,7 @@ metrics as (
             crossref_events.metrics as crossref_events,
             {% for dp in data_partners %}
                 {{ dp.type_id + ".metrics" }} AS {{ dp.type_id }}
-            {% endofor %}
+            {% endfor %}
         ) ORDER BY ebook_months.release_date DESC) as months
     FROM ebook_months
     {% for dp in data_partners %}
