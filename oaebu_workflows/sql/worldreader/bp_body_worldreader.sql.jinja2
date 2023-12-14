@@ -11,7 +11,7 @@ worldreader_metrics as (
                     value AS downloads
                 )
             ) AS country
-        ) AS metrics #group_items_worldreader_country(ARRAY_CONCAT(country_code, country_name, value)) as country
+        ) AS metrics group_items_worldreader_country(ARRAY_CONCAT(country_code, country_name, value)) as country
         #ARRAY_AGG(value) as country_downloads, 
         #ARRAY_AGG(country_name) as country
     FROM
@@ -20,7 +20,7 @@ worldreader_metrics as (
         ISBN13,
         release_date
 ),
-# Worldreader Metadata
+
 worldreader_metadata as (
     SELECT
         ISBN13,
