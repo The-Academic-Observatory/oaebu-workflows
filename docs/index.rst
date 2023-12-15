@@ -1,6 +1,8 @@
 Book Analytics Dashboard 
 =======================
 
+Our documentation on Read the Docs is no longer updated. Please see our latest documentation `here <https://documentation.book-analytics.org>`_
+
 Documentation on how the Dashboard works and information on the data sources used.
 
 .. toctree::
@@ -16,6 +18,8 @@ Documentation on how the Dashboard works and information on the data sources use
 
 Book Usage Data Workflows
 =======================
+
+Our documentation on Read the Docs is no longer updated. Please see our latest documentation `here <https://documentation.book-analytics.org>`_
 
 Documentation about the code/files hosted in the Book Usage Data Worfklows Github repository. This includes (technical) documentation on the telescope/analytical workflows that are a part of this repository, license info & contributing guidelines and auto-generated API reference documentation.
 

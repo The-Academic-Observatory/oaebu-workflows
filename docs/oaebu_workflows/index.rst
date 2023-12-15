@@ -1,5 +1,6 @@
 Book Usage Data Workflows
 -------------------------
+Our documentation on Read the Docs is no longer updated. Please see our latest documentation `here <https://documentation.book-analytics.org>`_
 
 Book Usage Data Workflows provides Apache Airflow workflows for fetching, processing and analysing data about Open Access Books.
 
