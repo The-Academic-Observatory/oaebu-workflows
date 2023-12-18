@@ -1,8 +1,5 @@
--- The purpose of this block of SQL is to organise the metrics from IRUS Fulcrum for easier consumption of downstream queries.
--- Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'irus_fulcrum_table_id'.
--- This will either point to 'empty_irus_fulcrum' (defined above as an empty row) or the name of the real data table in bigquery.
--- The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
--- Providng an empty row enable simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
+# The purpose of this block of SQL is to organise the metrics from IRUS Fulcrum for easier consumption of downstream queries.
+# Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'irus_fulcrum_table_id'.
 irus_fulcrum_metrics as (
     SELECT
         ISBN as ISBN13,
@@ -20,11 +17,9 @@ irus_fulcrum_metrics as (
         ISBN,
         release_date
 ),
--- The purpose of this block of SQL is to organise the Metadata from IRUS OAPEN for easier consumption of downstream queries.
--- Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'irus_fulcrum_table_id'.
--- This will either point to 'empty_irus_oapen' (defined above as an empty row) or the name of the real data table in bigquery.
--- The reason for the choice of selecting an empty row, is that some partners will not have corresponding data to query.
--- Providng an empty row enable simplicity of the downstream queries and also means the resulting schema across all publishers is the same.
+
+# The purpose of this block of SQL is to organise the Metadata from IRUS OAPEN for easier consumption of downstream queries.
+# Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'irus_fulcrum_table_id'.
 irus_fulcrum_metadata as (
     SELECT
         ISBN as ISBN13,

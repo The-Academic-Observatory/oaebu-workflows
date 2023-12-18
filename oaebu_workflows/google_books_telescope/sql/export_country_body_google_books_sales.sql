@@ -7,4 +7,4 @@ google_books_month_country as (
     FROM
         months,
         UNNEST(google_books_sales.countries)
-),
+)

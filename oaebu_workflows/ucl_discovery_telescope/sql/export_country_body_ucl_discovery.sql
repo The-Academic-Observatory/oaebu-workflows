@@ -8,4 +8,4 @@ ucl_discovery_month_country as (
     FROM
         months,
         UNNEST(ucl_discovery.country)
-),
+)

@@ -1,3 +1,5 @@
+# The purpose of this block of SQL is to organise the metrics from worldreader for easier consumption of downstream queries.
+# Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'worldreader_table_id'.
 worldreader_metrics as (
     SELECT
         ISBN13,
@@ -21,6 +23,8 @@ worldreader_metrics as (
         release_date
 ),
 
+# The purpose of this block of SQL is to organise the Metadata from worldreader for easier consumption of downstream queries.
+# Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'worldreader_table_id'.
 worldreader_metadata as (
     SELECT
         ISBN13,
@@ -29,4 +33,4 @@ worldreader_metadata as (
         `{{ worldreader_table_id }}`
     GROUP BY
         ISBN13
-),
+)

@@ -30,17 +30,17 @@ SELECT
     MAX(author.ORCID) as orcid,
     count(ISBN13) as unique_books,
     month.month,
-    STRUCT(group_counts(ARRAY_CONCAT_AGG(month.crossref_events)) as count) as crossref_events,
     {% for dp in data_partners %}
-        {% if dp.export_author %}
-            {% include dp.export_author_struct %}
+        {% if dp.month_metrics_sum %}
+            {% include dp.month_metrics_sum %},
         {% endif %}
     {% endfor %}
+    STRUCT(group_counts(ARRAY_CONCAT_AGG(month.crossref_events)) as count) as crossref_events
 FROM `{{ book_product_table_id }}`, UNNEST(onix.authors) as author, UNNEST(months) as month
 WHERE 
     {% for dp in data_partners %}
-        {% if dp.export_author %}
-            {% include dp.export_author_null %} OR
+        {% if dp.month_metrics_sum %}
+            {% include dp.month_mull %} OR
         {% endif %}
     {% endfor %}
 ARRAY_LENGTH(month.crossref_events) > 0

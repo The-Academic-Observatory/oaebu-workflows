@@ -1,4 +1,4 @@
-{# Copyright 2020 Curtin University
+{# Copyright 2020-2023 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Author: Richard Hosking #}
+# Author: Richard Hosking, Keegan Smith #}
 {#
 The purpose of this script it to export the BIC subject metrics section from the book_product table
 Primarily, the goal is to create a flat structure which is suitable for graphing in Kibana
@@ -41,44 +41,24 @@ FROM(
         subject,
         count(ISBN13) as unique_books,
         month.month,
-        STRUCT(
-            group_counts(ARRAY_CONCAT_AGG(month.google_analytics.views_total_country)) as page_views,
-            group_counts(ARRAY_CONCAT_AGG(month.google_analytics.downloads_total_country)) as downloads,
-            group_counts(ARRAY_CONCAT_AGG(month.google_analytics.downloads_pdf_book_country)) as downloads_pdf_book,
-            group_counts(ARRAY_CONCAT_AGG(month.google_analytics.downloads_pdf_chapter_country)) as downloads_pdf_chapter,
-            group_counts(ARRAY_CONCAT_AGG(month.google_analytics.downloads_html_chapter_country)) as downloads_html_chapter,
-            group_counts(ARRAY_CONCAT_AGG(month.google_analytics.downloads_epub_book_country)) as downloads_epub_book,
-            group_counts(ARRAY_CONCAT_AGG(month.google_analytics.downloads_epub_chapter_country)) as downloads_epub_chapter,
-            group_counts(ARRAY_CONCAT_AGG(month.google_analytics.downloads_mobi_book_country)) as downloads_mobi_book
-        ) as google_analytics,
-        STRUCT(group_counts(ARRAY_CONCAT_AGG(month.crossref_events)) as count) as crossref_events,
-        STRUCT(
-            SUM(month.google_books_traffic.Book_Visits_BV_) as Book_Visits_BV_,
-            SUM(month.google_books_traffic.BV_with_Pages_Viewed) as BV_with_Pages_Viewed,
-            SUM(month.google_books_traffic.Non_Unique_Buy_Clicks) as Non_Unique_Buy_Clicks,
-            SUM(month.google_books_traffic.BV_with_Buy_Clicks) as BV_with_Buy_Clicks,
-            SUM(month.google_books_traffic.Buy_Link_CTR) as Buy_Link_CTR,
-            SUM(month.google_books_traffic.Pages_Viewed) as Pages_Viewed
-        ) as google_books_traffic,
-        STRUCT(
-            SUM(month.google_books_sales.qty) as qty
-        ) as google_books_sales,
-        STRUCT(group_counts(ARRAY_CONCAT_AGG(month.jstor_country)) as Total_Item_Requests) as jstor,
-        STRUCT(
-            SUM(month.irus_oapen.title_requests) as title_requests,
-            SUM(month.irus_oapen.total_item_investigations) as total_item_investigations,
-            SUM(month.irus_oapen.total_item_requests) as total_item_requests,
-            SUM(month.irus_oapen.unique_item_investigations) as unique_item_investigations,
-            SUM(month.irus_oapen.unique_item_requests) as unique_item_requests
-        ) as irus_oapen,
-        STRUCT(
-            SUM(month.irus_fulcrum.total_item_investigations) as total_item_investigations,
-            SUM(month.irus_fulcrum.total_item_requests) as total_item_requests,
-            SUM(month.irus_fulcrum.unique_item_investigations) as unique_item_investigations,
-            SUM(month.irus_fulcrum.unique_item_requests) as unique_item_requests
-        ) as irus_fulcrum,
+
+        {% for dp in data_partners %}
+          {% if dp.month_metrics_sum %}
+            {% include dp.month_metrics_sum %},
+          {% endif %}
+        {% endfor %}
+        STRUCT(group_counts(ARRAY_CONCAT_AGG(month.crossref_events)) as count) as crossref_events
+        
     FROM `{{ book_product_table_id }}`, UNNEST(top_level_subjects(onix.bic_subjects)) as subject, UNNEST(months) as month
-    WHERE month.irus_fulcrum IS NOT NULL OR month.irus_oapen IS NOT NULL OR month.google_books_traffic IS NOT NULL OR month.google_books_sales IS NOT NULL OR month.google_analytics IS NOT NULL OR ARRAY_LENGTH(month.crossref_events) > 0 OR ARRAY_LENGTH(month.jstor_country) > 0
+    WHERE 
+
+    {% for dp in data_partners %}
+      {% if dp.month_metrics_sum %}
+        {% include dp.month_null %} OR 
+      {% endif %}
+    {% endfor %}
+    
+    ARRAY_LENGTH(month.crossref_events) > 0 
     GROUP BY subject, month
     ORDER BY subject ASC, month DESC) as metrics
 LEFT JOIN `{{ bic_table_id }}` as bic on bic.code = subject
