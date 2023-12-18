@@ -10,4 +10,4 @@ irus_fulcrum_month_country as (
     FROM
         months,
         UNNEST(irus_fulcrum.country)
-),
+)

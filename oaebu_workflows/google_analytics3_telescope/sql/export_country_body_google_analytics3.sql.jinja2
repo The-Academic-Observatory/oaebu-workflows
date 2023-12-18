@@ -157,4 +157,4 @@ google_analytics_downloads_mobi_book_month_country as (
                 UNNEST(google_analytics.downloads_mobi_book_country)
         ) as google
         LEFT JOIN `{{ country_table_id }}` as country on country.google_analytics_name = google.country_name
-),
+)

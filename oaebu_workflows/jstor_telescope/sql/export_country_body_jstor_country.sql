@@ -8,4 +8,4 @@ jstor_month_country as (
     FROM
         months,
         UNNEST(jstor_country)
-),
+)

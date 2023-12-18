@@ -35,4 +35,4 @@ STRUCT(
             month.google_analytics.downloads_mobi_book_country
         )
     ) as downloads_mobi_book
-) as google_analytics,
+) as google_analytics
