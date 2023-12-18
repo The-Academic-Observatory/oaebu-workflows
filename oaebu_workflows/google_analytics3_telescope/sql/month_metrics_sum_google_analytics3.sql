@@ -1,7 +1,7 @@
 STRUCT(
     group_counts(
         ARRAY_CONCAT_AGG(month.google_analytics.views_total_country)
-    ) as views_total_country,
+    ) as page_views,
     group_counts(
         ARRAY_CONCAT_AGG(month.google_analytics.downloads_total_country)
     ) as downloads,

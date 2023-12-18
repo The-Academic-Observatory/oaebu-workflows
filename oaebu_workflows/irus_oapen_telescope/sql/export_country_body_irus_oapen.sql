@@ -11,4 +11,4 @@ irus_oapen_month_country as (
     FROM
         months,
         UNNEST(irus_oapen.country)
-),
+)

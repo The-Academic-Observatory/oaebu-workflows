@@ -5,4 +5,4 @@ STRUCT(
         FROM
             UNNEST(month.jstor_country)
     ) AS Total_Item_Requests
-) AS jstor,
+) AS jstor

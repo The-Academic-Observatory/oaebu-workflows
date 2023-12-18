@@ -1,1 +1,1 @@
-irus_fulcrum.total_item_requests IS NOT NULL
+month.irus_fulcrum IS NOT NULL
