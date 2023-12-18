@@ -1,6 +1,8 @@
 Book Analytics Dashboard
 =======================
 
+## Our documentation on Read the Docs is no longer updated. Please see our latest documentation [here](https://documentation.book-analytics.org).
+
 ## How can the Book Analytics Dashboard help me?
 Whether you’re a publisher, librarian, funder, administrator, or other stakeholder in the scholarly communications community, the Dashboard can help you gain a fuller view of book usage data.
 

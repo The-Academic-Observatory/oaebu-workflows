@@ -32,7 +32,7 @@ Onix, UCL Discovery and an Onix Workflow for combining all of this data.
 
 
 ## Documentation
-For detailed documentation about the Book Usage Data Workflows see the Read the Docs website  [https://oaebu-workflows.readthedocs.io](https://oaebu-workflows.readthedocs.io)
+For detailed documentation about the Book Usage Data Workflows hosted on GitBook, [click here](documentation.book-analytics.org). Thank you to GitBook for the supporting this repository under their Open Source plan.
 
 ## Other requirements to create the Book Usage Datasets
 The Observatory Platform, an environment for fetching, processing and analysing data, see the Repository  [https://github.com/The-Academic-Observatory/observatory-platform](https://github.com/The-Academic-Observatory/observatory-platform)
