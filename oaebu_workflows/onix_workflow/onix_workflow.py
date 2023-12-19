@@ -707,6 +707,8 @@ class OnixWorkflow(Workflow):
         """Create an intermediate oaebu table. They are of the form datasource_matched<date>"""
         output_table: str = kwargs["output_table"]
         query_template: str = kwargs["query_template"]
+        template_path = os.path.join(sql_folder(workflow_module="onix_workflow"), query_template)
+
         bq_create_dataset(
             project_id=self.cloud_workspace.project_id,
             dataset_id=self.bq_oaebu_export_dataset,
@@ -717,7 +719,6 @@ class OnixWorkflow(Workflow):
         output_table_id = bq_sharded_table_id(
             self.cloud_workspace.project_id, self.bq_oaebu_export_dataset, output_table_name, release.snapshot_date
         )
-        template_path = os.path.join(sql_folder(workflow_module="onix_workflow"), query_template)
         schema_file_path = bq_find_schema(
             path=self.schema_folder,
             table_name=output_table,
@@ -733,8 +734,9 @@ class OnixWorkflow(Workflow):
         bic_table_id = bq_table_id(self.bq_subject_project_id, self.bq_subject_dataset_id, "bic_lookup")
         bisac_table_id = bq_table_id(self.bq_subject_project_id, self.bq_subject_dataset_id, "bisac_lookup")
         thema_table_id = bq_table_id(self.bq_subject_project_id, self.bq_subject_dataset_id, "thema_lookup")
-        sql = render_template(
-            template_path,
+
+        env = create_data_partner_env(main_template=template_path, data_partners=self.data_partners)
+        sql = env.render(
             project_id=self.cloud_workspace.project_id,
             dataset_id=self.bq_oaebu_dataset,
             release=release.snapshot_date,
@@ -745,112 +747,6 @@ class OnixWorkflow(Workflow):
             thema_table_id=thema_table_id,
         )
         status = bq_create_table_from_query(sql=sql, table_id=output_table_id, schema_file_path=schema_file_path)
-        set_task_state(status, kwargs["ti"].task_id, release=release)
-
-    def export_oaebu_qa_metrics(
-        self,
-        release: OnixWorkflowRelease,
-        **kwargs,
-    ):
-        """Create the unmatched metrics table"""
-        data_partner_isbns = {data.type_id: data.isbn_field_name for data in self.data_partners}
-        data_partner_tables = {data.type_id: data.bq_table_name for data in self.data_partners}
-        google_analytics3_table = data_partner_tables.get("google_analytics3")
-        google_books_table = data_partner_tables.get("google_books_traffic")
-        jstor_table = data_partner_tables.get("jstor_country")
-        irus_oapen_table = data_partner_tables.get("irus_oapen")
-        ucl_table = data_partner_tables.get("ucl_discovery")
-        fulcrum_table = data_partner_tables.get("irus_fulcrum")
-
-        google_analytics3_unmatched_table_id = (
-            bq_sharded_table_id(
-                self.cloud_workspace.project_id,
-                self.bq_oaebu_data_qa_dataset,
-                f"{google_analytics3_table}_unmatched_{data_partner_isbns['google_analytics3']}",
-                release.snapshot_date,
-            )
-            if google_analytics3_table
-            else None
-        )
-        google_books_unmatched_table_id = (
-            bq_sharded_table_id(
-                self.cloud_workspace.project_id,
-                self.bq_oaebu_data_qa_dataset,
-                f"{google_books_table}_unmatched_{data_partner_isbns['google_books_traffic']}",
-                release.snapshot_date,
-            )
-            if google_books_table
-            else None
-        )
-        jstor_unmatched_table_id = (
-            bq_sharded_table_id(
-                self.cloud_workspace.project_id,
-                self.bq_oaebu_data_qa_dataset,
-                f"{jstor_table}_unmatched_{data_partner_isbns['jstor_country']}",
-                release.snapshot_date,
-            )
-            if jstor_table
-            else None
-        )
-        irus_oapen_unmatched_table_id = (
-            bq_sharded_table_id(
-                self.cloud_workspace.project_id,
-                self.bq_oaebu_data_qa_dataset,
-                f"{irus_oapen_table}_unmatched_{data_partner_isbns['irus_oapen']}",
-                release.snapshot_date,
-            )
-            if irus_oapen_table
-            else None
-        )
-        ucl_discovery_unmatched_table_id = (
-            bq_sharded_table_id(
-                self.cloud_workspace.project_id,
-                self.bq_oaebu_data_qa_dataset,
-                f"{ucl_table}_unmatched_{data_partner_isbns['ucl_discovery']}",
-                release.snapshot_date,
-            )
-            if ucl_table
-            else None
-        )
-        fulcrum_unmatched_table_id = (
-            bq_sharded_table_id(
-                self.cloud_workspace.project_id,
-                self.bq_oaebu_data_qa_dataset,
-                f"{fulcrum_table}_unmatched_{data_partner_isbns['irus_fulcrum']}",
-                release.snapshot_date,
-            )
-            if fulcrum_table
-            else None
-        )
-        bq_create_dataset(
-            project_id=self.cloud_workspace.project_id,
-            dataset_id=self.bq_oaebu_export_dataset,
-            location=self.cloud_workspace.data_location,
-            description="OAEBU Tables for Dashboarding",
-        )
-        table_id = bq_sharded_table_id(
-            self.cloud_workspace.project_id,
-            self.bq_oaebu_export_dataset,
-            f"{self.cloud_workspace.project_id.replace('-', '_')}_unmatched_book_metrics",
-            release.snapshot_date,
-        )
-        template_path = os.path.join(sql_folder(workflow_module="onix_workflow"), "export_unmatched_metrics.sql.jinja2")
-        sql = render_template(
-            template_path,
-            google_analytics3_unmatched_table_id=google_analytics3_unmatched_table_id,
-            google_books_unmatched_table_id=google_books_unmatched_table_id,
-            jstor_unmatched_table_id=jstor_unmatched_table_id,
-            irus_oapen_unmatched_table_id=irus_oapen_unmatched_table_id,
-            ucl_discovery_unmatched_table_id=ucl_discovery_unmatched_table_id,
-            fulcrum_unmatched_table_id=fulcrum_unmatched_table_id,
-            google_analytics3_isbn=data_partner_isbns.get("google_analytics3"),
-            google_books_isbn=data_partner_isbns.get("google_books_traffic"),
-            jstor_isbn=data_partner_isbns.get("jstor_country"),
-            irus_oapen_isbn=data_partner_isbns.get("irus_oapen"),
-            ucl_discovery_isbn=data_partner_isbns.get("ucl_discovery"),
-            fulcrum_isbn=data_partner_isbns.get("irus_fulcrum"),
-        )
-        status = bq_create_table_from_query(sql=sql, table_id=table_id)
         set_task_state(status, kwargs["ti"].task_id, release=release)
 
     def create_oaebu_export_tasks(self):
@@ -922,9 +818,6 @@ class OnixWorkflow(Workflow):
                     ),
                     task_id=task_id,
                 )
-
-        # Export QA Metrics
-        self.add_task(self.export_oaebu_qa_metrics)
 
     def create_oaebu_data_qa_tasks(self):
         """Create tasks for outputing QA metrics from our OAEBU data.
@@ -1078,8 +971,7 @@ class OnixWorkflow(Workflow):
         isbn: str,
         **kwargs,
     ):
-        """Create a BQ table of invalid ISBNs for the Google Analytics feed.
-        No attempt is made to normalise the string so we catch as many string issues as we can.
+        """Create a BQ table of invalid ISBNs.
 
         :param release: workflow release object.
         :param data_partner: OaebuPartner,
