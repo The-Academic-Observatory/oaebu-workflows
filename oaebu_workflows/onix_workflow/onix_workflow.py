@@ -836,7 +836,6 @@ class OnixWorkflow(Workflow):
         output_table_id = bq_sharded_table_id(
             self.cloud_workspace.project_id, self.bq_oaebu_export_dataset, output_table_name, release.snapshot_date
         )
-
         book_product_table_id = bq_sharded_table_id(
             self.cloud_workspace.project_id,
             self.bq_oaebu_dataset,
