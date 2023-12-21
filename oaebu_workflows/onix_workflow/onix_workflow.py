@@ -1270,7 +1270,6 @@ def insert_into_schema(schema_base: List[dict], insert_field: dict, schema_field
 
     Raises ValueError If the provided schema_field_name is not found in the schema.
     """
-
     if schema_field_name:
         field_found = False
         for row in schema_base:
