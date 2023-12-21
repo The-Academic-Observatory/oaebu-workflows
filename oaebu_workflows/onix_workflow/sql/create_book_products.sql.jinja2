@@ -16,8 +16,8 @@
 
 # Add data partner temp functions
 {% for dp in data_partners %}
-    {% if dp.bp_temp_functions %}
-        {% include dp.bp_temp_functions %}
+    {% if dp.book_product_functions %}
+        {% include dp.files.book_product_functions %}
     {% endif %}
 {% endfor %}
 
@@ -36,9 +36,7 @@ CREATE TEMP FUNCTION custom_split(str STRING, sep STRING) AS (
 
 # Add data partner main body blocks
 {% for dp in data_partners %}
-    {% if dp.bp_temp_functions %}
-        {% include dp.bp_body %}
-    {% endif %}
+    {% include dp.files.book_product_body %}
 {% endfor %}
 
 {#

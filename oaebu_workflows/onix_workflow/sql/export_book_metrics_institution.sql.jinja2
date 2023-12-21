@@ -24,6 +24,7 @@ SELECT
     CAST(onix.published_year as INT64) as published_year,
     month.month,
     institution.institution,
+    {# Currently only used by jstor #}
     STRUCT(
         institution.Total_Item_Requests
     ) as jstor,

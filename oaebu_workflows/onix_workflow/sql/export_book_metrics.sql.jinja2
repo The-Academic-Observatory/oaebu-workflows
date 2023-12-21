@@ -26,17 +26,13 @@ SELECT
     onix.authors,
     CAST(onix.published_year as INT64) as published_year,
     month.month,
-    {% for dp in data_partners %}
-        {% if dp.export_book_metrics %}
-            {% include dp.files.export_book_metrics %}
-        {% endif %}
+    {% for dp in data_partners | selectattr("export_book_metrics", "equalto", True) %}
+        {% include dp.files.export_book_metrics %}
     {% endfor %}    
     STRUCT((SELECT SUM(count) FROM UNNEST(month.crossref_events)) as count) as crossref_events
 FROM `{{ book_product_table_id }}`, UNNEST(months) as month
 WHERE 
-{% for dp in data_partners %}
-    {% if dp.month_null%}
-        {% include dp.files.month_null %} OR
-    {% endif %}
+{% for dp in data_partners | selectattr("export_book_metrics", "equalto", True) %}
+    {% include dp.files.month_null %} OR
 {% endfor %}
 ARRAY_LENGTH(month.crossref_events) > 0
