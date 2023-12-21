@@ -27,22 +27,17 @@ SELECT
     month.month,
     city.city,
     CONCAT(CAST(MAX(city.latitude) as STRING), ", ", CAST(MAX(city.longitude) as STRING)) as coordinates,
-    
     {# Currently only used by IRUS OAPEN #}
-    {%if irus_oapen in (dp.type_id for dp in data_partners) %} 
-        STRUCT(
-            SUM(city.title_requests) as title_requests,
-            SUM(city.total_item_investigations) as total_item_investigations,
-            SUM(city.total_item_requests) as total_item_requests,
-            SUM(city.unique_item_investigations) as unique_item_investigations,
-            SUM(city.unique_item_requests) as unique_item_requests
-        ) as irus_oapen
-    {% endif %}
+    STRUCT(
+        SUM(city.title_requests) as title_requests,
+        SUM(city.total_item_investigations) as total_item_investigations,
+        SUM(city.total_item_requests) as total_item_requests,
+        SUM(city.unique_item_investigations) as unique_item_investigations,
+        SUM(city.unique_item_requests) as unique_item_requests
+    ) as irus_oapen
     
 
 FROM `{{ book_product_table_id }}`, UNNEST(months) as month, 
-    {%if irus_oapen in (dp.type_id for dp in data_partners) %} 
         UNNEST(month.irus_oapen.locations) as city 
-    {% endif %}
 WHERE city.city IS NOT NULL
 GROUP BY ISBN13, month, city
