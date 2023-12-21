@@ -1,0 +1,34 @@
+{
+    "fields": [
+        {
+            "mode": "NULLABLE",
+            "name": "qty",
+            "type": "INTEGER",
+            "description": "Quantity of sales"
+        },
+        {
+            "fields": [
+                {
+                    "mode": "NULLABLE",
+                    "name": "Country_of_Sale",
+                    "type": "STRING",
+                    "description": "Country in which sale occured"
+                },
+                {
+                    "mode": "NULLABLE",
+                    "name": "qty",
+                    "type": "INTEGER",
+                    "description": "Quantity of sales"
+                }
+            ],
+            "mode": "REPEATED",
+            "name": "countries",
+            "type": "RECORD",
+            "description": "A list of Countries"
+        }
+    ],
+    "mode": "NULLABLE",
+    "name": "google_books_sales",
+    "type": "RECORD",
+    "description": "Metrics from Google Books Sales"
+}

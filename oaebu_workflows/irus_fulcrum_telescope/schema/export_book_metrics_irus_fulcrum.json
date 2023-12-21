@@ -1,0 +1,32 @@
+{
+    "fields": [
+        {
+            "mode": "NULLABLE",
+            "name": "total_item_investigations",
+            "type": "INTEGER",
+            "description": "The total number of item investigations."
+        },
+        {
+            "mode": "NULLABLE",
+            "name": "total_item_requests",
+            "type": "INTEGER",
+            "description": "The total number of item requests."
+        },
+        {
+            "mode": "NULLABLE",
+            "name": "unique_item_investigations",
+            "type": "INTEGER",
+            "description": "The number of unique item investigations."
+        },
+        {
+            "mode": "NULLABLE",
+            "name": "unique_item_requests",
+            "type": "INTEGER",
+            "description": "The number of unique item requests."
+        }
+    ],
+    "mode": "NULLABLE",
+    "name": "irus_fulcrum",
+    "type": "RECORD",
+    "description": "Metrics from Fulcrum. Recorded with the IRUS platform"
+}
