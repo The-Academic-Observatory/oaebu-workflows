@@ -16,24 +16,31 @@
 # Author: Tuan Chien, Keegan Smith
 
 import os
-from typing import Union, Optional
+from typing import Union
 from dataclasses import dataclass
 
 from oaebu_workflows.config import schema_folder, sql_folder
 
 
-@dataclass
-class DataPart:
-    sql_directory: str
-    book_product_functions: str
-    book_product_body: str
-    month_null: Optional[str] = None
-    month_metrics_sum: Optional[str] = None
-    export_country_body: Optional[str] = None
-    export_country_struct: Optional[str] = None
-    export_country_join: Optional[str] = None
-    export_country_null: Optional[str] = None
-    export_book_metrics: Optional[str] = None
+class DataPartnerFiles:
+    def __init__(self, *, partner_name: str):
+        self.partner_name = partner_name
+
+        # Schema files
+        self.book_product_metrics_schema = f"book_product_metrics_{self.partner_name}.json"
+        self.book_product_metadata_schema = f"book_product_metadata_{self.partner_name}.json"
+
+        # SQL files
+        self.book_product_body = f"book_product_body_{self.partner_name}.sql.jinja2"
+        self.book_product_functions = f"book_product_functions_{self.partner_name}.sql"
+        self.export_author_struct = f"export_author_struct_{self.partner_name}.sql"
+        self.export_book_metrics = f"export_book_metrics_{self.partner_name}.sql"
+        self.export_country_metrics = f"export_country_metrics_{self.partner_name}.sql.jinja2"
+        self.export_country_join = f"export_country_join_{self.partner_name}.sql"
+        self.export_country_null = f"export_country_null_{self.partner_name}.sql"
+        self.export_country_struct = f"export_country_struct_{self.partner_name}.sql"
+        self.month_metrics_sum = f"month_metrics_sum_{self.partner_name}.sql"
+        self.month_null = f"month_null_{self.partner_name}.sql"
 
 
 @dataclass(kw_only=True)
@@ -101,27 +108,6 @@ class DataPartner(OaebuPartner):
         self.export_country = export_country
         self.export_subject = export_subject
         self.files = DataPartnerFiles(partner_name=self.type_id)
-
-
-class DataPartnerFiles:
-    def __init__(self, *, partner_name: str):
-        self.partner_name = partner_name
-
-        # Schema files
-        self.book_product_metrics_schema = f"book_product_metrics_{self.partner_name}.json"
-        self.book_product_metadata_schema = f"book_product_metadata_{self.partner_name}.json"
-
-        # SQL files
-        self.book_product_body = f"book_product_body_{self.partner_name}.sql.jinja2"
-        self.book_product_functions = f"book_product_functions_{self.partner_name}.sql"
-        self.export_author_struct = f"export_author_struct_{self.partner_name}.sql"
-        self.export_book_metrics = f"export_book_metrics_{self.partner_name}.sql"
-        self.export_country_metrics = f"export_country_metrics_{self.partner_name}.sql.jinja2"
-        self.export_country_join = f"export_country_join_{self.partner_name}.sql"
-        self.export_country_null = f"export_country_null_{self.partner_name}.sql"
-        self.export_country_struct = f"export_country_struct_{self.partner_name}.sql"
-        self.month_metrics_sum = f"month_metrics_sum_{self.partner_name}.sql"
-        self.month_null = f"month_null_{self.partner_name}.sql"
 
 
 OAEBU_METADATA_PARTNERS = dict(
