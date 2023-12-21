@@ -1,0 +1,14 @@
+{
+    "fields": [
+        {
+            "mode": "NULLABLE",
+            "name": "total_downloads",
+            "type": "INTEGER",
+            "description": ""
+        }
+    ],
+    "mode": "NULLABLE",
+    "name": "internet_archive",
+    "type": "RECORD",
+    "description": "Metrics from Internet Archive"
+}
