@@ -44,7 +44,7 @@ month_country as (
 
 {% for dp in data_partners %}
     {% if dp.export_country_body %}
-        {% include dp.export_country_body %}{% if not loop.last %}, {% endif %}
+        {% include dp.files.export_country_body %}{% if not loop.last %}, {% endif %}
     {% endif %}
 {% endfor %}
 
@@ -62,18 +62,18 @@ SELECT
     month_country.country_wikipedia_name,
     {% for dp in data_partners %}
         {% if dp.export_country_struct %}
-            {% include dp.export_country_struct %}{% if not loop.last %}, {% endif %}
+            {% include dp.files.export_country_struct %}{% if not loop.last %}, {% endif %}
         {% endif %}
     {% endfor %}
 FROM month_country
     {% for dp in data_partners %}
         {% if dp.export_country_join %}
-            {% include dp.export_country_join %}
+            {% include dp.files.export_country_join %}
         {% endif %}
     {% endfor %}
 WHERE 
     {% for dp in data_partners %}
         {% if dp.export_country_null %}
-            {% include dp.export_country_null %}{% if not loop.last %}OR {% endif %}
+            {% include dp.files.export_country_null %}{% if not loop.last %}OR {% endif %}
         {% endif %}
     {% endfor %}

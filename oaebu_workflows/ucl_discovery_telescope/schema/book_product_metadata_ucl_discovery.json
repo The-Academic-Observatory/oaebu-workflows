@@ -1,0 +1,20 @@
+{
+    "fields": [
+        {
+            "mode": "NULLABLE",
+            "name": "ISBN13",
+            "type": "STRING",
+            "description": "ISBN of the book"
+        },
+        {
+            "mode": "NULLABLE",
+            "name": "eprint_id",
+            "type": "STRING",
+            "description": "The UCL Discovery eprint ID"
+        }
+    ],
+    "mode": "NULLABLE",
+    "name": "ucl_discovery_metadata",
+    "type": "RECORD",
+    "description": "Metadata derived from UCL Discovery"
+}

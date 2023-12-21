@@ -28,7 +28,7 @@ SELECT
     month.month,
     {% for dp in data_partners %}
         {% if dp.export_book_metrics %}
-            {% include dp.export_book_metrics %}
+            {% include dp.files.export_book_metrics %}
         {% endif %}
     {% endfor %}    
     STRUCT((SELECT SUM(count) FROM UNNEST(month.crossref_events)) as count) as crossref_events
@@ -36,7 +36,7 @@ FROM `{{ book_product_table_id }}`, UNNEST(months) as month
 WHERE 
 {% for dp in data_partners %}
     {% if dp.month_null%}
-        {% include dp.month_null %} OR
+        {% include dp.files.month_null %} OR
     {% endif %}
 {% endfor %}
 ARRAY_LENGTH(month.crossref_events) > 0

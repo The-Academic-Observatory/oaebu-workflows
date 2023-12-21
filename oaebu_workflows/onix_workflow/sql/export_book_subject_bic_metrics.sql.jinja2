@@ -43,8 +43,8 @@ FROM(
         month.month,
 
         {% for dp in data_partners %}
-          {% if dp.month_metrics_sum %}
-            {% include dp.month_metrics_sum %},
+          {% if dp.export_subject %}
+            {% include dp.files.month_metrics_sum %},
           {% endif %}
         {% endfor %}
         STRUCT(group_counts(ARRAY_CONCAT_AGG(month.crossref_events)) as count) as crossref_events
@@ -53,8 +53,8 @@ FROM(
     WHERE 
 
     {% for dp in data_partners %}
-      {% if dp.month_metrics_sum %}
-        {% include dp.month_null %} OR 
+      {% if dp.export_subject %}
+        {% include dp.files.month_null %} OR 
       {% endif %}
     {% endfor %}
     
