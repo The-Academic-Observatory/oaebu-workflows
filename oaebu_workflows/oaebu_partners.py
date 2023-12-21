@@ -16,7 +16,7 @@
 # Author: Tuan Chien, Keegan Smith
 
 import os
-from typing import Union, Optional
+from typing import Union
 from dataclasses import dataclass
 
 from oaebu_workflows.config import schema_folder, sql_folder
