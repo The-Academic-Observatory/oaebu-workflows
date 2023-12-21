@@ -31,16 +31,16 @@ SELECT
     count(ISBN13) as unique_books,
     month.month,
     {% for dp in data_partners %}
-        {% if dp.month_metrics_sum %}
-            {% include dp.month_metrics_sum %},
+        {% if dp.export_author %}
+            {% include dp.files.month_metrics_sum %},
         {% endif %}
     {% endfor %}
     STRUCT(group_counts(ARRAY_CONCAT_AGG(month.crossref_events)) as count) as crossref_events
 FROM `{{ book_product_table_id }}`, UNNEST(onix.authors) as author, UNNEST(months) as month
 WHERE 
     {% for dp in data_partners %}
-        {% if dp.month_metrics_sum %}
-            {% include dp.month_mull %} OR
+        {% if dp.export_author %}
+            {% include dp.files.month_mull %} OR
         {% endif %}
     {% endfor %}
 ARRAY_LENGTH(month.crossref_events) > 0

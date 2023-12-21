@@ -778,10 +778,6 @@ class OnixWorkflow(Workflow):
                 "query_template": "export_book_metrics_event.sql.jinja2",
             },
             {
-                "output_table": "book_product_publisher_metrics",
-                "query_template": "export_book_publisher_metrics.sql.jinja2",
-            },
-            {
                 "output_table": "book_product_subject_bic_metrics",
                 "query_template": "export_book_subject_bic_metrics.sql.jinja2",
             },
@@ -792,14 +788,6 @@ class OnixWorkflow(Workflow):
             {
                 "output_table": "book_product_subject_thema_metrics",
                 "query_template": "export_book_subject_thema_metrics.sql.jinja2",
-            },
-            {
-                "output_table": "book_product_year_metrics",
-                "query_template": "export_book_year_metrics.sql.jinja2",
-            },
-            {
-                "output_table": "book_product_subject_year_metrics",
-                "query_template": "export_book_subject_year_metrics.sql.jinja2",
             },
             {
                 "output_table": "book_product_author_metrics",
@@ -1303,3 +1291,32 @@ def create_data_partner_env(main_template: str, data_partners: Iterable[DataPart
     loader = FileSystemLoader(directories)
     env = Environment(loader=loader).from_string(contents)
     return env
+
+
+def insert_into_schema(schema_base: List[dict], insert_field: dict, schema_field_name: Optional[str] = None):
+    """
+    Inserts a given field into a schema.
+
+
+    :param schema_base: (List[dict]): The base schema to insert the field into.
+    :param insert_field: (dict): The field to be inserted into the schema.
+    :param schema_field_name: (Optional[str], optional): The name of the field in the schema.
+        If provided, the field will be inserted into the matching field.
+        If not provided, the field will be appended to the end of the schema.
+    :return: The updated schema with the field inserted.
+
+    Raises ValueError If the provided schema_field_name is not found in the schema.
+    """
+    if schema_field_name:
+        field_found = False
+        for row in schema_base:
+            if row["name"] == schema_field_name:
+                field_found = True
+                row["fields"].append(insert_field)
+                break
+        if not field_found:
+            raise ValueError(f"Field {schema_field_name} not found in schema")
+    else:
+        schema_base.append(insert_field)
+
+    return schema_base

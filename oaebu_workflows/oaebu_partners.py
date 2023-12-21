@@ -23,7 +23,7 @@ from oaebu_workflows.config import schema_folder, sql_folder
 
 
 @dataclass
-class PartnerSQL:
+class DataPart:
     sql_directory: str
     book_product_functions: str
     book_product_body: str
@@ -61,7 +61,6 @@ class OaebuPartner:
         return self.type_id
 
 
-@dataclass(kw_only=True)
 class DataPartner(OaebuPartner):
     """Represents a data class for an oaebu data source.
 
@@ -69,7 +68,60 @@ class DataPartner(OaebuPartner):
     :param book_product_body: The name of the book product body file.
     """
 
-    sql: Optional[PartnerSQL] = None
+    def __init__(
+        self,
+        *,
+        type_id: str,
+        bq_dataset_id: str,
+        bq_table_name: str,
+        isbn_field_name: str,
+        title_field_name: str,
+        sharded: bool,
+        schema_path: str,
+        schema_directory: str,
+        sql_directory: str,
+        export_author: bool,
+        export_book_metrics: bool,
+        export_country: bool,
+        export_subject: bool,
+    ):
+        super().__init__(
+            type_id=type_id,
+            bq_dataset_id=bq_dataset_id,
+            bq_table_name=bq_table_name,
+            isbn_field_name=isbn_field_name,
+            title_field_name=title_field_name,
+            sharded=sharded,
+            schema_path=schema_path,
+        )
+        self.schema_directory = schema_directory
+        self.sql_directory = sql_directory
+        self.export_author = export_author
+        self.export_book_metrics = export_book_metrics
+        self.export_country = export_country
+        self.export_subject = export_subject
+        self.files = DataPartnerFiles(partner_name=self.type_id)
+
+
+class DataPartnerFiles:
+    def __init__(self, *, partner_name: str):
+        self.partner_name = partner_name
+
+        # Schema files
+        self.book_product_metrics_schema = f"book_product_metrics_{self.partner_name}.json"
+        self.book_product_metadata_schema = f"book_product_metadata_{self.partner_name}.json"
+
+        # SQL files
+        self.book_product_body = f"book_product_body_{self.partner_name}.sql.jinja2"
+        self.book_product_functions = f"book_product_functions_{self.partner_name}.sql"
+        self.export_author_struct = f"export_author_struct_{self.partner_name}.sql"
+        self.export_book_metrics = f"export_book_metrics_{self.partner_name}.sql"
+        self.export_country_metrics = f"export_country_metrics_{self.partner_name}.sql.jinja2"
+        self.export_country_join = f"export_country_join_{self.partner_name}.sql"
+        self.export_country_null = f"export_country_null_{self.partner_name}.sql"
+        self.export_country_struct = f"export_country_struct_{self.partner_name}.sql"
+        self.month_metrics_sum = f"month_metrics_sum_{self.partner_name}.sql"
+        self.month_null = f"month_null_{self.partner_name}.sql"
 
 
 OAEBU_METADATA_PARTNERS = dict(
@@ -111,18 +163,12 @@ OAEBU_DATA_PARTNERS = dict(
         title_field_name="title",
         sharded=False,
         schema_path=os.path.join(schema_folder(workflow_module="google_analytics3_telescope"), "google_analytics.json"),
-        sql=PartnerSQL(
-            sql_directory=os.path.join(sql_folder(workflow_module="google_analytics3_telescope")),
-            book_product_functions="book_product_functions_google_analytics3.sql",
-            book_product_body="book_product_body_google_analytics3.sql.jinja2",
-            month_null="month_null_google_analytics3.sql",
-            month_metrics_sum="month_metrics_sum_google_analytics3.sql",
-            export_country_body="export_country_body_google_analytics3.sql.jinja2",
-            export_country_struct="export_country_struct_google_analytics3.sql",
-            export_country_join="export_country_join_google_analytics3.sql",
-            export_country_null="export_country_null_google_analytics3.sql",
-            export_book_metrics="export_book_metrics_google_analytics3.sql",
-        ),
+        schema_directory=os.path.join(schema_folder(workflow_module="google_analytics3_telescope")),
+        sql_directory=os.path.join(sql_folder(workflow_module="google_analytics3_telescope")),
+        export_author=True,
+        export_book_metrics=True,
+        export_country=True,
+        export_subject=True,
     ),
     google_books_sales=DataPartner(
         type_id="google_books_sales",
@@ -132,18 +178,12 @@ OAEBU_DATA_PARTNERS = dict(
         title_field_name="Title",
         sharded=False,
         schema_path=os.path.join(schema_folder(workflow_module="google_books_telescope"), "google_books_sales.json"),
-        sql=PartnerSQL(
-            sql_directory=os.path.join(sql_folder(workflow_module="google_books_telescope")),
-            book_product_functions="book_product_functions_google_books_sales.sql",
-            book_product_body="book_product_body_google_books_sales.sql.jinja2",
-            month_null="month_null_google_books_sales.sql",
-            month_metrics_sum="month_metrics_sum_google_books_sales.sql",
-            export_country_body="export_country_body_google_books_sales.sql",
-            export_country_struct="export_country_struct_google_books_sales.sql",
-            export_country_join="export_country_join_google_books_sales.sql",
-            export_country_null="export_country_null_google_books_sales.sql",
-            export_book_metrics="export_book_metrics_google_books_sales.sql",
-        ),
+        schema_directory=os.path.join(schema_folder(workflow_module="google_books_telescope")),
+        sql_directory=os.path.join(sql_folder(workflow_module="google_books_telescope")),
+        export_author=True,
+        export_book_metrics=True,
+        export_country=True,
+        export_subject=True,
     ),
     google_books_traffic=DataPartner(
         type_id="google_books_traffic",
@@ -153,18 +193,12 @@ OAEBU_DATA_PARTNERS = dict(
         title_field_name="Title",
         sharded=False,
         schema_path=os.path.join(schema_folder(workflow_module="google_books_telescope"), "google_books_traffic.json"),
-        sql=PartnerSQL(
-            sql_directory=os.path.join(sql_folder(workflow_module="google_books_telescope")),
-            book_product_functions=None,
-            book_product_body="book_product_body_google_books_traffic.sql.jinja2",
-            month_null="month_null_google_books_traffic.sql",
-            month_metrics_sum="month_metrics_sum_google_books_traffic.sql",
-            export_country_body=None,
-            export_country_struct=None,
-            export_country_join=None,
-            export_country_null=None,
-            export_book_metrics="export_book_metrics_google_books_traffic.sql",
-        ),
+        schema_directory=os.path.join(schema_folder(workflow_module="google_books_telescope")),
+        sql_directory=os.path.join(sql_folder(workflow_module="google_books_telescope")),
+        export_author=True,
+        export_book_metrics=True,
+        export_country=True,
+        export_subject=True,
     ),
     jstor_country=DataPartner(
         type_id="jstor_country",
@@ -174,18 +208,12 @@ OAEBU_DATA_PARTNERS = dict(
         title_field_name="Book_Title",
         sharded=False,
         schema_path=os.path.join(schema_folder(workflow_module="jstor_telescope"), "jstor_country.json"),
-        sql=PartnerSQL(
-            sql_directory=os.path.join(sql_folder(workflow_module="jstor_telescope")),
-            book_product_functions="book_product_functions_jstor_country.sql",
-            book_product_body="book_product_body_jstor_country.sql.jinja2",
-            month_null="month_null_jstor_country.sql",
-            month_metrics_sum=None,
-            export_country_body="export_country_body_jstor_country.sql",
-            export_country_struct="export_country_struct_jstor_country.sql",
-            export_country_join="export_country_join_jstor_country.sql",
-            export_country_null="export_country_null_jstor_country.sql",
-            export_book_metrics="export_book_metrics_jstor_country.sql",
-        ),
+        schema_directory=os.path.join(schema_folder(workflow_module="jstor_telescope")),
+        sql_directory=os.path.join(sql_folder(workflow_module="jstor_telescope")),
+        export_author=False,
+        export_book_metrics=True,
+        export_country=True,
+        export_subject=False,
     ),
     jstor_institution=DataPartner(
         type_id="jstor_institution",
@@ -195,18 +223,12 @@ OAEBU_DATA_PARTNERS = dict(
         title_field_name="Book_Title",
         sharded=False,
         schema_path=os.path.join(schema_folder(workflow_module="jstor_telescope"), "jstor_institution.json"),
-        sql=PartnerSQL(
-            sql_directory=os.path.join(sql_folder(workflow_module="jstor_telescope")),
-            book_product_functions="book_product_functions_jstor_institution.sql",
-            book_product_body="book_product_body_jstor_institution.sql.jinja2",
-            month_null=None,
-            month_metrics_sum=None,
-            export_country_body=None,
-            export_country_struct=None,
-            export_country_join=None,
-            export_country_null=None,
-            export_book_metrics=None,
-        ),
+        schema_directory=os.path.join(schema_folder(workflow_module="jstor_telescope")),
+        sql_directory=os.path.join(sql_folder(workflow_module="jstor_telescope")),
+        export_author=False,
+        export_book_metrics=False,
+        export_country=False,
+        export_subject=False,
     ),
     jstor_country_collection=DataPartner(
         type_id="jstor_country_collection",
@@ -216,6 +238,12 @@ OAEBU_DATA_PARTNERS = dict(
         title_field_name="Book_Title",
         sharded=False,
         schema_path=os.path.join(schema_folder(workflow_module="jstor_telescope"), "jstor_country_collection.json"),
+        schema_directory=os.path.join(schema_folder(workflow_module="jstor_telescope")),
+        sql_directory=os.path.join(sql_folder(workflow_module="jstor_telescope")),
+        export_author=True,
+        export_book_metrics=False,
+        export_country=True,
+        export_subject=True,
     ),
     jstor_institution_collection=DataPartner(
         type_id="jstor_institution_collection",
@@ -225,6 +253,12 @@ OAEBU_DATA_PARTNERS = dict(
         title_field_name="Book_Title",
         sharded=False,
         schema_path=os.path.join(schema_folder(workflow_module="jstor_telescope"), "jstor_institution_collection.json"),
+        schema_directory=os.path.join(schema_folder(workflow_module="jstor_telescope")),
+        sql_directory=os.path.join(sql_folder(workflow_module="jstor_telescope")),
+        export_author=False,
+        export_book_metrics=False,
+        export_country=False,
+        export_subject=False,
     ),
     irus_oapen=DataPartner(
         type_id="irus_oapen",
@@ -234,18 +268,12 @@ OAEBU_DATA_PARTNERS = dict(
         title_field_name="book_title",
         sharded=False,
         schema_path=os.path.join(schema_folder(workflow_module="irus_oapen_telescope"), "irus_oapen.json"),
-        sql=PartnerSQL(
-            sql_directory=os.path.join(sql_folder(workflow_module="irus_oapen_telescope")),
-            book_product_functions="book_product_functions_irus_oapen.sql",
-            book_product_body="book_product_body_irus_oapen.sql.jinja2",
-            month_null="month_null_irus_oapen.sql",
-            month_metrics_sum="month_metrics_sum_irus_oapen.sql",
-            export_country_body="export_country_body_irus_oapen.sql",
-            export_country_struct="export_country_struct_irus_oapen.sql",
-            export_country_join="export_country_join_irus_oapen.sql",
-            export_country_null="export_country_null_irus_oapen.sql",
-            export_book_metrics="export_book_metrics_irus_oapen.sql",
-        ),
+        schema_directory=os.path.join(schema_folder(workflow_module="irus_oapen_telescope")),
+        sql_directory=os.path.join(sql_folder(workflow_module="irus_oapen_telescope")),
+        export_author=True,
+        export_book_metrics=True,
+        export_country=True,
+        export_subject=True,
     ),
     irus_fulcrum=DataPartner(
         type_id="irus_fulcrum",
@@ -255,18 +283,12 @@ OAEBU_DATA_PARTNERS = dict(
         title_field_name="book_title",
         sharded=False,
         schema_path=os.path.join(schema_folder(workflow_module="irus_fulcrum_telescope"), "irus_fulcrum.json"),
-        sql=PartnerSQL(
-            sql_directory=os.path.join(sql_folder(workflow_module="irus_fulcrum_telescope")),
-            book_product_functions="book_product_functions_irus_fulcrum.sql",
-            book_product_body="book_product_body_irus_fulcrum.sql.jinja2",
-            month_null="month_null_irus_fulcrum.sql",
-            month_metrics_sum="month_metrics_sum_irus_fulcrum.sql",
-            export_country_body="export_country_body_irus_fulcrum.sql",
-            export_country_struct="export_country_struct_irus_fulcrum.sql",
-            export_country_join="export_country_join_irus_fulcrum.sql",
-            export_country_null="export_country_null_irus_fulcrum.sql",
-            export_book_metrics="export_book_metrics_irus_fulcrum.sql",
-        ),
+        schema_directory=os.path.join(schema_folder(workflow_module="irus_fulcrum_telescope")),
+        sql_directory=os.path.join(sql_folder(workflow_module="irus_fulcrum_telescope")),
+        export_author=True,
+        export_book_metrics=True,
+        export_country=True,
+        export_subject=True,
     ),
     ucl_discovery=DataPartner(
         type_id="ucl_discovery",
@@ -276,18 +298,12 @@ OAEBU_DATA_PARTNERS = dict(
         title_field_name="title",
         sharded=False,
         schema_path=os.path.join(schema_folder(workflow_module="ucl_discovery_telescope"), "ucl_discovery.json"),
-        sql=PartnerSQL(
-            sql_directory=os.path.join(sql_folder(workflow_module="ucl_discovery_telescope")),
-            book_product_functions=None,
-            book_product_body="book_product_body_ucl_discovery.sql.jinja2",
-            month_null="month_null_ucl_discovery.sql",
-            month_metrics_sum=None,
-            export_country_body="export_country_body_ucl_discovery.sql",
-            export_country_struct="export_country_struct_ucl_discovery.sql",
-            export_country_join="export_country_join_ucl_discovery.sql",
-            export_country_null="export_country_null_ucl_discovery.sql",
-            export_book_metrics="export_book_metrics_ucl_discovery.sql",
-        ),
+        schema_directory=os.path.join(schema_folder(workflow_module="ucl_discovery_telescope")),
+        sql_directory=os.path.join(sql_folder(workflow_module="ucl_discovery_telescope")),
+        export_author=False,
+        export_book_metrics=True,
+        export_country=True,
+        export_subject=False,
     ),
     internet_archive=DataPartner(
         type_id="internet_archive",
@@ -297,18 +313,12 @@ OAEBU_DATA_PARTNERS = dict(
         title_field_name="title",
         sharded=False,
         schema_path=os.path.join(schema_folder(), "internet_archive", "internet_archive.json"),
-        sql=PartnerSQL(
-            sql_directory=os.path.join(sql_folder(), "internet_archive"),
-            book_product_functions="book_product_functions_internet_archive.sql",
-            book_product_body="book_product_body_internet_archive.sql.jinja2",
-            month_null="month_null_internet_archive.sql",
-            month_metrics_sum=None,
-            export_country_body=None,
-            export_country_struct=None,
-            export_country_join=None,
-            export_country_null=None,
-            export_book_metrics="export_book_metrics_internet_archive.sql",
-        ),
+        schema_directory=os.path.join(schema_folder(), "internet_archive"),
+        sql_directory=os.path.join(sql_folder(), "internet_archive"),
+        export_author=False,
+        export_book_metrics=True,
+        export_country=False,
+        export_subject=False,
     ),
     worldreader=DataPartner(
         type_id="worldreader",
@@ -318,18 +328,12 @@ OAEBU_DATA_PARTNERS = dict(
         title_field_name="title",
         sharded=False,
         schema_path=os.path.join(schema_folder(), "worldreader", "worldreader.json"),
-        sql=PartnerSQL(
-            sql_directory=os.path.join(sql_folder(), "worldreader"),
-            book_product_functions="book_product_functions_worldreader.sql",
-            book_product_body="book_product_body_worldreader.sql.jinja2",
-            month_null="month_null_worldreader.sql",
-            month_metrics_sum=None,
-            export_country_body="export_country_body_worldreader.sql",
-            export_country_struct="export_country_struct_worldreader.sql",
-            export_country_join="export_country_join_worldreader.sql",
-            export_country_null="export_country_null_worldreader.sql",
-            export_book_metrics="export_book_metrics_worldreader.sql",
-        ),
+        schema_directory=os.path.join(schema_folder(), "worldreader"),
+        sql_directory=os.path.join(sql_folder(), "worldreader"),
+        export_author=False,
+        export_book_metrics=True,
+        export_country=True,
+        export_subject=False,
     ),
 )
 

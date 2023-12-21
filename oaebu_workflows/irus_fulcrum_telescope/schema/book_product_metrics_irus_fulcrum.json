@@ -1,0 +1,76 @@
+{
+    "fields": [
+        {
+            "mode": "NULLABLE",
+            "name": "total_item_investigations",
+            "type": "INTEGER",
+            "description": "The total number of item investigations"
+        },
+        {
+            "mode": "NULLABLE",
+            "name": "total_item_requests",
+            "type": "INTEGER",
+            "description": "The total number of item requests"
+        },
+        {
+            "mode": "NULLABLE",
+            "name": "unique_item_investigations",
+            "type": "INTEGER",
+            "description": "The number of unique item investigations"
+        },
+        {
+            "mode": "NULLABLE",
+            "name": "unique_item_requests",
+            "type": "INTEGER",
+            "description": "The number of unique item requests"
+        },
+        {
+            "fields": [
+                {
+                    "mode": "NULLABLE",
+                    "name": "name",
+                    "type": "STRING",
+                    "description": "The country name of the client"
+                },
+                {
+                    "mode": "NULLABLE",
+                    "name": "code",
+                    "type": "STRING",
+                    "description": "The country code of the client"
+                },
+                {
+                    "mode": "NULLABLE",
+                    "name": "total_item_investigations",
+                    "type": "INTEGER",
+                    "description": "The total number of item investigations"
+                },
+                {
+                    "mode": "NULLABLE",
+                    "name": "total_item_requests",
+                    "type": "INTEGER",
+                    "description": "The total number of item requests"
+                },
+                {
+                    "mode": "NULLABLE",
+                    "name": "unique_item_investigations",
+                    "type": "INTEGER",
+                    "description": "The number of unique item investigations"
+                },
+                {
+                    "mode": "NULLABLE",
+                    "name": "unique_item_requests",
+                    "type": "INTEGER",
+                    "description": "The number of unique item requests"
+                }
+            ],
+            "mode": "REPEATED",
+            "name": "country",
+            "type": "RECORD",
+            "description": "Record to store statistics on the country level"
+        }
+    ],
+    "mode": "NULLABLE",
+    "name": "irus_fulcrum",
+    "type": "RECORD",
+    "description": "Metrics from Fulcrum. Recorded with the IRUS platform"
+}
