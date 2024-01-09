@@ -292,7 +292,6 @@ class OnixWorkflow(Workflow):
 
         # Aggregate Works
         self.add_task(self.aggregate_works)
-        self.add_task(self.upload_aggregation_tables)
         self.add_task(self.bq_load_aggregations)
 
         # Create crossref metadata and event tables
@@ -408,8 +407,7 @@ class OnixWorkflow(Workflow):
         lookup_table = agg.get_works_family_lookup_table()
         save_jsonl_gz(release.worksfamilylookup_path, lookup_table)
 
-    def upload_aggregation_tables(self, release: OnixWorkflowRelease, **kwargs):
-        """Upload the aggregation tables and error tables to a GCP bucket in preparation for BQ loading."""
+        # Upload the aggregation tables and error tables to a GCP bucket in preparation for BQ loading
         files = [release.workslookup_path, release.workslookup_errors_path, release.worksfamilylookup_path]
         gcs_upload_files(bucket_name=self.cloud_workspace.transform_bucket, file_paths=files)
 
@@ -704,7 +702,12 @@ class OnixWorkflow(Workflow):
         release: OnixWorkflowRelease,
         **kwargs,
     ):
-        """Create an intermediate oaebu table. They are of the form datasource_matched<date>"""
+        """Create an export table.
+
+        Takes Kwargs:
+        :param output_table: The name of the table to create
+        :param query_template: The name of the template SQL file
+        """
         output_table: str = kwargs["output_table"]
         query_template: str = kwargs["query_template"]
         template_path = os.path.join(sql_folder(workflow_module="onix_workflow"), query_template)
@@ -740,12 +743,15 @@ class OnixWorkflow(Workflow):
             project_id=self.cloud_workspace.project_id,
             dataset_id=self.bq_oaebu_dataset,
             release=release.snapshot_date,
+            data_partners=self.data_partners,
             book_product_table_id=book_product_table_id,
             country_table_id=country_table_id,
             bic_table_id=bic_table_id,
             bisac_table_id=bisac_table_id,
             thema_table_id=thema_table_id,
         )
+        logging.info(f"{output_table} SQL:\n{sql}")
+
         status = bq_create_table_from_query(sql=sql, table_id=output_table_id, schema_file_path=schema_file_path)
         set_task_state(status, kwargs["ti"].task_id, release=release)
 
