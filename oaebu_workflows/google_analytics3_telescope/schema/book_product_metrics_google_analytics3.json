@@ -202,7 +202,7 @@
         }
     ],
     "mode": "NULLABLE",
-    "name": "google_analytics",
+    "name": "google_analytics3",
     "type": "RECORD",
     "description": "Metrics derived from Google Analytics"
 }

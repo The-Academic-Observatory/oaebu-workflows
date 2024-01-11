@@ -14,7 +14,7 @@
         }
     ],
     "mode": "NULLABLE",
-    "name": "worldreader_metadata",
+    "name": "worldreader",
     "type": "RECORD",
     "description": "Metadata derived from Worldreader"
 }

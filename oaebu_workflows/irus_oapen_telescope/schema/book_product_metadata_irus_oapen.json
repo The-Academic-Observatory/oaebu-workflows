@@ -20,7 +20,7 @@
         }
     ],
     "mode": "NULLABLE",
-    "name": "irus_oapen_metadata",
+    "name": "irus_oapen",
     "type": "RECORD",
     "description": "Metadata derived from IRUS OAPEN"
 }

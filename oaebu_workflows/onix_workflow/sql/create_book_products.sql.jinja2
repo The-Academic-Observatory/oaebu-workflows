@@ -17,7 +17,7 @@
 # Add data partner temp functions
 {% for dp in data_partners %}
     {% if dp.book_product_functions %}
-        {% include dp.files.book_product_functions %}
+        {% include dp.files.book_product_functions_sql %}
     {% endif %}
 {% endfor %}
 
@@ -36,7 +36,10 @@ CREATE TEMP FUNCTION custom_split(str STRING, sep STRING) AS (
 
 # Add data partner main body blocks
 {% for dp in data_partners %}
-    {% include dp.files.book_product_body %}
+    {% if loop.first %}
+        WITH
+    {% endif %}
+    {% include dp.files.book_product_body_sql %},
 {% endfor %}
 
 {#
@@ -133,17 +136,10 @@ unique_releases as (
         DISTINCT(release_date) as release_date,
     FROM
         UNNEST(ARRAY_CONCAT(
-            ARRAY(SELECT DISTINCT(release_date) FROM crossref_events),
-            ARRAY(SELECT DISTINCT(release_date) FROM google_analytics3_metrics),
-            ARRAY(SELECT DISTINCT(release_date) FROM crossref_events),
-            ARRAY(SELECT DISTINCT(release_date) FROM google_books_sales_metrics),
-            ARRAY(SELECT DISTINCT(release_date) FROM google_books_traffic_metrics),
-            ARRAY(SELECT DISTINCT(release_date) FROM jstor_country_metrics),
-            ARRAY(SELECT DISTINCT(release_date) FROM jstor_institution_metrics),
-            ARRAY(SELECT DISTINCT(release_date) FROM irus_oapen_metrics),
-            ARRAY(SELECT DISTINCT(release_date) FROM irus_fulcrum_metrics),
-            ARRAY(SELECT DISTINCT(release_date) FROM worldreader_metrics),
-            ARRAY(SELECT DISTINCT(release_date) FROM internet_archive_metrics)
+            {% for dp in data_partners %}
+                ARRAY(SELECT DISTINCT(release_date) FROM {{ dp.type_id + "_metrics" }}),
+            {% endfor %}
+            ARRAY(SELECT DISTINCT(release_date) FROM crossref_events)
         )
     ) as release_date
     ORDER BY release_date DESC
@@ -176,7 +172,7 @@ metrics as (
             ebook_months.release_date as month,
             crossref_events.metrics as crossref_events,
             {% for dp in data_partners %}
-                {{ dp.type_id + ".metrics" }} AS {{ dp.type_id }}
+                {{ dp.type_id + ".metrics" }} AS {{ dp.type_id }}{% if not loop.last %},{% endif %}
             {% endfor %}
         ) ORDER BY ebook_months.release_date DESC) as months
     FROM ebook_months
@@ -200,12 +196,10 @@ Then we are able to pull in specific metadata from across all the various source
 #}
 SELECT
     onix_ebook_titles.*,
-    empty_work_ids.work_id,
-    empty_work_family_ids.work_family_id,
     STRUCT(
         crossref_objects, chapters, events.overall as events,
-        {% for dp in data_partners %}
-            {{ dp.type_id + "_metadata" }},
+        {% for dp in data_partners | selectattr("has_metadata", "equalto", True) %}
+            {{ dp.type_id + "_metadata" }} AS {{ dp.type_id }}{% if not loop.last %},{% endif %}
         {% endfor %}
     ) as metadata,
     metrics.months
@@ -213,7 +207,7 @@ FROM onix_ebook_titles
 LEFT JOIN `{{ workid_table_id }}` ON `{{ workid_table_id }}`.isbn13 = onix_ebook_titles.ISBN13
 LEFT JOIN `{{ workfamilyid_table_id }}` ON `{{ workfamilyid_table_id }}`.isbn13 = onix_ebook_titles.ISBN13
 LEFT JOIN metrics AS metrics ON metrics.ISBN13 = onix_ebook_titles.ISBN13
-{% for dp in data_partners %}
+{% for dp in data_partners | selectattr("has_metadata", "equalto", True) %}
     LEFT JOIN {{ dp.type_id + "_metadata" }} ON {{ dp.type_id + "_metadata.ISBN13" }} = onix_ebook_titles.ISBN13
 {% endfor %}
 LEFT JOIN `{{ book_table_id }}` as public_data on public_data.isbn = onix_ebook_titles.ISBN13;

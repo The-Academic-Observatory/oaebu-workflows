@@ -50,21 +50,21 @@ class DataPartnerFiles:
         self.partner_name = partner_name
 
         # Schema files
-        self.book_product_metrics_schema = f"book_product_metrics_{self.partner_name}.json"
-        self.book_product_metadata_schema = f"book_product_metadata_{self.partner_name}.json"
-        self.author_metrics_schema = f"export_author_metrics_{self.partner_name}.json"
-        self.country_metrics_schema = f"export_country_metrics_{self.partner_name}.json"
-        self.export_book_metrics_schema = f"export_book_metrics_{self.partner_name}.json"
-        self.export_subject_metrics_schema = f"export_subject_metrics_{self.partner_name}.json"
+        self.book_product_table_metrics_schema = f"book_product_metrics_{self.partner_name}.json"
+        self.book_product_table_metadata_schema = f"book_product_metadata_{self.partner_name}.json"
+        self.book_product_metrics_schema = f"export_book_metrics_{self.partner_name}.json"
+        self.book_product_metrics_author_schema = f"export_author_metrics_{self.partner_name}.json"
+        self.book_product_metrics_country_schema = f"export_country_metrics_{self.partner_name}.json"
+        self.book_product_metrics_subject_schema = f"export_subject_metrics_{self.partner_name}.json"
 
         # SQL files
         self.book_product_body_sql = f"book_product_body_{self.partner_name}.sql.jinja2"
         self.book_product_functions_sql = f"book_product_functions_{self.partner_name}.sql"
-        self.export_book_metrics_sql = f"export_book_metrics_{self.partner_name}.sql"
-        self.export_country_metrics_sql = f"export_country_metrics_{self.partner_name}.sql.jinja2"
-        self.export_country_join_sql = f"export_country_join_{self.partner_name}.sql"
-        self.export_country_null_sql = f"export_country_null_{self.partner_name}.sql"
-        self.export_country_struct_sql = f"export_country_struct_{self.partner_name}.sql"
+        self.book_product_metrics_sql = f"export_book_metrics_{self.partner_name}.sql"
+        self.book_product_country_metrics_sql = f"export_country_metrics_{self.partner_name}.sql.jinja2"
+        self.book_product_country_join_sql = f"export_country_join_{self.partner_name}.sql"
+        self.book_product_country_null_sql = f"export_country_null_{self.partner_name}.sql"
+        self.book_product_country_struct_sql = f"export_country_struct_{self.partner_name}.sql"
         self.month_metrics_sum_sql = f"month_metrics_sum_{self.partner_name}.sql"
         self.month_null_sql = f"month_null_{self.partner_name}.sql"
 
@@ -117,6 +117,7 @@ class DataPartner(OaebuPartner):
         export_book_metrics: bool,
         export_country: bool,
         export_subject: bool,
+        has_metdata: bool = True,
     ):
         """
         Initialises the class. Also uses the DataPartnerFiles class to set up the file names.
@@ -128,6 +129,7 @@ class DataPartner(OaebuPartner):
         :param export_book_metrics: Indicates if the partner will use the book metrics export table.
         :param export_country: Indicates if the partner will use the country export table.
         :param export_subject: Indicates if the partner will use the subject export tables (bic, bisac, thema).
+        :param has_metdata: whether the partner has book metadata records
         """
         super().__init__(
             type_id=type_id,
@@ -145,6 +147,7 @@ class DataPartner(OaebuPartner):
         self.export_book_metrics = export_book_metrics
         self.export_country = export_country
         self.export_subject = export_subject
+        self.has_metadata = has_metdata
         self.files = DataPartnerFiles(partner_name=self.type_id)
 
 
@@ -189,11 +192,12 @@ OAEBU_DATA_PARTNERS = dict(
         schema_path=os.path.join(schema_folder(workflow_module="google_analytics3_telescope"), "google_analytics.json"),
         schema_directory=os.path.join(schema_folder(workflow_module="google_analytics3_telescope")),
         sql_directory=os.path.join(sql_folder(workflow_module="google_analytics3_telescope")),
-        book_product_functions=False,
+        book_product_functions=True,
         export_author=True,
         export_book_metrics=True,
         export_country=True,
         export_subject=True,
+        has_metdata=False,
     ),
     google_books_sales=DataPartner(
         type_id="google_books_sales",
@@ -213,7 +217,7 @@ OAEBU_DATA_PARTNERS = dict(
     ),
     google_books_traffic=DataPartner(
         type_id="google_books_traffic",
-        bq_datasetsql_id="google",
+        bq_dataset_id="google",
         bq_table_name="google_books_traffic",
         isbn_field_name="Primary_ISBN",
         title_field_name="Title",
@@ -224,7 +228,7 @@ OAEBU_DATA_PARTNERS = dict(
         book_product_functions=False,
         export_author=True,
         export_book_metrics=True,
-        export_country=True,
+        export_country=False,
         export_subject=True,
     ),
     jstor_country=DataPartner(

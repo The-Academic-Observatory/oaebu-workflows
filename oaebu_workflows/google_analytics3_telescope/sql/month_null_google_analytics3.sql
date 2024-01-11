@@ -1,1 +1,1 @@
-month.google_analytics IS NOT NULL
+month.google_analytics3 IS NOT NULL

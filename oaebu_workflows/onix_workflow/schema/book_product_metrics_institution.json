@@ -28,5 +28,19 @@
     "name": "institution",
     "type": "STRING",
     "description": "Institution Name"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "Total_Item_Requests",
+        "type": "INTEGER",
+        "description": "Total number of request made from that specific institution"
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "jstor",
+    "type": "RECORD",
+    "description": "Metrics from JSTOR"
   }
 ]

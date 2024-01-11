@@ -56,7 +56,7 @@
         }
     ],
     "mode": "NULLABLE",
-    "name": "jstor_institution_metadata",
+    "name": "jstor_institution",
     "type": "RECORD",
     "description": "Metadata derived from JSTOR Institutions"
 }

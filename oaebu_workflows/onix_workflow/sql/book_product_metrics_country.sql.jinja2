@@ -43,7 +43,7 @@ month_country as (
 ),
 
 {% for dp in data_partners | selectattr("export_country", "equalto", True) %}
-    {% include dp.files.export_country_body %}{% if not loop.last %}, {% endif %}
+    {% include dp.files.book_product_country_metrics_sql %}{% if not loop.last %}, {% endif %}
 {% endfor %}
 
 
@@ -59,13 +59,13 @@ SELECT
     month_country.country_iso_name,
     month_country.country_wikipedia_name,
     {% for dp in data_partners | selectattr("export_country_struct", "equalto", True) %}
-        {% include dp.files.export_country_struct %}{% if not loop.last %}, {% endif %}
+        {% include dp.files.book_product_country_struct_sql %}{% if not loop.last %}, {% endif %}
     {% endfor %}
 FROM month_country
     {% for dp in data_partners | selectattr("export_country_join", "equalto", True) %}
-        {% include dp.files.export_country_join %}
+        {% include dp.files.book_product_country_join_sql %}
     {% endfor %}
-WHERE 
     {% for dp in data_partners | selectattr("export_country_null", "equalto", True) %}
-        {% include dp.files.export_country_null %}{% if not loop.last %}OR {% endif %}
+        {% if loop.first %}WHERE{% endif %}
+        {% include dp.files.book_product_country_null_sql %}{% if not loop.last %}OR {% endif %}
     {% endfor %}

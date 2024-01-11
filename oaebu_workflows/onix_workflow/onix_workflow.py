@@ -20,6 +20,7 @@ from datetime import timedelta
 from typing import List, Optional, Tuple, Union, Iterable
 import re
 import logging
+import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import pendulum
@@ -97,11 +98,20 @@ class OnixWorkflowRelease(SnapshotRelease):
         self.crossref_master_snapshot_date = crossref_master_snapshot_date
 
         # Files
-        self.workslookup_path = os.path.join(self.transform_folder, f"worksid.jsonl.gz")
-        self.workslookup_errors_path = os.path.join(self.transform_folder, f"worksid_errors.jsonl.gz")
-        self.worksfamilylookup_path = os.path.join(self.transform_folder, f"workfamilyid.jsonl.gz")
-        self.crossref_metadata_path = os.path.join(self.transform_folder, f"crossref_metadata.jsonl.gz")
-        self.crossref_events_path = os.path.join(self.transform_folder, f"crossref_events.jsonl.gz")
+        self.workslookup_path = os.path.join(self.transform_folder, "worksid.jsonl.gz")
+        self.workslookup_errors_path = os.path.join(self.transform_folder, "worksid_errors.jsonl.gz")
+        self.worksfamilylookup_path = os.path.join(self.transform_folder, "workfamilyid.jsonl.gz")
+        self.crossref_metadata_path = os.path.join(self.transform_folder, "crossref_metadata.jsonl.gz")
+        self.crossref_events_path = os.path.join(self.transform_folder, "crossref_events.jsonl.gz")
+
+        # Generated Schemas
+        self.book_product_schema_path = os.path.join(self.transform_folder, "book_product_schema.json")
+        self.export_author_schema = os.path.join(self.transform_folder, "export_author_schema.json")
+        self.export_book_schema = os.path.join(self.transform_folder, "export_metrics_books_schema.json")
+        self.export_country_schema = os.path.join(self.transform_folder, "export_country_schema.json")
+        self.export_subject_bic_schema = os.path.join(self.transform_folder, "export_subject_bic_schema.json")
+        self.export_subject_bisac_schema = os.path.join(self.transform_folder, "export_subject_bisac_schema.json")
+        self.export_subject_thema_schema = os.path.join(self.transform_folder, "export_subject_thema_schema.json")
 
 
 class OnixWorkflow(Workflow):
@@ -547,6 +557,8 @@ class OnixWorkflow(Workflow):
             crossref_events_table_id=crossref_events_table_id,
             crossref_metadata_table_id=crossref_metadata_table_id,
         )
+        logging.info(sql)
+
         status = bq_create_table_from_query(
             sql=sql,
             table_id=book_table_id,
@@ -670,7 +682,8 @@ class OnixWorkflow(Workflow):
 
         # Render the SQL
         env = create_data_partner_env(
-            main_template=os.path.join(sql_folder(workflow_module="onix_workflow")), data_partners=self.data_partners
+            main_template=os.path.join(sql_folder(workflow_module="onix_workflow"), "create_book_products.sql.jinja2"),
+            data_partners=self.data_partners,
         )
         sql = env.render(
             onix_table_id=onix_table_id,
@@ -685,7 +698,22 @@ class OnixWorkflow(Workflow):
         logging.info(f"Book Product SQL:\n{sql}")
 
         # Create the table
-        schema_file_path = bq_find_schema(path=self.schema_folder, table_name=self.bq_book_product_table_name)
+        with open(os.path.join(default_schema_folder("onix_workflow"), "book_product.json"), "r") as f:
+            schema = json.load(f)
+
+        # Create the schema
+        for dp in self.data_partners:
+            months_schema_file = os.path.join(dp.schema_directory, f"book_product_metrics_{dp.type_id}.json")
+            with open(months_schema_file, "r") as f:
+                months_schema = json.load(f)
+                schema = insert_into_schema(schema, insert_field=months_schema, schema_field_name="months")
+
+            metadata_schema_file = os.path.join(dp.schema_directory, f"book_product_metadata_{dp.type_id}.json")
+            if dp.has_metadata:
+                with open(metadata_schema_file, "r") as f:
+                    metadata_schema = json.load(f)
+                    schema = insert_into_schema(schema, insert_field=metadata_schema, schema_field_name="metadata")
+
         table_id = bq_sharded_table_id(
             self.cloud_workspace.project_id,
             self.bq_oaebu_dataset,
@@ -694,24 +722,25 @@ class OnixWorkflow(Workflow):
         )
 
         # Run the query
-        status = bq_create_table_from_query(sql=sql, table_id=table_id, schema_file_path=schema_file_path)
+        with open(release.book_product_schema_path, mode="w+") as f:
+            json.dump(schema, f)
+        status = bq_create_table_from_query(
+            sql=sql, table_id=table_id, schema_file_path=release.book_product_schema_path
+        )
         set_task_state(status, kwargs["ti"].task_id, release=release)
 
-    def export_oaebu_table(
-        self,
-        release: OnixWorkflowRelease,
-        **kwargs,
-    ):
+    def export_oaebu_table(self, release: OnixWorkflowRelease, **kwargs) -> bool:
         """Create an export table.
 
-        Takes Kwargs:
+        :param release: The OnixWorkflowRelease object
         :param output_table: The name of the table to create
         :param query_template: The name of the template SQL file
+        :param schema_file_path: The path to the schema
+        :return: Whether the table creation was a success
         """
         output_table: str = kwargs["output_table"]
-        query_template: str = kwargs["query_template"]
-        template_path = os.path.join(sql_folder(workflow_module="onix_workflow"), query_template)
-
+        query_template_path: str = kwargs["query_template_path"]
+        schema_file_path: str = kwargs["schema_file_path"]
         bq_create_dataset(
             project_id=self.cloud_workspace.project_id,
             dataset_id=self.bq_oaebu_export_dataset,
@@ -722,11 +751,7 @@ class OnixWorkflow(Workflow):
         output_table_id = bq_sharded_table_id(
             self.cloud_workspace.project_id, self.bq_oaebu_export_dataset, output_table_name, release.snapshot_date
         )
-        schema_file_path = bq_find_schema(
-            path=self.schema_folder,
-            table_name=output_table,
-            prefix="oaebu_publisher_",
-        )
+
         book_product_table_id = bq_sharded_table_id(
             self.cloud_workspace.project_id,
             self.bq_oaebu_dataset,
@@ -738,7 +763,7 @@ class OnixWorkflow(Workflow):
         bisac_table_id = bq_table_id(self.bq_subject_project_id, self.bq_subject_dataset_id, "bisac_lookup")
         thema_table_id = bq_table_id(self.bq_subject_project_id, self.bq_subject_dataset_id, "thema_lookup")
 
-        env = create_data_partner_env(main_template=template_path, data_partners=self.data_partners)
+        env = create_data_partner_env(main_template=query_template_path, data_partners=self.data_partners)
         sql = env.render(
             project_id=self.cloud_workspace.project_id,
             dataset_id=self.bq_oaebu_dataset,
@@ -753,65 +778,167 @@ class OnixWorkflow(Workflow):
         logging.info(f"{output_table} SQL:\n{sql}")
 
         status = bq_create_table_from_query(sql=sql, table_id=output_table_id, schema_file_path=schema_file_path)
-        set_task_state(status, kwargs["ti"].task_id, release=release)
+        return status
 
     def create_oaebu_export_tasks(self):
-        """Create tasks for exporting final metrics from our OAEBU data.  It will create output tables in the oaebu_elastic dataset."""
-        export_tables = [
-            {"output_table": "book_product_list", "query_template": "export_book_list.sql.jinja2"},
+        """Create tasks for exporting final metrics from our OAEBU data.
+        These are split into two categories: generic and custom.
+        The custom exports change their schema depending on the data partners."""
+
+        generic_export_tables = [
             {
-                "output_table": "book_product_metrics",
-                "query_template": "export_book_metrics.sql.jinja2",
-            },
-            {
-                "output_table": "book_product_metrics_country",
-                "query_template": "export_book_metrics_country.sql.jinja2",
+                "output_table": "book_product_list",
+                "query_template": os.path.join(sql_folder("onix_workflow"), "book_product_list.sql.jinja2"),
+                "schema": os.path.join(default_schema_folder("onix_workflow"), "book_product_list.json"),
             },
             {
                 "output_table": "book_product_metrics_institution",
-                "query_template": "export_book_metrics_institution.sql.jinja2",
+                "query_template": os.path.join(
+                    sql_folder("onix_workflow"), "book_product_metrics_institution.sql.jinja2"
+                ),
+                "schema": os.path.join(default_schema_folder("onix_workflow"), "book_product_metrics_institution.json"),
             },
             {
                 "output_table": "institution_list",
-                "query_template": "export_institution_list.sql.jinja2",
+                "query_template": os.path.join(sql_folder("onix_workflow"), "book_product_institution_list.sql.jinja2"),
+                "schema": os.path.join(default_schema_folder("onix_workflow"), "book_product_institution_list.json"),
             },
             {
                 "output_table": "book_product_metrics_city",
-                "query_template": "export_book_metrics_city.sql.jinja2",
+                "query_template": os.path.join(sql_folder("onix_workflow"), "book_product_metrics_city.sql.jinja2"),
+                "schema": os.path.join(default_schema_folder("onix_workflow"), "book_product_metrics_city.json"),
             },
             {
                 "output_table": "book_product_metrics_events",
-                "query_template": "export_book_metrics_event.sql.jinja2",
-            },
-            {
-                "output_table": "book_product_subject_bic_metrics",
-                "query_template": "export_book_subject_bic_metrics.sql.jinja2",
-            },
-            {
-                "output_table": "book_product_subject_bisac_metrics",
-                "query_template": "export_book_subject_bisac_metrics.sql.jinja2",
-            },
-            {
-                "output_table": "book_product_subject_thema_metrics",
-                "query_template": "export_book_subject_thema_metrics.sql.jinja2",
-            },
-            {
-                "output_table": "book_product_author_metrics",
-                "query_template": "export_book_author_metrics.sql.jinja2",
+                "query_template": os.path.join(sql_folder("onix_workflow"), "book_product_metrics_events.sql.jinja2"),
+                "schema": os.path.join(default_schema_folder("onix_workflow"), "book_product_metrics_events.json"),
             },
         ]
 
         # Create each export table in BiqQuery
         with self.parallel_tasks():
-            for export_table in export_tables:
-                task_id = f"export_oaebu_table_{export_table['output_table']}"
+            for export_table in generic_export_tables:
+                task_id = f"export_{export_table['output_table']}"
                 self.add_task(
                     self.export_oaebu_table,
                     op_kwargs=dict(
-                        output_table=export_table["output_table"], query_template=export_table["query_template"]
+                        output_table=export_table["output_table"],
+                        query_template_path=export_table["query_template"],
+                        schema_file_path=export_table["schema"],
                     ),
                     task_id=task_id,
                 )
+            self.add_task(self.export_metrics_country)
+            self.add_task(self.export_metrics_author)
+            self.add_task(self.export_metrics_books)
+            self.add_task(self.export_metrics_subject)
+
+    def export_metrics_country(self, release: OnixWorkflowRelease, **kwargs):
+        country_schema_base = os.path.join(default_schema_folder("onix_workflow"), "book_product_metrics_country.json")
+        with open(country_schema_base, "r") as f:
+            country_schema = json.load(f)
+
+        for dp in [dp for dp in self.data_partners if dp.export_country]:
+            _file = dp.files.book_product_metrics_country_schema
+            with open(os.path.join(dp.schema_directory, _file), "r") as f:
+                dp_schema = json.load(f)
+            country_schema = insert_into_schema(country_schema, dp_schema)
+
+        with open(release.export_country_schema, "w") as f:
+            json.dump(country_schema, f)
+
+        query_template_path = os.path.join(
+            sql_folder(workflow_module="onix_workflow"), "book_product_metrics_country.sql.jinja2"
+        )
+        status = self.export_oaebu_table(
+            release=release,
+            output_table="book_product_metrics_country",
+            query_template_path=query_template_path,
+            schema_file_path=release.export_country_schema,
+        )
+        set_task_state(status, kwargs["ti"].task_id, release=release)
+
+    def export_metrics_author(self, release: OnixWorkflowRelease, **kwargs):
+        author_schema_base = os.path.join(default_schema_folder("onix_workflow"), "book_product_metrics_author.json")
+        with open(author_schema_base, "r") as f:
+            author_schema = json.load(f)
+
+        for dp in [dp for dp in self.data_partners if dp.export_author]:
+            _file = dp.files.book_product_metrics_author_schema
+            with open(os.path.join(dp.schema_directory, _file), "r") as f:
+                dp_schema = json.load(f)
+            author_schema = insert_into_schema(author_schema, dp_schema)
+
+        with open(release.export_author_schema, "w") as f:
+            json.dump(author_schema, f)
+
+        query_template_path = os.path.join(
+            sql_folder(workflow_module="onix_workflow"), "book_product_metrics_author.sql.jinja2"
+        )
+        status = self.export_oaebu_table(
+            release=release,
+            output_table="book_product_metrics_author",
+            query_template_path=query_template_path,
+            schema_file_path=release.export_author_schema,
+        )
+        set_task_state(status, kwargs["ti"].task_id, release=release)
+
+    def export_metrics_books(self, release: OnixWorkflowRelease, **kwargs):
+        book_schema_base = os.path.join(default_schema_folder("onix_workflow"), "book_product_metrics.json")
+        with open(book_schema_base, "r") as f:
+            book_schema = json.load(f)
+
+        for dp in [dp for dp in self.data_partners if dp.export_book_metrics]:
+            _file = dp.files.book_product_metrics_schema
+            with open(os.path.join(dp.schema_directory, _file), "r") as f:
+                dp_schema = json.load(f)
+            book_schema = insert_into_schema(book_schema, dp_schema)
+
+        with open(release.export_book_schema, "w") as f:
+            json.dump(book_schema, f)
+
+        query_template_path = os.path.join(
+            sql_folder(workflow_module="onix_workflow"), "book_product_metrics.sql.jinja2"
+        )
+        status = self.export_oaebu_table(
+            release=release,
+            output_table="book_product_metrics_books",
+            query_template_path=query_template_path,
+            schema_file_path=release.export_book_schema,
+        )
+        set_task_state(status, kwargs["ti"].task_id, release=release)
+
+    def export_metrics_subject(self, release: OnixWorkflowRelease, **kwargs):
+        for sub, schema_dump in [
+            ("bic", release.export_subject_bic_schema),
+            ("bisac", release.export_subject_bisac_schema),
+            ("thema", release.export_subject_thema_schema),
+        ]:
+            subject_schema_base = os.path.join(
+                default_schema_folder("onix_workflow"), f"book_product_subject_{sub}_metrics.json"
+            )
+            with open(subject_schema_base, "r") as f:
+                subject_schema = json.load(f)
+
+            for dp in [dp for dp in self.data_partners if dp.export_subject]:
+                _file = dp.files.book_product_metrics_subject_schema
+                with open(os.path.join(dp.schema_directory, _file), "r") as f:
+                    dp_schema = json.load(f)
+                subject_schema = insert_into_schema(subject_schema, dp_schema)
+
+            with open(schema_dump, "w") as f:
+                json.dump(subject_schema, f)
+
+            query_template_path = os.path.join(
+                sql_folder(workflow_module="onix_workflow"), f"book_product_subject_{sub}_metrics.sql.jinja2"
+            )
+            status = self.export_oaebu_table(
+                release=release,
+                output_table=f"book_product_subject_{sub}_metrics",
+                query_template_path=query_template_path,
+                schema_file_path=schema_dump,
+            )
+            set_task_state(status, kwargs["ti"].task_id, release=release)
 
     def create_oaebu_data_qa_tasks(self):
         """Create tasks for outputing QA metrics from our OAEBU data.

@@ -14,7 +14,7 @@
 
 # Author: Richard Hosking, Keegan Smith #}
 {#
-The purpose of this script it to export the BIC subject metrics section from the book_product table
+The purpose of this script it to export the Thema subject metrics section from the book_product table
 Primarily, the goal is to create a flat structure which is suitable for graphing in Kibana
 #}
 
@@ -25,7 +25,7 @@ CREATE TEMP FUNCTION group_counts(counts ARRAY<STRUCT<name STRING, value INT64>>
   FROM UNNEST(counts))
 );
 
-# Helper Function: Get just the unique set of top level BIC Subjects from the provided list
+# Helper Function: Get just the unique set of top level Thema Subjects from the provided list
 CREATE TEMP FUNCTION top_level_subjects(subjects ARRAY<STRING>) AS (
   ARRAY(SELECT
     DISTINCT(SUBSTRING(subject, 0, 1)) as top_level
@@ -33,7 +33,7 @@ CREATE TEMP FUNCTION top_level_subjects(subjects ARRAY<STRING>) AS (
 );
 
 SELECT
-  bic.name as subject,
+  thema.name as subject,
   metrics.subject as subject_code,
   metrics.* EXCEPT (subject)
 FROM(
@@ -43,19 +43,19 @@ FROM(
         month.month,
 
         {% for dp in data_partners | selectattr("export_subject", "equalto", True) %}
-            {% include dp.files.month_metrics_sum %},
+            {% include dp.files.month_metrics_sum_sql %},
         {% endfor %}
-        
+
         STRUCT(group_counts(ARRAY_CONCAT_AGG(month.crossref_events)) as count) as crossref_events
-        
-    FROM `{{ book_product_table_id }}`, UNNEST(top_level_subjects(onix.bic_subjects)) as subject, UNNEST(months) as month
+
+    FROM `{{ book_product_table_id }}`, UNNEST(top_level_subjects(onix.thema_subjects)) as subject, UNNEST(months) as month
     WHERE 
 
     {% for dp in data_partners | selectattr("export_subject", "equalto", True) %}
-        {% include dp.files.month_null %} OR 
+        {% include dp.files.month_null_sql %} OR 
     {% endfor %}
     
     ARRAY_LENGTH(month.crossref_events) > 0 
     GROUP BY subject, month
     ORDER BY subject ASC, month DESC) as metrics
-LEFT JOIN `{{ bic_table_id }}` as bic on bic.code = subject
+LEFT JOIN `{{ thema_table_id }}` as thema on thema.code = subject

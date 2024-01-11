@@ -30,14 +30,14 @@ SELECT
     MAX(author.ORCID) as orcid,
     count(ISBN13) as unique_books,
     month.month,
-    {% for dp in data_partners | selectattr("export_author", "equalto", True)%}
-        {% include dp.files.month_metrics_sum %},
+    {% for dp in data_partners | selectattr("export_author", "equalto", True) %}
+        {% include dp.files.month_metrics_sum_sql %},
     {% endfor %}
     STRUCT(group_counts(ARRAY_CONCAT_AGG(month.crossref_events)) as count) as crossref_events
 FROM `{{ book_product_table_id }}`, UNNEST(onix.authors) as author, UNNEST(months) as month
 WHERE 
     {% for dp in data_partners | selectattr("export_author", "equalto", True) %}
-        {% include dp.files.month_mull %} OR
+        {% include dp.files.month_null_sql %} OR
     {% endfor %}
 ARRAY_LENGTH(month.crossref_events) > 0
 GROUP BY author.PersonName, month
