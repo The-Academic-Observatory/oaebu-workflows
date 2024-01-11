@@ -14,7 +14,7 @@
         }
     ],
     "mode": "NULLABLE",
-    "name": "internet_archive_metadata",
+    "name": "internet_archive",
     "type": "RECORD",
     "description": "Metadata derived from Internet Archive"
 }

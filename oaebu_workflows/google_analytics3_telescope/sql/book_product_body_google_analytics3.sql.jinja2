@@ -10,7 +10,7 @@ google_analytics3_grouped_metrics AS(
             publication_format = 'PDF'
             AND publication_whole_or_part = 'whole',
             group_items_google_analytics3(
-                ARRAY_CONCAT_AGG({ { ga3_views_field } }.country)
+                ARRAY_CONCAT_AGG({{ ga3_views_field }}.country)
             ),
             ARRAY_AGG(
                 STRUCT(
@@ -23,7 +23,7 @@ google_analytics3_grouped_metrics AS(
             publication_format = 'PDF'
             AND publication_whole_or_part = 'part',
             group_items_google_analytics3(
-                ARRAY_CONCAT_AGG({ { ga3_views_field } }.country)
+                ARRAY_CONCAT_AGG({{ ga3_views_field }}.country)
             ),
             ARRAY_AGG(
                 STRUCT(
@@ -36,7 +36,7 @@ google_analytics3_grouped_metrics AS(
             publication_format = 'HTML'
             AND publication_whole_or_part = 'whole',
             group_items_google_analytics3(
-                ARRAY_CONCAT_AGG({ { ga3_views_field } }.country)
+                ARRAY_CONCAT_AGG({{ ga3_views_field }}.country)
             ),
             ARRAY_AGG(
                 STRUCT(
@@ -49,7 +49,7 @@ google_analytics3_grouped_metrics AS(
             publication_format = 'HTML'
             AND publication_whole_or_part = 'part',
             group_items_google_analytics3(
-                ARRAY_CONCAT_AGG({ { ga3_views_field } }.country)
+                ARRAY_CONCAT_AGG({{ ga3_views_field }}.country)
             ),
             ARRAY_AGG(
                 STRUCT(
@@ -62,7 +62,7 @@ google_analytics3_grouped_metrics AS(
             publication_format = 'EPUB'
             AND publication_whole_or_part = 'whole',
             group_items_google_analytics3(
-                ARRAY_CONCAT_AGG({ { ga3_views_field } }.country)
+                ARRAY_CONCAT_AGG({{ ga3_views_field }}.country)
             ),
             ARRAY_AGG(
                 STRUCT(
@@ -75,7 +75,7 @@ google_analytics3_grouped_metrics AS(
             publication_format = 'EPUB'
             AND publication_whole_or_part = 'part',
             group_items_google_analytics3(
-                ARRAY_CONCAT_AGG({ { ga3_views_field } }.country)
+                ARRAY_CONCAT_AGG({{ ga3_views_field }}.country)
             ),
             ARRAY_AGG(
                 STRUCT(
@@ -88,7 +88,7 @@ google_analytics3_grouped_metrics AS(
             publication_format = 'MOBI'
             AND publication_whole_or_part = 'whole',
             group_items_google_analytics3(
-                ARRAY_CONCAT_AGG({ { ga3_views_field } }.country)
+                ARRAY_CONCAT_AGG({{ ga3_views_field }}.country)
             ),
             ARRAY_AGG(
                 STRUCT(
@@ -101,7 +101,7 @@ google_analytics3_grouped_metrics AS(
             publication_format = 'MOBI'
             AND publication_whole_or_part = 'part',
             group_items_google_analytics3(
-                ARRAY_CONCAT_AGG({ { ga3_views_field } }.country)
+                ARRAY_CONCAT_AGG({{ ga3_views_field }}.country)
             ),
             ARRAY_AGG(
                 STRUCT(
@@ -114,7 +114,7 @@ google_analytics3_grouped_metrics AS(
             publication_format IN ('PDF', 'HTML', 'EPUB', 'MOBI')
             AND publication_whole_or_part IN ('whole', 'part'),
             group_items_google_analytics3(
-                ARRAY_CONCAT_AGG({ { ga3_views_field } }.country)
+                ARRAY_CONCAT_AGG({{ ga3_views_field }}.country)
             ),
             ARRAY_AGG(
                 STRUCT(
@@ -126,7 +126,7 @@ google_analytics3_grouped_metrics AS(
         IF (
             publication_whole_or_part = '(citation)',
             group_items_google_analytics3(
-                ARRAY_CONCAT_AGG({ { ga3_views_field } }.country)
+                ARRAY_CONCAT_AGG({{ ga3_views_field }}.country)
             ),
             ARRAY_AGG(
                 STRUCT(

@@ -2,7 +2,7 @@
     "fields": [
         {
             "mode": "NULLABLE",
-            "name": "page_views",
+            "name": "views",
             "type": "INTEGER",
             "description": "Number of page views"
         },
@@ -56,7 +56,7 @@
         }
     ],
     "mode": "NULLABLE",
-    "name": "google_analytics",
+    "name": "google_analytics3",
     "type": "RECORD",
     "description": "Metrics from Google Analytics"
 }

@@ -56,7 +56,7 @@
         }
     ],
     "mode": "NULLABLE",
-    "name": "jstor_metadata",
+    "name": "jstor_country",
     "type": "RECORD",
-    "description": "Metadata derived from JSTOR"
+    "description": "Metadata derived from JSTOR country"
 }

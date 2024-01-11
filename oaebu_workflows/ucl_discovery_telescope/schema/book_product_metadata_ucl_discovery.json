@@ -14,7 +14,7 @@
         }
     ],
     "mode": "NULLABLE",
-    "name": "ucl_discovery_metadata",
+    "name": "ucl_discovery",
     "type": "RECORD",
     "description": "Metadata derived from UCL Discovery"
 }

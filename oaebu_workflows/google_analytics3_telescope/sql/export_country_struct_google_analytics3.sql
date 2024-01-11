@@ -1,5 +1,5 @@
 STRUCT(
-    google_page_views.value as page_views,
+    google_page_views.value as views,
     google_downloads.value as downloads,
     google_downloads_pdf_book.value as downloads_pdf_book,
     google_downloads_pdf_chapter.value as downloads_pdf_chapter,
@@ -7,4 +7,4 @@ STRUCT(
     google_downloads_epub_book.value as downloads_epub_book,
     google_downloads_epub_chapter.value as downloads_epub_chapter,
     google_downloads_mobi_book.value as downloads_mobi_book
-) as google_analytics
+) as google_analytics3
