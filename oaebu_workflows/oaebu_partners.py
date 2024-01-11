@@ -217,7 +217,7 @@ OAEBU_DATA_PARTNERS = dict(
     ),
     google_books_traffic=DataPartner(
         type_id="google_books_traffic",
-        bq_datasetsql_id="google",
+        bq_dataset_id="google",
         bq_table_name="google_books_traffic",
         isbn_field_name="Primary_ISBN",
         title_field_name="Title",

@@ -822,7 +822,6 @@ class OnixWorkflow(Workflow):
         :param schema_file_path: The path to the schema
         :return: Whether the table creation was a success
         """
-
         output_table: str = kwargs["output_table"]
         query_template_path: str = kwargs["query_template_path"]
         schema_file_path: str = kwargs["schema_file_path"]

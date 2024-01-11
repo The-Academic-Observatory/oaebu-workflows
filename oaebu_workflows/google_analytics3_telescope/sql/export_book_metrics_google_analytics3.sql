@@ -3,20 +3,20 @@ STRUCT(
         SELECT
             SUM(value)
         FROM
-            UNNEST(month.google_analytics.views_total_country)
-    ) AS page_views,
+            UNNEST(month.google_analytics3.views_total_country)
+    ) AS views,
     (
         SELECT
             SUM(value)
         FROM
-            UNNEST(month.google_analytics.downloads_total_country)
+            UNNEST(month.google_analytics3.downloads_total_country)
     ) AS downloads,
     (
         SELECT
             SUM(value)
         FROM
             UNNEST(
-                month.google_analytics.downloads_pdf_book_country
+                month.google_analytics3.downloads_pdf_book_country
             )
     ) AS downloads_pdf_book,
     (
@@ -24,7 +24,7 @@ STRUCT(
             SUM(value)
         FROM
             UNNEST(
-                month.google_analytics.downloads_pdf_chapter_country
+                month.google_analytics3.downloads_pdf_chapter_country
             )
     ) AS downloads_pdf_chapter,
     (
@@ -32,7 +32,7 @@ STRUCT(
             SUM(value)
         FROM
             UNNEST(
-                month.google_analytics.downloads_html_chapter_country
+                month.google_analytics3.downloads_html_chapter_country
             )
     ) AS downloads_html_chapter,
     (
@@ -40,7 +40,7 @@ STRUCT(
             SUM(value)
         FROM
             UNNEST(
-                month.google_analytics.downloads_epub_book_country
+                month.google_analytics3.downloads_epub_book_country
             )
     ) AS downloads_epub_book,
     (
@@ -48,7 +48,7 @@ STRUCT(
             SUM(value)
         FROM
             UNNEST(
-                month.google_analytics.downloads_epub_chapter_country
+                month.google_analytics3.downloads_epub_chapter_country
             )
     ) AS downloads_epub_chapter,
     (
@@ -56,7 +56,7 @@ STRUCT(
             SUM(value)
         FROM
             UNNEST(
-                month.google_analytics.downloads_mobi_book_country
+                month.google_analytics3.downloads_mobi_book_country
             )
     ) AS downloads_mobi_book
-) AS google_analytics
+) AS google_analytics3
