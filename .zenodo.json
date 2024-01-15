@@ -1,13 +1,16 @@
 {
   "title": "Book Usage Data Workflows",
-  "description": "<p>Book Usage Data Workflows provides Apache Airflow workflows for fetching, processing and analysing data about Open Access Books.&nbsp;The workflows include: Directory of Open Access Books (DOAB), Google Analytics, Google Books, JSTOR, Oapen IRUS UK, Oapen Metadata, Onix, UCL Discovery and an Onix Workflow for combining all of this data.</p>\n\n<p><strong>Contributors</strong><br>\nConceptualization: Richard Hosking, Aniek Roelofs, Cameron Neylon, and Lucy Montgomery.<br>\nData curation: Richard Hosking, Aniek Roelofs, James P. Diprose, Rebecca N. Handcock, Alkim Ozaygen, and Rebecca Lange.<br>\nFormal analysis: Richard Hosking, Aniek Roelofs, and Rebecca N. Handcock.<br>\nFunding acquisition: Cameron Neylon and Lucy Montgomery.<br>\nInvestigation: Richard Hosking, Aniek Roelofs, Tuan-Yow Chien, James P. Diprose, Rebecca N. Handcock, Alkim Ozaygen, and Kathryn R. Napier.<br>\nMethodology: Richard Hosking, Aniek Roelofs, Tuan-Yow Chien, and James P. Diprose.<br>\nProject administration: Richard Hosking, Kathryn R. Napier, Cameron Neylon, and Lucy Montgomery.<br>\nResources: Richard Hosking, Aniek Roelofs, and James P. Diprose. Software: Richard Hosking, Aniek Roelofs, Tuan-Yow Chien, and James P. Diprose.<br>\nSupervision: Richard Hosking, James P. Diprose, Kathryn R. Napier, Cameron Neylon, and Lucy Montgomery.<br>\nValidation: Richard Hosking, Aniek Roelofs, Tuan-Yow Chien, Rebecca N. Handcock, and Kathryn R. Napier.<br>\nVisualization: Richard Hosking, Rebecca N. Handcock, and Kathryn R. Napier.<br>\nWriting - original draft: Richard Hosking, Aniek Roelofs, Tuan-Yow Chien, James P. Diprose, and Niamh Quigley.<br>\nWriting - review &amp; editing: Richard Hosking, Aniek Roelofs, Rebecca N. Handcock, Kathryn R. Napier, and Niamh Quigley.</p>",
-  "notes": "The Curtin Open Knowledge Initiative (COKI) is a strategic initiative of the Research Office at Curtin, the Faculty of Humanities, School of Media, Creative Arts and Social Inquiry and the Curtin Institute for Computation, with additional support from the Andrew W. Mellon Foundation and the Arcadia Fund, a charitable fund of Lisbet Rausing and Peter Baldwin.",
+  "description": "<p>Book Usage Data Workflows provides Apache Airflow workflows for fetching, processing and analysing data about Open Access Books.&nbsp;The workflows include: Google Analytics, Google Books, JSTOR, IRUS Fulcrum, IRUS OAPEN, Onix, UCL Discovery and an Onix Workflow for combining all of this data.</p>\n\n<p><strong>Contributors</strong><br>\nConceptualization: Richard Hosking, Keegan R. Smith, Aniek Roelofs, Kathryn R. Napier, Cameron Neylon, and Lucy Montgomery.<br>\nData curation: Richard Hosking, Keegan R. Smith, Aniek Roelofs, James P. Diprose, Rebecca N. Handcock, Alkim Ozaygen, and Kathryn R. Napier.<br>\nFormal analysis: Richard Hosking, Keegan R. Smith, Aniek Roelofs, Rebecca N. Handcock, and Kathryn R. Napier.<br>\nFunding acquisition: Cameron Neylon and Lucy Montgomery.<br>\nInvestigation: Richard Hosking, Keegan R. Smith, Aniek Roelofs, Tuan-Yow Chien, James P. Diprose, Rebecca N. Handcock, Alkim Ozaygen, and Kathryn R. Napier.<br>\nMethodology: Richard Hosking, Keegan R. Smith, Aniek Roelofs, Tuan-Yow Chien, James P. Diprose, and Kathryn R. Napier.<br>\nProject administration: Richard Hosking, Keegan R. Smith, Kathryn R. Napier, Cameron Neylon, and Lucy Montgomery.<br>\nResources: Richard Hosking, Keegan R. Smith, Aniek Roelofs, James P. Diprose, and Alex Massen-Hane.<br>\nSoftware: Richard Hosking, Keegan R. Smith, Aniek Roelofs, Tuan-Yow Chien, James P. Diprose, and Alex Massen-Hane.<br>\nSupervision: Richard Hosking, James P. Diprose, Kathryn R. Napier, Cameron Neylon, and Lucy Montgomery.<br>\nValidation: Richard Hosking, Keegan R. Smith, Aniek Roelofs, Tuan-Yow Chien, Rebecca N. Handcock, and Kathryn R. Napier.<br>\nVisualization: Visualization: Richard Hosking, Keegan R. Smith, Rebecca N. Handcock, and Kathryn R. Napier.<br>\nWriting - original draft: Richard Hosking, Keegan R. Smith, Aniek Roelofs, Tuan-Yow Chien, James P. Diprose, Kathryn R. Napier, and Laura J. Wilkinson.<br>\nWriting - review &amp; editing: Richard Hosking, Keegan R. Smith, Aniek Roelofs, Rebecca N. Handcock, Alex Massen-Hane, Kathryn R. Napier, and Laura J. Wilkinson.</p>",
+  "notes": "The Curtin Open Knowledge Initiative (COKI) is a strategic initiative of the Research Office at Curtin, the Faculty of Humanities, School of Media, Creative Arts and Social Inquiry and the Curtin Institute for Data Science, with additional support from the Mellon Foundation and the Arcadia Fund, a charitable fund of Lisbet Rausing and Peter Baldwin.",
   "communities": [
     {
       "identifier": "coki"
     },
     {
       "identifier": "2020to2022-developing-pilot-data-trust-for-oa-book-usage"
+    },
+    {
+      "identifier": "book-analytics-dashboard-project"
     }
   ],
   "keywords": [
@@ -15,7 +18,8 @@
     "open access books",
     "apache airflow",
     "workflow",
-    "coki"
+    "coki",
+    "bad-project"
   ],
   "license": {
     "id": "Apache-2.0"
@@ -24,57 +28,62 @@
     {
       "orcid": "0000-0001-8288-5241",
       "affiliation": "Centre for Culture and Technology, Curtin University",
-      "name": "Richard Hosking"
+      "name": "Hosking, Richard "
+    },
+    {
+      "orcid": "0000-0001-7801-9105",
+      "affiliation": "Curtin Institute for Data Science, Curtin University",
+      "name": "Smith, Keegan R"
     },
     {
       "orcid": "0000-0003-0485-3388",
-      "affiliation": "Curtin Institute for Computation, Curtin University",
-      "name": "Aniek Roelofs"
+      "affiliation": "Centre for Culture and Technology, Curtin University",
+      "name": "Roelofs, Aniek "
     },
     {
       "orcid": "0000-0002-6237-7423",
       "affiliation": "Centre for Culture and Technology, Curtin University",
-      "name": "Tuan-Yow Chien"
+      "name": "Chien, Tuan-Yow"
     },
     {
       "orcid": "0000-0002-5094-3571",
       "affiliation": "Centre for Culture and Technology, Curtin University",
-      "name": "James P. Diprose"
+      "name": "Diprose, James P"
     },
     {
       "orcid": "0000-0001-5903-6620",
-      "affiliation": "Curtin Institute for Computation, Curtin University",
-      "name": "Rebecca N. Handcock"
+      "affiliation": "Curtin Institute for Data Science, Curtin University",
+      "name": "Handcock, Rebecca N"
     },
+    {
+      "orcid": "0009-0001-9854-1483",
+      "affiliation": "Curtin Institute for Data Science, Curtin University",
+      "name": "Massen-Hane, Alex"
+    },    
     {
       "orcid": "0000-0001-6813-8362",
       "affiliation": "Centre for Culture and Technology, Curtin University",
-      "name": "Alkim Ozaygen"
-    },
-    {
-      "orcid": "0000-0002-9449-4384",
-      "affiliation": "Curtin Institute for Computation, Curtin University",
-      "name": "Rebecca Lange"
+      "name": "Ozaygen, Alkim"
     },
     {
       "orcid": "0000-0003-1202-7238",
       "affiliation": "Curtin Institute for Computation, Curtin University",
-      "name": "Kathryn R. Napier"
+      "name": "Napier, Kathryn R"
     },
     {
-      "orcid": "0000-0001-9542-1577",
-      "affiliation": "Centre for Culture and Technology, Curtin University",
-      "name": "Niamh Quigley"
+      "orcid": "0000-0002-8922-7839",
+      "affiliation": "OAPEN Foundation",
+      "name": "Wilkinson, Laura J."
     },
     {
       "orcid": "0000-0002-0068-716X",
       "affiliation": "Centre for Culture and Technology, Curtin University",
-      "name": "Cameron Neylon"
+      "name": "Neylon, Cameron"
     },
     {
       "orcid": "0000-0001-6551-8140",
       "affiliation": "Centre for Culture and Technology, Curtin University",
-      "name": "Lucy Montgomery"
+      "name": "Montgomery, Lucy"
     }
   ]
 }
