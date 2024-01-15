@@ -60,8 +60,8 @@ class DataPartnerFiles:
         # SQL files
         self.book_product_body_sql = f"book_product_body_{self.partner_name}.sql.jinja2"
         self.book_product_functions_sql = f"book_product_functions_{self.partner_name}.sql"
-        self.book_product_metrics_sql = f"export_book_metrics_{self.partner_name}.sql"
-        self.book_product_country_metrics_sql = f"export_country_metrics_{self.partner_name}.sql.jinja2"
+        self.book_product_metrics_sql = f"book_product_metrics_{self.partner_name}.sql"
+        self.book_product_country_metrics_sql = f"book_product_country_metrics_{self.partner_name}.sql.jinja2"
         self.book_product_country_join_sql = f"export_country_join_{self.partner_name}.sql"
         self.book_product_country_null_sql = f"export_country_null_{self.partner_name}.sql"
         self.book_product_country_struct_sql = f"export_country_struct_{self.partner_name}.sql"
