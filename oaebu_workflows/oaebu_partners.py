@@ -50,21 +50,21 @@ class DataPartnerFiles:
         self.partner_name = partner_name
 
         # Schema files
-        self.book_product_table_metrics_schema = f"book_product_metrics_{self.partner_name}.json"
-        self.book_product_table_metadata_schema = f"book_product_metadata_{self.partner_name}.json"
-        self.book_product_metrics_schema = f"export_book_metrics_{self.partner_name}.json"
-        self.book_product_metrics_author_schema = f"export_author_metrics_{self.partner_name}.json"
-        self.book_product_metrics_country_schema = f"export_country_metrics_{self.partner_name}.json"
-        self.book_product_metrics_subject_schema = f"export_subject_metrics_{self.partner_name}.json"
+        self.book_product_table_metrics_schema = f"book_product_table_metrics_{self.partner_name}.json"
+        self.book_product_table_metadata_schema = f"book_product_table_metadata_{self.partner_name}.json"
+        self.book_product_metrics_schema = f"book_product_metrics_{self.partner_name}.json"
+        self.book_product_metrics_author_schema = f"book_product_metrics_author_{self.partner_name}.json"
+        self.book_product_metrics_country_schema = f"book_product_metrics_country_{self.partner_name}.json"
+        self.book_product_metrics_subject_schema = f"book_product_metrics_subject_{self.partner_name}.json"
 
         # SQL files
         self.book_product_body_sql = f"book_product_body_{self.partner_name}.sql.jinja2"
         self.book_product_functions_sql = f"book_product_functions_{self.partner_name}.sql"
         self.book_product_metrics_sql = f"book_product_metrics_{self.partner_name}.sql"
         self.book_product_country_metrics_sql = f"book_product_country_metrics_{self.partner_name}.sql.jinja2"
-        self.book_product_country_join_sql = f"export_country_join_{self.partner_name}.sql"
-        self.book_product_country_null_sql = f"export_country_null_{self.partner_name}.sql"
-        self.book_product_country_struct_sql = f"export_country_struct_{self.partner_name}.sql"
+        self.book_product_country_join_sql = f"book_product_country_join_{self.partner_name}.sql"
+        self.book_product_country_null_sql = f"book_product_country_null_{self.partner_name}.sql"
+        self.book_product_country_struct_sql = f"book_product_country_struct_{self.partner_name}.sql"
         self.month_metrics_sum_sql = f"month_metrics_sum_{self.partner_name}.sql"
         self.month_null_sql = f"month_null_{self.partner_name}.sql"
 

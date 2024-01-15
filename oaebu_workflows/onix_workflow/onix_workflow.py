@@ -688,12 +688,12 @@ class OnixWorkflow(Workflow):
 
         # Create the schema
         for dp in self.data_partners:
-            months_schema_file = os.path.join(dp.schema_directory, f"book_product_metrics_{dp.type_id}.json")
+            months_schema_file = os.path.join(dp.schema_directory, dp.files.book_product_table_metrics_schema)
             with open(months_schema_file, "r") as f:
                 months_schema = json.load(f)
                 schema = insert_into_schema(schema, insert_field=months_schema, schema_field_name="months")
 
-            metadata_schema_file = os.path.join(dp.schema_directory, f"book_product_metadata_{dp.type_id}.json")
+            metadata_schema_file = os.path.join(dp.schema_directory, dp.files.book_product_table_metadata_schema)
             if dp.has_metadata:
                 with open(metadata_schema_file, "r") as f:
                     metadata_schema = json.load(f)
