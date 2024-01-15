@@ -72,9 +72,7 @@ CROSSREF_EVENT_URL_TEMPLATE = (
 
 
 class OnixWorkflowRelease(SnapshotRelease):
-    """
-    Release information for OnixWorkflow.
-    """
+    """Release information for OnixWorkflow"""
 
     def __init__(
         self,
@@ -115,20 +113,7 @@ class OnixWorkflowRelease(SnapshotRelease):
 
 
 class OnixWorkflow(Workflow):
-    """This workflow telescope:
-    1. [Not implemented] Creates an ISBN13-> internal identifier lookup table.
-    2. Creates an ISBN13 -> WorkID lookup table.
-      a. Aggregates Product records into Work clusters.
-      b. Writes the lookup table to BigQuery.
-      c. Writes an error table to BigQuery.
-    3. Create an ISBN13 -> Work Family ID lookup table.  Clusters editions together.
-      a. Aggregate Works into Work Families.
-      b. Writes the lookup table to BigQuery.
-    4. Create OAEBU intermediate tables.
-      a. For each data partner, create new tables in oaebu_intermediate dataset where existing tables are augmented
-         with work_id and work_family_id columns.
-    5. Create OAEBU QA tables for looking at metrics and problems arising from the data sets (and for eventual automatic reporting).
-    """
+    """Onix Workflow Instance"""
 
     def __init__(
         self,
