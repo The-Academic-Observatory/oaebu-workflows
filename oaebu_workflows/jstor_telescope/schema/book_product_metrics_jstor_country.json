@@ -2,19 +2,13 @@
     "fields": [
         {
             "mode": "NULLABLE",
-            "name": "Country_name",
-            "type": "STRING",
-            "description": "Country Name"
-        },
-        {
-            "mode": "NULLABLE",
             "name": "Total_Item_Requests",
             "type": "INTEGER",
-            "description": "Total number of request made from that specific country"
+            "description": "Total number of item requests"
         }
     ],
-    "mode": "REPEATED",
-    "name": "jstor_country",
+    "mode": "NULLABLE",
+    "name": "jstor",
     "type": "RECORD",
-    "description": "Metrics derived from JSTOR Country"
+    "description": "Metrics from JSTOR"
 }
