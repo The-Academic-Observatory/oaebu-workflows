@@ -1,208 +1,62 @@
 {
     "fields": [
         {
-            "fields": [
-                {
-                    "mode": "NULLABLE",
-                    "name": "name",
-                    "type": "STRING",
-                    "description": "The country name"
-                },
-                {
-                    "mode": "NULLABLE",
-                    "name": "value",
-                    "type": "INTEGER",
-                    "description": "The total number of views"
-                }
-            ],
-            "mode": "REPEATED",
-            "name": "views_total_country",
-            "type": "RECORD",
-            "description": "The total number of views per country"
+            "mode": "NULLABLE",
+            "name": "views",
+            "type": "INTEGER",
+            "description": "Number of page views"
         },
         {
-            "fields": [
-                {
-                    "mode": "NULLABLE",
-                    "name": "name",
-                    "type": "STRING",
-                    "description": "The country name"
-                },
-                {
-                    "mode": "NULLABLE",
-                    "name": "value",
-                    "type": "INTEGER",
-                    "description": "The total number of downloads"
-                }
-            ],
-            "mode": "REPEATED",
-            "name": "downloads_total_country",
-            "type": "RECORD",
-            "description": "The total number of downloads per country"
+            "mode": "NULLABLE",
+            "name": "downloads",
+            "type": "INTEGER",
+            "description": "Number of total downloads"
         },
         {
-            "fields": [
-                {
-                    "mode": "NULLABLE",
-                    "name": "name",
-                    "type": "STRING",
-                    "description": "The country name"
-                },
-                {
-                    "mode": "NULLABLE",
-                    "name": "value",
-                    "type": "INTEGER",
-                    "description": "The total number of PDF book downloads"
-                }
-            ],
-            "mode": "REPEATED",
-            "name": "downloads_pdf_book_country",
-            "type": "RECORD",
-            "description": "PDF book downloads per country"
+            "mode": "NULLABLE",
+            "name": "downloads_pdf_book",
+            "type": "INTEGER",
+            "description": "Number of PDF book downloads"
         },
         {
-            "fields": [
-                {
-                    "mode": "NULLABLE",
-                    "name": "name",
-                    "type": "STRING",
-                    "description": "The country name"
-                },
-                {
-                    "mode": "NULLABLE",
-                    "name": "value",
-                    "type": "INTEGER",
-                    "description": "The total number of PDF chapter downloads"
-                }
-            ],
-            "mode": "REPEATED",
-            "name": "downloads_pdf_chapter_country",
-            "type": "RECORD",
-            "description": "PDF chapter downloads per country"
+            "mode": "NULLABLE",
+            "name": "downloads_pdf_chapter",
+            "type": "INTEGER",
+            "description": "Number of PDF chapter downloads"
         },
         {
-            "fields": [
-                {
-                    "mode": "NULLABLE",
-                    "name": "name",
-                    "type": "STRING",
-                    "description": "The country name"
-                },
-                {
-                    "mode": "NULLABLE",
-                    "name": "value",
-                    "type": "INTEGER",
-                    "description": "The total number of HTML book downloads"
-                }
-            ],
-            "mode": "REPEATED",
-            "name": "downloads_html_book_country",
-            "type": "RECORD",
-            "description": "HTML book downloads per country"
+            "mode": "NULLABLE",
+            "name": "downloads_html_chapter",
+            "type": "INTEGER",
+            "description": "Number of HTML chapter downloads"
         },
         {
-            "fields": [
-                {
-                    "mode": "NULLABLE",
-                    "name": "name",
-                    "type": "STRING",
-                    "description": "The country name"
-                },
-                {
-                    "mode": "NULLABLE",
-                    "name": "value",
-                    "type": "INTEGER",
-                    "description": "The total number of HTML chapter downloads"
-                }
-            ],
-            "mode": "REPEATED",
-            "name": "downloads_html_chapter_country",
-            "type": "RECORD",
-            "description": "HTML chapter downloads per country"
+            "mode": "NULLABLE",
+            "name": "downloads_epub_book",
+            "type": "INTEGER",
+            "description": "Number of ePUB book downloads"
         },
         {
-            "fields": [
-                {
-                    "mode": "NULLABLE",
-                    "name": "name",
-                    "type": "STRING",
-                    "description": "The country name"
-                },
-                {
-                    "mode": "NULLABLE",
-                    "name": "value",
-                    "type": "INTEGER",
-                    "description": "The total number of EPUB book downloads"
-                }
-            ],
-            "mode": "REPEATED",
-            "name": "downloads_epub_book_country",
-            "type": "RECORD",
-            "description": "EPUB book downloads per country"
+            "mode": "NULLABLE",
+            "name": "downloads_epub_chapter",
+            "type": "INTEGER",
+            "description": "Number of ePUB chapter downloads"
         },
         {
-            "fields": [
-                {
-                    "mode": "NULLABLE",
-                    "name": "name",
-                    "type": "STRING",
-                    "description": "The country name"
-                },
-                {
-                    "mode": "NULLABLE",
-                    "name": "value",
-                    "type": "INTEGER",
-                    "description": "The total number of EPUB chapter downloads"
-                }
-            ],
-            "mode": "REPEATED",
-            "name": "downloads_epub_chapter_country",
-            "type": "RECORD",
-            "description": "EPUB chapter downloads per country"
+            "mode": "NULLABLE",
+            "name": "downloads_mobi_book",
+            "type": "INTEGER",
+            "description": "Number of MOBI book downloads"
         },
         {
-            "fields": [
-                {
-                    "mode": "NULLABLE",
-                    "name": "name",
-                    "type": "STRING",
-                    "description": "The country name"
-                },
-                {
-                    "mode": "NULLABLE",
-                    "name": "value",
-                    "type": "INTEGER",
-                    "description": "The total number of MOBI book downloads"
-                }
-            ],
-            "mode": "REPEATED",
-            "name": "downloads_mobi_book_country",
-            "type": "RECORD",
-            "description": "MOBI book downloads per country"
-        },
-        {
-            "fields": [
-                {
-                    "mode": "NULLABLE",
-                    "name": "name",
-                    "type": "STRING",
-                    "description": "The country name"
-                },
-                {
-                    "mode": "NULLABLE",
-                    "name": "value",
-                    "type": "INTEGER",
-                    "description": "The total number of MOBI chapter downloads"
-                }
-            ],
-            "mode": "REPEATED",
-            "name": "downloads_mobi_chapter_country",
-            "type": "RECORD",
-            "description": "MOBI chapter downloads per country"
+            "mode": "NULLABLE",
+            "name": "downloads_mobi_chapter",
+            "type": "INTEGER",
+            "description": "Number of MOBI chapter downloads"
         }
     ],
     "mode": "NULLABLE",
     "name": "google_analytics3",
     "type": "RECORD",
-    "description": "Metrics derived from Google Analytics"
+    "description": "Metrics from Google Analytics"
 }
