@@ -4,7 +4,7 @@
             "mode": "NULLABLE",
             "name": "qty",
             "type": "INTEGER",
-            "description": "Quantity of sales"
+            "description": "The number of units in the transaction. Negative for refunds"
         },
         {
             "fields": [
@@ -12,23 +12,23 @@
                     "mode": "NULLABLE",
                     "name": "Country_of_Sale",
                     "type": "STRING",
-                    "description": "Country in which sale occured"
+                    "description": "The country where the buyer bought the book"
                 },
                 {
                     "mode": "NULLABLE",
                     "name": "qty",
                     "type": "INTEGER",
-                    "description": "Quantity of sales"
+                    "description": "The number of units in the transaction. Negative for refunds"
                 }
             ],
             "mode": "REPEATED",
             "name": "countries",
             "type": "RECORD",
-            "description": "A list of Countries"
+            "description": "The list of countries where buyers brought the book"
         }
     ],
     "mode": "NULLABLE",
     "name": "google_books_sales",
     "type": "RECORD",
-    "description": "Metrics from Google Books Sales"
+    "description": "Metrics derived from Google Books Sales"
 }
