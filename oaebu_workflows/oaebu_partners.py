@@ -31,40 +31,40 @@ class DataPartnerFiles:
         :param partner_name: The name of the partner. The type_id from the OaebuPartner class.
 
         Generates the following file names:
-        - book_product_table_metrics_schema: The schema for the metrics field in the book_products table.
-        - book_product_table_metadata_schema: The schema for the metadata field in the book_products table.
-        - book_product_metrics_schema: The schema for the book metrics export table.
-        - book_product_metrics_author_schema: The schema for the author metrics table.
-        - book_product_metrics_country_schema: The schema for the country metrics table.
-        - book_product_metrics_subject_schema: The schema for the subject metrics export tables.
+        - book_product_metrics_schema: The schema for the metrics field in the book_products table.
+        - book_product_metadata_schema: The schema for the metadata field in the book_products table.
+        - book_metrics_schema: The schema for the book metrics export table.
+        - book_metrics_author_schema: The schema for the author metrics table.
+        - book_metrics_country_schema: The schema for the country metrics table.
+        - book_metrics_subject_schema: The schema for the subject metrics export tables.
         - book_product_body_sql: The SQL template for the body of the book_product table.
         - book_product_functions_sql: The SQL for the functions in the book_product table.
-        - book_product_metrics_sql: The SQL for the book metrics export table.
-        - book_product_country_metrics_sql: The SQL template for metrics extion of the country export table.
-        - book_product_country_join_sql: The SQL for the join of the country export table.
-        - book_product_country_null_sql: The SQL for the null value assertion in the country export table.
-        - book_product_country_struct_sql: The SQL for the struct in the country export table.
+        - book_metrics_sql: The SQL for the book metrics export table.
+        - book_metrics_country_body_sql: The SQL template for metrics extion of the country export table.
+        - book_metrics_country_join_sql: The SQL for the join of the country export table.
+        - book_metrics_country_null_sql: The SQL for the null value assertion in the country export table.
+        - book_metrics_country_struct_sql: The SQL for the struct in the country export table.
         - month_metrics_sum_sql: The SQL for the sum of the data partner's month metrics.
         - month_null_sql: The SQL for the null value assertion in the data partner's month metrics.
         """
         self.partner_name = partner_name
 
         # Schema files
-        self.book_product_table_metrics_schema = f"book_product_table_metrics_{self.partner_name}.json"
-        self.book_product_table_metadata_schema = f"book_product_table_metadata_{self.partner_name}.json"
         self.book_product_metrics_schema = f"book_product_metrics_{self.partner_name}.json"
-        self.book_product_metrics_author_schema = f"book_product_metrics_author_{self.partner_name}.json"
-        self.book_product_metrics_country_schema = f"book_product_metrics_country_{self.partner_name}.json"
-        self.book_product_metrics_subject_schema = f"book_product_metrics_subject_{self.partner_name}.json"
+        self.book_product_metadata_schema = f"book_product_metadata_{self.partner_name}.json"
+        self.book_metrics_schema = f"book_metrics_{self.partner_name}.json"
+        self.book_metrics_author_schema = f"book_metrics_author_{self.partner_name}.json"
+        self.book_metrics_country_schema = f"book_metrics_country_{self.partner_name}.json"
+        self.book_metrics_subject_schema = f"book_metrics_subject_{self.partner_name}.json"
 
         # SQL files
         self.book_product_body_sql = f"book_product_body_{self.partner_name}.sql.jinja2"
         self.book_product_functions_sql = f"book_product_functions_{self.partner_name}.sql"
-        self.book_product_metrics_sql = f"book_product_metrics_{self.partner_name}.sql"
-        self.book_product_country_metrics_sql = f"book_product_country_metrics_{self.partner_name}.sql.jinja2"
-        self.book_product_country_join_sql = f"book_product_country_join_{self.partner_name}.sql"
-        self.book_product_country_null_sql = f"book_product_country_null_{self.partner_name}.sql"
-        self.book_product_country_struct_sql = f"book_product_country_struct_{self.partner_name}.sql"
+        self.book_metrics_sql = f"book_metrics_{self.partner_name}.sql"
+        self.book_country_body_sql = f"book_country_body_{self.partner_name}.sql.jinja2"
+        self.book_country_join_sql = f"book_country_join_{self.partner_name}.sql"
+        self.book_country_null_sql = f"book_country_null_{self.partner_name}.sql"
+        self.book_country_struct_sql = f"book_country_struct_{self.partner_name}.sql"
         self.month_metrics_sum_sql = f"month_metrics_sum_{self.partner_name}.sql"
         self.month_null_sql = f"month_null_{self.partner_name}.sql"
 
@@ -129,7 +129,7 @@ class DataPartner(OaebuPartner):
         :param export_book_metrics: Indicates if the partner will use the book metrics export table.
         :param export_country: Indicates if the partner will use the country export table.
         :param export_subject: Indicates if the partner will use the subject export tables (bic, bisac, thema).
-        :param has_metdata: whether the partner has book metadata records
+        :param has_metdata: Whether the partner has book metadata records
         """
         super().__init__(
             type_id=type_id,

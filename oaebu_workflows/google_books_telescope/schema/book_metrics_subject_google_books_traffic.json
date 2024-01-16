@@ -34,11 +34,11 @@
             "mode": "NULLABLE",
             "name": "Pages_Viewed",
             "type": "INTEGER",
-            "description": "The total number of unique preview content pages that a user viewed in a given session (counted as a 24-hour period). If a user views the same page of your book twice during a session, only a single page view is registered"
+            "description": "The total number of unique preview content pages that a user viewed in a given session (counted as a 24-hour period)"
         }
     ],
     "mode": "NULLABLE",
     "name": "google_books_traffic",
     "type": "RECORD",
-    "description": "Metrics derived from Google Books Traffic"
+    "description": "Metrics from Google Books Traffic"
 }
