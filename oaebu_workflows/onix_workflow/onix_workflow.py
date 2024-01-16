@@ -1,4 +1,4 @@
-# Copyright 2020-2023 Curtin University
+# Copyright 2020-2024 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,9 +28,9 @@ from google.cloud.bigquery import SourceFormat, Client
 from ratelimit import limits, sleep_and_retry
 from tenacity import wait_exponential_jitter
 from jinja2 import Environment, FileSystemLoader
+from airflow import DAG
+from airflow.models.baseoperator import chain
 from airflow.operators.empty import EmptyOperator
-from airflow.operators.python import BranchPythonOperator
-from airflow.operators.python import ShortCircuitOperator, PythonOperator
 from airflow.utils.task_group import TaskGroup
 
 from oaebu_workflows.airflow_pools import CrossrefEventsPool
@@ -108,12 +108,12 @@ class OnixWorkflowRelease(SnapshotRelease):
 
         # Generated Schemas
         self.book_product_schema_path = os.path.join(self.transform_folder, "book_product_schema.json")
-        self.export_author_schema = os.path.join(self.transform_folder, "export_author_schema.json")
-        self.export_book_schema = os.path.join(self.transform_folder, "export_metrics_books_schema.json")
-        self.export_country_schema = os.path.join(self.transform_folder, "export_country_schema.json")
-        self.export_subject_bic_schema = os.path.join(self.transform_folder, "export_subject_bic_schema.json")
-        self.export_subject_bisac_schema = os.path.join(self.transform_folder, "export_subject_bisac_schema.json")
-        self.export_subject_thema_schema = os.path.join(self.transform_folder, "export_subject_thema_schema.json")
+        self.author_metrics_schema = os.path.join(self.transform_folder, "author_metrics_schema.json")
+        self.book_metrics_schema = os.path.join(self.transform_folder, "metrics_books_metrics_schema.json")
+        self.country_metrics_schema = os.path.join(self.transform_folder, "country_metrics_schema.json")
+        self.subject_metrics_bic_schema = os.path.join(self.transform_folder, "subject_metrics_bic_schema.json")
+        self.subject_metrics_bisac_schema = os.path.join(self.transform_folder, "subject_metrics_bisac_schema.json")
+        self.subject_metrics_thema_schema = os.path.join(self.transform_folder, "subject_metrics_thema_schema.json")
 
 
 class OnixWorkflow(Workflow):
@@ -271,74 +271,220 @@ class OnixWorkflow(Workflow):
 
         check_workflow_inputs(self)
 
-        # Create pools for crossref API calls (if they don't exist)
-        # Pools are necessary to throttle the maxiumum number of requests we can make per second and avoid 429 errors
-        crossref_events_pool = CrossrefEventsPool(pool_slots=15)
-        crossref_events_pool.create_pool()
+    def make_dag(self) -> DAG:
+        """Construct the DAG"""
 
-        # Wait for external workflows to finish
-        with self.parallel_tasks():
-            for ext_dag_id in self.sensor_dag_ids:
-                sensor = DagRunSensor(
-                    task_id=f"{ext_dag_id}_sensor",
-                    external_dag_id=ext_dag_id,
-                    mode="reschedule",
-                    duration=timedelta(days=7),  # Look back up to 7 days from execution date
-                    poke_interval=int(timedelta(hours=1).total_seconds()),  # Check at this interval if dag run is ready
-                    timeout=int(timedelta(days=2).total_seconds()),  # Sensor will fail after 2 days of waiting
-                )
-                self.add_operator(sensor)
+        with self.dag:
+            # DAG Sensors - Check the data partner dag runs are complete
+            task_sensors = []
+            with TaskGroup(group_id="sensors"):
+                for ext_dag_id in self.sensor_dag_ids:
+                    sensor = DagRunSensor(
+                        task_id=f"{ext_dag_id}_sensor",
+                        external_dag_id=ext_dag_id,
+                        mode="reschedule",
+                        duration=timedelta(days=7),  # Look back up to 7 days from execution date
+                        poke_interval=int(
+                            timedelta(hours=1).total_seconds()
+                        ),  # Check at this interval if dag run is ready
+                        timeout=int(timedelta(days=2).total_seconds()),  # Sensor will fail after 2 days of waiting
+                    )
+                    task_sensors.append(sensor)
 
-        # Aggregate Works
-        self.add_task(self.aggregate_works)
-        self.add_task(self.bq_load_aggregations)
+            # Aggregate Works
+            task_aggregate_works = self.make_python_operator(self.aggregate_works, "aggregate_works")
 
-        # Create crossref metadata and event tables
-        self.add_task(self.create_crossref_metadata_table)
-        self.add_task(
-            self.create_crossref_events_table,
-            pool=crossref_events_pool.pool_name,
-            pool_slots=min(self.max_threads, crossref_events_pool.pool_slots),
-        )
+            # Create crossref metadata and event tables
+            task_create_crossref_metadata_table = self.make_python_operator(
+                self.create_crossref_metadata_table, "create_crossref_metadata_table"
+            )
+            # Create pool for crossref API calls (if they don't exist)
+            # Pools are necessary to throttle the maxiumum number of requests we can make per second and avoid 429 errors
+            crossref_events_pool = CrossrefEventsPool(pool_slots=15)
+            crossref_events_pool.create_pool()
+            task_create_crossref_events_table = self.make_python_operator(
+                self.create_crossref_events_table,
+                "create_crossref_events_table",
+                op_kwargs=dict(
+                    pool=crossref_events_pool.pool_name,
+                    pool_slots=min(self.max_threads, crossref_events_pool.pool_slots),
+                ),
+            )
 
-        # Create book table
-        self.add_task(self.create_book_table)
+            # Create book table
+            task_create_book_table = self.make_python_operator(self.create_book_table, "create_book_table")
 
-        # Create OAEBU Intermediate tables (not for onix partner types)
-        with self.parallel_tasks():
+            # Create OAEBU Intermediate tables for data partners
+            task_create_intermediate_tables = []
+            with TaskGroup(group_id="intermediate_tables"):
+                for data_partner in self.data_partners:
+                    task_id = f"intermediate_{data_partner.bq_table_name}"
+                    intermediate = self.make_python_operator(
+                        self.create_intermediate_table,
+                        task_id,
+                        op_kwargs=dict(
+                            orig_project_id=self.cloud_workspace.project_id,
+                            orig_dataset=data_partner.bq_dataset_id,
+                            orig_table=data_partner.bq_table_name,
+                            orig_isbn=data_partner.isbn_field_name,
+                            sharded=data_partner.sharded,
+                        ),
+                    )
+                    task_create_intermediate_tables.append(intermediate)
+
+            # Book product table
+            task_create_book_product_table = self.make_python_operator(
+                self.create_book_product_table, "create_book_product_table"
+            )
+
+            # Data QA tasks
+            task_create_data_qa_tables = self.create_tasks_data_qa()
+
+            # Dummy task for Airflow
+            task_dummy = EmptyOperator(task_id="wait_task")
+
+            # Create OAEBU Elastic Export tables
+            task_create_export_tables = self.create_tasks_export_tables()
+
+            # Create the (non-sharded) views of the sharded tables
+            task_create_latest_views = self.make_python_operator(self.create_latest_views, "create_latest_views")
+
+            # Final tasks
+            task_add_release = self.make_python_operator(self.add_new_dataset_releases, "add_new_dataset_releases")
+            task_cleanup = self.make_python_operator(self.cleanup, "cleanup")
+
+            chain(
+                task_sensors,
+                task_aggregate_works,
+                task_create_crossref_metadata_table,
+                task_create_crossref_events_table,
+                task_create_book_table,
+                task_create_intermediate_tables,
+                task_create_book_product_table,
+                task_create_data_qa_tables,
+                task_dummy,
+                task_create_export_tables,
+                task_create_latest_views,
+                task_add_release,
+                task_cleanup,
+            )
+
+        return self.dag
+
+    def create_tasks_data_qa(self):
+        """Create tasks for outputing QA metrics from our OAEBU data.
+        It will create output tables in the oaebu_data_qa dataset.
+        """
+        tasks = []
+        with TaskGroup(group_id="data_qa_tables"):
+            tasks.append(self.make_python_operator(self.create_data_qa_isbn_onix, "data_qa_isbn_onix"))
+            tasks.append(self.make_python_operator(self.create_data_qa_onix_aggregate, "data_qa_onix_aggregate"))
             for data_partner in self.data_partners:
-                task_id = f"create_intermediate_table_{data_partner.bq_table_name}"
-
-                self.add_task(
-                    self.create_intermediate_table,
-                    op_kwargs=dict(
-                        orig_project_id=self.cloud_workspace.project_id,
-                        orig_dataset=data_partner.bq_dataset_id,
-                        orig_table=data_partner.bq_table_name,
-                        orig_isbn=data_partner.isbn_field_name,
-                        sharded=data_partner.sharded,
-                    ),
-                    task_id=task_id,
+                task_id_invalid_isbn = f"data_qa_isbn_{data_partner.bq_table_name}"
+                task_id_unmatched_isbn = f"data_qa_intermediate_unmatched_{data_partner.bq_table_name}"
+                tasks.append(
+                    self.make_python_operator(
+                        self.create_data_qa_intermediate_unmatched_workid,
+                        task_id_unmatched_isbn,
+                        op_kwargs=dict(data_partner=data_partner),
+                    )
                 )
+                # JSTOR has QA for EISBN and collates country + institution
+                if data_partner.type_id.startswith("jstor"):
+                    tasks.append(
+                        self.make_python_operator(
+                            self.create_data_qa_isbn,
+                            task_id_invalid_isbn,
+                            op_kwargs=dict(
+                                data_partner=data_partner,
+                                table_name="jstor_invalid_isbn",
+                                isbn=data_partner.isbn_field_name,
+                            ),
+                        )
+                    )
+                    tasks.append(
+                        self.make_python_operator(
+                            self.create_data_qa_isbn,
+                            task_id_invalid_isbn.replace("isbn", "eisbn"),
+                            op_kwargs=dict(
+                                data_partner=data_partner,
+                                table_name="jstor_invalid_eisbn",
+                                isbn="eISBN",
+                            ),
+                        )
+                    )
+                else:
+                    tasks.append(
+                        self.make_python_operator(
+                            self.create_data_qa_isbn,
+                            task_id_invalid_isbn,
+                            op_kwargs=dict(
+                                data_partner=data_partner,
+                                table_name=f"{data_partner.type_id}_invalid_isbn",
+                                isbn=data_partner.isbn_field_name,
+                            ),
+                        )
+                    )
+        return tasks
 
-        # Create OAEBU tables
-        self.add_task(self.create_book_product_table)
+    def create_tasks_export_tables(self):
+        """Create tasks for exporting final metrics from our OAEBU data.
+        These are split into two categories: generic and custom.
+        The custom exports change their schema depending on the data partners."""
 
-        # Create QA metrics tables
-        self.create_data_qa_tasks()
+        generic_export_tables = [
+            {
+                "output_table": "book_list",
+                "query_template": os.path.join(sql_folder("onix_workflow"), "book_list.sql.jinja2"),
+                "schema": os.path.join(default_schema_folder("onix_workflow"), "book_list.json"),
+            },
+            {
+                "output_table": "book_institution_list",
+                "query_template": os.path.join(sql_folder("onix_workflow"), "book_institution_list.sql.jinja2"),
+                "schema": os.path.join(default_schema_folder("onix_workflow"), "book_institution_list.json"),
+            },
+            {
+                "output_table": "book_metrics_institution",
+                "query_template": os.path.join(sql_folder("onix_workflow"), "book_metrics_institution.sql.jinja2"),
+                "schema": os.path.join(default_schema_folder("onix_workflow"), "book_metrics_institution.json"),
+            },
+            {
+                "output_table": "book_metrics_city",
+                "query_template": os.path.join(sql_folder("onix_workflow"), "book_metrics_city.sql.jinja2"),
+                "schema": os.path.join(default_schema_folder("onix_workflow"), "book_metrics_city.json"),
+            },
+            {
+                "output_table": "book_metrics_events",
+                "query_template": os.path.join(sql_folder("onix_workflow"), "book_metrics_events.sql.jinja2"),
+                "schema": os.path.join(default_schema_folder("onix_workflow"), "book_metrics_events.json"),
+            },
+        ]
 
-        # Create OAEBU Elastic Export tables
-        self.create_export_tasks()
-
-        # Create the (non-sharded) views of the sharded tables
-        self.add_task(self.create_latest_views)
-
-        # Final tasks
-        self.add_task(self.add_new_dataset_releases)
-        self.add_task(self.cleanup)
+        # Create each export table in BiqQuery
+        tasks = []
+        with TaskGroup(group_id="export_tables"):
+            for export_table in generic_export_tables:
+                task_id = f"export_{export_table['output_table']}"
+                tasks.append(
+                    self.make_python_operator(
+                        self.export_oaebu_table,
+                        task_id,
+                        op_kwargs=dict(
+                            output_table=export_table["output_table"],
+                            query_template_path=export_table["query_template"],
+                            schema_file_path=export_table["schema"],
+                        ),
+                    )
+                )
+            tasks.append(self.make_python_operator(self.export_book_metrics, "export_book_metrics"))
+            tasks.append(self.make_python_operator(self.export_book_metrics_country, "export_book_metrics_country"))
+            tasks.append(self.make_python_operator(self.export_book_metrics_author, "export_book_metrics_author"))
+            tasks.append(self.make_python_operator(self.export_book_metrics_subjects, "export_book_metrics_subjects"))
+        return tasks
 
     def make_release(self, **kwargs) -> OnixWorkflowRelease:
         """Creates a release object.
+
         :param kwargs: From Airflow. Contains the execution_date.
         :return: an OnixWorkflowRelease object.
         """
@@ -377,9 +523,12 @@ class OnixWorkflow(Workflow):
             crossref_master_snapshot_date=crossref_master_snapshot_date,
         )
 
-    def aggregate_works(self, release: OnixWorkflowRelease, **kwargs):
+    def aggregate_works(self, release: OnixWorkflowRelease, **kwargs) -> None:
         """Fetches the ONIX product records from our ONIX database, aggregates them into works, workfamilies,
-        and outputs it into jsonl files."""
+        and outputs it into jsonl files.
+
+        :param release: The onix workflow release object
+        """
 
         # Fetch ONIX data
         sharded_onix_table = bq_sharded_table_id(
@@ -410,8 +559,7 @@ class OnixWorkflow(Workflow):
         files = [release.workslookup_path, release.workslookup_errors_path, release.worksfamilylookup_path]
         gcs_upload_files(bucket_name=self.cloud_workspace.transform_bucket, file_paths=files)
 
-    def bq_load_aggregations(self, release: OnixWorkflowRelease, **kwargs):
-        """Loads the 'WorkID lookup', 'WorkID lookup table errors' and 'WorkFamilyID lookup' tables into BigQuery."""
+        # Load the 'WorkID lookup', 'WorkID lookup table errors' and 'WorkFamilyID lookup' tables into BigQuery
         bq_create_dataset(
             project_id=self.cloud_workspace.project_id,
             dataset_id=self.bq_onix_workflow_dataset,
@@ -435,14 +583,13 @@ class OnixWorkflow(Workflow):
                 table_id=table_id,
                 schema_file_path=bq_find_schema(path=self.schema_folder, table_name=table_name),
                 source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
+                write_disposition="WRITE_TRUNCATE",
             )
             set_task_state(state, kwargs["ti"].task_id, release=release)
 
-    def create_crossref_metadata_table(self, release: OnixWorkflowRelease, **kwargs):
-        """Creates the crossref metadata table by querying the AO master table and matching on this publisher's ISBNs
+    def create_crossref_metadata_table(self, release: OnixWorkflowRelease, **kwargs) -> None:
+        """Creates the crossref metadata table by querying the AO master table and matching on this publisher's ISBNs"""
 
-        :param release: The onix workflow release object
-        """
         bq_create_dataset(
             project_id=self.cloud_workspace.project_id,
             dataset_id=self.bq_oaebu_crossref_dataset_id,
@@ -482,7 +629,7 @@ class OnixWorkflow(Workflow):
         )
         set_task_state(state, kwargs["ti"].task_id, release=release)
 
-    def create_crossref_events_table(self, release: OnixWorkflowRelease, **kwargs):
+    def create_crossref_events_table(self, release: OnixWorkflowRelease, **kwargs) -> None:
         """Download, transform, upload and create a table for crossref events"""
 
         # Get the unique dois from the metadata table
@@ -515,11 +662,13 @@ class OnixWorkflow(Workflow):
             table_id=table_id,
             schema_file_path=bq_find_schema(path=self.schema_folder, table_name=self.bq_crossref_events_table_name),
             source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
+            write_disposition="WRITE_TRUNCATE",
         )
         set_task_state(state, kwargs["ti"].task_id, release=release)
 
-    def create_book_table(self, release: OnixWorkflowRelease, **kwargs):
+    def create_book_table(self, release: OnixWorkflowRelease, **kwargs) -> None:
         """Create the oaebu book table using the crossref event and metadata tables"""
+
         bq_create_dataset(
             project_id=self.cloud_workspace.project_id,
             dataset_id=self.bq_oaebu_dataset,
@@ -565,8 +714,9 @@ class OnixWorkflow(Workflow):
         orig_isbn: str,
         sharded: bool,
         **kwargs,
-    ):
+    ) -> None:
         """Create an intermediate oaebu table.  They are of the form datasource_matched<date>
+
         :param release: Onix workflow release information.
         :param orig_project_id: Project ID for the partner data.
         :param orig_dataset: Dataset ID for the partner data.
@@ -574,6 +724,7 @@ class OnixWorkflow(Workflow):
         :param orig_isbn: Name of the ISBN field in the partner data table.
         :param sharded: Whether the data partner table is sharded
         """
+
         bq_create_dataset(
             project_id=self.cloud_workspace.project_id,
             dataset_id=self.bq_oaebu_intermediate_dataset,
@@ -623,8 +774,9 @@ class OnixWorkflow(Workflow):
         self,
         release: OnixWorkflowRelease,
         **kwargs,
-    ):
+    ) -> None:
         """Create the Book Product Table"""
+
         bq_create_dataset(
             project_id=self.cloud_workspace.project_id,
             dataset_id=self.bq_oaebu_dataset,
@@ -721,12 +873,13 @@ class OnixWorkflow(Workflow):
     def export_oaebu_table(self, release: OnixWorkflowRelease, **kwargs) -> bool:
         """Create an export table.
 
-        :param release: The OnixWorkflowRelease object
+        Takes several kwargs:
         :param output_table: The name of the table to create
         :param query_template: The name of the template SQL file
         :param schema_file_path: The path to the schema
         :return: Whether the table creation was a success
         """
+
         output_table: str = kwargs["output_table"]
         query_template_path: str = kwargs["query_template_path"]
         schema_file_path: str = kwargs["schema_file_path"]
@@ -769,58 +922,9 @@ class OnixWorkflow(Workflow):
         status = bq_create_table_from_query(sql=sql, table_id=output_table_id, schema_file_path=schema_file_path)
         return status
 
-    def create_export_tasks(self):
-        """Create tasks for exporting final metrics from our OAEBU data.
-        These are split into two categories: generic and custom.
-        The custom exports change their schema depending on the data partners."""
+    def export_book_metrics_country(self, release: OnixWorkflowRelease, **kwargs) -> None:
+        """Create table for country metrics"""
 
-        generic_export_tables = [
-            {
-                "output_table": "book_list",
-                "query_template": os.path.join(sql_folder("onix_workflow"), "book_list.sql.jinja2"),
-                "schema": os.path.join(default_schema_folder("onix_workflow"), "book_list.json"),
-            },
-            {
-                "output_table": "book_metrics_institution",
-                "query_template": os.path.join(sql_folder("onix_workflow"), "book_metrics_institution.sql.jinja2"),
-                "schema": os.path.join(default_schema_folder("onix_workflow"), "book_metrics_institution.json"),
-            },
-            {
-                "output_table": "book_institution_list",
-                "query_template": os.path.join(sql_folder("onix_workflow"), "book_institution_list.sql.jinja2"),
-                "schema": os.path.join(default_schema_folder("onix_workflow"), "book_institution_list.json"),
-            },
-            {
-                "output_table": "book_metrics_city",
-                "query_template": os.path.join(sql_folder("onix_workflow"), "book_metrics_city.sql.jinja2"),
-                "schema": os.path.join(default_schema_folder("onix_workflow"), "book_metrics_city.json"),
-            },
-            {
-                "output_table": "book_metrics_events",
-                "query_template": os.path.join(sql_folder("onix_workflow"), "book_metrics_events.sql.jinja2"),
-                "schema": os.path.join(default_schema_folder("onix_workflow"), "book_metrics_events.json"),
-            },
-        ]
-
-        # Create each export table in BiqQuery
-        with self.parallel_tasks():
-            for export_table in generic_export_tables:
-                task_id = f"export_{export_table['output_table']}"
-                self.add_task(
-                    self.export_oaebu_table,
-                    op_kwargs=dict(
-                        output_table=export_table["output_table"],
-                        query_template_path=export_table["query_template"],
-                        schema_file_path=export_table["schema"],
-                    ),
-                    task_id=task_id,
-                )
-            self.add_task(self.export_metrics_country)
-            self.add_task(self.export_metrics_author)
-            self.add_task(self.export_metrics_books)
-            self.add_task(self.export_metrics_subject)
-
-    def export_metrics_country(self, release: OnixWorkflowRelease, **kwargs):
         country_schema_base = os.path.join(default_schema_folder("onix_workflow"), "book_metrics_country.json")
         with open(country_schema_base, "r") as f:
             country_schema = json.load(f)
@@ -845,7 +949,9 @@ class OnixWorkflow(Workflow):
         )
         set_task_state(status, kwargs["ti"].task_id, release=release)
 
-    def export_metrics_author(self, release: OnixWorkflowRelease, **kwargs):
+    def export_book_metrics_author(self, release: OnixWorkflowRelease, **kwargs) -> None:
+        """Create table for author metrics"""
+
         author_schema_base = os.path.join(default_schema_folder("onix_workflow"), "book_metrics_author.json")
         with open(author_schema_base, "r") as f:
             author_schema = json.load(f)
@@ -870,7 +976,9 @@ class OnixWorkflow(Workflow):
         )
         set_task_state(status, kwargs["ti"].task_id, release=release)
 
-    def export_metrics_books(self, release: OnixWorkflowRelease, **kwargs):
+    def export_book_metrics(self, release: OnixWorkflowRelease, **kwargs) -> None:
+        """Create table for book metrics"""
+
         book_schema_base = os.path.join(default_schema_folder("onix_workflow"), "book_metrics.json")
         with open(book_schema_base, "r") as f:
             book_schema = json.load(f)
@@ -893,7 +1001,9 @@ class OnixWorkflow(Workflow):
         )
         set_task_state(status, kwargs["ti"].task_id, release=release)
 
-    def export_metrics_subject(self, release: OnixWorkflowRelease, **kwargs):
+    def export_book_metrics_subjects(self, release: OnixWorkflowRelease, **kwargs) -> None:
+        """Create tables for subject metrics"""
+
         for sub, schema_dump in [
             ("bic", release.export_subject_bic_schema),
             ("bisac", release.export_subject_bisac_schema),
@@ -925,54 +1035,9 @@ class OnixWorkflow(Workflow):
             )
             set_task_state(status, kwargs["ti"].task_id, release=release)
 
-    def create_data_qa_tasks(self):
-        """Create tasks for outputing QA metrics from our OAEBU data.
-        It will create output tables in the oaebu_data_qa dataset.
-        """
-        with self.parallel_tasks():
-            self.add_task(self.create_data_qa_isbn_onix)
-            self.add_task(self.create_data_qa_onix_aggregate)
-            for data_partner in self.data_partners:
-                task_id_invalid_isbn = f"data_qa_isbn_{data_partner.bq_table_name}"
-                task_id_unmatched_isbn = f"data_qa_intermediate_unmatched_{data_partner.bq_table_name}"
-                self.add_task(
-                    self.create_data_qa_intermediate_unmatched_workid,
-                    op_kwargs=dict(data_partner=data_partner),
-                    task_id=task_id_unmatched_isbn,
-                )
-                # JSTOR has QA for EISBN and collates country + institution
-                if data_partner.type_id.startswith("jstor"):
-                    self.add_task(
-                        self.create_data_qa_isbn,
-                        op_kwargs=dict(
-                            data_partner=data_partner,
-                            table_name="jstor_invalid_isbn",
-                            isbn=data_partner.isbn_field_name,
-                        ),
-                        task_id=task_id_invalid_isbn,
-                    )
-                    self.add_task(
-                        self.create_data_qa_isbn,
-                        op_kwargs=dict(
-                            data_partner=data_partner,
-                            table_name="jstor_invalid_eisbn",
-                            isbn="eISBN",
-                        ),
-                        task_id=task_id_invalid_isbn.replace("isbn", "eisbn"),
-                    )
-                else:
-                    self.add_task(
-                        self.create_data_qa_isbn,
-                        op_kwargs=dict(
-                            data_partner=data_partner,
-                            table_name=f"{data_partner.type_id}_invalid_isbn",
-                            isbn=data_partner.isbn_field_name,
-                        ),
-                        task_id=task_id_invalid_isbn,
-                    )
-
-    def create_latest_views(self, release: OnixWorkflowRelease, **kwargs):
+    def create_latest_views(self, release: OnixWorkflowRelease, **kwargs) -> None:
         """Create views of the latest data export tables in bigquery"""
+
         create_latest_views_from_dataset(
             project_id=self.cloud_workspace.project_id,
             from_dataset=self.bq_oaebu_data_qa_dataset,
@@ -988,8 +1053,9 @@ class OnixWorkflow(Workflow):
             data_location=self.cloud_workspace.data_location,
         )
 
-    def create_data_qa_onix_aggregate(self, release: OnixWorkflowRelease, **kwargs):
+    def create_data_qa_onix_aggregate(self, release: OnixWorkflowRelease, **kwargs) -> None:
         """Create a bq table of some aggregate metrics for the ONIX data set."""
+
         onix_table_id = bq_sharded_table_id(
             self.cloud_workspace.project_id,
             self.metadata_partner.bq_dataset_id,
@@ -1019,10 +1085,11 @@ class OnixWorkflow(Workflow):
         )
         set_task_state(status, kwargs["ti"].task_id, release=release)
 
-    def create_data_qa_isbn_onix(self, release: OnixWorkflowRelease, **kwargs):
+    def create_data_qa_isbn_onix(self, release: OnixWorkflowRelease, **kwargs) -> None:
         """Create a BQ table of invalid ISBNs for the ONIX feed that can be fed back to publishers.
         No attempt is made to normalise the string so we catch as many string issues as we can.
         """
+
         orig_table_id = bq_sharded_table_id(
             self.cloud_workspace.project_id,
             self.metadata_partner.bq_dataset_id,
@@ -1058,6 +1125,7 @@ class OnixWorkflow(Workflow):
         :param schema_file_path: The path of the schema file to use for the BigQuery upload
         :return: The status of the table creation
         """
+
         bq_create_dataset(
             project_id=self.cloud_workspace.project_id,
             dataset_id=self.bq_oaebu_data_qa_dataset,
@@ -1076,7 +1144,7 @@ class OnixWorkflow(Workflow):
         table_name: str,
         isbn: str,
         **kwargs,
-    ):
+    ) -> None:
         """Create a BQ table of invalid ISBNs.
 
         :param release: workflow release object.
@@ -1119,10 +1187,12 @@ class OnixWorkflow(Workflow):
         data_partner: OaebuPartner,
         *args,
         **kwargs,
-    ):
+    ) -> None:
         """Create quality assurance metrics for the OAEBU intermediate tables.
+
         :param data_partner: The OaebuPartner to use
         """
+
         bq_create_dataset(
             project_id=self.cloud_workspace.project_id,
             dataset_id=self.bq_oaebu_data_qa_dataset,
@@ -1153,6 +1223,7 @@ class OnixWorkflow(Workflow):
 
     def add_new_dataset_releases(self, release: OnixWorkflowRelease, **kwargs) -> None:
         """Adds release information to API."""
+
         api = make_observatory_api(observatory_api_conn_id=self.observatory_api_conn_id)
         dataset_release = DatasetRelease(
             dag_id=self.dag_id,
@@ -1178,6 +1249,7 @@ def dois_from_table(table_id: str, doi_column_name: str = "DOI", distinct: str =
     :param distinct: Whether to retrieve only unique DOIs
     :return: All DOIs present in the metadata table
     """
+
     select_field = f"DISTINCT({doi_column_name})" if distinct else doi_column_name
     sql = f"SELECT {select_field} FROM `{table_id}`"
     query_results = bq_run_query(sql)
@@ -1207,6 +1279,7 @@ def download_crossref_events(
     :param max_threads: The maximum threads to spawn for the downloads.
     :return: All events for the input DOIs
     """
+
     event_url_template = CROSSREF_EVENT_URL_TEMPLATE
     url_start_date = start_date.strftime("%Y-%m-%d")
     url_end_date = end_date.strftime("%Y-%m-%d")
@@ -1240,6 +1313,7 @@ def download_crossref_event_url(url: str, i: int = 0) -> List[dict]:
     :param i: Worker number
     :return: The events from this URL
     """
+
     events = []
     headers = {"User-Agent": get_user_agent(package_name="oaebu_workflows")}
     next_cursor, page_counts, total_events, page_events = download_crossref_page_events(url, headers)
@@ -1263,6 +1337,7 @@ def download_crossref_page_events(url: str, headers: dict) -> Tuple[str, int, in
     :param headers: Headers to send with the request
     :return: The cursor, event counter, total number of events and the events for the URL
     """
+
     crossref_events_limiter()
     response = retry_get_url(url, num_retries=5, wait=wait_exponential_jitter(initial=0.5, max=60), headers=headers)
     response_json = response.json()
@@ -1289,6 +1364,7 @@ def transform_crossref_events(events: List[dict], max_threads: int = 1) -> List[
     :param max_threads: The maximum number of threads to utilise for the transforming process
     :return: transformed events, the order of the events in the input list is not preserved
     """
+
     logging.info(f"Beginning crossref event transform with {max_threads} workers")
     transformed_events = []
     with ThreadPoolExecutor(max_workers=max_threads) as executor:
@@ -1308,6 +1384,7 @@ def transform_event(event: dict) -> dict:
     :param event: The event dictionary
     :return: The transformed event dictionary
     """
+
     if isinstance(event, (str, int, float)):
         return event
     if isinstance(event, dict):
@@ -1343,8 +1420,10 @@ def create_latest_views_from_dataset(
     :param data_location: The regional location of the data in google cloud
     :param description: The description for the views dataset
     """
+
     if description is None:
         description = "OAEBU Export Views for Dashboarding"
+
     # Make to_dataset if it doesn't exist
     bq_create_dataset(
         project_id=project_id,
@@ -1403,6 +1482,7 @@ def create_data_partner_env(main_template: str, data_partners: Iterable[DataPart
     :param data_partners: The data partners
     :return: Jinja2 environment with data partners sql folders loaded
     """
+
     directories = [dp.sql_directory for dp in data_partners]
     with open(main_template) as f:
         contents = f.read()
@@ -1415,7 +1495,6 @@ def insert_into_schema(schema_base: List[dict], insert_field: dict, schema_field
     """
     Inserts a given field into a schema.
 
-
     :param schema_base: (List[dict]): The base schema to insert the field into.
     :param insert_field: (dict): The field to be inserted into the schema.
     :param schema_field_name: (Optional[str], optional): The name of the field in the schema.
@@ -1425,6 +1504,7 @@ def insert_into_schema(schema_base: List[dict], insert_field: dict, schema_field
 
     Raises ValueError If the provided schema_field_name is not found in the schema.
     """
+
     if schema_field_name:
         field_found = False
         for row in schema_base:
