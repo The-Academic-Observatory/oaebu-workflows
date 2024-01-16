@@ -822,6 +822,7 @@ class OnixWorkflow(Workflow):
         :param schema_file_path: The path to the schema
         :return: Whether the table creation was a success
         """
+
         output_table: str = kwargs["output_table"]
         query_template_path: str = kwargs["query_template_path"]
         schema_file_path: str = kwargs["schema_file_path"]
@@ -1269,6 +1270,7 @@ def insert_into_schema(schema_base: List[dict], insert_field: dict, schema_field
 
     Raises ValueError If the provided schema_field_name is not found in the schema.
     """
+
     if schema_field_name:
         field_found = False
         for row in schema_base:
