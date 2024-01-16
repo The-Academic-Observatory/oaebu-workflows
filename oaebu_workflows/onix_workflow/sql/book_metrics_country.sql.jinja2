@@ -43,11 +43,21 @@ month_country as (
 )
 
 {% for dp in data_partners | selectattr("export_country", "equalto", True) %}
+<<<<<<< HEAD
+=======
+<<<<<<<< HEAD:oaebu_workflows/onix_workflow/sql/book_product_metrics_country.sql.jinja2
+>>>>>>> aab0e22 (Naming convention update)
 <<<<<<<< HEAD:oaebu_workflows/onix_workflow/sql/book_metrics_country.sql.jinja2
     , {% include dp.files.book_metrics_country_body_sql %}
 ========
     {% include dp.files.book_product_country_metrics_sql %}{% if not loop.last %}, {% endif %}
 >>>>>>>> 7b1e7db (Modular export tables and renames):oaebu_workflows/onix_workflow/sql/book_product_metrics_country.sql.jinja2
+<<<<<<< HEAD
+=======
+========
+    {% include dp.files.book_metrics_country_body_sql %}{% if not loop.last %}, {% endif %}
+>>>>>>>> aab0e22 (Naming convention update):oaebu_workflows/onix_workflow/sql/book_metrics_country.sql.jinja2
+>>>>>>> aab0e22 (Naming convention update)
 {% endfor %}
 
 
@@ -76,6 +86,7 @@ FROM month_country
 ========
     month_country.country_wikipedia_name,
     {% for dp in data_partners | selectattr("export_country_struct", "equalto", True) %}
+<<<<<<< HEAD
         {% include dp.files.book_product_country_struct_sql %}{% if not loop.last %}, {% endif %}
     {% endfor %}
 FROM month_country
@@ -86,4 +97,20 @@ FROM month_country
         {% if loop.first %}WHERE{% endif %}
         {% include dp.files.book_product_country_null_sql %}{% if not loop.last %}OR {% endif %}
 >>>>>>>> 7b1e7db (Modular export tables and renames):oaebu_workflows/onix_workflow/sql/book_product_metrics_country.sql.jinja2
+=======
+        {% include dp.files.book_metrics_country_struct_sql %}{% if not loop.last %}, {% endif %}
+    {% endfor %}
+FROM month_country
+    {% for dp in data_partners | selectattr("export_country_join", "equalto", True) %}
+        {% include dp.files.book_metrics_country_join_sql %}
+    {% endfor %}
+    {% for dp in data_partners | selectattr("export_country_null", "equalto", True) %}
+        {% if loop.first %}WHERE{% endif %}
+<<<<<<<< HEAD:oaebu_workflows/onix_workflow/sql/book_product_metrics_country.sql.jinja2
+        {% include dp.files.book_product_country_null_sql %}{% if not loop.last %}OR {% endif %}
+>>>>>>>> 7b1e7db (Modular export tables and renames):oaebu_workflows/onix_workflow/sql/book_product_metrics_country.sql.jinja2
+========
+        {% include dp.files.book_metrics_country_null_sql %}{% if not loop.last %}OR {% endif %}
+>>>>>>>> aab0e22 (Naming convention update):oaebu_workflows/onix_workflow/sql/book_metrics_country.sql.jinja2
+>>>>>>> aab0e22 (Naming convention update)
     {% endfor %}

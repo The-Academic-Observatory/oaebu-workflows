@@ -4,11 +4,11 @@
             "mode": "NULLABLE",
             "name": "total_downloads",
             "type": "INTEGER",
-            "description": ""
+            "description": "Number of downloads"
         }
     ],
     "mode": "NULLABLE",
     "name": "internet_archive",
     "type": "RECORD",
-    "description": "Metrics from Internet Archive"
+    "description": "Metrics derived from Internet Archive"
 }

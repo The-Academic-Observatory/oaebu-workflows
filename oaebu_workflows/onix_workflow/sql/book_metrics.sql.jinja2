@@ -27,11 +27,21 @@ SELECT
     CAST(onix.published_year as INT64) as published_year,
     month.month,
     {% for dp in data_partners | selectattr("export_book_metrics", "equalto", True) %}
+<<<<<<< HEAD
+=======
+<<<<<<<< HEAD:oaebu_workflows/onix_workflow/sql/book_product_metrics.sql.jinja2
+>>>>>>> aab0e22 (Naming convention update)
 <<<<<<<< HEAD:oaebu_workflows/onix_workflow/sql/book_metrics.sql.jinja2
         {% include dp.files.book_metrics_sql %},
 ========
         {% include dp.files.book_product_metrics_sql %},
 >>>>>>>> 7b1e7db (Modular export tables and renames):oaebu_workflows/onix_workflow/sql/book_product_metrics.sql.jinja2
+<<<<<<< HEAD
+=======
+========
+        {% include dp.files.book_metrics_sql %},
+>>>>>>>> aab0e22 (Naming convention update):oaebu_workflows/onix_workflow/sql/book_metrics.sql.jinja2
+>>>>>>> aab0e22 (Naming convention update)
     {% endfor %}    
     STRUCT((SELECT SUM(count) FROM UNNEST(month.crossref_events)) as count) as crossref_events
 FROM `{{ book_product_table_id }}`, UNNEST(months) AS month
