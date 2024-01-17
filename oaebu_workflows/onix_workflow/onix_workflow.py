@@ -137,8 +137,6 @@ class OnixWorkflow(Workflow):
         bq_subject_dataset_id: str = "oaebu_reference",
         bq_book_table_name: str = "book",
         bq_book_product_table_name: str = "book_product",
-        bq_oaebu_data_qa_dataset: str = "oaebu_data_qa",
-        bq_oaebu_latest_data_qa_dataset: str = "oaebu_data_qa_latset",
         bq_onix_workflow_dataset: str = "onix_workflow",
         bq_oaebu_intermediate_dataset: str = "oaebu_intermediate",
         bq_oaebu_dataset: str = "oaebu",
@@ -182,8 +180,6 @@ class OnixWorkflow(Workflow):
         :param bq_subject_dataset_id: GCP dataset ID of the subject tables
         :param bq_book_table_name: The name of the book table
         :param bq_book_product_table_name: The name of the book product table
-        :param bq_oaebu_data_qa_dataset: OAEBU Data QA dataset.
-        :param bq_oaebu_latest_data_qa_dataset: OAEBU Data QA dataset with the latest data views
         :param bq_onix_workflow_dataset: Onix workflow dataset.
         :param bq_oaebu_intermediate_dataset: OAEBU intermediate dataset.
         :param bq_oaebu_dataset: OAEBU dataset.
@@ -232,8 +228,6 @@ class OnixWorkflow(Workflow):
         self.bq_subject_dataset_id = bq_subject_dataset_id
         self.bq_book_table_name = bq_book_table_name
         self.bq_book_product_table_name = bq_book_product_table_name
-        self.bq_oaebu_data_qa_dataset = bq_oaebu_data_qa_dataset
-        self.bq_oaebu_latest_data_qa_dataset = bq_oaebu_latest_data_qa_dataset
         self.bq_onix_workflow_dataset = bq_onix_workflow_dataset
         self.bq_oaebu_intermediate_dataset = bq_oaebu_intermediate_dataset
         self.bq_oaebu_dataset = bq_oaebu_dataset
@@ -337,9 +331,6 @@ class OnixWorkflow(Workflow):
                 self.create_book_product_table, "create_book_product_table"
             )
 
-            # Data QA tasks
-            task_create_data_qa_tables = self.create_tasks_data_qa()
-
             # Dummy task for Airflow
             task_dummy = EmptyOperator(task_id="wait_task")
 
@@ -361,7 +352,6 @@ class OnixWorkflow(Workflow):
                 task_create_book_table,
                 task_create_intermediate_tables,
                 task_create_book_product_table,
-                task_create_data_qa_tables,
                 task_dummy,
                 task_create_export_tables,
                 task_create_latest_views,
@@ -370,62 +360,6 @@ class OnixWorkflow(Workflow):
             )
 
         return self.dag
-
-    def create_tasks_data_qa(self):
-        """Create tasks for outputing QA metrics from our OAEBU data.
-        It will create output tables in the oaebu_data_qa dataset.
-        """
-        tasks = []
-        with TaskGroup(group_id="data_qa_tables"):
-            tasks.append(self.make_python_operator(self.create_data_qa_isbn_onix, "data_qa_isbn_onix"))
-            tasks.append(self.make_python_operator(self.create_data_qa_onix_aggregate, "data_qa_onix_aggregate"))
-            for data_partner in self.data_partners:
-                task_id_invalid_isbn = f"data_qa_isbn_{data_partner.bq_table_name}"
-                task_id_unmatched_isbn = f"data_qa_intermediate_unmatched_{data_partner.bq_table_name}"
-                tasks.append(
-                    self.make_python_operator(
-                        self.create_data_qa_intermediate_unmatched_workid,
-                        task_id_unmatched_isbn,
-                        op_kwargs=dict(data_partner=data_partner),
-                    )
-                )
-                # JSTOR has QA for EISBN and collates country + institution
-                if data_partner.type_id.startswith("jstor"):
-                    tasks.append(
-                        self.make_python_operator(
-                            self.create_data_qa_isbn,
-                            task_id_invalid_isbn,
-                            op_kwargs=dict(
-                                data_partner=data_partner,
-                                table_name="jstor_invalid_isbn",
-                                isbn=data_partner.isbn_field_name,
-                            ),
-                        )
-                    )
-                    tasks.append(
-                        self.make_python_operator(
-                            self.create_data_qa_isbn,
-                            task_id_invalid_isbn.replace("isbn", "eisbn"),
-                            op_kwargs=dict(
-                                data_partner=data_partner,
-                                table_name="jstor_invalid_eisbn",
-                                isbn="eISBN",
-                            ),
-                        )
-                    )
-                else:
-                    tasks.append(
-                        self.make_python_operator(
-                            self.create_data_qa_isbn,
-                            task_id_invalid_isbn,
-                            op_kwargs=dict(
-                                data_partner=data_partner,
-                                table_name=f"{data_partner.type_id}_invalid_isbn",
-                                isbn=data_partner.isbn_field_name,
-                            ),
-                        )
-                    )
-        return tasks
 
     def create_tasks_export_tables(self):
         """Create tasks for exporting final metrics from our OAEBU data.
@@ -1037,14 +971,6 @@ class OnixWorkflow(Workflow):
 
     def create_latest_views(self, release: OnixWorkflowRelease, **kwargs) -> None:
         """Create views of the latest data export tables in bigquery"""
-
-        create_latest_views_from_dataset(
-            project_id=self.cloud_workspace.project_id,
-            from_dataset=self.bq_oaebu_data_qa_dataset,
-            to_dataset=self.bq_oaebu_latest_data_qa_dataset,
-            date_match=release.snapshot_date.strftime("%Y%m%d"),
-            data_location=self.cloud_workspace.data_location,
-        )
         create_latest_views_from_dataset(
             project_id=self.cloud_workspace.project_id,
             from_dataset=self.bq_oaebu_export_dataset,
@@ -1052,174 +978,6 @@ class OnixWorkflow(Workflow):
             date_match=release.snapshot_date.strftime("%Y%m%d"),
             data_location=self.cloud_workspace.data_location,
         )
-
-    def create_data_qa_onix_aggregate(self, release: OnixWorkflowRelease, **kwargs) -> None:
-        """Create a bq table of some aggregate metrics for the ONIX data set."""
-
-        onix_table_id = bq_sharded_table_id(
-            self.cloud_workspace.project_id,
-            self.metadata_partner.bq_dataset_id,
-            self.metadata_partner.bq_table_name,
-            release.onix_snapshot_date,
-        )
-        output_table_name = "onix_aggregate_metrics"
-        table_id = bq_sharded_table_id(
-            self.cloud_workspace.project_id,
-            self.bq_oaebu_data_qa_dataset,
-            output_table_name,
-            release.snapshot_date,
-        )
-        template_path = os.path.join(sql_folder(workflow_module="onix_workflow"), "onix_aggregate_metrics.sql.jinja2")
-        sql = render_template(template_path, table_id=onix_table_id, isbn="ISBN13")
-        bq_create_dataset(
-            project_id=self.cloud_workspace.project_id,
-            dataset_id=self.bq_oaebu_data_qa_dataset,
-            location=self.cloud_workspace.data_location,
-            description="OAEBU Quality Analysis Tables",
-        )
-        schema_file_path = bq_find_schema(path=self.schema_folder, table_name=output_table_name)
-        status = bq_create_table_from_query(
-            sql=sql,
-            table_id=table_id,
-            schema_file_path=schema_file_path,
-        )
-        set_task_state(status, kwargs["ti"].task_id, release=release)
-
-    def create_data_qa_isbn_onix(self, release: OnixWorkflowRelease, **kwargs) -> None:
-        """Create a BQ table of invalid ISBNs for the ONIX feed that can be fed back to publishers.
-        No attempt is made to normalise the string so we catch as many string issues as we can.
-        """
-
-        orig_table_id = bq_sharded_table_id(
-            self.cloud_workspace.project_id,
-            self.metadata_partner.bq_dataset_id,
-            self.metadata_partner.bq_table_name,
-            release.onix_snapshot_date,
-        )
-        output_table_name = "onix_invalid_isbn"
-        output_table_id = bq_sharded_table_id(
-            self.cloud_workspace.project_id, self.bq_oaebu_data_qa_dataset, output_table_name, release.snapshot_date
-        )
-        status = self.oaebu_data_qa_validate_isbn(
-            orig_table_id=orig_table_id,
-            output_table_id=output_table_id,
-            isbn="ISBN13",
-            schema_file_path=bq_find_schema(path=self.schema_folder, table_name=output_table_name),
-        )
-        set_task_state(status, kwargs["ti"].task_id, release=release)
-
-    def oaebu_data_qa_validate_isbn(
-        self,
-        *,
-        orig_table_id: str,
-        output_table_id: str,
-        isbn: str,
-        schema_file_path: str = None,
-    ) -> bool:
-        """Create a BQ table of invalid ISBNs for the ONIX feed that can be fed back to publishers.
-        No attempt is made to normalise the string so we catch as many string issues as we can.
-
-        :param orig_table_id: Fully qualified table ID of the source data
-        :param output_table_id: Fully qualified table ID for the output data.
-        :param isbn: Name of the isbn field in source table.
-        :param schema_file_path: The path of the schema file to use for the BigQuery upload
-        :return: The status of the table creation
-        """
-
-        bq_create_dataset(
-            project_id=self.cloud_workspace.project_id,
-            dataset_id=self.bq_oaebu_data_qa_dataset,
-            location=self.cloud_workspace.data_location,
-            description="OAEBU Quality Analysis Tables",
-        )
-        sql_template = os.path.join(sql_folder(workflow_module="onix_workflow"), "validate_isbn.sql.jinja2")
-        sql = get_isbn_utils_sql_string() + render_template(sql_template, table_id=orig_table_id, isbn=isbn)
-        status = bq_create_table_from_query(sql=sql, table_id=output_table_id, schema_file_path=schema_file_path)
-        return status
-
-    def create_data_qa_isbn(
-        self,
-        release: OnixWorkflowRelease,
-        data_partner: OaebuPartner,
-        table_name: str,
-        isbn: str,
-        **kwargs,
-    ) -> None:
-        """Create a BQ table of invalid ISBNs.
-
-        :param release: workflow release object.
-        :param data_partner: OaebuPartner,
-        :param table_name: The name of the table to create
-        :param isbn: Name of the isbn field in source table.
-        """
-
-        if data_partner.sharded:
-            orig_table_id = bq_sharded_table_id(
-                self.cloud_workspace.project_id,
-                data_partner.bq_dataset_id,
-                data_partner.bq_table_name,
-                release.snapshot_date,
-            )
-        else:
-            orig_table_id = bq_table_id(
-                self.cloud_workspace.project_id,
-                data_partner.bq_dataset_id,
-                data_partner.bq_table_name,
-            )
-
-        output_table_id = bq_sharded_table_id(
-            self.cloud_workspace.project_id,
-            self.bq_oaebu_data_qa_dataset,
-            table_name,
-            release.snapshot_date,
-        )
-        # Validate the ISBN field
-        status = self.oaebu_data_qa_validate_isbn(
-            orig_table_id=orig_table_id,
-            output_table_id=output_table_id,
-            isbn=isbn,
-        )
-        set_task_state(status, kwargs["ti"].task_id, release=release)
-
-    def create_data_qa_intermediate_unmatched_workid(
-        self,
-        release: OnixWorkflowRelease,
-        data_partner: OaebuPartner,
-        *args,
-        **kwargs,
-    ) -> None:
-        """Create quality assurance metrics for the OAEBU intermediate tables.
-
-        :param data_partner: The OaebuPartner to use
-        """
-
-        bq_create_dataset(
-            project_id=self.cloud_workspace.project_id,
-            dataset_id=self.bq_oaebu_data_qa_dataset,
-            location=self.cloud_workspace.data_location,
-            description="OAEBU Quality Analysis Tables",
-        )
-        template_path = os.path.join(
-            sql_folder(workflow_module="onix_workflow"), "oaebu_intermediate_metrics.sql.jinja2"
-        )
-        intermediate_table_id = bq_sharded_table_id(
-            self.cloud_workspace.project_id,
-            self.bq_oaebu_intermediate_dataset,
-            f"{data_partner.bq_table_name}_matched",
-            release.snapshot_date,
-        )
-        sql = render_template(
-            template_path,
-            table_id=intermediate_table_id,
-            isbn=data_partner.isbn_field_name,
-            title=data_partner.title_field_name,
-        )
-        output_table_name = f"{data_partner.bq_table_name}_unmatched_{data_partner.isbn_field_name}"
-        output_table_id = bq_sharded_table_id(
-            self.cloud_workspace.project_id, self.bq_oaebu_data_qa_dataset, output_table_name, release.snapshot_date
-        )
-        status = bq_create_table_from_query(sql=sql, table_id=output_table_id)
-        set_task_state(status, kwargs["ti"].task_id, release=release)
 
     def add_new_dataset_releases(self, release: OnixWorkflowRelease, **kwargs) -> None:
         """Adds release information to API."""
