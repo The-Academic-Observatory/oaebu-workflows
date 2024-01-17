@@ -30,7 +30,6 @@ from tenacity import wait_exponential_jitter
 from jinja2 import Environment, FileSystemLoader
 from airflow import DAG
 from airflow.models.baseoperator import chain
-from airflow.operators.empty import EmptyOperator
 from airflow.utils.task_group import TaskGroup
 
 from oaebu_workflows.airflow_pools import CrossrefEventsPool
@@ -331,9 +330,6 @@ class OnixWorkflow(Workflow):
                 self.create_book_product_table, "create_book_product_table"
             )
 
-            # Dummy task for Airflow
-            task_dummy = EmptyOperator(task_id="wait_task")
-
             # Create OAEBU Elastic Export tables
             task_create_export_tables = self.create_tasks_export_tables()
 
@@ -352,7 +348,6 @@ class OnixWorkflow(Workflow):
                 task_create_book_table,
                 task_create_intermediate_tables,
                 task_create_book_product_table,
-                task_dummy,
                 task_create_export_tables,
                 task_create_latest_views,
                 task_add_release,
@@ -869,7 +864,7 @@ class OnixWorkflow(Workflow):
                 dp_schema = json.load(f)
             country_schema = insert_into_schema(country_schema, dp_schema)
 
-        with open(release.export_country_schema, "w") as f:
+        with open(release.country_metrics_schema, "w") as f:
             json.dump(country_schema, f)
 
         query_template_path = os.path.join(
@@ -879,7 +874,7 @@ class OnixWorkflow(Workflow):
             release=release,
             output_table="book_metrics_country",
             query_template_path=query_template_path,
-            schema_file_path=release.export_country_schema,
+            schema_file_path=release.country_metrics_schema,
         )
         set_task_state(status, kwargs["ti"].task_id, release=release)
 
@@ -896,7 +891,7 @@ class OnixWorkflow(Workflow):
                 dp_schema = json.load(f)
             author_schema = insert_into_schema(author_schema, dp_schema)
 
-        with open(release.export_author_schema, "w") as f:
+        with open(release.author_metrics_schema, "w") as f:
             json.dump(author_schema, f)
 
         query_template_path = os.path.join(
@@ -906,7 +901,7 @@ class OnixWorkflow(Workflow):
             release=release,
             output_table="book_metrics_author",
             query_template_path=query_template_path,
-            schema_file_path=release.export_author_schema,
+            schema_file_path=release.author_metrics_schema,
         )
         set_task_state(status, kwargs["ti"].task_id, release=release)
 
@@ -923,7 +918,7 @@ class OnixWorkflow(Workflow):
                 dp_schema = json.load(f)
             book_schema = insert_into_schema(book_schema, dp_schema)
 
-        with open(release.export_book_schema, "w") as f:
+        with open(release.book_metrics_schema, "w") as f:
             json.dump(book_schema, f)
 
         query_template_path = os.path.join(sql_folder(workflow_module="onix_workflow"), "book_metrics.sql.jinja2")
@@ -931,7 +926,7 @@ class OnixWorkflow(Workflow):
             release=release,
             output_table="book_metrics",
             query_template_path=query_template_path,
-            schema_file_path=release.export_book_schema,
+            schema_file_path=release.book_metrics_schema,
         )
         set_task_state(status, kwargs["ti"].task_id, release=release)
 
@@ -939,9 +934,9 @@ class OnixWorkflow(Workflow):
         """Create tables for subject metrics"""
 
         for sub, schema_dump in [
-            ("bic", release.export_subject_bic_schema),
-            ("bisac", release.export_subject_bisac_schema),
-            ("thema", release.export_subject_thema_schema),
+            ("bic", release.subject_metrics_bic_schema),
+            ("bisac", release.subject_metrics_bisac_schema),
+            ("thema", release.subject_metrics_thema_schema),
         ]:
             subject_schema_base = os.path.join(
                 default_schema_folder("onix_workflow"), f"book_metrics_subject_{sub}.json"

@@ -58,14 +58,14 @@ SELECT
     month_country.country_name,
     month_country.country_iso_name,
     month_country.country_wikipedia_name,
-    {% for dp in data_partners | selectattr("export_country_struct", "equalto", True) %}
+    {% for dp in data_partners | selectattr("export_country", "equalto", True) %}
         {% include dp.files.book_metrics_country_struct_sql %}{% if not loop.last %}, {% endif %}
     {% endfor %}
 FROM month_country
-    {% for dp in data_partners | selectattr("export_country_join", "equalto", True) %}
+    {% for dp in data_partners | selectattr("export_country", "equalto", True) %}
         {% include dp.files.book_metrics_country_join_sql %}
     {% endfor %}
-    {% for dp in data_partners | selectattr("export_country_null", "equalto", True) %}
+    {% for dp in data_partners | selectattr("export_country", "equalto", True) %}
         {% if loop.first %}WHERE{% endif %}
-        {% include dp.files.book_metrics_country_null_sql %}{% if not loop.last %}OR {% endif %}
+        {% include dp.files.book_metrics_country_null_sql %}{% if not loop.last %} OR {% endif %}
     {% endfor %}
