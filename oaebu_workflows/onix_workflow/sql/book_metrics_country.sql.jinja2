@@ -1,4 +1,4 @@
-{# Copyright 2020-2023 Curtin University
+{# Copyright 2020-2024 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -48,6 +48,9 @@ month_country as (
 
 
 SELECT
+    {% for dp in data_partners | selectattr("export_country", "equalto", True) %}
+        {% include dp.files.book_metrics_country_struct_sql %},
+    {% endfor %}
     month_country.ISBN13 as product_id,
     month_country.work_id as work_id,
     month_country.work_family_id as work_family_id,
@@ -57,10 +60,7 @@ SELECT
     month_country.alpha2 as country_code,
     month_country.country_name,
     month_country.country_iso_name,
-    month_country.country_wikipedia_name,
-    {% for dp in data_partners | selectattr("export_country", "equalto", True) %}
-        {% include dp.files.book_metrics_country_struct_sql %}{% if not loop.last %}, {% endif %}
-    {% endfor %}
+    month_country.country_wikipedia_name
 FROM month_country
     {% for dp in data_partners | selectattr("export_country", "equalto", True) %}
         {% include dp.files.book_metrics_country_join_sql %}

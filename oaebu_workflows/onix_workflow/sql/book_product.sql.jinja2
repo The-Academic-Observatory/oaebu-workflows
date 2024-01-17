@@ -1,4 +1,4 @@
-{# Copyright 2020-2023 Curtin University
+{# Copyright 2020-2024 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -34,11 +34,9 @@ CREATE TEMP FUNCTION custom_split(str STRING, sep STRING) AS (
     )
 );
 
+WITH
 # Add data partner main body blocks
 {% for dp in data_partners %}
-    {% if loop.first %}
-        WITH
-    {% endif %}
     {% include dp.files.book_product_body_sql %},
 {% endfor %}
 
@@ -169,11 +167,12 @@ metrics as (
     SELECT
         ebook_months.ISBN13,
         ARRAY_AGG(STRUCT(
-            ebook_months.release_date as month,
-            crossref_events.metrics as crossref_events,
             {% for dp in data_partners %}
-                {{ dp.type_id + ".metrics" }} AS {{ dp.type_id }}{% if not loop.last %},{% endif %}
+                {{ dp.type_id + ".metrics" }} AS {{ dp.type_id }},
             {% endfor %}
+            ebook_months.release_date as month,
+            crossref_events.metrics as crossref_events
+            
         ) ORDER BY ebook_months.release_date DESC) as months
     FROM ebook_months
     {% for dp in data_partners %}
@@ -199,11 +198,11 @@ SELECT
     work_ids.work_id,
     work_family_ids.work_family_id,
     STRUCT(
-        crossref_objects, chapters, events.overall as events,
         {% for dp in data_partners | selectattr("has_metadata", "equalto", True) %}
-            {{ dp.type_id + "_metadata" }} AS {{ dp.type_id }}{% if not loop.last %},{% endif %}
+            {{ dp.type_id + "_metadata" }} AS {{ dp.type_id }},
         {% endfor %}
-    ) as metadata,
+        crossref_objects, chapters, events.overall AS events
+    ) AS metadata,
     metrics.months
 FROM onix_ebook_titles
 LEFT JOIN `{{ workid_table_id }}` AS work_ids ON work_ids.isbn13 = onix_ebook_titles.ISBN13
