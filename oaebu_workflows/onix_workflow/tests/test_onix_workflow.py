@@ -272,7 +272,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
     def test_dag_structure(self):
         """Tests that the dag structure is created as expected on dag load"""
 
-        ## No data partners
+        ## No data partners - dry run
         env = ObservatoryEnvironment(
             self.gcp_project_id, self.data_location, api_host="localhost", api_port=find_free_port()
         )
@@ -291,9 +291,6 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 "create_book_table": [],
                 "create_book_product_table": [
                     "export_tables.export_book_list",
-                    "export_tables.export_book_institution_list",
-                    "export_tables.export_book_metrics_institution",
-                    "export_tables.export_book_metrics_city",
                     "export_tables.export_book_metrics_events",
                     "export_tables.export_book_metrics",
                     "export_tables.export_book_metrics_country",
@@ -301,9 +298,6 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     "export_tables.export_book_metrics_subjects",
                 ],
                 "export_tables.export_book_list": ["create_latest_views"],
-                "export_tables.export_book_institution_list": ["create_latest_views"],
-                "export_tables.export_book_metrics_institution": ["create_latest_views"],
-                "export_tables.export_book_metrics_city": ["create_latest_views"],
                 "export_tables.export_book_metrics_events": ["create_latest_views"],
                 "export_tables.export_book_metrics": ["create_latest_views"],
                 "export_tables.export_book_metrics_country": ["create_latest_views"],
@@ -504,6 +498,13 @@ class TestOnixWorkflow(ObservatoryTestCase):
         assert good_events, "Events should have returned something"
         assert len(good_events) == 4
         assert not bad_events, f"Events should have returned nothing, instead returned {bad_events}"
+
+    @patch("oaebu_workflows.onix_workflow.onix_workflow.bq_run_query")
+    def test_get_onix_records(self, mock_bq_query):
+        mock_bq_query.return_value = TestOnixWorkflow.onix_data
+        records = get_onix_records("test_table_id")
+        self.assertEqual(len(records), 3)
+        self.assertEqual(records[0]["ISBN13"], "111")
 
     def test_crossref_transform(self):
         """Test the function that transforms the crossref events data"""
@@ -791,7 +792,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
 
         return partners, metadata_partner
 
-    def run_telescope_tests(self, data_partners: List[str]):
+    def run_workflow_e2e(self, dry_run: bool = False):
         """End to end test of the ONIX workflow"""
 
         def vcr_ignore_condition(request):
@@ -828,7 +829,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
             # Setup data partners, remove Google Analytics (the last partner) from these tests
             partner_release_date = pendulum.datetime(2021, 5, 15)
             data_partners, metadata_partner = self.setup_input_data(
-                data_partners=data_partners,
+                data_partners=self.data_partner_list if not dry_run else [],
                 settings_dataset_id=oaebu_settings_dataset_id,
                 fixtures_dataset_id=oaebu_fixtures_dataset_id,
                 crossref_master_dataset_id=master_crossref_dataset_id,
@@ -839,15 +840,19 @@ class TestOnixWorkflow(ObservatoryTestCase):
             )
 
             # Expected sensor dag_ids
-            sensor_dag_ids = [
-                "jstor",
-                "google_books",
-                "google_analytics3",
-                "irus_oapen",
-                "irus_fulcrum",
-                "ucl_discovery",
-                "onix",
-            ]
+            sensor_dag_ids = (
+                [
+                    "jstor",
+                    "google_books",
+                    "google_analytics3",
+                    "irus_oapen",
+                    "irus_fulcrum",
+                    "ucl_discovery",
+                    "onix",
+                ]
+                if not dry_run
+                else []
+            )
 
             workflow = OnixWorkflow(
                 dag_id=f"onix_workflow_test",
@@ -1006,10 +1011,11 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 table_id = bq_sharded_table_id(
                     self.gcp_project_id, oaebu_output_dataset_id, workflow.bq_book_product_table_name, release_date
                 )
+                expected_book_product_table = "book_product.json" if not dry_run else "book_product_dry.json"
                 self.assert_table_content(
                     table_id,
                     load_and_parse_json(
-                        os.path.join(self.fixtures_folder, "e2e_outputs", "book_product.json"),
+                        os.path.join(self.fixtures_folder, "e2e_outputs", expected_book_product_table),
                         date_fields={"month", "published_date"},
                     ),
                     primary_key="ISBN13",
@@ -1019,7 +1025,9 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 ### Export OAEBU Tables ##
                 ##########################
 
-                export_tasks = [
+                
+                if not dry_run:
+                    export_tasks = [
                     "export_tables.export_book_list",
                     "export_tables.export_book_institution_list",
                     "export_tables.export_book_metrics",
@@ -1029,20 +1037,39 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     "export_tables.export_book_metrics_city",
                     "export_tables.export_book_metrics_events",
                     "export_tables.export_book_metrics_subjects",
+                    ]
+                    export_tables = [
+                        ("book_list", 4),
+                        ("book_institution_list", 1),
+                        ("book_metrics", 5),
+                        ("book_metrics_country", 23),
+                        ("book_metrics_institution", 1),
+                        ("book_metrics_author", 3),
+                        ("book_metrics_city", 26),
+                        ("book_metrics_events", 3),
+                        ("book_metrics_subject_bic", 0),
+                        ("book_metrics_subject_bisac", 0),
+                        ("book_metrics_subject_thema", 0),
+                    ]
+                else:
+                    export_tasks = [
+                    "export_tables.export_book_list",
+                    "export_tables.export_book_metrics",
+                    "export_tables.export_book_metrics_country",
+                    "export_tables.export_book_metrics_author",
+                    "export_tables.export_book_metrics_events",
+                    "export_tables.export_book_metrics_subjects",
                 ]
-                export_tables = [
-                    ("book_list", 4),
-                    ("book_institution_list", 1),
-                    ("book_metrics", 5),
-                    ("book_metrics_country", 23),
-                    ("book_metrics_institution", 1),
-                    ("book_metrics_author", 3),
-                    ("book_metrics_city", 26),
-                    ("book_metrics_events", 3),
-                    ("book_metrics_subject_bic", 0),
-                    ("book_metrics_subject_bisac", 0),
-                    ("book_metrics_subject_thema", 0),
-                ]
+                    export_tables = [
+                        ("book_list", 4),
+                        ("book_metrics", 0),
+                        ("book_metrics_country", 0),
+                        ("book_metrics_author", 0),
+                        ("book_metrics_events", 0),
+                        ("book_metrics_subject_bic", 0),
+                        ("book_metrics_subject_bisac", 0),
+                        ("book_metrics_subject_thema", 0),
+                    ]
 
                 # Create the export tables
                 export_prefix = self.gcp_project_id.replace("-", "_")
@@ -1146,13 +1173,10 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 self.assertEqual(ti.state, State.SUCCESS)
                 self.assert_cleanup(release.workflow_folder)
 
-    def test_telescope(self):
+    def test_workflow_e2e(self):
         """Test that ONIX Workflow works as expected"""
-        self.run_telescope_tests(data_partners=self.data_partner_list)
+        self.run_workflow_e2e(dry_run=False)
 
-    @patch("oaebu_workflows.onix_workflow.onix_workflow.bq_run_query")
-    def test_get_onix_records(self, mock_bq_query):
-        mock_bq_query.return_value = TestOnixWorkflow.onix_data
-        records = get_onix_records("test_table_id")
-        self.assertEqual(len(records), 3)
-        self.assertEqual(records[0]["ISBN13"], "111")
+    def test_e2e_dry(self):
+        """Test that ONIX Workflow works as expected"""
+        self.run_workflow_e2e(dry_run=True)

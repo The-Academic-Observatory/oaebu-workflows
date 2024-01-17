@@ -368,26 +368,32 @@ class OnixWorkflow(Workflow):
                 "schema": os.path.join(default_schema_folder("onix_workflow"), "book_list.json"),
             },
             {
-                "output_table": "book_institution_list",
-                "query_template": os.path.join(sql_folder("onix_workflow"), "book_institution_list.sql.jinja2"),
-                "schema": os.path.join(default_schema_folder("onix_workflow"), "book_institution_list.json"),
-            },
-            {
-                "output_table": "book_metrics_institution",
-                "query_template": os.path.join(sql_folder("onix_workflow"), "book_metrics_institution.sql.jinja2"),
-                "schema": os.path.join(default_schema_folder("onix_workflow"), "book_metrics_institution.json"),
-            },
-            {
-                "output_table": "book_metrics_city",
-                "query_template": os.path.join(sql_folder("onix_workflow"), "book_metrics_city.sql.jinja2"),
-                "schema": os.path.join(default_schema_folder("onix_workflow"), "book_metrics_city.json"),
-            },
-            {
                 "output_table": "book_metrics_events",
                 "query_template": os.path.join(sql_folder("onix_workflow"), "book_metrics_events.sql.jinja2"),
                 "schema": os.path.join(default_schema_folder("onix_workflow"), "book_metrics_events.json"),
             },
         ]
+        if "jstor_institution" in [dp.type_id for dp in self.data_partners]:
+            generic_export_tables.append(
+                {
+                    "output_table": "book_institution_list",
+                    "query_template": os.path.join(sql_folder("onix_workflow"), "book_institution_list.sql.jinja2"),
+                    "schema": os.path.join(default_schema_folder("onix_workflow"), "book_institution_list.json"),
+                },
+                {
+                    "output_table": "book_metrics_institution",
+                    "query_template": os.path.join(sql_folder("onix_workflow"), "book_metrics_institution.sql.jinja2"),
+                    "schema": os.path.join(default_schema_folder("onix_workflow"), "book_metrics_institution.json"),
+                },
+            )
+        if "irus_oapen" in [dp.type_id for dp in self.data_partners]:
+            generic_export_tables.append(
+                {
+                    "output_table": "book_metrics_city",
+                    "query_template": os.path.join(sql_folder("onix_workflow"), "book_metrics_city.sql.jinja2"),
+                    "schema": os.path.join(default_schema_folder("onix_workflow"), "book_metrics_city.json"),
+                }
+            )
 
         # Create each export table in BiqQuery
         tasks = []
