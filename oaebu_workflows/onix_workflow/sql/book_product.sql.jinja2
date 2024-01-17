@@ -196,6 +196,8 @@ Then we are able to pull in specific metadata from across all the various source
 #}
 SELECT
     onix_ebook_titles.*,
+    work_ids.work_id,
+    work_family_ids.work_family_id,
     STRUCT(
         crossref_objects, chapters, events.overall as events,
         {% for dp in data_partners | selectattr("has_metadata", "equalto", True) %}
@@ -204,10 +206,10 @@ SELECT
     ) as metadata,
     metrics.months
 FROM onix_ebook_titles
-LEFT JOIN `{{ workid_table_id }}` ON `{{ workid_table_id }}`.isbn13 = onix_ebook_titles.ISBN13
-LEFT JOIN `{{ workfamilyid_table_id }}` ON `{{ workfamilyid_table_id }}`.isbn13 = onix_ebook_titles.ISBN13
+LEFT JOIN `{{ workid_table_id }}` AS work_ids ON work_ids.isbn13 = onix_ebook_titles.ISBN13
+LEFT JOIN `{{ workfamilyid_table_id }}` AS work_family_ids ON work_family_ids.isbn13 = onix_ebook_titles.ISBN13
 LEFT JOIN metrics AS metrics ON metrics.ISBN13 = onix_ebook_titles.ISBN13
 {% for dp in data_partners | selectattr("has_metadata", "equalto", True) %}
     LEFT JOIN {{ dp.type_id + "_metadata" }} ON {{ dp.type_id + "_metadata.ISBN13" }} = onix_ebook_titles.ISBN13
 {% endfor %}
-LEFT JOIN `{{ book_table_id }}` as public_data on public_data.isbn = onix_ebook_titles.ISBN13;
+LEFT JOIN `{{ book_table_id }}` AS public_data on public_data.isbn = onix_ebook_titles.ISBN13;
