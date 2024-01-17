@@ -101,10 +101,10 @@ FROM month_country
         {% include dp.files.book_metrics_country_struct_sql %}{% if not loop.last %}, {% endif %}
     {% endfor %}
 FROM month_country
-    {% for dp in data_partners | selectattr("export_country_join", "equalto", True) %}
+    {% for dp in data_partners | selectattr("export_country", "equalto", True) %}
         {% include dp.files.book_metrics_country_join_sql %}
     {% endfor %}
-    {% for dp in data_partners | selectattr("export_country_null", "equalto", True) %}
+    {% for dp in data_partners | selectattr("export_country", "equalto", True) %}
         {% if loop.first %}WHERE{% endif %}
 <<<<<<<< HEAD:oaebu_workflows/onix_workflow/sql/book_product_metrics_country.sql.jinja2
         {% include dp.files.book_product_country_null_sql %}{% if not loop.last %}OR {% endif %}
