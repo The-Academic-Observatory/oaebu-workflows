@@ -1025,18 +1025,17 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 ### Export OAEBU Tables ##
                 ##########################
 
-                
                 if not dry_run:
                     export_tasks = [
-                    "export_tables.export_book_list",
-                    "export_tables.export_book_institution_list",
-                    "export_tables.export_book_metrics",
-                    "export_tables.export_book_metrics_country",
-                    "export_tables.export_book_metrics_institution",
-                    "export_tables.export_book_metrics_author",
-                    "export_tables.export_book_metrics_city",
-                    "export_tables.export_book_metrics_events",
-                    "export_tables.export_book_metrics_subjects",
+                        "export_tables.export_book_list",
+                        "export_tables.export_book_institution_list",
+                        "export_tables.export_book_metrics",
+                        "export_tables.export_book_metrics_country",
+                        "export_tables.export_book_metrics_institution",
+                        "export_tables.export_book_metrics_author",
+                        "export_tables.export_book_metrics_city",
+                        "export_tables.export_book_metrics_events",
+                        "export_tables.export_book_metrics_subjects",
                     ]
                     export_tables = [
                         ("book_list", 4),
@@ -1053,19 +1052,19 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     ]
                 else:
                     export_tasks = [
-                    "export_tables.export_book_list",
-                    "export_tables.export_book_metrics",
-                    "export_tables.export_book_metrics_country",
-                    "export_tables.export_book_metrics_author",
-                    "export_tables.export_book_metrics_events",
-                    "export_tables.export_book_metrics_subjects",
-                ]
+                        "export_tables.export_book_list",
+                        "export_tables.export_book_metrics",
+                        "export_tables.export_book_metrics_country",
+                        "export_tables.export_book_metrics_author",
+                        "export_tables.export_book_metrics_events",
+                        "export_tables.export_book_metrics_subjects",
+                    ]
                     export_tables = [
                         ("book_list", 4),
-                        ("book_metrics", 0),
-                        ("book_metrics_country", 0),
-                        ("book_metrics_author", 0),
-                        ("book_metrics_events", 0),
+                        ("book_metrics", 3),
+                        ("book_metrics_country", 750),  # No filter is applied in a dry run
+                        ("book_metrics_author", 2),
+                        ("book_metrics_events", 3),
                         ("book_metrics_subject_bic", 0),
                         ("book_metrics_subject_bisac", 0),
                         ("book_metrics_subject_thema", 0),
@@ -1088,8 +1087,9 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 table_id = bq_sharded_table_id(
                     self.gcp_project_id, oaebu_export_dataset_id, f"{export_prefix}_book_list", release_date
                 )
+                expected_book_list_table = "book_list.json" if not dry_run else "book_list_dry.json"
                 fixture_table = load_and_parse_json(
-                    os.path.join(self.fixtures_folder, "e2e_outputs", "book_list.json"),
+                    os.path.join(self.fixtures_folder, "e2e_outputs", expected_book_list_table),
                     date_fields=["published_date"],
                 )
                 self.assert_table_content(table_id, fixture_table, primary_key="product_id")

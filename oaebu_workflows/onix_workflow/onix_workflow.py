@@ -379,7 +379,9 @@ class OnixWorkflow(Workflow):
                     "output_table": "book_institution_list",
                     "query_template": os.path.join(sql_folder("onix_workflow"), "book_institution_list.sql.jinja2"),
                     "schema": os.path.join(default_schema_folder("onix_workflow"), "book_institution_list.json"),
-                },
+                }
+            )
+            generic_export_tables.append(
                 {
                     "output_table": "book_metrics_institution",
                     "query_template": os.path.join(sql_folder("onix_workflow"), "book_metrics_institution.sql.jinja2"),
