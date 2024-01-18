@@ -1,0 +1,1 @@
+STRUCT(group_counts(ARRAY_CONCAT_AGG(month.jstor_country)) AS Total_Item_Requests) AS jstor

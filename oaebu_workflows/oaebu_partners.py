@@ -242,7 +242,7 @@ OAEBU_DATA_PARTNERS = dict(
         schema_directory=os.path.join(schema_folder(workflow_module="jstor_telescope")),
         sql_directory=os.path.join(sql_folder(workflow_module="jstor_telescope")),
         book_product_functions=True,
-        export_author=False,
+        export_author=True,
         export_book_metrics=True,
         export_country=True,
         export_subject=True,
