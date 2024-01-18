@@ -4,7 +4,7 @@
             "mode": "NULLABLE",
             "name": "views",
             "type": "INTEGER",
-            "description": "Number of page views aggregated over all countries"
+            "description": "Number of views/sessions aggregated over all countries"
         },
         {
             "mode": "NULLABLE",
