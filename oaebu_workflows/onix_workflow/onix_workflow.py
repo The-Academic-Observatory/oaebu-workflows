@@ -54,7 +54,7 @@ from observatory.platform.bigquery import (
     bq_create_table_from_query,
     bq_run_query,
     bq_select_table_shard_dates,
-    bq_create_view,
+    bq_copy_table,
     bq_find_schema,
 )
 from observatory.platform.workflows.workflow import (
@@ -92,8 +92,8 @@ class OnixWorkflowRelease(SnapshotRelease):
         :param release_date: The date of the partition/release
         :param onix_snapshot_date: The ONIX snapshot/release date.
         :param crossref_master_snapshot_date: The release date/suffix of the crossref master table
-
         """
+
         super().__init__(dag_id=dag_id, run_id=run_id, snapshot_date=snapshot_date)
         self.onix_snapshot_date = onix_snapshot_date
         self.crossref_master_snapshot_date = crossref_master_snapshot_date
@@ -124,7 +124,7 @@ class OnixWorkflow(Workflow):
         cloud_workspace: CloudWorkspace,
         metadata_partner: Union[str, OaebuPartner],
         # Bigquery parameters
-        bq_master_crossref_project_id: str = "academic-observatory",
+        bq_master_crossref_project_id: str = "keegan-dev",  # "academic-observatory", TODO: revert
         bq_master_crossref_dataset_id: str = "crossref_metadata",
         bq_oaebu_crossref_dataset_id: str = "crossref",
         bq_master_crossref_metadata_table_name: str = "crossref_metadata",
@@ -183,7 +183,7 @@ class OnixWorkflow(Workflow):
         :param bq_oaebu_intermediate_dataset: OAEBU intermediate dataset.
         :param bq_oaebu_dataset: OAEBU dataset.
         :param bq_oaebu_export_dataset: OAEBU data export dataset.
-        :param bq_oaebu_latest_export_dataset: OAEBU data export dataset with the latest data views
+        :param bq_oaebu_latest_export_dataset: OAEBU data export dataset with the latest export tables
         :param bq_worksid_table_name: table ID of the worksid table
         :param bq_worksid_error_table_name: table ID of the worksid error table
         :param bq_workfamilyid_table_name: table ID of the workfamilyid table
@@ -333,8 +333,10 @@ class OnixWorkflow(Workflow):
             # Create OAEBU Elastic Export tables
             task_create_export_tables = self.create_tasks_export_tables()
 
-            # Create the (non-sharded) views of the sharded tables
-            task_create_latest_views = self.make_python_operator(self.create_latest_views, "create_latest_views")
+            # Create the (non-sharded) copies of the sharded tables
+            task_update_latest_export_tables = self.make_python_operator(
+                self.update_latest_export_tables, "update_latest_export_tables"
+            )
 
             # Final tasks
             task_add_release = self.make_python_operator(self.add_new_dataset_releases, "add_new_dataset_releases")
@@ -349,7 +351,7 @@ class OnixWorkflow(Workflow):
                 task_create_intermediate_tables,
                 task_create_book_product_table,
                 task_create_export_tables,
-                task_create_latest_views,
+                task_update_latest_export_tables,
                 task_add_release,
                 task_cleanup,
             )
@@ -436,7 +438,9 @@ class OnixWorkflow(Workflow):
             table_id=self.metadata_partner.bq_table_name,
         )
         onix_snapshot_dates = bq_select_table_shard_dates(table_id=onix_table_id, end_date=snapshot_date)
-        assert len(onix_snapshot_dates), "OnixWorkflow.make_release: no ONIX releases found"
+        if not len(onix_snapshot_dates):
+            raise RuntimeError("OnixWorkflow.make_release: no ONIX releases found")
+
         onix_snapshot_date = onix_snapshot_dates[0]  # Get most recent snapshot
 
         # Get Crossref Metadata release date
@@ -448,7 +452,8 @@ class OnixWorkflow(Workflow):
         crossref_metadata_snapshot_dates = bq_select_table_shard_dates(
             table_id=crossref_table_id, end_date=snapshot_date
         )
-        assert len(crossref_metadata_snapshot_dates), "OnixWorkflow.make_release: no Crossref Metadata releases found"
+        if not len(crossref_metadata_snapshot_dates):
+            raise RuntimeError("OnixWorkflow.make_release: no Crossref Metadata releases found")
         crossref_master_snapshot_date = crossref_metadata_snapshot_dates[0]  # Get most recent snapshot
 
         # Make the release object
@@ -637,7 +642,7 @@ class OnixWorkflow(Workflow):
         status = bq_create_table_from_query(
             sql=sql,
             table_id=book_table_id,
-            schema_file_path=bq_find_schema(path=self.schema_folder, table_name=self.bq_book_table_name),
+            schema_file_path=os.path.join(self.schema_folder, "book.json"),
         )
         set_task_state(status, kwargs["ti"].task_id, release=release)
 
@@ -972,9 +977,9 @@ class OnixWorkflow(Workflow):
             )
             set_task_state(status, kwargs["ti"].task_id, release=release)
 
-    def create_latest_views(self, release: OnixWorkflowRelease, **kwargs) -> None:
-        """Create views of the latest data export tables in bigquery"""
-        create_latest_views_from_dataset(
+    def update_latest_export_tables(self, release: OnixWorkflowRelease, **kwargs) -> None:
+        """Create copies of the latest data export tables in bigquery"""
+        copy_latest_export_tables(
             project_id=self.cloud_workspace.project_id,
             from_dataset=self.bq_oaebu_export_dataset,
             to_dataset=self.bq_oaebu_latest_export_dataset,
@@ -1169,21 +1174,21 @@ def transform_event(event: dict) -> dict:
         return new
 
 
-def create_latest_views_from_dataset(
+def copy_latest_export_tables(
     project_id: str, from_dataset: str, to_dataset: str, date_match: str, data_location: str, description: str = None
 ) -> None:
-    """Creates views from all sharded tables from a dataset with a matching a date string.
+    """Creates copies of all sharded tables from a dataset with a matching a date string.
 
     :param project_id: The project id
     :param from_dataset: The dataset containing the sharded tables
-    :param to_dataset: The dataset to contain the views
+    :param to_dataset: The dataset to contain the copied tables - will create if does not exist
     :param date_match: The date string to match. e.g. for a table named 'this_table20220101', this would be '20220101'
     :param data_location: The regional location of the data in google cloud
-    :param description: The description for the views dataset
+    :param description: The description for dataset housing the copied tables
     """
 
     if description is None:
-        description = "OAEBU Export Views for Dashboarding"
+        description = "OAEBU Export tables for Dashboarding"
 
     # Make to_dataset if it doesn't exist
     bq_create_dataset(
@@ -1203,12 +1208,12 @@ def create_latest_views_from_dataset(
     matched_tables = [t[0] for t in matched_tables if t]
     assert len(matched_tables), f"No tables matching date {date_match} in dataset {project_id}.{from_dataset}"
 
-    # Create all of the views
+    # Copy all of the tables
     for table in matched_tables:
-        query = f"SELECT * FROM `{project_id}.{from_dataset}.{table}`"
-        view_name = re.match(r"(.*?)\d{8}$", table).group(1)  # Drop the date from the table for the view name
-        view_id = bq_table_id(project_id, to_dataset, view_name)
-        bq_create_view(view_id=view_id, query=query)
+        table_id = bq_table_id(project_id, from_dataset, table)
+        unsharded_name = re.match(r"(.*?)\d{8}$", table).group(1)  # Drop the date from the table for copied table
+        copy_table_id = bq_table_id(project_id, to_dataset, unsharded_name)
+        bq_copy_table(src_table_id=table_id, dst_table_id=copy_table_id, write_disposition="WRITE_TRUNCATE")
 
 
 def get_onix_records(table_id: str) -> List[dict]:

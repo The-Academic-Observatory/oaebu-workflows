@@ -37,7 +37,7 @@ from oaebu_workflows.onix_workflow.onix_workflow import (
     transform_event,
     dois_from_table,
     download_crossref_event_url,
-    create_latest_views_from_dataset,
+    copy_latest_export_tables,
     get_onix_records,
     insert_into_schema,
 )
@@ -298,13 +298,13 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     "export_tables.export_book_metrics_author",
                     "export_tables.export_book_metrics_subjects",
                 ],
-                "export_tables.export_book_list": ["create_latest_views"],
-                "export_tables.export_book_metrics_events": ["create_latest_views"],
-                "export_tables.export_book_metrics": ["create_latest_views"],
-                "export_tables.export_book_metrics_country": ["create_latest_views"],
-                "export_tables.export_book_metrics_author": ["create_latest_views"],
-                "export_tables.export_book_metrics_subjects": ["create_latest_views"],
-                "create_latest_views": ["add_new_dataset_releases"],
+                "export_tables.export_book_list": ["update_latest_export_tables"],
+                "export_tables.export_book_metrics_events": ["update_latest_export_tables"],
+                "export_tables.export_book_metrics": ["update_latest_export_tables"],
+                "export_tables.export_book_metrics_country": ["update_latest_export_tables"],
+                "export_tables.export_book_metrics_author": ["update_latest_export_tables"],
+                "export_tables.export_book_metrics_subjects": ["update_latest_export_tables"],
+                "update_latest_export_tables": ["add_new_dataset_releases"],
                 "add_new_dataset_releases": ["cleanup"],
                 "cleanup": [],
             }
@@ -365,16 +365,16 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     "export_tables.export_book_metrics_author",
                     "export_tables.export_book_metrics_subjects",
                 ],
-                "export_tables.export_book_list": ["create_latest_views"],
-                "export_tables.export_book_institution_list": ["create_latest_views"],
-                "export_tables.export_book_metrics_institution": ["create_latest_views"],
-                "export_tables.export_book_metrics_city": ["create_latest_views"],
-                "export_tables.export_book_metrics_events": ["create_latest_views"],
-                "export_tables.export_book_metrics": ["create_latest_views"],
-                "export_tables.export_book_metrics_country": ["create_latest_views"],
-                "export_tables.export_book_metrics_author": ["create_latest_views"],
-                "export_tables.export_book_metrics_subjects": ["create_latest_views"],
-                "create_latest_views": ["add_new_dataset_releases"],
+                "export_tables.export_book_list": ["update_latest_export_tables"],
+                "export_tables.export_book_institution_list": ["update_latest_export_tables"],
+                "export_tables.export_book_metrics_institution": ["update_latest_export_tables"],
+                "export_tables.export_book_metrics_city": ["update_latest_export_tables"],
+                "export_tables.export_book_metrics_events": ["update_latest_export_tables"],
+                "export_tables.export_book_metrics": ["update_latest_export_tables"],
+                "export_tables.export_book_metrics_country": ["update_latest_export_tables"],
+                "export_tables.export_book_metrics_author": ["update_latest_export_tables"],
+                "export_tables.export_book_metrics_subjects": ["update_latest_export_tables"],
+                "update_latest_export_tables": ["add_new_dataset_releases"],
                 "add_new_dataset_releases": ["cleanup"],
                 "cleanup": [],
             }
@@ -611,7 +611,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         )
         fake_doi_isbn_dataset_id = env.add_dataset(prefix="doi_isbn_test")
         fake_sharded_dataset = env.add_dataset(prefix="sharded_data")
-        fake_view_dataset = env.add_dataset(prefix="views")
+        fake_copied_export_dataset = env.add_dataset(prefix="copied_export")
         fake_table_schema = os.path.join(default_schema_folder(workflow_module="onix_telescope"), "onix.json")
         with env.create():
             doi_table_file = os.path.join(self.fixtures_folder, "doi_isbn_query_test.jsonl")
@@ -647,7 +647,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
             assert sorted(actual_dois) == sorted(fake_doi_isbns)
 
             #############################################
-            ### Test create_latest_views_from_dataset ###
+            ### Test copy_latest_export_tables ###
             #############################################
 
             # We will use the onix.jsonl fixture for testing.
@@ -662,27 +662,27 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     project_id=self.gcp_project_id,
                 )
 
-            # Now make the views from this dataset
-            create_latest_views_from_dataset(
+            # Now make the copied tables from this dataset
+            copy_latest_export_tables(
                 project_id=self.gcp_project_id,
                 from_dataset=fake_sharded_dataset,
-                to_dataset=fake_view_dataset,
+                to_dataset=fake_copied_export_dataset,
                 date_match=release_date.strftime("%Y%m%d"),
                 data_location=self.data_location,
             )
 
-            # Grab the data from the view and make assertions
-            view_data = bq_run_query(f"SELECT * FROM {self.gcp_project_id}.{fake_view_dataset}.data_export")
-            view_isbns = [entry["ISBN13"] for entry in view_data]
-            view_dois = [entry["DOI"] for entry in view_data]
+            # Grab the data from the copied tables and make assertions
+            copied_data = bq_run_query(f"SELECT * FROM {self.gcp_project_id}.{fake_copied_export_dataset}.data_export")
+            copied_isbns = [entry["ISBN13"] for entry in copied_data]
+            copied_dois = [entry["DOI"] for entry in copied_data]
             actual_isbns = [entry["ISBN13"] for entry in fake_doi_isbn_table]
             actual_dois = [entry["DOI"] for entry in fake_doi_isbn_table]
 
-            assert len(view_data) == len(fake_doi_isbn_table)
-            assert len(actual_isbns) == len(view_isbns)
-            assert sorted(actual_isbns) == sorted(view_isbns)
-            assert len(actual_dois) == len(view_dois)
-            assert sorted(actual_dois) == sorted(view_dois)
+            assert len(copied_data) == len(fake_doi_isbn_table)
+            assert len(actual_isbns) == len(copied_isbns)
+            assert sorted(actual_isbns) == sorted(copied_isbns)
+            assert len(actual_dois) == len(copied_dois)
+            assert sorted(actual_dois) == sorted(copied_dois)
 
     def setup_fake_lookup_tables(
         self, settings_dataset_id: str, fixtures_dataset_id: str, release_date: pendulum.DateTime, bucket_name: str
@@ -1162,21 +1162,21 @@ class TestOnixWorkflow(ObservatoryTestCase):
                         and oaebu_wfam["211"] is None
                     )
 
-                #################################
-                ### Create and validate views ###
-                #################################
+                #########################################
+                ### Create and validate export copies ###
+                #########################################
 
-                ti = env.run_task(workflow.create_latest_views.__name__)
+                ti = env.run_task(workflow.update_latest_export_tables.__name__)
                 self.assertEqual(ti.state, State.SUCCESS)
 
                 # Check export views are the same as the tables
                 for export_table, exp_rows in export_tables:
-                    export_view = bq_run_query(
+                    export_copy = bq_run_query(
                         f"SELECT * FROM {self.gcp_project_id}.{oaebu_latest_export_dataset_id}.{self.gcp_project_id.replace('-', '_')}_{export_table}"
                     )
                     self.assertEqual(expected_state, ti.state, msg=f"table: {table}")
-                    # Check that the data_export tables (views) has the correct number of rows
-                    self.assertEqual(len(export_view), exp_rows)
+                    # Check that the data_export table has the correct number of rows
+                    self.assertEqual(len(export_copy), exp_rows)
 
                 ################################
                 ### Add releases and Cleanup ###
