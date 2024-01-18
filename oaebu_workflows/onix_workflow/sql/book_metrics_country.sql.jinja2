@@ -40,10 +40,10 @@ month_country as (
         jstor_name as country_jstor_name
     FROM months
     CROSS JOIN countries
-),
+)
 
 {% for dp in data_partners | selectattr("export_country", "equalto", True) %}
-    {% include dp.files.book_metrics_country_body_sql %}{% if not loop.last %}, {% endif %}
+    , {% include dp.files.book_metrics_country_body_sql %}
 {% endfor %}
 
 
