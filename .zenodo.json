@@ -26,14 +26,14 @@
   },
   "creators": [
     {
-      "orcid": "0000-0001-8288-5241",
-      "affiliation": "Centre for Culture and Technology, Curtin University",
-      "name": "Hosking, Richard "
-    },
-    {
       "orcid": "0000-0001-7801-9105",
       "affiliation": "Curtin Institute for Data Science, Curtin University",
       "name": "Smith, Keegan R"
+    },
+    {
+      "orcid": "0000-0001-8288-5241",
+      "affiliation": "Centre for Culture and Technology, Curtin University",
+      "name": "Hosking, Richard "
     },
     {
       "orcid": "0000-0003-0485-3388",
@@ -59,7 +59,7 @@
       "orcid": "0009-0001-9854-1483",
       "affiliation": "Curtin Institute for Data Science, Curtin University",
       "name": "Massen-Hane, Alex"
-    },    
+    },
     {
       "orcid": "0000-0001-6813-8362",
       "affiliation": "Centre for Culture and Technology, Curtin University",
