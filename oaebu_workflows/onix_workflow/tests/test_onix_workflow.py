@@ -39,6 +39,7 @@ from oaebu_workflows.onix_workflow.onix_workflow import (
     download_crossref_event_url,
     create_latest_views_from_dataset,
     get_onix_records,
+    insert_into_schema,
 )
 from observatory.platform.api import get_dataset_releases
 from observatory.platform.observatory_config import Workflow
@@ -574,6 +575,27 @@ class TestOnixWorkflow(ObservatoryTestCase):
         actual_transformed_events = transform_crossref_events(input_events)
         assert len(actual_transformed_events) == 1
         assert expected_transformed_events == actual_transformed_events
+
+    def test_insert_into_schema(self):
+        """Tests the instert_into_schema function"""
+
+        # Inserting a field into a schema with no existing fields
+        schema_base = []
+        insert_field = {"name": "field1", "type": "string"}
+        result = insert_into_schema(schema_base, insert_field)
+        self.assertEqual(result, [{"name": "field1", "type": "string"}])
+
+        # Inserting a field into a schema with existing fields
+        schema_base = [{"name": "field1", "type": "string"}]
+        insert_field = {"name": "field2", "type": "integer"}
+        result = insert_into_schema(schema_base, insert_field)
+        self.assertEqual(result, [{"name": "field1", "type": "string"}, {"name": "field2", "type": "integer"}])
+
+        # Inserting a field with no name into a schema
+        schema_base = [{"name": "field1", "type": "string"}]
+        insert_field = {"type": "integer"}
+        with self.assertRaises(ValueError):
+            insert_into_schema(schema_base, insert_field, "field2")
 
     def test_utility_functions(self):
         """
