@@ -188,7 +188,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
 
                 # Test for case - no ONIX releases found
                 mock_sel_table_suffixes.side_effect = [[]]
-                with self.assertRaisesRegex(AssertionError, "ONIX"):
+                with self.assertRaisesRegex(RuntimeError, "ONIX"):
                     release = wf.make_release(
                         data_interval_end=pendulum.parse(str(env.dag_run.data_interval_end)),
                         run_id=env.dag_run.run_id,
@@ -196,7 +196,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
 
                 # Test for case - no Crossref releases found
                 mock_sel_table_suffixes.side_effect = [[onix_snapshot_date], []]  # No crossref releases
-                with self.assertRaisesRegex(AssertionError, "Crossref"):
+                with self.assertRaisesRegex(RuntimeError, "Crossref"):
                     release = wf.make_release(
                         data_interval_end=pendulum.parse(str(env.dag_run.data_interval_end)),
                         run_id=env.dag_run.run_id,
