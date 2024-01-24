@@ -1,4 +1,4 @@
-# Copyright 2022-2023 Curtin University
+# Copyright 2022-2024 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,24 +20,19 @@ from typing import List, Tuple, Union
 
 import pendulum
 from airflow.hooks.base import BaseHook
+from airflow.decorators import dag, task
 from google.cloud.bigquery import SourceFormat, WriteDisposition
 from google.cloud.bigquery.table import TimePartitioningType
 
 from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
-from observatory.platform.files import add_partition_date
 from observatory.platform.api import make_observatory_api, DatasetRelease
 from observatory.platform.airflow import AirflowConns
 from observatory.platform.observatory_config import CloudWorkspace
-from observatory.platform.files import save_jsonl_gz, load_jsonl
-from observatory.platform.gcs import gcs_blob_name_from_path, gcs_upload_files, gcs_blob_uri
+from observatory.platform.files import save_jsonl_gz, load_jsonl, add_partition_date
+from observatory.platform.gcs import gcs_blob_name_from_path, gcs_upload_files, gcs_blob_uri, gcs_download_blob
 from observatory.platform.bigquery import bq_load_table, bq_create_dataset, bq_table_id
-from observatory.platform.workflows.workflow import (
-    Workflow,
-    PartitionRelease,
-    cleanup,
-    set_task_state,
-    check_workflow_inputs,
-)
+from observatory.platform.tasks import check_dependencies
+from observatory.platform.workflows.workflow import PartitionRelease, set_task_state
 from observatory.platform.utils.url_utils import retry_get_url
 
 IRUS_FULCRUM_ENDPOINT_TEMPLATE = (
@@ -66,14 +61,55 @@ class IrusFulcrumRelease(PartitionRelease):
         super().__init__(dag_id=dag_id, run_id=run_id, partition_date=partition_date)
         self.data_interval_start = data_interval_start
         self.data_interval_end = data_interval_end
-        self.download_totals_path = os.path.join(self.download_folder, "fulcrum_totals.jsonl.gz")
-        self.download_country_path = os.path.join(self.download_folder, "fulcrum_country.json.gz")
-        self.transform_path = os.path.join(self.transform_folder, "fulcrum.json.gz")
+        self.download_totals_name = "fulcrum_totals.jsonl.gz"
+        self.download_country_name = "fulcrum_country.json.gz"
+        self.transfrom_name = "fulcrum.jsonl.gz"
 
+    @property
+    def download_totals_path(self):
+        return os.path.join(self.download_folder, self.download_totals_name)
 
-class IrusFulcrumTelescope(Workflow):
-    def __init__(
-        self,
+    @property
+    def download_country_path(self):
+        return os.path.join(self.download_folder, self.download_country_name)
+
+    @property
+    def transform_path(self):
+        return os.path.join(self.transform_folder, self.transfrom_name)
+
+    @property
+    def download_totals_blob(self):
+        return gcs_blob_name_from_path(self.download_totals_path)
+
+    @property
+    def download_country_blob(self):
+        return gcs_blob_name_from_path(self.download_country_path)
+
+    @property
+    def transform_blob(self):
+        return gcs_blob_name_from_path(self.transform_path)
+
+    @staticmethod
+    def from_dict(dict_: dict):
+        return IrusFulcrumRelease(
+            dag_id=dict_["dag_id"],
+            run_id=dict_["run_id"],
+            data_interval_start=pendulum.parse(dict_["data_interval_start"]),
+            data_interval_end=pendulum.parse(dict_["data_interval_end"]),
+            partition_date=pendulum.parse(dict_["partition_date"]),
+        )
+
+    def to_dict(self):
+        return {
+            "dag_id": self.dag_id,
+            "run_id": self.run_id,
+            "data_interval_start": self.data_interval_start.to_date_string(),
+            "data_interval_end": self.data_interval_end.to_date_string(),
+            "partition_date": self.partition_date.to_date_string(),
+        }
+
+    def create_dag(
+        *,
         dag_id: str,
         cloud_workspace: CloudWorkspace,
         publishers: List[str],
@@ -104,143 +140,171 @@ class IrusFulcrumTelescope(Workflow):
         if bq_table_description is None:
             bq_table_description = "Fulcrum metrics as recorded by the IRUS platform"
 
-        super().__init__(
-            dag_id,
-            start_date,
-            schedule,
-            airflow_conns=[observatory_api_conn_id, irus_oapen_api_conn_id],
+        data_partner = partner_from_str(data_partner)
+
+        @dag(
+            dag_id=dag_id,
+            schedule=schedule,
+            start_date=start_date,
             catchup=catchup,
             tags=["oaebu"],
         )
+        def irus_fulcrum():
+            @task
+            def make_release(**context) -> IrusFulcrumRelease:
+                """Create a IrusFulcrumRelease instance
+                Dates are best explained with an example
+                Say the dag is scheduled to run on 2022-04-07
+                Interval_start will be 2022-03-01
+                Interval_end will be 2022-04-01
+                partition_date will be 2022-03-31
+                """
+                data_interval_start = context["data_interval_start"].start_of("month")
+                data_interval_end = context["data_interval_end"].start_of("month")
+                partition_date = data_interval_start.end_of("month")
+                return IrusFulcrumRelease(
+                    dag_id,
+                    context["run_id"],
+                    data_interval_start=data_interval_start,
+                    data_interval_end=data_interval_end,
+                    partition_date=partition_date,
+                ).to_dict()
 
-        self.dag_id = dag_id
-        self.cloud_workspace = cloud_workspace
-        self.publishers = publishers
-        self.data_partner = partner_from_str(data_partner)
-        self.bq_dataset_description = bq_dataset_description
-        self.bq_table_description = bq_table_description
-        self.api_dataset_id = api_dataset_id
-        self.observatory_api_conn_id = observatory_api_conn_id
-        self.irus_oapen_api_conn_id = irus_oapen_api_conn_id
+            @task
+            def download(release: dict, **context):
+                """Task to download the Fulcrum data from IRUS and upload to cloud storage
 
-        check_workflow_inputs(self)
+                :param release: the IrusFulcrumRelease instance.
+                """
+                release = IrusFulcrumRelease.from_dict(release)
+                requestor_id = BaseHook.get_connection(irus_oapen_api_conn_id).login
+                totals_data, country_data = download_fulcrum_month_data(release.partition_date, requestor_id)
+                if not totals_data or not country_data:
+                    raise RuntimeError(f"Data not available for supplied release month: {release.partition_date}")
+                save_jsonl_gz(release.download_totals_path, totals_data)
+                save_jsonl_gz(release.download_country_path, country_data)
 
-        self.add_setup_task(self.check_dependencies)
-        self.add_task(self.download)
-        self.add_task(self.upload_downloaded)
-        self.add_task(self.transform)
-        self.add_task(self.upload_transformed)
-        self.add_task(self.bq_load)
-        self.add_task(self.add_new_dataset_releases)
-        self.add_task(self.cleanup)
+                # Upload to GCS
+                success = gcs_upload_files(
+                    bucket_name=cloud_workspace.download_bucket,
+                    file_paths=[release.download_totals_path, release.download_country_path],
+                )
+                set_task_state(success, context["ti"].task_id, release=release)
 
-    def make_release(self, **kwargs) -> IrusFulcrumRelease:
-        """Create a IrusFulcrumRelease instance
-        Dates are best explained with an example
-        Say the dag is scheduled to run on 2022-04-07
-        Interval_start will be 2022-03-01
-        Interval_end will be 2022-04-01
-        partition_date will be 2022-03-31
-        """
-        data_interval_start = kwargs["data_interval_start"].start_of("month")
-        data_interval_end = kwargs["data_interval_end"].start_of("month")
-        partition_date = data_interval_start.end_of("month")
-        return IrusFulcrumRelease(
-            self.dag_id,
-            kwargs["run_id"],
-            data_interval_start=data_interval_start,
-            data_interval_end=data_interval_end,
-            partition_date=partition_date,
-        )
+            @task
+            def transform(release: dict, **context):
+                """Task to transform the fulcrum data and upload to cloud storage"""
+                release = IrusFulcrumRelease.from_dict(release)
 
-    def download(self, release: IrusFulcrumRelease, **kwargs):
-        """Task to download the Fulcrum data for a release
+                # Download files
+                success = gcs_download_blob(
+                    bucket_name=cloud_workspace.download_bucket,
+                    blob_name=release.download_totals_blob_name,
+                    file_path=release.download_totals_path,
+                )
+                if not success:
+                    raise FileNotFoundError(f"Error downloading file: {release.download_totals_blob_name}")
+                success = gcs_download_blob(
+                    bucket_name=cloud_workspace.download_bucket,
+                    blob_name=release.download_country_blob_name,
+                    file_path=release.download_country_path,
+                )
+                if not success:
+                    raise FileNotFoundError(f"Error downloading file: {release.download_country_blob_name}")
 
-        :param releases: the IrusFulcrumRelease instance.
-        """
-        requestor_id = BaseHook.get_connection(self.irus_oapen_api_conn_id).login
-        totals_data, country_data = download_fulcrum_month_data(release.partition_date, requestor_id)
-        assert totals_data and country_data, f"Data not available for supplied release month: {release.partition_date}"
-        save_jsonl_gz(release.download_totals_path, totals_data)
-        save_jsonl_gz(release.download_country_path, country_data)
+                logging.info(f"Transforming the Fulcrum dataset with the following publisher filter: {publishers}")
+                totals_data = load_jsonl(release.download_totals_path)
+                country_data = load_jsonl(release.download_country_path)
+                transformed_data = transform_fulcrum_data(
+                    totals_data=totals_data,
+                    country_data=country_data,
+                    publishers=publishers,
+                )
+                transformed_data = add_partition_date(
+                    transformed_data,
+                    partition_date=release.partition_date.end_of("month"),
+                    partition_type=TimePartitioningType.MONTH,
+                    partition_field="release_date",
+                )
+                save_jsonl_gz(release.transform_path, transformed_data)
 
-    def upload_downloaded(self, release: IrusFulcrumRelease, **kwargs):
-        """Upload the downloaded fulcrum data to the google cloud download bucket"""
-        success = gcs_upload_files(
-            bucket_name=self.cloud_workspace.download_bucket,
-            file_paths=[release.download_totals_path, release.download_country_path],
-        )
-        set_task_state(success, kwargs["ti"].task_id, release=release)
+                # Upload to GCS
+                success = gcs_upload_files(
+                    bucket_name=cloud_workspace.transform_bucket, file_paths=[release.transform_path]
+                )
+                set_task_state(success, context["ti"].task_id, release=release)
 
-    def transform(self, release: IrusFulcrumRelease, **kwargs):
-        """Task to transform the fulcrum data"""
-        logging.info(f"Transforming the Fulcrum dataset with the following publisher filter: {self.publishers}")
-        totals_data = load_jsonl(release.download_totals_path)
-        country_data = load_jsonl(release.download_country_path)
-        transformed_data = transform_fulcrum_data(
-            totals_data=totals_data,
-            country_data=country_data,
-            publishers=self.publishers,
-        )
-        transformed_data = add_partition_date(
-            transformed_data,
-            partition_date=release.partition_date.end_of("month"),
-            partition_type=TimePartitioningType.MONTH,
-            partition_field="release_date",
-        )
-        save_jsonl_gz(release.transform_path, transformed_data)
+            @task
+            def bq_load(release: dict, **context) -> None:
+                """Load the transfromed data into bigquery"""
+                release = IrusFulcrumRelease.from_dict(release)
+                bq_create_dataset(
+                    project_id=cloud_workspace.project_id,
+                    dataset_id=data_partner.bq_dataset_id,
+                    location=cloud_workspace.data_location,
+                    description=bq_dataset_description,
+                )
 
-    def upload_transformed(self, release: IrusFulcrumRelease, **kwargs):
-        """Upload the transformed fulcrum data to the google cloud download bucket"""
-        success = gcs_upload_files(
-            bucket_name=self.cloud_workspace.transform_bucket, file_paths=[release.transform_path]
-        )
-        set_task_state(success, kwargs["ti"].task_id, release=release)
+                # Load each transformed release
+                uri = gcs_blob_uri(cloud_workspace.transform_bucket, release.transform_blob)
+                table_id = bq_table_id(
+                    cloud_workspace.project_id, data_partner.bq_dataset_id, data_partner.bq_table_name
+                )
+                success = bq_load_table(
+                    uri=uri,
+                    table_id=table_id,
+                    schema_file_path=data_partner.schema_path,
+                    source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
+                    table_description=bq_table_description,
+                    partition=True,
+                    partition_type=TimePartitioningType.MONTH,
+                    write_disposition=WriteDisposition.WRITE_APPEND,
+                    partition_field="release_date",
+                    ignore_unknown_values=True,
+                )
+                set_task_state(success, context["ti"].task_id, release=release)
 
-    def bq_load(self, release: IrusFulcrumRelease, **kwargs) -> None:
-        """Load the transfromed data into bigquery"""
-        bq_create_dataset(
-            project_id=self.cloud_workspace.project_id,
-            dataset_id=self.data_partner.bq_dataset_id,
-            location=self.cloud_workspace.data_location,
-            description=self.bq_dataset_description,
-        )
+            @task
+            def add_new_dataset_releases(release: dict, **context) -> None:
+                """Adds release information to API."""
+                release = IrusFulcrumRelease.from_dict(release)
+                api = make_observatory_api(observatory_api_conn_id=observatory_api_conn_id)
+                dataset_release = DatasetRelease(
+                    dag_id=dag_id,
+                    dataset_id=api_dataset_id,
+                    dag_run_id=release.run_id,
+                    data_interval_start=release.data_interval_start,
+                    data_interval_end=release.data_interval_end,
+                    partition_date=release.partition_date,
+                )
+                api.post_dataset_release(dataset_release)
 
-        # Load each transformed release
-        uri = gcs_blob_uri(self.cloud_workspace.transform_bucket, gcs_blob_name_from_path(release.transform_path))
-        table_id = bq_table_id(
-            self.cloud_workspace.project_id, self.data_partner.bq_dataset_id, self.data_partner.bq_table_name
-        )
-        success = bq_load_table(
-            uri=uri,
-            table_id=table_id,
-            schema_file_path=self.data_partner.schema_path,
-            source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
-            table_description=self.bq_table_description,
-            partition=True,
-            partition_type=TimePartitioningType.MONTH,
-            write_disposition=WriteDisposition.WRITE_APPEND,
-            partition_field="release_date",
-            ignore_unknown_values=True,
-        )
-        set_task_state(success, kwargs["ti"].task_id, release=release)
+            @task
+            def cleanup(release: dict, **context) -> None:
+                """Delete all files and folders associated with this release."""
+                release = IrusFulcrumRelease.from_dict(release)
+                cleanup(dag_id, execution_date=context["execution_date"], workflow_folder=release.workflow_folder)
 
-    def add_new_dataset_releases(self, release: IrusFulcrumRelease, **kwargs) -> None:
-        """Adds release information to API."""
-        api = make_observatory_api(observatory_api_conn_id=self.observatory_api_conn_id)
-        dataset_release = DatasetRelease(
-            dag_id=self.dag_id,
-            dataset_id=self.api_dataset_id,
-            dag_run_id=release.run_id,
-            data_interval_start=release.data_interval_start,
-            data_interval_end=release.data_interval_end,
-            partition_date=release.partition_date,
-        )
-        api.post_dataset_release(dataset_release)
+            # Define DAG tasks
+            task_check = check_dependencies(airflow_conns=[observatory_api_conn_id, irus_oapen_api_conn_id])
+            xcom_release = make_release()
+            task_download = download(xcom_release)
+            task_transform = transform(xcom_release)
+            task_bq_load = bq_load(xcom_release)
+            task_add_release = add_new_dataset_releases(xcom_release)
+            task_cleanup = cleanup(xcom_release)
 
-    def cleanup(self, release: IrusFulcrumRelease, **kwargs) -> None:
-        """Delete all files and folders associated with this release."""
-        cleanup(self.dag_id, execution_date=kwargs["execution_date"], workflow_folder=release.workflow_folder)
+            (
+                task_check
+                >> xcom_release
+                >> task_download
+                >> task_transform
+                >> task_bq_load
+                >> task_add_release
+                >> task_cleanup
+            )
+
+        return irus_fulcrum()
 
 
 def download_fulcrum_month_data(
