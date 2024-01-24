@@ -1,4 +1,4 @@
-# Copyright 2020-2023 Curtin University
+# Copyright 2020-2024 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,9 +29,9 @@ from abc import ABC, abstractmethod
 
 import pendulum
 import requests
-from airflow.exceptions import AirflowException
+from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.hooks.base import BaseHook
-from airflow.models.taskinstance import TaskInstance
+from airflow.decorators import dag, task
 from bs4 import BeautifulSoup, SoupStrainer
 from google.cloud.bigquery import TimePartitioningType, SourceFormat, WriteDisposition
 from google.oauth2.credentials import Credentials
@@ -47,13 +47,24 @@ from observatory.platform.utils.url_utils import get_user_agent, retry_get_url
 from observatory.platform.gcs import gcs_upload_files, gcs_blob_uri, gcs_blob_name_from_path
 from observatory.platform.bigquery import bq_load_table, bq_table_id, bq_create_dataset
 from observatory.platform.observatory_config import CloudWorkspace
+from observatory.platform.tasks import check_dependencies
 from observatory.platform.files import add_partition_date, convert
 from observatory.platform.workflows.workflow import (
-    Workflow,
     PartitionRelease,
-    cleanup,
     set_task_state,
-    check_workflow_inputs,
+)
+
+JSTOR_REPORTS_INFO = "reports"
+JSTOR_PROCESSED_LABEL_NAME = "processed_report"
+
+# download settings
+JSTOR_MAX_ATTEMPTS = 3
+JSTOR_FIXED_WAIT = 20  # seconds
+JSTOR_MAX_WAIT_TIME = 60 * 10  # seconds
+JSTOR_EXP_BASE = 3
+JSTOR_MULTIPLIER = 10
+JSTOR_WAIT_FN = wait_fixed(JSTOR_FIXED_WAIT) + wait_exponential(
+    multiplier=JSTOR_MULTIPLIER, exp_base=JSTOR_EXP_BASE, max=JSTOR_MAX_WAIT_TIME
 )
 
 
@@ -84,277 +95,296 @@ class JstorRelease(PartitionRelease):
         self.reports = reports
         self.data_interval_start = data_interval_start
         self.data_interval_end = data_interval_end
-        self.download_country_path = os.path.join(self.download_folder, "country.tsv")
-        self.download_institution_path = os.path.join(self.download_folder, "institution.tsv")
-        self.transform_country_path = os.path.join(self.transform_folder, "country.jsonl.gz")
-        self.transform_institution_path = os.path.join(self.transform_folder, "institution.jsonl.gz")
+        self.download_country_file_name = "country.tsv"
+        self.download_institution_file_name = "institution.tsv"
+        self.transform_country_file_name = "country.jsonl.gz"
+        self.transform_institution_file_name = "institution.jsonl.gz"
 
+    @property
+    def download_country_path(self):
+        return os.path.join(self.download_folder, self.download_country_file_name)
 
-class JstorTelescope(Workflow):
+    @property
+    def download_institution_path(self):
+        return os.path.join(self.download_folder, self.download_institution_file_name)
+
+    @property
+    def transform_country_path(self):
+        return os.path.join(self.transform_folder, self.transform_country_file_name)
+
+    @property
+    def transform_institution_path(self):
+        return os.path.join(self.transform_folder, self.transform_institution_file_name)
+
+    @property
+    def download_country_blob(self):
+        return gcs_blob_name_from_path(self.download_country_path)
+
+    @property
+    def download_institution_blob(self):
+        return gcs_blob_name_from_path(self.download_institution_path)
+
+    @property
+    def transform_country_blob(self):
+        return gcs_blob_name_from_path(self.transform_country_path)
+
+    @property
+    def transform_institution_blob(self):
+        return gcs_blob_name_from_path(self.transform_institution_path)
+
+    @staticmethod
+    def from_dict(dict_: dict):
+        return JstorRelease(
+            dag_id=dict_["dag_id"],
+            run_id=dict_["run_id"],
+            data_interval_start=pendulum.parse(dict_["data_interval_start"]),
+            data_interval_end=pendulum.parse(dict_["data_interval_end"]),
+            partition_date=pendulum.parse(dict_["partition_date"]),
+            reports=dict_["reports"],
+        )
+
+    def to_dict(self):
+        return {
+            "dag_id": self.dag_id,
+            "run_id": self.run_id,
+            "data_interval_start": self.data_interval_start.to_date_string(),
+            "data_interval_end": self.data_interval_end.to_date_string(),
+            "partition_date": self.partition_date.to_date_string(),
+            "reports": self.reports,
+        }
+
     """The JSTOR telescope."""
 
-    REPORTS_INFO = "reports"
-    PROCESSED_LABEL_NAME = "processed_report"
 
-    # download settings
-    MAX_ATTEMPTS = 3
-    FIXED_WAIT = 20  # seconds
-    MAX_WAIT_TIME = 60 * 10  # seconds
-    EXP_BASE = 3
-    MULTIPLIER = 10
-    WAIT_FN = wait_fixed(FIXED_WAIT) + wait_exponential(multiplier=MULTIPLIER, exp_base=EXP_BASE, max=MAX_WAIT_TIME)
+def create_dag(
+    *,
+    dag_id: str,
+    cloud_workspace: CloudWorkspace,
+    entity_id: str,
+    entity_type: Literal["publisher", "collection"] = "publisher",
+    country_partner: Union[str, OaebuPartner] = "jstor_country",
+    institution_partner: Union[str, OaebuPartner] = "jstor_institution",
+    bq_dataset_description: str = "Data from JSTOR sources",
+    bq_country_table_description: Optional[str] = None,
+    bq_institution_table_description: Optional[str] = None,
+    api_dataset_id: str = "jstor",
+    gmail_api_conn_id: str = "gmail_api",
+    observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
+    catchup: bool = False,
+    schedule: str = "0 0 4 * *",  # 4th day of every month
+    start_date: pendulum.DateTime = pendulum.datetime(2016, 10, 1),
+):
+    """Construct a JstorTelescope instance.
+    :param dag_id: The ID of the DAG
+    :param cloud_workspace: The CloudWorkspace object for this DAG
+    :param entity_id: The ID of the publisher for this DAG
+    :param entity_type: Whether this entity should be treated as a publisher or a collection
+    :param country_partner: The name of the country partner
+    :param institution_partner: The name of the institution partner
+    :param bq_dataset_description: Description for the BigQuery dataset
+    :param bq_country_table_description: Description for the BigQuery JSTOR country table
+    :param bq_institution_table_description: Description for the BigQuery JSTOR institution table
+    :param api_dataset_id: The ID to store the dataset release in the API
+    :param gmail_api_conn_id: Airflow connection ID for the Gmail API
+    :param observatory_api_conn_id: Airflow connection ID for the overvatory API
+    :param catchup: Whether to catchup the DAG or not
+    :param max_active_runs: The maximum number of DAG runs that can be run concurrently
+    :param schedule: The schedule interval of the DAG
+    :param start_date: The start date of the DAG
+    """
 
-    def __init__(
-        self,
-        dag_id: str,
-        cloud_workspace: CloudWorkspace,
-        entity_id: str,
-        entity_type: Literal["publisher", "collection"] = "publisher",
-        country_partner: Union[str, OaebuPartner] = "jstor_country",
-        institution_partner: Union[str, OaebuPartner] = "jstor_institution",
-        bq_dataset_description: str = "Data from JSTOR sources",
-        bq_country_table_description: Optional[str] = None,
-        bq_institution_table_description: Optional[str] = None,
-        api_dataset_id: str = "jstor",
-        gmail_api_conn_id: str = "gmail_api",
-        observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
-        catchup: bool = False,
-        max_active_runs: int = 1,
-        schedule: str = "0 0 4 * *",  # 4th day of every month
-        start_date: pendulum.DateTime = pendulum.datetime(2016, 10, 1),
-    ):
-        """Construct a JstorTelescope instance.
-        :param dag_id: The ID of the DAG
-        :param cloud_workspace: The CloudWorkspace object for this DAG
-        :param entity_id: The ID of the publisher for this DAG
-        :param entity_type: Whether this entity should be treated as a publisher or a collection
-        :param country_partner: The name of the country partner
-        :param institution_partner: The name of the institution partner
-        :param bq_dataset_description: Description for the BigQuery dataset
-        :param bq_country_table_description: Description for the BigQuery JSTOR country table
-        :param bq_institution_table_description: Description for the BigQuery JSTOR institution table
-        :param api_dataset_id: The ID to store the dataset release in the API
-        :param gmail_api_conn_id: Airflow connection ID for the Gmail API
-        :param observatory_api_conn_id: Airflow connection ID for the overvatory API
-        :param catchup: Whether to catchup the DAG or not
-        :param max_active_runs: The maximum number of DAG runs that can be run concurrently
-        :param schedule: The schedule interval of the DAG
-        :param start_date: The start date of the DAG
-        """
-        super().__init__(
-            dag_id,
-            start_date,
-            schedule,
-            catchup=catchup,
-            airflow_conns=[gmail_api_conn_id, observatory_api_conn_id],
-            max_active_runs=max_active_runs,
-            tags=["oaebu"],
+    country_partner = partner_from_str(country_partner)
+    institution_partner = partner_from_str(institution_partner)
+
+    @dag(dag_id=dag_id, schedule=schedule, start_date=start_date, catchup=catchup, tags=["oaebu"])
+    def jstor():
+        @task
+        def list_reports(**context) -> List[dict]:
+            """Lists all Jstor releases for a given month and publishes their report_type, download_url and
+            release_date's as an XCom.
+
+            :return: Whether to continue the DAG
+            """
+            # Get the reports from GMAIL API
+            api = make_jstor_api(entity_type, entity_id)
+            available_reports = api.list_reports()
+            if not len(available_reports) > 0:
+                raise AirflowSkipException("No reports available. Skipping downstream DAG taks.")
+            return available_reports
+
+        @task
+        def download(available_reports: List[dict], **context) -> List[dict]:
+            """Downloads the reports from the GMAIL API. A release is created for each unique release date.
+            Upoads the reports to GCS
+
+            :returns: List of unique releases"""
+
+            # Download reports and determine dates
+            available_releases = {}
+            api = make_jstor_api(entity_type, entity_id)
+            for report in available_reports:
+                # Download report to temporary file
+                tmp_download_path = NamedTemporaryFile().name
+                api.download_report(report, download_path=tmp_download_path)
+                start_date, end_date = api.get_release_date(tmp_download_path)
+
+                # Create temporary release and move report to correct path
+                release = JstorRelease(
+                    dag_id=dag_id,
+                    run_id=context["run_id"],
+                    data_interval_start=start_date,
+                    data_interval_end=end_date.add(days=1).start_of("month"),
+                    partition_date=end_date,
+                    reports=[report],
+                )
+                download_path = (
+                    release.download_country_path if report["type"] == "country" else release.download_institution_path
+                )
+                shutil.move(tmp_download_path, download_path)
+
+                # Add reports to list with available releases
+                release_date = release.partition_date.format("YYYYMMDD")
+                try:
+                    available_releases[release_date].append(report)
+                except KeyError:
+                    available_releases[release_date] = [report]
+
+            # Generate the release for each release date
+            releases = []
+            for release_date, reports in available_releases.items():
+                partition_date = pendulum.parse(release_date)
+                data_interval_start = partition_date.start_of("month")
+                data_interval_end = partition_date.add(days=1).start_of("month")
+                releases.append(
+                    JstorRelease(
+                        dag_id=dag_id,
+                        run_id=context["run_id"],
+                        partition_date=partition_date,
+                        data_interval_start=data_interval_start,
+                        data_interval_end=data_interval_end,
+                        reports=reports,
+                    )
+                )
+
+            # Upload to GCS
+            for release in releases:
+                success = gcs_upload_files(
+                    bucket_name=cloud_workspace.download_bucket,
+                    file_paths=[release.download_totals_path, release.download_country_path],
+                )
+                set_task_state(success, context["ti"].task_id, release=release)
+
+            return [r.to_dict() for r in releases]
+
+        @task
+        def transform(releases: List[dict], **context) -> None:
+            """Task to transform the Jstor releases for a given month."""
+            releases = [JstorRelease.from_dict(r) for r in releases]
+            api = make_jstor_api(entity_type, entity_id)
+            for release in releases:
+                api.transform_reports(
+                    download_country=release.download_country_path,
+                    download_institution=release.download_institution_path,
+                    transform_country=release.transform_country_path,
+                    transform_institution=release.transform_institution_path,
+                    partition_date=release.partition_date,
+                )
+
+                success = gcs_upload_files(
+                    bucket_name=cloud_workspace.transform_bucket,
+                    file_paths=[release.transform_country_path, release.transform_institution_path],
+                )
+                set_task_state(success, context["ti"].task_id, release=release)
+
+        @task
+        def bq_load(releases: List[dict], **context) -> None:
+            """Loads the sales and traffic data into BigQuery"""
+
+            releases = [JstorRelease.from_dict(r) for r in releases]
+            for release in releases:
+                for partner, table_description, file_path in [
+                    (country_partner, bq_country_table_description, release.transform_country_path),
+                    (
+                        institution_partner,
+                        bq_institution_table_description,
+                        release.transform_institution_path,
+                    ),
+                ]:
+                    bq_create_dataset(
+                        project_id=cloud_workspace.project_id,
+                        dataset_id=partner.bq_dataset_id,
+                        location=cloud_workspace.data_location,
+                        description=bq_dataset_description,
+                    )
+                    uri = gcs_blob_uri(cloud_workspace.transform_bucket, gcs_blob_name_from_path(file_path))
+                    table_id = bq_table_id(cloud_workspace.project_id, partner.bq_dataset_id, partner.bq_table_name)
+                    state = bq_load_table(
+                        uri=uri,
+                        table_id=table_id,
+                        schema_file_path=partner.schema_path,
+                        source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
+                        partition_type=TimePartitioningType.MONTH,
+                        partition=True,
+                        partition_field="release_date",
+                        write_disposition=WriteDisposition.WRITE_APPEND,
+                        table_description=table_description,
+                        ignore_unknown_values=True,
+                    )
+                    set_task_state(state, context["ti"].task_id, release=release)
+
+        @task
+        def add_new_dataset_releases(releases: List[dict], **context) -> None:
+            """Adds release information to API."""
+
+            releases = [JstorRelease.from_dict(r) for r in releases]
+            api = make_observatory_api(observatory_api_conn_id=observatory_api_conn_id)
+            for release in releases:
+                dataset_release = DatasetRelease(
+                    dag_id=dag_id,
+                    dataset_id=api_dataset_id,
+                    dag_run_id=release.run_id,
+                    data_interval_start=release.data_interval_start,
+                    data_interval_end=release.data_interval_end,
+                    partition_date=release.partition_date,
+                )
+                api.post_dataset_release(dataset_release)
+
+        @task
+        def cleanup(releases: List[dict], **context) -> None:
+            """Delete all files, folders and XComs associated with this release.
+            Assign a label to the gmail messages that have been processed."""
+
+            releases = [JstorRelease.from_dict(r) for r in releases]
+            api = make_jstor_api(entity_type, entity_id)
+            for release in releases:
+                cleanup(
+                    dag_id=dag_id,
+                    execution_date=context["execution_date"],
+                    workflow_folder=release.workflow_folder,
+                )
+                success = api.add_labels(release.reports)
+                set_task_state(success, context["ti"].task_id, release=release)
+
+        # Define DAG tasks
+        task_check = check_dependencies(airflow_conns=[observatory_api_conn_id, gmail_api_conn_id])
+        xcom_reports = list_reports()
+        xcom_releases = download(xcom_reports)
+        task_transform = transform(xcom_releases)
+        task_bq_load = bq_load(xcom_releases)
+        task_add_release = add_new_dataset_releases(xcom_releases)
+        task_cleanup = cleanup(xcom_releases)
+
+        (
+            task_check
+            >> xcom_reports
+            >> xcom_releases
+            >> task_transform
+            >> task_bq_load
+            >> task_add_release
+            >> task_cleanup
         )
 
-        self.dag_id = dag_id
-        self.cloud_workspace = cloud_workspace
-        self.entity_id = entity_id
-        self.entity_type = entity_type
-        self.country_partner = partner_from_str(country_partner)
-        self.institution_partner = partner_from_str(institution_partner)
-        self.bq_dataset_description = bq_dataset_description
-        self.bq_country_table_description = bq_country_table_description
-        self.bq_institution_table_description = bq_institution_table_description
-        self.api_dataset_id = api_dataset_id
-        self.gmail_api_conn_id = gmail_api_conn_id
-        self.observatory_api_conn_id = observatory_api_conn_id
-
-        check_workflow_inputs(self)
-
-        self.add_setup_task(self.check_dependencies)
-        self.add_setup_task(self.list_reports)
-        self.add_setup_task(self.download_reports)
-        self.add_task(self.upload_downloaded)
-        self.add_task(self.transform)
-        self.add_task(self.upload_transformed)
-        self.add_task(self.bq_load)
-        self.add_task(self.add_new_dataset_releases)
-        self.add_task(self.cleanup)
-
-    def make_release(self, **kwargs) -> List[JstorRelease]:
-        """Make release instances. The release is passed as an argument to the function (TelescopeFunction) that is
-        called in 'task_callable'.
-
-        :param kwargs: the context passed from the PythonOperator.
-        See https://airflow.apache.org/docs/stable/macros-ref.html for the keyword arguments that can be passed
-        :return: A list of grid release instances
-        """
-
-        ti: TaskInstance = kwargs["ti"]
-        available_releases = ti.xcom_pull(
-            key=JstorTelescope.RELEASE_INFO, task_ids=self.download_reports.__name__, include_prior_dates=False
-        )
-        releases = []
-        for release_date in available_releases:
-            reports = available_releases[release_date]
-            partition_date = pendulum.parse(release_date)
-            data_interval_start = partition_date.start_of("month")
-            data_interval_end = partition_date.add(days=1).start_of("month")
-            releases.append(
-                JstorRelease(
-                    dag_id=self.dag_id,
-                    run_id=kwargs["run_id"],
-                    partition_date=partition_date,
-                    data_interval_start=data_interval_start,
-                    data_interval_end=data_interval_end,
-                    reports=reports,
-                )
-            )
-        return releases
-
-    def list_reports(self, **kwargs) -> bool:
-        """Lists all Jstor releases for a given month and publishes their report_type, download_url and
-        release_date's as an XCom.
-
-        :return: Whether to continue the DAG
-        """
-        api = make_jstor_api(self.entity_type, self.entity_id)
-        available_reports = api.list_reports()
-        continue_dag = len(available_reports) > 0
-        if continue_dag:
-            # Push messages
-            ti: TaskInstance = kwargs["ti"]
-            ti.xcom_push(JstorTelescope.REPORTS_INFO, available_reports)
-
-        return continue_dag
-
-    def download_reports(self, **kwargs) -> bool:
-        """Download the JSTOR reports based on the list with available reports.
-        The release date for each report is only known after downloading the report. Therefore they are first
-        downloaded to a temporary location, afterwards the release info can be pushed as an xcom and the report is
-        moved to the correct location.
-
-        :return: Whether to continue the DAG (always True)
-        """
-        ti: TaskInstance = kwargs["ti"]
-        available_reports = ti.xcom_pull(
-            key=JstorTelescope.REPORTS_INFO, task_ids=self.list_reports.__name__, include_prior_dates=False
-        )
-        available_releases = {}
-        api = make_jstor_api(self.entity_type, self.entity_id)
-        for report in available_reports:
-            # Download report to temporary file
-            tmp_download_path = NamedTemporaryFile().name
-            api.download_report(report, download_path=tmp_download_path)
-            start_date, end_date = api.get_release_date(tmp_download_path)
-
-            # Create temporary release and move report to correct path
-            release = JstorRelease(
-                dag_id=self.dag_id,
-                run_id=kwargs["run_id"],
-                data_interval_start=start_date,
-                data_interval_end=end_date.add(days=1).start_of("month"),
-                partition_date=end_date,
-                reports=[report],
-            )
-            download_path = (
-                release.download_country_path if report["type"] == "country" else release.download_institution_path
-            )
-            shutil.move(tmp_download_path, download_path)
-
-            # Add reports to list with available releases
-            release_date = release.partition_date.format("YYYYMMDD")
-            try:
-                available_releases[release_date].append(report)
-            except KeyError:
-                available_releases[release_date] = [report]
-
-        ti.xcom_push(JstorTelescope.RELEASE_INFO, available_releases)
-        return True
-
-    def upload_downloaded(self, releases: List[JstorRelease], **kwargs) -> None:
-        """Uploads the downloaded files to GCS for each release
-
-        :param releases: List of JstorRelease instances:
-        """
-        for release in releases:
-            success = gcs_upload_files(
-                bucket_name=self.cloud_workspace.download_bucket,
-                file_paths=[release.download_country_path, release.download_institution_path],
-            )
-            set_task_state(success, kwargs["ti"].task_id, release=release)
-
-    def transform(self, releases: List[JstorRelease], **kwargs):
-        """Task to transform the Jstor releases for a given month."""
-        api = make_jstor_api(self.entity_type, self.entity_id)
-        for release in releases:
-            api.transform_reports(
-                download_country=release.download_country_path,
-                download_institution=release.download_institution_path,
-                transform_country=release.transform_country_path,
-                transform_institution=release.transform_institution_path,
-                partition_date=release.partition_date,
-            )
-
-    def upload_transformed(self, releases: List[JstorRelease], **kwargs) -> None:
-        """Uploads the transformed files to GCS for each release"""
-        for release in releases:
-            success = gcs_upload_files(
-                bucket_name=self.cloud_workspace.transform_bucket,
-                file_paths=[release.transform_country_path, release.transform_institution_path],
-            )
-            set_task_state(success, kwargs["ti"].task_id, release=release)
-
-    def bq_load(self, releases: List[JstorRelease], **kwargs) -> None:
-        """Loads the sales and traffic data into BigQuery"""
-
-        for release in releases:
-            for partner, table_description, file_path in [
-                (self.country_partner, self.bq_country_table_description, release.transform_country_path),
-                (self.institution_partner, self.bq_institution_table_description, release.transform_institution_path),
-            ]:
-                bq_create_dataset(
-                    project_id=self.cloud_workspace.project_id,
-                    dataset_id=partner.bq_dataset_id,
-                    location=self.cloud_workspace.data_location,
-                    description=self.bq_dataset_description,
-                )
-                uri = gcs_blob_uri(self.cloud_workspace.transform_bucket, gcs_blob_name_from_path(file_path))
-                table_id = bq_table_id(self.cloud_workspace.project_id, partner.bq_dataset_id, partner.bq_table_name)
-                state = bq_load_table(
-                    uri=uri,
-                    table_id=table_id,
-                    schema_file_path=partner.schema_path,
-                    source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
-                    partition_type=TimePartitioningType.MONTH,
-                    partition=True,
-                    partition_field="release_date",
-                    write_disposition=WriteDisposition.WRITE_APPEND,
-                    table_description=table_description,
-                    ignore_unknown_values=True,
-                )
-                set_task_state(state, kwargs["ti"].task_id, release=release)
-
-    def add_new_dataset_releases(self, releases: List[JstorRelease], **kwargs) -> None:
-        """Adds release information to API."""
-        api = make_observatory_api(observatory_api_conn_id=self.observatory_api_conn_id)
-        for release in releases:
-            dataset_release = DatasetRelease(
-                dag_id=self.dag_id,
-                dataset_id=self.api_dataset_id,
-                dag_run_id=release.run_id,
-                data_interval_start=release.data_interval_start,
-                data_interval_end=release.data_interval_end,
-                partition_date=release.partition_date,
-            )
-            api.post_dataset_release(dataset_release)
-
-    def cleanup(self, releases: List[JstorRelease], **kwargs) -> None:
-        """Delete all files, folders and XComs associated with this release.
-        Assign a label to the gmail messages that have been processed."""
-
-        api = make_jstor_api(self.entity_type, self.entity_id)
-        for release in releases:
-            cleanup(
-                dag_id=self.dag_id, execution_date=kwargs["execution_date"], workflow_folder=release.workflow_folder
-            )
-            success = api.add_labels(release.reports)
-            set_task_state(success, kwargs["ti"].task_id, release=release)
+    return jstor()
 
 
 def create_gmail_service() -> Resource:
@@ -480,7 +510,7 @@ class JstorPublishersAPI(JstorAPI):
         # List messages with specific query
         list_params = {
             "userId": "me",
-            "q": f'-label:{JstorTelescope.PROCESSED_LABEL_NAME} subject:"JSTOR Publisher Report Available" from:no-reply@ithaka.org',
+            "q": f'-label:{JSTOR_PROCESSED_LABEL_NAME} subject:"JSTOR Publisher Report Available" from:no-reply@ithaka.org',
             "labelIds": ["INBOX"],
             "maxResults": 500,
         }
@@ -548,14 +578,12 @@ class JstorPublishersAPI(JstorAPI):
 
         logging.info(f"Downloading report: {url} to: {download_path}")
         headers = {"User-Agent": get_user_agent(package_name="oaebu_workflows")}
-        response = retry_get_url(
-            url, headers=headers, wait=JstorTelescope.WAIT_FN, num_retries=JstorTelescope.MAX_ATTEMPTS
-        )
+        response = retry_get_url(url, headers=headers, wait=JSTOR_WAIT_FN, num_retries=JSTOR_MAX_ATTEMPTS)
         content = response.content.decode("utf-8")
         with open(download_path, "w") as f:
             f.write(content)
 
-    @retry(stop=stop_after_attempt(JstorTelescope.MAX_ATTEMPTS), reraise=True, wait=JstorTelescope.WAIT_FN)
+    @retry(stop=stop_after_attempt(JSTOR_MAX_ATTEMPTS), reraise=True, wait=JSTOR_WAIT_FN)
     def get_header_info(self, url: str) -> Tuple[str, str]:
         """Get header info from url and parse for filename and extension of file.
 
@@ -697,15 +725,13 @@ class JstorPublishersAPI(JstorAPI):
         :param reports: List of report info
         :return: True if successful, False otherwise
         """
-        label_id = self.get_label_id(JstorTelescope.PROCESSED_LABEL_NAME)
+        label_id = self.get_label_id(JSTOR_PROCESSED_LABEL_NAME)
         body = {"addLabelIds": [label_id]}
         for message in [report["id"] for report in reports]:
             response = self.service.users().messages().modify(userId="me", id=message, body=body).execute()
             try:
                 message_id = response["id"]
-                logging.info(
-                    f"Added label '{JstorTelescope.PROCESSED_LABEL_NAME}' to GMAIL message, message_id: {message_id}"
-                )
+                logging.info(f"Added label '{JSTOR_PROCESSED_LABEL_NAME}' to GMAIL message, message_id: {message_id}")
             except KeyError:
                 return False
         return True
@@ -724,7 +750,7 @@ class JstorCollectionsAPI(JstorAPI):
         # List messages with specific query
         list_params = {
             "userId": "me",
-            "q": f"-label:{JstorTelescope.PROCESSED_LABEL_NAME} from:grp_ithaka_data_intelligence@ithaka.org",
+            "q": f"-label:{JSTOR_PROCESSED_LABEL_NAME} from:grp_ithaka_data_intelligence@ithaka.org",
             "labelIds": ["INBOX"],
             "maxResults": 500,
         }
@@ -849,15 +875,13 @@ class JstorCollectionsAPI(JstorAPI):
         :param reports: List of report info
         :return: True if successful, False otherwise
         """
-        label_id = self.get_label_id(JstorTelescope.PROCESSED_LABEL_NAME)
+        label_id = self.get_label_id(JSTOR_PROCESSED_LABEL_NAME)
         body = {"addLabelIds": [label_id]}
         message = reports[0]["id"]  # Only one message for collections
         response = self.service.users().messages().modify(userId="me", id=message, body=body).execute()
         try:
             message_id = response["id"]
-            logging.info(
-                f"Added label '{JstorTelescope.PROCESSED_LABEL_NAME}' to GMAIL message, message_id: {message_id}"
-            )
+            logging.info(f"Added label '{JSTOR_PROCESSED_LABEL_NAME}' to GMAIL message, message_id: {message_id}")
         except KeyError:
             return False
         return True
