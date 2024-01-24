@@ -837,7 +837,7 @@ def collection_http_mock_sequence(country_json: str, institution_json: str) -> l
             "parts": [
                 {"partId": "0", "filename": "", "body": {"attachmentId": "0"}},
                 {"partId": "1", "filename": "BTAA_Overall_Open_Usage.xlsx", "body": {"attachmentId": "1"}},
-                {"partId": "2", "filename": "BTAA_Open_Country_Usage.csv", "body": {"attachmentId": "2"}},
+                {"partId": "2", "filename": "BTAA_Country_Open_Usage.csv", "body": {"attachmentId": "2"}},
                 {"partId": "3", "filename": "BTAA_Open_Institution_Usage.csv", "body": {"attachmentId": "3"}},
             ],
         },
