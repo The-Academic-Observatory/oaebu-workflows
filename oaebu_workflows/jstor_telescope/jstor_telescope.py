@@ -729,8 +729,8 @@ class JstorCollectionsAPI(JstorAPI):
             "maxResults": 500,
         }
         available_reports = []
-        country_regex = rf"^{self.entity_id}_Open_Country_Usage\.csv$"
-        institution_regex = rf"^{self.entity_id}_Open_Institution_Usage\.csv$"
+        country_regex = rf"^{self.entity_id}_(Open_Country|Country_Open)_Usage\.csv$"
+        institution_regex = rf"^{self.entity_id}_(Open_Institution|Institution_Open)_Usage\.csv$"
         for message_info in self.get_messages(list_params):
             message_id = message_info["id"]
             message = self.service.users().messages().get(userId="me", id=message_id).execute()
