@@ -1,4 +1,4 @@
-# Copyright 2023 Curtin University
+# Copyright 2023-2024 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ from typing import Union, Optional
 
 import pendulum
 from pendulum.datetime import DateTime
+from airflow.decorators import dag, task
 from airflow.exceptions import AirflowException
 from google.cloud.bigquery import SourceFormat
 
@@ -30,16 +31,10 @@ from observatory.platform.api import make_observatory_api
 from observatory.platform.airflow import AirflowConns
 from observatory.platform.bigquery import bq_load_table, bq_sharded_table_id, bq_create_dataset
 from observatory.platform.observatory_config import CloudWorkspace
+from observatory.platform.tasks import check_dependencies
 from observatory.platform.utils.url_utils import retry_get_url
-from observatory.platform.gcs import gcs_upload_files, gcs_blob_name_from_path, gcs_blob_uri
-from observatory.platform.workflows.workflow import (
-    Workflow,
-    SnapshotRelease,
-    make_snapshot_date,
-    cleanup,
-    set_task_state,
-    check_workflow_inputs,
-)
+from observatory.platform.gcs import gcs_upload_files, gcs_blob_name_from_path, gcs_blob_uri, gcs_download_blob
+from observatory.platform.workflows.workflow import SnapshotRelease, make_snapshot_date, cleanup, set_task_state
 
 
 THOTH_URL = "{host_name}/specifications/{format_specification}/publisher/{publisher_id}"
@@ -60,168 +55,216 @@ class ThothRelease(SnapshotRelease):
         :param release_date: The date of the snapshot_date/release
         """
         super().__init__(dag_id=dag_id, run_id=run_id, snapshot_date=snapshot_date)
-        self.download_path = os.path.join(self.download_folder, f"thoth_{snapshot_date.format('YYYY_MM_DD')}.xml")
-        self.transform_path = os.path.join(self.transform_folder, f"transformed.jsonl.gz")
+        self.download_file_name = f"thoth_{snapshot_date.format('YYYY_MM_DD')}.xml"
+        self.transform_file_name = "transformed.jsonl.gz"
 
+    @property
+    def download_file_path(self) -> str:
+        return os.path.join(self.download_folder, self.download_file_name)
 
-class ThothTelescope(Workflow):
-    def __init__(
-        self,
-        *,
-        dag_id: str,
-        cloud_workspace: CloudWorkspace,
-        publisher_id: str,
-        format_specification: str,
-        elevate_related_products: bool = False,
-        metadata_partner: Union[str, OaebuPartner] = "thoth",
-        bq_dataset_description: str = "Thoth ONIX Feed",
-        bq_table_description: Optional[str] = None,
-        api_dataset_id: str = "onix",
-        host_name: str = "https://export.thoth.pub",
-        observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
-        catchup: bool = False,
-        start_date: DateTime = pendulum.datetime(2022, 12, 1),
-        schedule: str = "@weekly",
-    ):
-        """Construct an ThothOnixTelescope instance.
-        :param dag_id: The ID of the DAG
-        :param cloud_workspace: The CloudWorkspace object for this DAG
-        :param publisher_id: The Thoth ID for this publisher
-        :param format_specification: The Thoth ONIX/metadata format specification. e.g. "onix_3.0::oapen"
-        :param elevate_related_products: Whether to pull out the related products to the product level.
-        :param metadata_partner: The metadata partner name
-        :param bq_dataset_description: Description for the BigQuery dataset
-        :param bq_table_description: Description for the biguery table
-        :param api_dataset_id: The ID to store the dataset release in the API
-        :param host_name: The Thoth host name
-        :param observatory_api_conn_id: Airflow connection ID for the overvatory API
-        :param catchup: Whether to catchup the DAG or not
-        :param start_date: The start date of the DAG
-        :param schedule: The schedule interval of the DAG
-        """
-        super().__init__(
-            dag_id,
-            start_date=start_date,
-            schedule=schedule,
-            airflow_conns=[observatory_api_conn_id],
-            catchup=catchup,
-            tags=["oaebu"],
+    @property
+    def transform_file_path(self) -> str:
+        return os.path.join(self.download_folder, self.transform_file_name)
+
+    @property
+    def download_blob(self):
+        return gcs_blob_name_from_path(self.download_file_path)
+
+    @property
+    def tranform_blob(self):
+        return gcs_blob_name_from_path(self.transform_file_path)
+
+    @staticmethod
+    def from_dict(dict_: dict):
+        return ThothRelease(
+            dag_id=dict_["dag_id"],
+            run_id=dict_["run_id"],
+            snapshot_date=dict_["snapshot_date"],
         )
 
-        if bq_table_description is None:
-            bq_table_description = "Thoth ONIX Feed"
+    def to_dict(self) -> dict:
+        return {
+            "dag_id": self.dag_id,
+            "run_id": self.run_id,
+            "snapshot_date": self.snapshot_date.isoformat(),
+        }
 
-        self.dag_id = dag_id
-        self.cloud_workspace = cloud_workspace
-        self.publisher_id = publisher_id
-        self.elevate_related_products = elevate_related_products
-        self.metadata_partner = partner_from_str(metadata_partner, metadata_partner=True)
-        self.bq_dataset_description = bq_dataset_description
-        self.bq_table_description = bq_table_description
-        self.api_dataset_id = api_dataset_id
-        self.host_name = host_name
-        self.format_specification = format_specification
-        self.observatory_api_conn_id = observatory_api_conn_id
 
-        check_workflow_inputs(self)
+def create_dag(
+    *,
+    dag_id: str,
+    cloud_workspace: CloudWorkspace,
+    publisher_id: str,
+    format_specification: str,
+    elevate_related_products: bool = False,
+    metadata_partner: Union[str, OaebuPartner] = "thoth",
+    bq_dataset_description: str = "Thoth ONIX Feed",
+    bq_table_description: Optional[str] = None,
+    api_dataset_id: str = "onix",
+    observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
+    catchup: bool = False,
+    start_date: DateTime = pendulum.datetime(2022, 12, 1),
+    schedule: str = "@weekly",
+):
+    """Construct an ThothOnixTelescope instance.
+    :param dag_id: The ID of the DAG
+    :param cloud_workspace: The CloudWorkspace object for this DAG
+    :param publisher_id: The Thoth ID for this publisher
+    :param format_specification: The Thoth ONIX/metadata format specification. e.g. "onix_3.0::oapen"
+    :param elevate_related_products: Whether to pull out the related products to the product level.
+    :param metadata_partner: The metadata partner name
+    :param bq_dataset_description: Description for the BigQuery dataset
+    :param bq_table_description: Description for the biguery table
+    :param api_dataset_id: The ID to store the dataset release in the API
+    :param observatory_api_conn_id: Airflow connection ID for the overvatory API
+    :param catchup: Whether to catchup the DAG or not
+    :param start_date: The start date of the DAG
+    :param schedule: The schedule interval of the DAG
+    """
 
-        self.add_setup_task(self.check_dependencies)
-        self.add_task(self.download)
-        self.add_task(self.upload_downloaded)
-        self.add_task(self.transform)
-        self.add_task(self.upload_transformed)
-        self.add_task(self.bq_load)
-        self.add_task(self.add_new_dataset_releases)
-        self.add_task(self.cleanup)
+    if bq_table_description is None:
+        bq_table_description = "Thoth ONIX Feed"
 
-    def make_release(self, **kwargs) -> ThothRelease:
-        """Creates a new Thoth release instance
+    metadata_partner = partner_from_str(metadata_partner, metadata_partner=True)
 
-        :param kwargs: the context passed from the PythonOperator.
-        See https://airflow.apache.org/docs/stable/macros-ref.html for the keyword arguments that can be passed
-        :return: The Thoth release instance
-        """
-        snapshot_date = make_snapshot_date(**kwargs)
-        release = ThothRelease(dag_id=self.dag_id, run_id=kwargs["run_id"], snapshot_date=snapshot_date)
-        return release
+    @dag(
+        dag_id=dag_id,
+        start_date=start_date,
+        schedule=schedule,
+        airflow_conns=[observatory_api_conn_id],
+        catchup=catchup,
+        tags=["oaebu"],
+    )
+    def thoth_telescope():
+        @task()
+        def make_release(**content) -> ThothRelease:
+            """Creates a new Thoth release instance
 
-    def download(self, release: ThothRelease, **kwargs) -> None:
-        """Task to download the ONIX release from Thoth.
+            :param content: the context passed from the PythonOperator.
+            See https://airflow.apache.org/docs/stable/macros-ref.html for the keyword arguments that can be passed
+            :return: The Thoth release instance
+            """
 
-        :param release: The Thoth release instance
-        """
-        thoth_download_onix(
-            publisher_id=self.publisher_id,
-            format_spec=self.format_specification,
-            download_path=release.download_path,
+            snapshot_date = make_snapshot_date(**content)
+            return ThothRelease(dag_id=dag_id, run_id=content["run_id"], snapshot_date=snapshot_date).to_dict()
+
+        @task()
+        def download(release: dict, **content) -> None:
+            """Task to download the ONIX release from Thoth.
+
+            :param release: The Thoth release instance
+            """
+
+            release = ThothRelease.from_dict(release)
+            thoth_download_onix(
+                publisher_id=publisher_id,
+                format_spec=format_specification,
+                download_path=release.download_path,
+            )
+            success = gcs_upload_files(bucket_name=cloud_workspace.download_bucket, file_paths=[release.download_path])
+            set_task_state(success, content["ti"].task_id, release=release)
+
+        @task()
+        def transform(release: dict, **content) -> None:
+            """Task to transform the Thoth ONIX data"""
+
+            release = ThothRelease.from_dict(release)
+            # Download files from GCS
+            success = gcs_download_blob(
+                bucket_name=cloud_workspace.download_bucket,
+                blob_name=release.download_blob_name,
+                file_path=release.download_path,
+            )
+            if not success:
+                raise FileNotFoundError(f"Error downloading file: {release.download_blob_name}")
+
+            transformer = OnixTransformer(
+                input_path=release.download_path,
+                output_dir=release.transform_folder,
+                deduplicate_related_products=elevate_related_products,
+                elevate_related_products=elevate_related_products,
+                add_name_fields=True,
+                collapse_subjects=True,
+            )
+            out_file = transformer.transform()
+            if release.transform_path != out_file:
+                raise FileNotFoundError(
+                    f"Expected file {release.transform_path} not equal to transformed file: {out_file}"
+                )
+            success = gcs_upload_files(
+                bucket_name=cloud_workspace.transform_bucket, file_paths=[release.transform_path]
+            )
+            set_task_state(success, content["ti"].task_id, release=release)
+
+        @task()
+        def bq_load(release: dict, **content) -> None:
+            """Task to load the transformed ONIX jsonl file to BigQuery."""
+
+            release = ThothRelease.from_dict(release)
+            bq_create_dataset(
+                project_id=cloud_workspace.project_id,
+                dataset_id=metadata_partner.bq_dataset_id,
+                location=cloud_workspace.data_location,
+                description=bq_dataset_description,
+            )
+            uri = gcs_blob_uri(cloud_workspace.transform_bucket, gcs_blob_name_from_path(release.transform_path))
+            table_id = bq_sharded_table_id(
+                cloud_workspace.project_id,
+                metadata_partner.bq_dataset_id,
+                metadata_partner.bq_table_name,
+                release.snapshot_date,
+            )
+            state = bq_load_table(
+                uri=uri,
+                table_id=table_id,
+                schema_file_path=metadata_partner.schema_path,
+                source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
+                table_description=bq_table_description,
+            )
+            set_task_state(state, content["ti"].task_id, release=release)
+
+        @task()
+        def add_new_dataset_releases(release: dict, **content) -> None:
+            """Adds release information to API."""
+
+            release = ThothRelease.from_dict(release)
+            dataset_release = DatasetRelease(
+                dag_id=dag_id,
+                dataset_id=api_dataset_id,
+                dag_run_id=release.run_id,
+                snapshot_date=release.snapshot_date,
+                data_interval_start=content["data_interval_start"],
+                data_interval_end=content["data_interval_end"],
+            )
+            api = make_observatory_api(observatory_api_conn_id=observatory_api_conn_id)
+            api.post_dataset_release(dataset_release)
+
+        @task()
+        def cleanup_workflow(release: dict, **content) -> None:
+            """Delete all files, folders and XComs associated with this release."""
+
+            release = ThothRelease.from_dict(release)
+            cleanup(dag_id=dag_id, execution_date=content["execution_date"], workflow_folder=release.workflow_folder)
+
+        task_check_dependencies = check_dependencies()
+        xcom_release = make_release()
+        task_download = download(xcom_release)
+        task_transform = transform(xcom_release)
+        task_bq_load = bq_load(xcom_release)
+        task_add_new_dataset_releases = add_new_dataset_releases(xcom_release)
+        task_cleanup_workflow = cleanup_workflow(xcom_release)
+
+        (
+            task_check_dependencies
+            >> xcom_release
+            >> task_download
+            >> task_transform
+            >> task_bq_load
+            >> task_add_new_dataset_releases
+            >> task_cleanup_workflow
         )
 
-    def upload_downloaded(self, release: ThothRelease, **kwargs) -> None:
-        """Upload the downloaded thoth onix XML to google cloud bucket"""
-        success = gcs_upload_files(bucket_name=self.cloud_workspace.download_bucket, file_paths=[release.download_path])
-        set_task_state(success, kwargs["ti"].task_id, release=release)
-
-    def transform(self, release: ThothRelease, **kwargs) -> None:
-        """Task to transform the Thoth ONIX data"""
-        transformer = OnixTransformer(
-            input_path=release.download_path,
-            output_dir=release.transform_folder,
-            deduplicate_related_products=self.elevate_related_products,
-            elevate_related_products=self.elevate_related_products,
-            add_name_fields=True,
-            collapse_subjects=True,
-        )
-        out_file = transformer.transform()
-        if release.transform_path != out_file:
-            raise FileNotFoundError(f"Expected file {release.transform_path} not equal to transformed file: {out_file}")
-
-    def upload_transformed(self, release: ThothRelease, **kwargs) -> None:
-        """Upload the downloaded thoth onix .jsonl to google cloud bucket"""
-        success = gcs_upload_files(
-            bucket_name=self.cloud_workspace.transform_bucket, file_paths=[release.transform_path]
-        )
-        set_task_state(success, kwargs["ti"].task_id, release=release)
-
-    def bq_load(self, release: ThothRelease, **kwargs) -> None:
-        """Task to load the transformed ONIX jsonl file to BigQuery."""
-        bq_create_dataset(
-            project_id=self.cloud_workspace.project_id,
-            dataset_id=self.metadata_partner.bq_dataset_id,
-            location=self.cloud_workspace.data_location,
-            description=self.bq_dataset_description,
-        )
-        uri = gcs_blob_uri(self.cloud_workspace.transform_bucket, gcs_blob_name_from_path(release.transform_path))
-        table_id = bq_sharded_table_id(
-            self.cloud_workspace.project_id,
-            self.metadata_partner.bq_dataset_id,
-            self.metadata_partner.bq_table_name,
-            release.snapshot_date,
-        )
-        state = bq_load_table(
-            uri=uri,
-            table_id=table_id,
-            schema_file_path=self.metadata_partner.schema_path,
-            source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
-            table_description=self.bq_table_description,
-        )
-        set_task_state(state, kwargs["ti"].task_id, release=release)
-
-    def add_new_dataset_releases(self, release: ThothRelease, **kwargs) -> None:
-        """Adds release information to API."""
-        dataset_release = DatasetRelease(
-            dag_id=self.dag_id,
-            dataset_id=self.api_dataset_id,
-            dag_run_id=release.run_id,
-            snapshot_date=release.snapshot_date,
-            data_interval_start=kwargs["data_interval_start"],
-            data_interval_end=kwargs["data_interval_end"],
-        )
-        api = make_observatory_api(observatory_api_conn_id=self.observatory_api_conn_id)
-        api.post_dataset_release(dataset_release)
-
-    def cleanup(self, release: ThothRelease, **kwargs) -> None:
-        """Delete all files, folders and XComs associated with this release."""
-        cleanup(dag_id=self.dag_id, execution_date=kwargs["execution_date"], workflow_folder=release.workflow_folder)
+    return thoth_telescope()
 
 
 def thoth_download_onix(

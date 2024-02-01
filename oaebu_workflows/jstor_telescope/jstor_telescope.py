@@ -44,15 +44,12 @@ from observatory.platform.api import make_observatory_api
 from observatory.platform.airflow import AirflowConns
 from observatory.platform.files import save_jsonl_gz
 from observatory.platform.utils.url_utils import get_user_agent, retry_get_url
-from observatory.platform.gcs import gcs_upload_files, gcs_blob_uri, gcs_blob_name_from_path
+from observatory.platform.gcs import gcs_upload_files, gcs_blob_uri, gcs_blob_name_from_path, gcs_download_blob
 from observatory.platform.bigquery import bq_load_table, bq_table_id, bq_create_dataset
 from observatory.platform.observatory_config import CloudWorkspace
 from observatory.platform.tasks import check_dependencies
 from observatory.platform.files import add_partition_date, convert
-from observatory.platform.workflows.workflow import (
-    PartitionRelease,
-    set_task_state,
-)
+from observatory.platform.workflows.workflow import PartitionRelease, set_task_state, cleanup
 
 JSTOR_REPORTS_INFO = "reports"
 JSTOR_PROCESSED_LABEL_NAME = "processed_report"
@@ -203,8 +200,10 @@ def create_dag(
             """Lists all Jstor releases for a given month and publishes their report_type, download_url and
             release_date's as an XCom.
 
-            :return: Whether to continue the DAG
+            :raises AirflowSkipException: Raised if there are no available reports
+            :return: A list of available reports
             """
+
             # Get the reports from GMAIL API
             api = make_jstor_api(entity_type, entity_id)
             available_reports = api.list_reports()
@@ -217,7 +216,8 @@ def create_dag(
             """Downloads the reports from the GMAIL API. A release is created for each unique release date.
             Upoads the reports to GCS
 
-            :returns: List of unique releases"""
+            :returns: List of unique releases
+            """
 
             # Download reports and determine dates
             available_releases = {}
@@ -279,9 +279,26 @@ def create_dag(
         @task
         def transform(releases: List[dict], **context) -> None:
             """Task to transform the Jstor releases for a given month."""
+
             releases = [JstorRelease.from_dict(r) for r in releases]
             api = make_jstor_api(entity_type, entity_id)
             for release in releases:
+                # Download files from GCS
+                success = gcs_download_blob(
+                    bucket_name=cloud_workspace.download_bucket,
+                    blob_name=release.download_country_blob_name,
+                    file_path=release.download_country_path,
+                )
+                if not success:
+                    raise FileNotFoundError(f"Error downloading file: {release.download_country_blob_name}")
+                success = gcs_download_blob(
+                    bucket_name=cloud_workspace.download_bucket,
+                    blob_name=release.download_institution_blob_name,
+                    file_path=release.download_institution_path,
+                )
+                if not success:
+                    raise FileNotFoundError(f"Error downloading file: {release.download_institution_blob_name}")
+
                 api.transform_reports(
                     download_country=release.download_country_path,
                     download_institution=release.download_institution_path,
@@ -350,7 +367,7 @@ def create_dag(
                 api.post_dataset_release(dataset_release)
 
         @task
-        def cleanup(releases: List[dict], **context) -> None:
+        def cleanup_workflow(releases: List[dict], **context) -> None:
             """Delete all files, folders and XComs associated with this release.
             Assign a label to the gmail messages that have been processed."""
 
@@ -372,7 +389,7 @@ def create_dag(
         task_transform = transform(xcom_releases)
         task_bq_load = bq_load(xcom_releases)
         task_add_release = add_new_dataset_releases(xcom_releases)
-        task_cleanup = cleanup(xcom_releases)
+        task_cleanup_workflow = cleanup_workflow(xcom_releases)
 
         (
             task_check

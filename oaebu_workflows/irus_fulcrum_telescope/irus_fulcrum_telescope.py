@@ -32,7 +32,7 @@ from observatory.platform.files import save_jsonl_gz, load_jsonl, add_partition_
 from observatory.platform.gcs import gcs_blob_name_from_path, gcs_upload_files, gcs_blob_uri, gcs_download_blob
 from observatory.platform.bigquery import bq_load_table, bq_create_dataset, bq_table_id
 from observatory.platform.tasks import check_dependencies
-from observatory.platform.workflows.workflow import PartitionRelease, set_task_state
+from observatory.platform.workflows.workflow import PartitionRelease, set_task_state, cleanup
 from observatory.platform.utils.url_utils import retry_get_url
 
 IRUS_FULCRUM_ENDPOINT_TEMPLATE = (
@@ -152,7 +152,7 @@ def create_dag(
     )
     def irus_fulcrum():
         @task
-        def make_release(**context) -> IrusFulcrumRelease:
+        def make_release(**context) -> dict:
             """Create a IrusFulcrumRelease instance
             Dates are best explained with an example
             Say the dag is scheduled to run on 2022-04-07
@@ -172,7 +172,7 @@ def create_dag(
             ).to_dict()
 
         @task
-        def download(release: dict, **context):
+        def download(release: dict, **context) -> None:
             """Task to download the Fulcrum data from IRUS and upload to cloud storage
 
             :param release: the IrusFulcrumRelease instance.
@@ -193,10 +193,10 @@ def create_dag(
             set_task_state(success, context["ti"].task_id, release=release)
 
         @task
-        def transform(release: dict, **context):
+        def transform(release: dict, **context) -> None:
             """Task to transform the fulcrum data and upload to cloud storage"""
-            release = IrusFulcrumRelease.from_dict(release)
 
+            release = IrusFulcrumRelease.from_dict(release)
             # Download files
             success = gcs_download_blob(
                 bucket_name=cloud_workspace.download_bucket,
@@ -205,6 +205,7 @@ def create_dag(
             )
             if not success:
                 raise FileNotFoundError(f"Error downloading file: {release.download_totals_blob_name}")
+
             success = gcs_download_blob(
                 bucket_name=cloud_workspace.download_bucket,
                 blob_name=release.download_country_blob_name,
@@ -279,7 +280,7 @@ def create_dag(
             api.post_dataset_release(dataset_release)
 
         @task
-        def cleanup(release: dict, **context) -> None:
+        def cleanup_workflow(release: dict, **context) -> None:
             """Delete all files and folders associated with this release."""
             release = IrusFulcrumRelease.from_dict(release)
             cleanup(dag_id, execution_date=context["execution_date"], workflow_folder=release.workflow_folder)
@@ -291,7 +292,7 @@ def create_dag(
         task_transform = transform(xcom_release)
         task_bq_load = bq_load(xcom_release)
         task_add_release = add_new_dataset_releases(xcom_release)
-        task_cleanup = cleanup(xcom_release)
+        task_cleanup = cleanup_workflow(xcom_release)
 
         (
             task_check
