@@ -282,7 +282,7 @@ def create_dag(
         task_bq_load = bq_load(xcom_release)
         task_move_files_to_finished = move_files_to_finished(xcom_release)
         task_add_new_dataset_releases = add_new_dataset_releases(xcom_release)
-        task_cleanup = cleanup_workflow(xcom_release)
+        task_cleanup_workflow = cleanup_workflow(xcom_release)
 
         (
             task_check_dependencies
@@ -293,7 +293,7 @@ def create_dag(
             >> task_bq_load
             >> task_move_files_to_finished
             >> task_add_new_dataset_releases
-            >> task_cleanup
+            >> task_cleanup_workflow
         )
 
     return onix_telescope()

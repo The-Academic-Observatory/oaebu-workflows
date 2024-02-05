@@ -351,7 +351,7 @@ def create_dag(
         task_finished = move_files_to_finished(xcom_release)
         task_bq_load = bq_load(xcom_release)
         task_add_release = add_new_dataset_releases(xcom_release)
-        task_cleanup = cleanup_workflow(xcom_release)
+        task_cleanup_workflow = cleanup_workflow(xcom_release)
 
         (
             task_check
@@ -362,7 +362,7 @@ def create_dag(
             >> task_finished
             >> task_bq_load
             >> task_add_release
-            >> task_cleanup
+            >> task_cleanup_workflow
         )
 
     return google_books()

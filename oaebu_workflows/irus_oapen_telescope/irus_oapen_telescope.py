@@ -419,7 +419,7 @@ def create_dag(
         task_transform = transform(xcom_release)
         task_bq_load = bq_load(xcom_release)
         task_add_release = add_new_dataset_releases(xcom_release)
-        task_cleanup = cleanup_workflow(xcom_release)
+        task_cleanup_workflow = cleanup_workflow(xcom_release)
 
         (
             task_check
@@ -430,7 +430,7 @@ def create_dag(
             >> task_transform
             >> task_bq_load
             >> task_add_release
-            >> task_cleanup
+            >> task_cleanup_workflow
         )
 
     return irus_oapen()

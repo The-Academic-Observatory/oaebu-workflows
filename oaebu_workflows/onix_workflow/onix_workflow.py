@@ -341,7 +341,7 @@ class OnixWorkflow(Workflow):
 
             # Final tasks
             task_add_release = self.make_python_operator(self.add_new_dataset_releases, "add_new_dataset_releases")
-            task_cleanup = self.make_python_operator(self.cleanup, "cleanup")
+            task_cleanup_workflow = self.make_python_operator(self.cleanup, "cleanup")
 
             chain(
                 task_sensors,
@@ -354,7 +354,7 @@ class OnixWorkflow(Workflow):
                 task_create_export_tables,
                 task_update_latest_export_tables,
                 task_add_release,
-                task_cleanup,
+                task_cleanup_workflow,
             )
 
         return self.dag

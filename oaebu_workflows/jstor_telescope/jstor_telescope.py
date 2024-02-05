@@ -398,7 +398,7 @@ def create_dag(
             >> task_transform
             >> task_bq_load
             >> task_add_release
-            >> task_cleanup
+            >> task_cleanup_workflow
         )
 
     return jstor()
