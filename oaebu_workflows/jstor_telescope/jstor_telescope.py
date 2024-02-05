@@ -174,7 +174,7 @@ class JstorTelescope(Workflow):
         self.add_task(self.upload_transformed)
         self.add_task(self.bq_load)
         self.add_task(self.add_new_dataset_releases)
-        # self.add_task(self.cleanup)
+        self.add_task(self.cleanup)
 
     def make_release(self, **kwargs) -> List[JstorRelease]:
         """Make release instances. The release is passed as an argument to the function (TelescopeFunction) that is
