@@ -174,7 +174,7 @@ class JstorTelescope(Workflow):
         self.add_task(self.upload_transformed)
         self.add_task(self.bq_load)
         self.add_task(self.add_new_dataset_releases)
-        self.add_task(self.cleanup)
+        # self.add_task(self.cleanup)
 
     def make_release(self, **kwargs) -> List[JstorRelease]:
         """Make release instances. The release is passed as an argument to the function (TelescopeFunction) that is
@@ -826,7 +826,10 @@ class JstorCollectionsAPI(JstorAPI):
                 row["Publisher"] = row.pop("publisher")
                 row["Book_ID"] = row.pop("item_doi")
                 row["Usage_Month"] = partition_date.strftime("%Y-%m")
-                row[entity] = row.pop("\ufeffentity_name")
+                try:
+                    row[entity] = row.pop("\ufeffentity_name")
+                except KeyError:
+                    row[entity] = row.pop("entity_name")
                 row["Book_Title"] = row.pop("book_title")
                 row["Authors"] = row.pop("authors")
                 row["ISBN"] = row.pop("eisbn")
