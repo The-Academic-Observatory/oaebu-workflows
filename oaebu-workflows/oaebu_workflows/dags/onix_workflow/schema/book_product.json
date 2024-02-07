@@ -1,0 +1,252 @@
+[
+  {
+    "mode": "NULLABLE",
+    "name": "ISBN13",
+    "type": "STRING",
+    "description": "ISBN13"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "Doi",
+        "type": "STRING",
+        "description": "DOI"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "ProductForm",
+        "type": "STRING",
+        "description": "The product form, such as digital, print etc"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "EditionNumber",
+        "type": "INTEGER",
+        "description": "The edition number of this book product"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "title",
+        "type": "STRING",
+        "description": "The Book's Title"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "published_year",
+        "type": "STRING",
+        "description": "The year the book was published"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "published_date",
+        "type": "DATE",
+        "description": "The date the book was published"
+      },
+      {
+        "mode": "REPEATED",
+        "name": "bic_subjects",
+        "type": "STRING",
+        "description": "A list of BIC subjects"
+      },
+      {
+        "mode": "REPEATED",
+        "name": "bisac_subjects",
+        "type": "STRING",
+        "description": "A list of BISAC subjects"
+      },
+      {
+        "mode": "REPEATED",
+        "name": "thema_subjects",
+        "type": "STRING",
+        "description": "A list of THEMA subjects"
+      },
+      {
+        "mode": "REPEATED",
+        "name": "keywords",
+        "type": "STRING",
+        "description": "A list of Keywords"
+      },
+      {
+        "fields": [
+          {
+            "mode": "NULLABLE",
+            "name": "PersonName",
+            "type": "STRING",
+            "description": "The Author's Full Name in the format '[first name] [last name]'"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "PersonNameInverted",
+            "type": "STRING",
+            "description": "The Authors Full Name in the format '[last name], [first name]'"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "ORCID",
+            "type": "STRING",
+            "description": "Authors ORCID ID, if present"
+          }
+        ],
+        "mode": "REPEATED",
+        "name": "authors",
+        "type": "RECORD",
+        "description": "Book Authors"
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "onix",
+    "type": "RECORD",
+    "description": "Fields Pulled from the ONIX Record for this Book Product"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "work_id",
+    "type": "STRING",
+    "description": "The dervied Work_ID that we calculate"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "work_family_id",
+    "type": "STRING",
+    "description": "The Dervied Work_Family_ID that we calculate"
+  },
+  {
+    "fields": [
+      {
+        "fields": [
+          {
+            "mode": "NULLABLE",
+            "name": "doi",
+            "type": "STRING",
+            "description": "The DOI from crossref"
+          },
+          {
+            "mode": "REPEATED",
+            "name": "title",
+            "type": "STRING",
+            "description": "The title from crossref"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "type",
+            "type": "STRING",
+            "description": "The type from crossref"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "publisher",
+            "type": "STRING",
+            "description": "The publisher from crossref"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "published_year",
+            "type": "INTEGER",
+            "description": "The published year from crossref"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "published_year_month",
+            "type": "STRING",
+            "description": "The published year-month from crossref"
+          },
+          {
+            "mode": "REPEATED",
+            "name": "work_isbns",
+            "type": "STRING",
+            "description": "ISBNs"
+          }
+        ],
+        "mode": "REPEATED",
+        "name": "crossref_objects",
+        "type": "RECORD",
+        "description": "Linked Objects from Crossref and their values"
+      },
+      {
+        "fields": [
+          {
+            "mode": "NULLABLE",
+            "name": "doi",
+            "type": "STRING",
+            "description": "The Book Chapter DOI"
+          },
+          {
+            "mode": "REPEATED",
+            "name": "title",
+            "type": "STRING",
+            "description": "The Book Chapter title"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "type",
+            "type": "STRING",
+            "description": "The Book Chapter type"
+          }
+        ],
+        "mode": "REPEATED",
+        "name": "chapters",
+        "type": "RECORD",
+        "description": "Linked Objects from Crossref where they are of type book-chapter only"
+      },
+      {
+        "fields": [
+          {
+            "mode": "NULLABLE",
+            "name": "source",
+            "type": "STRING",
+            "description": "Event Source Type"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "count",
+            "type": "INTEGER",
+            "description": "Count of events"
+          }
+        ],
+        "mode": "REPEATED",
+        "name": "events",
+        "type": "RECORD",
+        "description": "Count of events from Crossref Events"
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "metadata",
+    "type": "RECORD",
+    "description": "Metadata on this book, derived and organised by source"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "month",
+        "type": "DATE",
+        "description": "Month of Recorded Metrics"
+      },
+      {
+        "fields": [
+          {
+            "mode": "NULLABLE",
+            "name": "source",
+            "type": "STRING",
+            "description": "The event source"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "count",
+            "type": "INTEGER",
+            "description": "The count of events"
+          }
+        ],
+        "mode": "REPEATED",
+        "name": "crossref_events",
+        "type": "RECORD",
+        "description": "Metrics Derived From Crossref Events"
+      }
+    ],
+    "mode": "REPEATED",
+    "name": "months",
+    "type": "RECORD",
+    "description": "Linked Metrics from all sources, organised by month of occurance"
+  }
+]

@@ -1,0 +1,8 @@
+[
+    {
+        "mode": "NULLABLE",
+        "name": "ISBN",
+        "type": "STRING",
+        "description": "ISBN13"
+    }
+]

@@ -1,0 +1,62 @@
+{
+    "fields": [
+        {
+            "mode": "NULLABLE",
+            "name": "ISBN13",
+            "type": "STRING",
+            "description": "ISBN of the book (13 digits)"
+        },
+        {
+            "mode": "NULLABLE",
+            "name": "Book_Title",
+            "type": "STRING",
+            "description": "Title of the book"
+        },
+        {
+            "mode": "NULLABLE",
+            "name": "Book_ID",
+            "type": "STRING",
+            "description": "DOI of the book on JSTOR"
+        },
+        {
+            "mode": "NULLABLE",
+            "name": "Authors",
+            "type": "STRING",
+            "description": ""
+        },
+        {
+            "mode": "NULLABLE",
+            "name": "ISBN",
+            "type": "STRING",
+            "description": "ISBN of the book (13 digits)"
+        },
+        {
+            "mode": "NULLABLE",
+            "name": "eISBN",
+            "type": "STRING",
+            "description": "ISBN of the digital version of the book (13 digits)"
+        },
+        {
+            "mode": "NULLABLE",
+            "name": "Copyright_Year",
+            "type": "INTEGER",
+            "description": "Publication year"
+        },
+        {
+            "mode": "NULLABLE",
+            "name": "Disciplines",
+            "type": "STRING",
+            "description": "Subject category of the book"
+        },
+        {
+            "mode": "NULLABLE",
+            "name": "Usage_Type",
+            "type": "STRING",
+            "description": "For our case it is Open Access"
+        }
+    ],
+    "mode": "NULLABLE",
+    "name": "jstor_institution",
+    "type": "RECORD",
+    "description": "Metadata derived from JSTOR Institutions"
+}

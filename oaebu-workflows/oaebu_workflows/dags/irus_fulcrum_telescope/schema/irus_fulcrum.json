@@ -1,0 +1,112 @@
+[
+  {
+    "description": "Proprietary identifier of the book.",
+    "mode": "NULLABLE",
+    "name": "proprietary_id",
+    "type": "STRING"
+  },
+  {
+    "description": "ISBN of the book.",
+    "mode": "NULLABLE",
+    "name": "ISBN",
+    "type": "STRING"
+  },
+  {
+    "description": "Title of the book",
+    "mode": "NULLABLE",
+    "name": "book_title",
+    "type": "STRING"
+  },
+  {
+    "description": "The publisher",
+    "mode": "NULLABLE",
+    "name": "publisher",
+    "type": "STRING"
+  },
+  {
+    "description": "The names of the authors",
+    "mode": "NULLABLE",
+    "name": "authors",
+    "type": "STRING"
+  },
+  {
+    "description": "The investigated month.",
+    "mode": "NULLABLE",
+    "name": "event_month",
+    "type": "STRING"
+  },
+  {
+    "description": "The total number of item investigations.",
+    "mode": "NULLABLE",
+    "name": "total_item_investigations",
+    "type": "INTEGER"
+  },
+  {
+    "description": "The total number of item requests.",
+    "mode": "NULLABLE",
+    "name": "total_item_requests",
+    "type": "INTEGER"
+  },
+  {
+    "description": "The number of unique item investigations.",
+    "mode": "NULLABLE",
+    "name": "unique_item_investigations",
+    "type": "INTEGER"
+  },
+  {
+    "description": "The number of unique item requests.",
+    "mode": "NULLABLE",
+    "name": "unique_item_requests",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Record to store statistics on the country level.",
+    "mode": "REPEATED",
+    "name": "country",
+    "type": "RECORD",
+    "fields": [
+      {
+        "description": "The country name of the client registered by IRUS.",
+        "mode": "NULLABLE",
+        "name": "name",
+        "type": "STRING"
+      },
+      {
+        "description": "The country code of the client registered by IRUS.",
+        "mode": "NULLABLE",
+        "name": "code",
+        "type": "STRING"
+      },
+      {
+        "description": "The total number of item investigations.",
+        "mode": "NULLABLE",
+        "name": "total_item_investigations",
+        "type": "INTEGER"
+      },
+      {
+        "description": "The total number of item requests.",
+        "mode": "NULLABLE",
+        "name": "total_item_requests",
+        "type": "INTEGER"
+      },
+      {
+        "description": "The number of unique item investigations.",
+        "mode": "NULLABLE",
+        "name": "unique_item_investigations",
+        "type": "INTEGER"
+      },
+      {
+        "description": "The number of unique item requests.",
+        "mode": "NULLABLE",
+        "name": "unique_item_requests",
+        "type": "INTEGER"
+      }
+    ]
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "release_date",
+    "type": "DATE",
+    "description": "Last day of the release month. Table is partitioned on this column."
+  }
+]

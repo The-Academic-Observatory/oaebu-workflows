@@ -1,0 +1,1 @@
+google_books.qty IS NOT NULL

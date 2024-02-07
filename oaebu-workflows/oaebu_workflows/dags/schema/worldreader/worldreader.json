@@ -1,0 +1,44 @@
+[
+    {
+        "mode": "REQUIRED",
+        "name": "ISBN13",
+        "type": "STRING",
+        "description": "13 Digit ISBN of the book."
+    },
+    {
+        "mode": "REQUIRED",
+        "name": "title",
+        "type": "STRING",
+        "description": "Title of the book."
+    },
+    {
+        "mode": "REQUIRED",
+        "name": "month",
+        "type": "DATE",
+        "description": "Start date for period of analytics info."
+    },
+    {
+        "mode": "REQUIRED",
+        "name": "country_code",
+        "type": "STRING",
+        "description": "Two-digit country code."
+    },
+    {
+        "mode": "REQUIRED",
+        "name": "country_name",
+        "type": "STRING",
+        "description": "Name of the country."
+    },
+    {
+        "mode": "REQUIRED",
+        "name": "value",
+        "type": "INTEGER",
+        "description": "Measured value for this country."
+    },
+    {
+        "mode": "REQUIRED",
+        "name": "release_date",
+        "type": "DATE",
+        "description": "The end date of the release month"
+    }
+]

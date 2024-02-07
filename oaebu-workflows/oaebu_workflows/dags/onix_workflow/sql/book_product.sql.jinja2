@@ -1,0 +1,214 @@
+{# Copyright 2020-2024 Curtin University
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Author: Richard Hosking, Keegan Smith #}
+
+# Add data partner temp functions
+{% for dp in data_partners %}
+    {% if dp.book_product_functions %}
+        {% include dp.files.book_product_functions_sql %}
+    {% endif %}
+{% endfor %}
+
+# Helper Function:
+{#
+Output Schema:
+lower_trim_word                 STRING   NULLABLE
+#}
+CREATE TEMP FUNCTION custom_split(str STRING, sep STRING) AS (
+  ARRAY(
+    SELECT LOWER(TRIM(word)) 
+    FROM UNNEST(SPLIT(IFNULL(str,''),sep)) AS word
+    WHERE TRIM(word) != ''
+    )
+);
+
+WITH
+# Add data partner main body blocks
+{% for dp in data_partners %}
+    {% include dp.files.book_product_body_sql %},
+{% endfor %}
+
+{#
+This block of SQL queries data in an ONIX release, and produces a normalised and focused dataset to pass into the next step of this workflow.
+
+The 'project_id', 'onix_dataset_id', and 'onix_release_date' are all passed in as JINJA parameters to ensure the correct raw table is selected for each publisher.
+The query also only selects for product forms that match: "Digital download and online", "Digital (delivered electronically)", or "Digital download"
+
+Also of note, the onix format stores all the different subject classifications together. This query neatly separates out BIC, BISAC, Thema and keywords to their own lists for easier access.
+#}
+onix_ebook_titles_raw as (
+    SELECT
+        ISBN13,
+        STRUCT(
+            Doi,
+            ProductForm,
+            EditionNumber,
+            # This IF statement is used to select between two fields to extract the title as different publishers place the title value in different locations
+            IF(
+                onix.TitleDetails[SAFE_OFFSET(0)].TitleElements[SAFE_OFFSET(0)].TitleText is not null,
+                onix.TitleDetails[SAFE_OFFSET(0)].TitleElements[SAFE_OFFSET(0)].TitleText,
+                onix.TitleDetails[SAFE_OFFSET(0)].TitleElements[SAFE_OFFSET(0)].TitleWithoutPrefix) as title,
+            ARRAY(SELECT
+                SUBSTRING(CAST(dates.Date as STRING), 0, 4)
+            FROM UNNEST(onix.PublishingDates) as dates
+            WHERE dates.PublishingDateRole = "Publication date")[SAFE_OFFSET(0)] as published_year,
+            # This subquery creates the published_date when the date.Date field is 8 characters long (YYYYMMDD)
+            ARRAY(SELECT 
+                SAFE.PARSE_DATE("%Y%m%d", SUBSTRING(SAFE_CAST(dates.Date AS STRING), 0, 8))
+            FROM UNNEST(onix.PublishingDates) AS dates
+            WHERE dates.PublishingDateRole = "Publication date" AND 
+                CHAR_LENGTH(SAFE_CAST(dates.Date AS STRING)) = 8 )[SAFE_OFFSET(0)] AS published_date,
+            # The following four sub-queries all pull data from the onix.subjects array, but neatly organised the values into the 4 current classification systems
+            ARRAY(
+                SELECT
+                    subject.SubjectCode
+                FROM UNNEST(onix.Subjects) as subject
+                WHERE subject.SubjectSchemeIdentifier = "BIC_subject_category") as bic_subjects,
+            ARRAY(
+                SELECT
+                    subject.SubjectCode
+                FROM UNNEST(onix.Subjects) as subject
+                WHERE subject.SubjectSchemeIdentifier = "BISAC_Subject_Heading") as bisac_subjects,
+            ARRAY(
+                SELECT
+                    subject.SubjectCode
+                FROM UNNEST(onix.Subjects) as subject
+                WHERE subject.SubjectSchemeIdentifier = "Thema_subject_category") as thema_subjects,
+            (SELECT 
+                custom_split(heading,';') 
+            FROM UNNEST(onix.Subjects) as subject, UNNEST(subject.SubjectHeadingText) as heading
+            WHERE subject.SubjectSchemeIdentifier = "Keywords") as keywords,
+            (SELECT
+                ARRAY(
+                    SELECT as STRUCT
+                        PersonName, PersonNameInverted, ORCID
+                    FROM UNNEST(onix.Contributors) as contributor
+                )
+            ) as authors
+        ) as onix
+    FROM `{{ onix_table_id }}` as onix
+),
+
+{#
+The purpose of this query is to dedepulicate any repeated rows as a safely check.
+#}
+onix_ebook_titles as (
+    SELECT
+        dedupe.*
+    FROM (
+        SELECT
+            ARRAY_AGG(raw LIMIT 1)[OFFSET(0)] dedupe
+        FROM onix_ebook_titles_raw as raw
+        GROUP BY ISBN13
+    )
+),
+
+crossref_events as (
+    SELECT
+        public_data.isbn as ISBN13,
+        LAST_DAY(DATE(CAST(SPLIT(month_source.month, "-")[OFFSET(0)] as INT64), CAST(SPLIT(month_source.month, "-")[OFFSET(1)] as INT64), 1), MONTH) as release_date,
+        ARRAY_AGG(STRUCT(month_source.source, month_source.count)) as metrics
+    FROM `{{ book_table_id }}` as public_data, UNNEST(public_data.events.months) as month_source
+    GROUP BY public_data.isbn, month_source.month
+),
+
+{#
+The purpose of the block of SQL is to select a unique set of release dates (also read as unique months).
+The secondary purpose of this block is to not include months for which no metrics source has any data for a particular release.
+This ensures that for any book, there is only an array of months for where at least one source of metrics is available
+#}
+unique_releases as (
+    SELECT
+        DISTINCT(release_date) as release_date,
+    FROM
+        UNNEST(ARRAY_CONCAT(
+            {% for dp in data_partners %}
+                ARRAY(SELECT DISTINCT(release_date) FROM {{ dp.type_id + "_metrics" }}),
+            {% endfor %}
+            ARRAY(SELECT DISTINCT(release_date) FROM crossref_events)
+        )
+    ) as release_date
+    ORDER BY release_date DESC
+),
+
+{#
+The purpose of this query is to link the list of books, obtained via the ONIX feed, to a list of unique months.
+The result, is a row for each ISBN - release_date (month) comhination.
+This is made use of in the following query
+#}
+ebook_months as (
+    SELECT
+        ISBN13, release_date
+    FROM onix_ebook_titles
+    LEFT JOIN unique_releases on 1 = 1
+    ORDER BY ISBN13, release_date DESC
+),
+
+{#
+The purpose of this query is to link all the metrics, which are already indexed by release_date (month) to the set of ISBN-Release_date combinations from the above query
+
+The logic is essentially a series of LEFT JOINs, always matching the metric source to the ebook_months.ISBN13 and ebook_months.release_date fields
+Finally, the last line 'GROUP BY ebook_months.ISBN13' groups all the various months into a single row per ISBN, with an ARRAY of STRUCTs
+These STRUCTS (one per month) contain the 'month' as a field, and subfeilds contains all the metrics from each source.
+#}
+metrics as (
+    SELECT
+        ebook_months.ISBN13,
+        ARRAY_AGG(STRUCT(
+            {% for dp in data_partners %}
+                {{ dp.type_id + ".metrics" }} AS {{ dp.type_id }},
+            {% endfor %}
+            ebook_months.release_date as month,
+            crossref_events.metrics as crossref_events
+            
+        ) ORDER BY ebook_months.release_date DESC) as months
+    FROM ebook_months
+    {% for dp in data_partners %}
+        LEFT JOIN {{ dp.type_id + "_metrics" }} AS {{ dp.type_id }} ON ebook_months.ISBN13 = {{ dp.type_id + ".ISBN13" }} AND ebook_months.release_date = {{ dp.type_id + ".release_date" }}
+    {% endfor %}
+    LEFT JOIN crossref_events as crossref_events ON ebook_months.ISBN13 = crossref_events.ISBN13 AND ebook_months.release_date = crossref_events.release_date
+    WHERE crossref_events.metrics IS NOT NULL 
+    {% for dp in data_partners %}
+        OR {{ dp.type_id + ".metrics" }} IS NOT NULL
+    {% endfor %}
+    GROUP BY ebook_months.ISBN13
+)
+
+# Main Query
+{#
+The purpose of this query is to bring together a range of individual sources as compose them into the final query output.
+
+From onix_ebook_titles, we get the list of books and from 'metrics' we we are able join all the metrics that were organised in the query above.
+Then we are able to pull in specific metadata from across all the various sources, as seen in the sequence of LEFT JOINs below
+#}
+SELECT
+    onix_ebook_titles.*,
+    work_ids.work_id,
+    work_family_ids.work_family_id,
+    STRUCT(
+        {% for dp in data_partners | selectattr("has_metadata", "equalto", True) %}
+            {{ dp.type_id + "_metadata" }} AS {{ dp.type_id }},
+        {% endfor %}
+        crossref_objects, chapters, events.overall AS events
+    ) AS metadata,
+    metrics.months
+FROM onix_ebook_titles
+LEFT JOIN `{{ workid_table_id }}` AS work_ids ON work_ids.isbn13 = onix_ebook_titles.ISBN13
+LEFT JOIN `{{ workfamilyid_table_id }}` AS work_family_ids ON work_family_ids.isbn13 = onix_ebook_titles.ISBN13
+LEFT JOIN metrics AS metrics ON metrics.ISBN13 = onix_ebook_titles.ISBN13
+{% for dp in data_partners | selectattr("has_metadata", "equalto", True) %}
+    LEFT JOIN {{ dp.type_id + "_metadata" }} ON {{ dp.type_id + "_metadata.ISBN13" }} = onix_ebook_titles.ISBN13
+{% endfor %}
+LEFT JOIN `{{ book_table_id }}` AS public_data on public_data.isbn = onix_ebook_titles.ISBN13;

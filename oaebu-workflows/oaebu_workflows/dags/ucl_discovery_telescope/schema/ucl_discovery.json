@@ -1,0 +1,98 @@
+[
+  {
+    "description": "ISBN13 of the book.",
+    "mode": "REQUIRED",
+    "name": "ISBN",
+    "type": "STRING"
+  },
+  {
+    "description": "eprint ID of the book.",
+    "mode": "REQUIRED",
+    "name": "eprint_id",
+    "type": "STRING"
+  },
+  {
+    "description": "Title of the book.",
+    "mode": "NULLABLE",
+    "name": "title",
+    "type": "STRING"
+  },
+  {
+    "description": "Timescale of the statistics as reported by the origin.",
+    "mode": "NULLABLE",
+    "name": "timescale",
+    "type": "RECORD",
+    "fields": [
+      {
+        "description": "Format of the 'to' and 'from' fields",
+        "mode": "NULLABLE",
+        "name": "format",
+        "type": "STRING"
+      },
+      {
+        "description": "Beginning of date range for the statistics",
+        "mode": "NULLABLE",
+        "name": "from",
+        "type": "STRING"
+      },
+      {
+        "description": "End of date range for the statistics",
+        "mode": "NULLABLE",
+        "name": "to",
+        "type": "STRING"
+      }
+    ]
+  },
+  {
+    "description": "Origin of the statistics",
+    "mode": "NULLABLE",
+    "name": "origin",
+    "type": "RECORD",
+    "fields": [
+      {
+        "description": "The URL of the origin",
+        "mode": "NULLABLE",
+        "name": "url",
+        "type": "STRING"
+      },
+      {
+        "description": "The name of the origin",
+        "mode": "NULLABLE",
+        "name": "name",
+        "type": "STRING"
+      }
+    ]
+  },
+  {
+    "description": "The aggregated statistics for the reported period",
+    "mode": "NULLABLE",
+    "name": "total_downloads",
+    "type": "INTEGER"
+  },
+  {
+    "description": "The aggregated statistics for each reported country",
+    "mode": "REPEATED",
+    "name": "country",
+    "type": "RECORD",
+    "fields": [
+      {
+        "description": "The two letter country code.",
+        "mode": "NULLABLE",
+        "name": "value",
+        "type": "STRING"
+      },
+      {
+        "description": "The total number of item downloads for the reported period from this country.",
+        "mode": "NULLABLE",
+        "name": "count",
+        "type": "INTEGER"
+      }
+    ]
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "release_date",
+    "type": "DATE",
+    "description": "Last day of the release month. Table is partitioned on this column."
+  }
+]

@@ -1,0 +1,43 @@
+{# Copyright 2020 Curtin University
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Author: Richard Hosking #}
+{#
+The purpose of this script it to export the book city metrics section from the book_product table
+Primarily, the goal is to create a flat structure which is suitable for graphing in Kibana
+#}
+
+SELECT
+    ISBN13 as product_id,
+    MAX(work_id) as work_id,
+    MAX(work_family_id) as work_family_id,
+    MAX(onix.title) as title,
+    CAST(MAX(onix.published_year) as INT64) as published_year,
+    month.month,
+    city.city,
+    CONCAT(CAST(MAX(city.latitude) as STRING), ", ", CAST(MAX(city.longitude) as STRING)) as coordinates,
+    {# Currently only used by IRUS OAPEN #}
+    STRUCT(
+        SUM(city.title_requests) as title_requests,
+        SUM(city.total_item_investigations) as total_item_investigations,
+        SUM(city.total_item_requests) as total_item_requests,
+        SUM(city.unique_item_investigations) as unique_item_investigations,
+        SUM(city.unique_item_requests) as unique_item_requests
+    ) as irus_oapen
+    
+
+FROM `{{ book_product_table_id }}`, UNNEST(months) as month, 
+        UNNEST(month.irus_oapen.locations) as city 
+WHERE city.city IS NOT NULL
+GROUP BY ISBN13, month, city
