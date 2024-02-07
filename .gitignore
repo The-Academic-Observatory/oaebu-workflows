@@ -19,9 +19,8 @@ AUTHORS
 ChangeLog
 .eggs/
 .DS_Store
-/oaebu_workflows/workflows/oapen_cloud_function.zip
 docs/schemas
 *.Rhistory
 .env
 __pycache__
-oaebu-workflows/build
+/oaebu-workflows/build
