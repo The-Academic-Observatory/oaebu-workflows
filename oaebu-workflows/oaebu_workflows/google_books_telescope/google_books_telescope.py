@@ -151,9 +151,9 @@ def create_dag(
     sftp_regex = r"^Google(SalesTransaction|BooksTraffic)Report_\d{4}_\d{2}.csv$"
 
     @dag(
-        dag_id,
-        start_date,
-        schedule,
+        dag_id=dag_id,
+        start_date=start_date,
+        schedule=schedule,
         catchup=catchup,
         airflow_conns=[sftp_service_conn_id, observatory_api_conn_id],
         tags=["oaebu"],

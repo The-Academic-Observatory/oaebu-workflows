@@ -1,0 +1,12 @@
+beautifulsoup4<5,>=4.9.3
+onixcheck<1,>=0.9.7
+ratelimit<3,>=2.2.1
+apache-airflow-providers-cncf-kubernetes>=7.4.0
+
+[test]
+liccheck<1,>=0.4.9
+flake8<4,>=3.8.0
+coverage<6,>=5.2
+faker<9,>=8.12.1
+vcrpy<5,>=4.1.1
+responses<1,>=0

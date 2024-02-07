@@ -116,9 +116,9 @@ def create_dag(
     sftp_folders = SftpFolders(dag_id, sftp_conn_id=sftp_service_conn_id, sftp_root=sftp_root)
 
     @dag(
-        dag_id,
-        start_date,
-        schedule,
+        dag_id=dag_id,
+        start_date=start_date,
+        schedule=schedule,
         catchup=catchup,
         tags=["oaebu"],
     )
@@ -274,7 +274,7 @@ def create_dag(
                     dag_id=dag_id, execution_date=context["execution_date"], workflow_folder=release.workflow_folder
                 )
 
-        task_check_dependencies = check_dependencies(airflow_conns=[observatory_api_conn_id, sftp_service_conn_id])
+        task_check_dependencies = check_dependencies(airflow_conns=[observatory_api_conn_id, sftp_service_conn_id], start_date=start_date)
         xcom_release = make_release()
         task_download = download(xcom_release)
         task_move_files_to_in_progress = move_files_to_in_progress(xcom_release)
