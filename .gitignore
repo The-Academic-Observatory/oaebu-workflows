@@ -24,3 +24,4 @@ docs/schemas
 *.Rhistory
 .env
 __pycache__
+oaebu-workflows/build
