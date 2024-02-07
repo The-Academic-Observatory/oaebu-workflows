@@ -1,1 +1,0 @@
-month.google_books_sales IS NOT NULL

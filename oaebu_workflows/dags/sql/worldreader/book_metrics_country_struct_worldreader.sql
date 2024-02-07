@@ -1,1 +1,0 @@
-STRUCT(worldreader.download_count) as worldreader

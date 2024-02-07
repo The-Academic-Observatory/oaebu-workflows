@@ -1,1 +1,0 @@
-month.ucl_discovery IS NOT NULL

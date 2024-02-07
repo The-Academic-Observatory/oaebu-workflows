@@ -1,1 +1,0 @@
-jstor.total_item_requests IS NOT NULL

@@ -1,1 +1,0 @@
-STRUCT(month.worldreader.total_downloads) AS worldreader

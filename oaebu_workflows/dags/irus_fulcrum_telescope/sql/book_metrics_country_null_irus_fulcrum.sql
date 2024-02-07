@@ -1,1 +1,0 @@
-irus_fulcrum.total_item_requests IS NOT NULL

@@ -1,1 +1,0 @@
-worldreader.download_count IS NOT NULL
