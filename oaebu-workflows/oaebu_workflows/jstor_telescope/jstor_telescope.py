@@ -150,8 +150,6 @@ class JstorRelease(PartitionRelease):
             "reports": self.reports,
         }
 
-    """The JSTOR telescope."""
-
 
 def create_dag(
     *,
