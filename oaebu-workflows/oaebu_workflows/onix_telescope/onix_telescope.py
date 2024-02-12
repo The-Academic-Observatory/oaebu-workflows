@@ -121,6 +121,7 @@ def create_dag(
         schedule=schedule,
         catchup=catchup,
         tags=["oaebu"],
+        default_args={"retries": 3, "retry_delay": pendulum.duration(minutes=5)},
     )
     def onix_telescope():
         @task()
@@ -274,7 +275,9 @@ def create_dag(
                     dag_id=dag_id, execution_date=context["execution_date"], workflow_folder=release.workflow_folder
                 )
 
-        task_check_dependencies = check_dependencies(airflow_conns=[observatory_api_conn_id, sftp_service_conn_id], start_date=start_date)
+        task_check_dependencies = check_dependencies(
+            airflow_conns=[observatory_api_conn_id, sftp_service_conn_id], start_date=start_date
+        )
         xcom_release = make_release()
         task_download = download(xcom_release)
         task_move_files_to_in_progress = move_files_to_in_progress(xcom_release)

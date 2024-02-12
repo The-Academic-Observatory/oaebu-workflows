@@ -104,14 +104,16 @@ def create_dag(
     data_partner = partner_from_str(data_partner)
 
     @dag(
-        dag_id,
-        start_date,
-        schedule,
+        dag_id=dag_id,
+        start_date=start_date,
+        schedule=schedule,
         catchup=catchup,
         max_active_runs=max_active_runs,
         tags=["oaebu"],
+        default_args={"retries": 3, "retry_delay": pendulum.duration(minutes=5)},
     )
     def ucl_discovery():
+        @task()
         def make_release(**context) -> List[dict]:
             """Make release instances. The release is passed as an argument to the function (TelescopeFunction) that is
             called in 'task_callable'. There will only be 1 release, but it is passed on as a list so the
@@ -138,6 +140,7 @@ def create_dag(
                 partition_date=partition_date,
             ).to_dict()
 
+        @task()
         def download(release: dict, **context) -> None:
             """Fownload the ucl discovery data for a given release.
             :param releases: The UCL discovery release.
@@ -170,6 +173,7 @@ def create_dag(
             )
             set_task_state(success, context["ti"].task_id, release=release)
 
+        @task()
         def transform(release: dict, **context) -> None:
             """Transform the ucl discovery data for a given release."""
 
@@ -214,6 +218,7 @@ def create_dag(
             )
             set_task_state(success, context["ti"].task_id, release=release)
 
+        @task()
         def bq_load(release: dict, **context) -> None:
             """Loads the transformed data into BigQuery"""
 
@@ -241,6 +246,7 @@ def create_dag(
             )
             set_task_state(state, context["ti"].task_id, release=release)
 
+        @task()
         def add_new_dataset_releases(release: dict, **context) -> None:
             """Adds release information to API."""
 
@@ -256,6 +262,7 @@ def create_dag(
             )
             api.post_dataset_release(dataset_release)
 
+        @task()
         def cleanup_workflow(release: dict, **context) -> None:
             """Delete all files, folders and XComs associated with this release."""
 
@@ -263,7 +270,7 @@ def create_dag(
             cleanup(dag_id=dag_id, execution_date=context["execution_date"], workflow_folder=release.workflow_folder)
 
         task_check_dependencies = check_dependencies(
-            airflow_conns=[observatory_api_conn_id, oaebu_service_account_conn_id]
+            airflow_conns=[observatory_api_conn_id, oaebu_service_account_conn_id], start_date=start_date
         )
         xcom_release = make_release()
         task_download = download(xcom_release)

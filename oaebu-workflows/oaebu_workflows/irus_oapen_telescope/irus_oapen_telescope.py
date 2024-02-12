@@ -180,6 +180,7 @@ def create_dag(
         catchup=catchup,
         tags=["oaebu"],
         max_active_runs=max_active_runs,
+        default_args={"retries": 3, "retry_delay": pendulum.duration(minutes=5)},
     )
     def irus_oapen():
         @task()
@@ -413,7 +414,7 @@ def create_dag(
             ]
         )
         xcom_release = make_release()
-        task_create_cloud_function = create_cloud_function(xcom_release, task_concurrency=1)
+        task_create_cloud_function = create_cloud_function(xcom_release, task_concurrency=1, start_date=start_date)
         task_call_cloud_function = call_cloud_function(xcom_release)
         task_transfer = transfer(xcom_release)
         task_transform = transform(xcom_release)

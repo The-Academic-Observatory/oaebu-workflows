@@ -155,8 +155,8 @@ def create_dag(
         start_date=start_date,
         schedule=schedule,
         catchup=catchup,
-        airflow_conns=[sftp_service_conn_id, observatory_api_conn_id],
         tags=["oaebu"],
+        default_args={"retries": 3, "retry_delay": pendulum.duration(minutes=5)},
     )
     def google_books():
         @task
@@ -343,7 +343,9 @@ def create_dag(
                 )
 
         # Define dag tasks
-        task_check = check_dependencies(airflow_conns=[observatory_api_conn_id, sftp_service_conn_id])
+        task_check = check_dependencies(
+            airflow_conns=[observatory_api_conn_id, sftp_service_conn_id], start_date=start_date
+        )
         xcom_release = make_release()
         task_in_progress = move_files_to_in_progress(xcom_release)
         task_download = download(xcom_release)

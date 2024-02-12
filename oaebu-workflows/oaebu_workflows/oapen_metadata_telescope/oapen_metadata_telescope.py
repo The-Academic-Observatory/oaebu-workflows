@@ -143,6 +143,7 @@ def create_dag(
         start_date=start_date,
         catchup=catchup,
         tags=["oaebu"],
+        default_args={"retries": 3, "retry_delay": pendulum.duration(minutes=5)},
     )
     def oapen_metadata():
         @task()
@@ -270,7 +271,7 @@ def create_dag(
                 workflow_folder=release.workflow_folder,
             )
 
-        task_check = check_dependencies(airflow_conns=[observatory_api_conn_id])
+        task_check = check_dependencies(airflow_conns=[observatory_api_conn_id], start_date=start_date)
         xcom_release = make_release()
         task_download = download(xcom_release)
         task_transform = transform(xcom_release)

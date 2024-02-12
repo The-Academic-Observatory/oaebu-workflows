@@ -191,7 +191,14 @@ def create_dag(
     country_partner = partner_from_str(country_partner)
     institution_partner = partner_from_str(institution_partner)
 
-    @dag(dag_id=dag_id, schedule=schedule, start_date=start_date, catchup=catchup, tags=["oaebu"])
+    @dag(
+        dag_id=dag_id,
+        schedule=schedule,
+        start_date=start_date,
+        catchup=catchup,
+        tags=["oaebu"],
+        default_args={"retries": 3, "retry_delay": pendulum.duration(minutes=5)},
+    )
     def jstor():
         @task
         def list_reports(**context) -> List[dict]:
@@ -381,7 +388,9 @@ def create_dag(
                 set_task_state(success, context["ti"].task_id, release=release)
 
         # Define DAG tasks
-        task_check = check_dependencies(airflow_conns=[observatory_api_conn_id, gmail_api_conn_id])
+        task_check = check_dependencies(
+            airflow_conns=[observatory_api_conn_id, gmail_api_conn_id], start_date=start_date
+        )
         xcom_reports = list_reports()
         xcom_releases = download(xcom_reports)
         task_transform = transform(xcom_releases)

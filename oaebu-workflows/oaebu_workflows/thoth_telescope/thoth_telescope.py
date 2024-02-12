@@ -59,20 +59,20 @@ class ThothRelease(SnapshotRelease):
         self.transform_file_name = "transformed.jsonl.gz"
 
     @property
-    def download_file_path(self) -> str:
+    def download_path(self) -> str:
         return os.path.join(self.download_folder, self.download_file_name)
 
     @property
-    def transform_file_path(self) -> str:
+    def transform_path(self) -> str:
         return os.path.join(self.download_folder, self.transform_file_name)
 
     @property
     def download_blob(self):
-        return gcs_blob_name_from_path(self.download_file_path)
+        return gcs_blob_name_from_path(self.download_path)
 
     @property
     def tranform_blob(self):
-        return gcs_blob_name_from_path(self.transform_file_path)
+        return gcs_blob_name_from_path(self.transform_path)
 
     @staticmethod
     def from_dict(dict_: dict):
@@ -131,9 +131,9 @@ def create_dag(
         dag_id=dag_id,
         start_date=start_date,
         schedule=schedule,
-        airflow_conns=[observatory_api_conn_id],
         catchup=catchup,
         tags=["oaebu"],
+        default_args={"retries": 3, "retry_delay": pendulum.duration(minutes=5)},
     )
     def thoth_telescope():
         @task()
@@ -246,7 +246,7 @@ def create_dag(
             release = ThothRelease.from_dict(release)
             cleanup(dag_id=dag_id, execution_date=content["execution_date"], workflow_folder=release.workflow_folder)
 
-        task_check_dependencies = check_dependencies()
+        task_check_dependencies = check_dependencies(airflow_conns=[observatory_api_conn_id], start_date=start_date)
         xcom_release = make_release()
         task_download = download(xcom_release)
         task_transform = transform(xcom_release)

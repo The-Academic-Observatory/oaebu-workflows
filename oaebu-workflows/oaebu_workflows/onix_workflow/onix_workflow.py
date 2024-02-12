@@ -298,7 +298,14 @@ def create_dag(
     crossref_events_pool = CrossrefEventsPool(pool_slots=15)
     crossref_events_pool.create_pool()
 
-    @dag(dag_id=dag_id, schedule=schedule, start_date=start_date, catchup=catchup, tags=["oaebu"])
+    @dag(
+        dag_id=dag_id,
+        schedule=schedule,
+        start_date=start_date,
+        catchup=catchup,
+        tags=["oaebu"],
+        default_args={"retries": 3, "retry_delay": pendulum.duration(minutes=5)},
+    )
     def onix_workflow():
         """Construct the DAG"""
 
