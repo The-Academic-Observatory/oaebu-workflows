@@ -1212,7 +1212,7 @@ def copy_latest_export_tables(
     # Copy all of the tables
     for table in matched_tables:
         table_id = bq_table_id(project_id, from_dataset, table)
-        table_name = bq_table_id_parts(table_id)[3]  # Drop the date from the table for copied table
+        table_name = bq_table_id_parts(table_id)[2]  # Drop the date from the table for copied table
         unsharded_id = bq_table_id(project_id, to_dataset, table_name)
         bq_copy_table(src_table_id=table_id, dst_table_id=unsharded_id, write_disposition="WRITE_TRUNCATE")
 
