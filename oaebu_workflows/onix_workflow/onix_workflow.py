@@ -50,6 +50,7 @@ from observatory.platform.bigquery import (
     bq_load_table,
     bq_table_id,
     bq_sharded_table_id,
+    bq_table_id_parts,
     bq_create_dataset,
     bq_create_table_from_query,
     bq_run_query,
@@ -124,7 +125,7 @@ class OnixWorkflow(Workflow):
         cloud_workspace: CloudWorkspace,
         metadata_partner: Union[str, OaebuPartner],
         # Bigquery parameters
-        bq_master_crossref_project_id: str = "academic-observatory", 
+        bq_master_crossref_project_id: str = "academic-observatory",
         bq_master_crossref_dataset_id: str = "crossref_metadata",
         bq_oaebu_crossref_dataset_id: str = "crossref",
         bq_master_crossref_metadata_table_name: str = "crossref_metadata",
@@ -1211,9 +1212,9 @@ def copy_latest_export_tables(
     # Copy all of the tables
     for table in matched_tables:
         table_id = bq_table_id(project_id, from_dataset, table)
-        unsharded_name = re.match(r"(.*?)\d{8}$", table).group(1)  # Drop the date from the table for copied table
-        copy_table_id = bq_table_id(project_id, to_dataset, unsharded_name)
-        bq_copy_table(src_table_id=table_id, dst_table_id=copy_table_id, write_disposition="WRITE_TRUNCATE")
+        table_name = bq_table_id_parts(table_id)[3]  # Drop the date from the table for copied table
+        unsharded_id = bq_table_id(project_id, to_dataset, table_name)
+        bq_copy_table(src_table_id=table_id, dst_table_id=unsharded_id, write_disposition="WRITE_TRUNCATE")
 
 
 def get_onix_records(table_id: str) -> List[dict]:
