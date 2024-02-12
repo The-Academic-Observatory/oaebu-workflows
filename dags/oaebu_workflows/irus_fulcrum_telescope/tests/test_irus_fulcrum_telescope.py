@@ -24,7 +24,7 @@ from airflow.models.connection import Connection
 from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.oaebu_partners import partner_from_str
 from oaebu_workflows.irus_fulcrum_telescope.irus_fulcrum_telescope import (
-    IrusFulcrumTelescope,
+    create_dag,
     download_fulcrum_month_data,
     transform_fulcrum_data,
 )
@@ -66,20 +66,17 @@ class TestIrusFulcrumTelescope(ObservatoryTestCase):
 
     def test_dag_structure(self):
         """Test that the ONIX DAG has the correct structure and raises errors when necessary"""
-        dag = IrusFulcrumTelescope(
-            dag_id="fulcrum_test", cloud_workspace=self.fake_cloud_workspace, publishers=FAKE_PUBLISHERS
-        ).make_dag()
+        dag = create_dag(dag_id="fulcrum_test", cloud_workspace=self.fake_cloud_workspace, publishers=FAKE_PUBLISHERS)
 
         self.assert_dag_structure(
             {
-                "check_dependencies": ["download"],
-                "download": ["upload_downloaded"],
-                "upload_downloaded": ["transform"],
-                "transform": ["upload_transformed"],
-                "upload_transformed": ["bq_load"],
+                "check_dependencies": ["make_release"],
+                "make_release": ["download"],
+                "download": ["transform"],
+                "transform": ["bq_load"],
                 "bq_load": ["add_new_dataset_releases"],
-                "add_new_dataset_releases": ["cleanup"],
-                "cleanup": [],
+                "add_new_dataset_releases": ["cleanup_workflow"],
+                "cleanup_workflow": [],
             },
             dag,
         )

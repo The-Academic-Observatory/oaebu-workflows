@@ -28,7 +28,3 @@ USER astro
 RUN git clone --branch feature/astro https://github.com/The-Academic-Observatory/observatory-platform.git
 RUN pip install -e ./observatory-platform/observatory-api --constraint https://raw.githubusercontent.com/apache/airflow/constraints-2.7.3/constraints-no-providers-3.10.txt
 RUN pip install -e ./observatory-platform/observatory-platform --constraint https://raw.githubusercontent.com/apache/airflow/constraints-2.7.3/constraints-no-providers-3.10.txt
-
-# Install Academic Observatory Workflows
-COPY oaebu-workflows ./oaebu-workflows
-RUN pip install -e ./oaebu-workflows --constraint https://raw.githubusercontent.com/apache/airflow/constraints-2.7.3/constraints-no-providers-3.10.txt
