@@ -28,10 +28,7 @@ from tenacity import stop_after_attempt
 
 from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.oaebu_partners import partner_from_str
-from oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope import (
-    OapenMetadataTelescope,
-    download_metadata,
-)
+from oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope import download_metadata
 from observatory.platform.api import get_dataset_releases
 from observatory.platform.observatory_config import Workflow
 from observatory.platform.gcs import gcs_blob_name_from_path

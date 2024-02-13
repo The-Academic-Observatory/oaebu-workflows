@@ -78,15 +78,15 @@ class IrusFulcrumRelease(PartitionRelease):
         return os.path.join(self.transform_folder, self.transfrom_file_name)
 
     @property
-    def download_totals_blob(self):
+    def download_totals_blob_name(self):
         return gcs_blob_name_from_path(self.download_totals_path)
 
     @property
-    def download_country_blob(self):
+    def download_country_blob_name(self):
         return gcs_blob_name_from_path(self.download_country_path)
 
     @property
-    def transform_blob(self):
+    def transform_blob_name(self):
         return gcs_blob_name_from_path(self.transform_path)
 
     @staticmethod
@@ -249,7 +249,7 @@ def create_dag(
             )
 
             # Load each transformed release
-            uri = gcs_blob_uri(cloud_workspace.transform_bucket, release.transform_blob)
+            uri = gcs_blob_uri(cloud_workspace.transform_bucket, release.transform_blob_name)
             table_id = bq_table_id(cloud_workspace.project_id, data_partner.bq_dataset_id, data_partner.bq_table_name)
             success = bq_load_table(
                 uri=uri,

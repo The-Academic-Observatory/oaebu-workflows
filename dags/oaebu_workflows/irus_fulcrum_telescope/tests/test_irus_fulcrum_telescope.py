@@ -24,6 +24,7 @@ from airflow.models.connection import Connection
 from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.oaebu_partners import partner_from_str
 from oaebu_workflows.irus_fulcrum_telescope.irus_fulcrum_telescope import (
+    IrusFulcrumRelease,
     create_dag,
     download_fulcrum_month_data,
     transform_fulcrum_data,
@@ -99,61 +100,68 @@ class TestIrusFulcrumTelescope(ObservatoryTestCase):
 
     def test_telescope(self):
         """Test the Fulcrum telescope end to end."""
+
         # Setup Observatory environment
         env = ObservatoryEnvironment(
             self.project_id, self.data_location, api_host="localhost", api_port=find_free_port()
         )
+
         # Create the Observatory environment and run tests
         with env.create():
             # Setup Telescope
             execution_date = pendulum.datetime(year=2022, month=4, day=7)
-            partner = partner_from_str("irus_fulcrum")
-            partner.bq_dataset_id = env.add_dataset()
-            telescope = IrusFulcrumTelescope(
+            data_partner = partner_from_str("irus_fulcrum")
+            data_partner.bq_dataset_id = env.add_dataset()
+            api_dataset_id = "fulcrum"
+            dag = create_dag(
                 dag_id="fulcrum_test",
                 cloud_workspace=env.cloud_workspace,
                 publishers=FAKE_PUBLISHERS,
-                data_partner=partner,
+                data_partner=data_partner,
+                api_dataset_id=api_dataset_id,
             )
-            dag = telescope.make_dag()
-            env.add_connection(Connection(conn_id=telescope.irus_oapen_api_conn_id, uri=f"http://fake_api_login:@"))
+            env.add_connection(Connection(conn_id="irus_api", uri=f"http://fake_api_login:@"))
 
             # Add the fake requestor ID as a connection
             with env.create_dag_run(dag, execution_date):
                 # Test that all dependencies are specified: no error should be thrown
-                ti = env.run_task(telescope.check_dependencies.__name__)
+                ti = env.run_task("check_dependencies")
                 self.assertEqual(ti.state, State.SUCCESS)
+
+                # Test that make release is successful
+                ti = env.run_task("make_release")
+                self.assertEqual(ti.state, State.SUCCESS)
+                release_dict = ti.xcom_pull(task_ids="make_release")
+                expected_release_dict = {
+                    "dag_id": "fulcrum_test",
+                    "run_id": "scheduled__2022-04-07T00:00:00+00:00",
+                    "data_interval_start": "2022-04-01",
+                    "data_interval_end": "2022-05-01",
+                    "partition_date": "2022-04-30",
+                }
+                self.assertEqual(release_dict, expected_release_dict)
 
                 # Test download
-                fulcrum_vcr = vcr.VCR(record_mode="none")
+                # Ignore the googleapis host so the upload step works
+                fulcrum_vcr = vcr.VCR(
+                    record_mode="none", ignore_hosts=["oauth2.googleapis.com", "storage.googleapis.com"]
+                )
                 with fulcrum_vcr.use_cassette(self.download_cassette):
-                    ti = env.run_task(telescope.download.__name__)
+                    ti = env.run_task("download")
                     self.assertEqual(ti.state, State.SUCCESS)
 
-                # Test upload downloaded
-                ti = env.run_task(telescope.upload_downloaded.__name__)
-                self.assertEqual(ti.state, State.SUCCESS)
-
                 # Test transform
-                ti = env.run_task(telescope.transform.__name__)
-                self.assertEqual(ti.state, State.SUCCESS)
-
-                # Test upload to cloud storage
-                ti = env.run_task(telescope.upload_transformed.__name__)
+                ti = env.run_task("transform")
                 self.assertEqual(ti.state, State.SUCCESS)
 
                 # Test load into BigQuery
-                ti = env.run_task(telescope.bq_load.__name__)
+                ti = env.run_task("bq_load")
                 self.assertEqual(ti.state, State.SUCCESS)
 
                 ### Make assertions ##
 
                 # Create the release
-                release = telescope.make_release(
-                    run_id=env.dag_run.run_id,
-                    data_interval_start=pendulum.parse(str(env.dag_run.data_interval_start)),
-                    data_interval_end=pendulum.parse(str(env.dag_run.data_interval_end)),
-                )
+                release = IrusFulcrumRelease.from_dict(release_dict)
 
                 # Downloaded files
                 self.assert_file_integrity(release.download_totals_path, "95b7dceb", "gzip_crc")
@@ -181,9 +189,7 @@ class TestIrusFulcrumTelescope(ObservatoryTestCase):
 
                 # Uploaded table
                 table_id = bq_table_id(
-                    telescope.cloud_workspace.project_id,
-                    telescope.data_partner.bq_dataset_id,
-                    telescope.data_partner.bq_table_name,
+                    env.cloud_workspace.project_id, data_partner.bq_dataset_id, data_partner.bq_table_name
                 )
                 self.assert_table_integrity(table_id, expected_rows=3)
                 self.assert_table_content(
@@ -193,15 +199,15 @@ class TestIrusFulcrumTelescope(ObservatoryTestCase):
                 )
 
                 # Add_dataset_release_task
-                dataset_releases = get_dataset_releases(dag_id=telescope.dag_id, dataset_id=telescope.api_dataset_id)
+                dataset_releases = get_dataset_releases(dag_id="fulcrum_test", dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 0)
-                ti = env.run_task(telescope.add_new_dataset_releases.__name__)
+                ti = env.run_task("add_new_dataset_releases")
                 self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = get_dataset_releases(dag_id=telescope.dag_id, dataset_id=telescope.api_dataset_id)
+                dataset_releases = get_dataset_releases(dag_id="fulcrum_test", dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 1)
 
                 # Test cleanup
-                ti = env.run_task(telescope.cleanup.__name__)
+                ti = env.run_task("cleanup_workflow")
                 self.assertEqual(ti.state, State.SUCCESS)
                 self.assert_cleanup(release.workflow_folder)
 

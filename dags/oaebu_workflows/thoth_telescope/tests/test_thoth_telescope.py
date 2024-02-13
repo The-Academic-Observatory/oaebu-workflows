@@ -22,11 +22,7 @@ import vcr
 from airflow.utils.state import State
 
 from oaebu_workflows.oaebu_partners import partner_from_str
-from oaebu_workflows.thoth_telescope.thoth_telescope import (
-    ThothTelescope,
-    thoth_download_onix,
-    DEFAULT_HOST_NAME,
-)
+from oaebu_workflows.thoth_telescope.thoth_telescope import thoth_download_onix, DEFAULT_HOST_NAME
 from oaebu_workflows.config import test_fixtures_folder
 from observatory.platform.api import get_dataset_releases
 from observatory.platform.bigquery import bq_sharded_table_id

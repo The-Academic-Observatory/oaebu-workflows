@@ -34,7 +34,6 @@ from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.oaebu_partners import partner_from_str
 from oaebu_workflows.irus_oapen_telescope.irus_oapen_telescope import (
     IrusOapenRelease,
-    IrusOapenTelescope,
     call_cloud_function,
     cloud_function_exists,
     create_cloud_function,

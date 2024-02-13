@@ -27,10 +27,7 @@ from click.testing import CliRunner
 
 from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.oaebu_partners import partner_from_str
-from oaebu_workflows.google_books_telescope.google_books_telescope import (
-    GoogleBooksRelease,
-    GoogleBooksTelescope,
-)
+from oaebu_workflows.google_books_telescope.google_books_telescope import GoogleBooksRelease
 from observatory.platform.observatory_environment import (
     ObservatoryEnvironment,
     ObservatoryTestCase,

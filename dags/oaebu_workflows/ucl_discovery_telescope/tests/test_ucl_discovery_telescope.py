@@ -26,7 +26,6 @@ import vcr
 from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.oaebu_partners import partner_from_str
 from oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope import (
-    UclDiscoveryTelescope,
     get_isbn_eprint_mappings,
     download_discovery_stats,
     transform_discovery_stats,

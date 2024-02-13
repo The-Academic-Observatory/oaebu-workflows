@@ -29,7 +29,6 @@ from oaebu_workflows.config import schema_folder as default_schema_folder
 from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.oaebu_partners import OaebuPartner, OAEBU_DATA_PARTNERS, partner_from_str
 from oaebu_workflows.onix_workflow.onix_workflow import (
-    OnixWorkflow,
     OnixWorkflowRelease,
     CROSSREF_EVENT_URL_TEMPLATE,
     download_crossref_events,

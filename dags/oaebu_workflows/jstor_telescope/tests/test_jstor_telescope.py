@@ -32,7 +32,6 @@ from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.oaebu_partners import partner_from_str
 from oaebu_workflows.jstor_telescope.jstor_telescope import (
     JstorRelease,
-    JstorTelescope,
     JstorPublishersAPI,
     JstorCollectionsAPI,
     make_jstor_api,
