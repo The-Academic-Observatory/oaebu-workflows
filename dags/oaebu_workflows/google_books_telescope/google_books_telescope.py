@@ -343,25 +343,25 @@ def create_dag(
                 )
 
         # Define dag tasks
-        task_check = check_dependencies(
+        task_check_dependencies = check_dependencies(
             airflow_conns=[observatory_api_conn_id, sftp_service_conn_id], start_date=start_date
         )
         xcom_release = make_release()
-        task_in_progress = move_files_to_in_progress(xcom_release)
+        task_move_in_progress = move_files_to_in_progress(xcom_release)
         task_download = download(xcom_release)
         task_transform = transform(xcom_release)
-        task_finished = move_files_to_finished(xcom_release)
+        task_move_finished = move_files_to_finished(xcom_release)
         task_bq_load = bq_load(xcom_release)
         task_add_release = add_new_dataset_releases(xcom_release)
         task_cleanup_workflow = cleanup_workflow(xcom_release)
 
         (
-            task_check
+            task_check_dependencies
             >> xcom_release
-            >> task_in_progress
+            >> task_move_in_progress
             >> task_download
             >> task_transform
-            >> task_finished
+            >> task_move_finished
             >> task_bq_load
             >> task_add_release
             >> task_cleanup_workflow

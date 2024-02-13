@@ -1,4 +1,4 @@
-# Copyright 2022-2023 Curtin University
+# Copyright 2022-2024 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ from oaebu_workflows.irus_fulcrum_telescope.irus_fulcrum_telescope import (
     transform_fulcrum_data,
 )
 from observatory.platform.files import load_jsonl
+from observatory.platform.config import module_file_path
 from observatory.platform.observatory_environment import (
     ObservatoryEnvironment,
     ObservatoryTestCase,
@@ -68,11 +69,10 @@ class TestIrusFulcrumTelescope(ObservatoryTestCase):
     def test_dag_structure(self):
         """Test that the ONIX DAG has the correct structure and raises errors when necessary"""
         dag = create_dag(dag_id="fulcrum_test", cloud_workspace=self.fake_cloud_workspace, publishers=FAKE_PUBLISHERS)
-
         self.assert_dag_structure(
             {
                 "check_dependencies": ["make_release"],
-                "make_release": ["download"],
+                "make_release": ["transform", "cleanup_workflow", "download", "add_new_dataset_releases", "bq_load"],
                 "download": ["transform"],
                 "transform": ["bq_load"],
                 "bq_load": ["add_new_dataset_releases"],
@@ -89,14 +89,15 @@ class TestIrusFulcrumTelescope(ObservatoryTestCase):
                 Workflow(
                     dag_id="fulcrum_test",
                     name="Fulcrum Telescope",
-                    class_name="oaebu_workflows.irus_fulcrum_telescope.irus_fulcrum_telescope.IrusFulcrumTelescope",
+                    class_name="oaebu_workflows.irus_fulcrum_telescope.irus_fulcrum_telescope.create_dag",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(publishers=[FAKE_PUBLISHERS]),
                 )
             ]
         )
         with env.create():
-            self.assert_dag_load_from_config("fulcrum_test")
+            dag_file = os.path.join(module_file_path("dags"), "load_dags.py")
+            self.assert_dag_load_from_config("fulcrum_test", dag_file)
 
     def test_telescope(self):
         """Test the Fulcrum telescope end to end."""
@@ -131,7 +132,7 @@ class TestIrusFulcrumTelescope(ObservatoryTestCase):
                 # Test that make release is successful
                 ti = env.run_task("make_release")
                 self.assertEqual(ti.state, State.SUCCESS)
-                release_dict = ti.xcom_pull(task_ids="make_release")
+                release_dict = ti.xcom_pull(task_ids="make_release", include_prior_dates=False)
                 expected_release_dict = {
                     "dag_id": "fulcrum_test",
                     "run_id": "scheduled__2022-04-07T00:00:00+00:00",
@@ -207,9 +208,10 @@ class TestIrusFulcrumTelescope(ObservatoryTestCase):
                 self.assertEqual(len(dataset_releases), 1)
 
                 # Test cleanup
+                workflow_folder_path = release.workflow_folder
                 ti = env.run_task("cleanup_workflow")
                 self.assertEqual(ti.state, State.SUCCESS)
-                self.assert_cleanup(release.workflow_folder)
+                self.assert_cleanup(workflow_folder_path)
 
     def test_download_fulcrum_month_data(self):
         """Tests the download_fuclrum_month_data function"""

@@ -1,4 +1,4 @@
-# Copyright 2020-2023 Curtin University
+# Copyright 2020-2024 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,12 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Author: Aniek Roelofs
+# Author: Aniek Roelofs, Keegan Smith
 
 import os
 import shutil
-from collections import defaultdict
-from unittest.mock import patch
 
 import pendulum
 from airflow.exceptions import AirflowException
@@ -25,15 +23,14 @@ from airflow.models.connection import Connection
 from airflow.utils.state import State
 from click.testing import CliRunner
 
-from oaebu_workflows.config import test_fixtures_folder
+from oaebu_workflows.config import test_fixtures_folder, module_file_path
 from oaebu_workflows.oaebu_partners import partner_from_str
-from oaebu_workflows.google_books_telescope.google_books_telescope import GoogleBooksRelease
+from oaebu_workflows.google_books_telescope.google_books_telescope import GoogleBooksRelease, create_dag, gb_transform
 from observatory.platform.observatory_environment import (
     ObservatoryEnvironment,
     ObservatoryTestCase,
     SftpServer,
     find_free_port,
-    random_id,
 )
 from observatory.platform.bigquery import bq_table_id
 from observatory.platform.observatory_config import Workflow
@@ -58,22 +55,26 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
 
     def test_dag_structure(self):
         """Test that the Google Books DAG has the correct structure."""
-        dag = GoogleBooksTelescope(
-            dag_id="test_dag", cloud_workspace=self.fake_cloud_workspace, sftp_root="/"
-        ).make_dag()
+        dag = create_dag(dag_id="test_dag", cloud_workspace=self.fake_cloud_workspace, sftp_root="/")
         self.assert_dag_structure(
             {
-                "check_dependencies": ["list_release_info"],
-                "list_release_info": ["move_files_to_in_progress"],
+                "check_dependencies": ["make_release"],
+                "make_release": [
+                    "move_files_to_in_progress",
+                    "download",
+                    "transform",
+                    "move_files_to_finished",
+                    "bq_load",
+                    "add_new_dataset_releases",
+                    "cleanup_workflow",
+                ],
                 "move_files_to_in_progress": ["download"],
-                "download": ["upload_downloaded"],
-                "upload_downloaded": ["transform"],
-                "transform": ["upload_transformed"],
-                "upload_transformed": ["bq_load"],
-                "bq_load": ["move_files_to_finished"],
-                "move_files_to_finished": ["add_new_dataset_releases"],
-                "add_new_dataset_releases": ["cleanup"],
-                "cleanup": [],
+                "download": ["transform"],
+                "transform": ["move_files_to_finished"],
+                "move_files_to_finished": ["bq_load"],
+                "bq_load": ["add_new_dataset_releases"],
+                "add_new_dataset_releases": ["cleanup_workflow"],
+                "cleanup_workflow": [],
             },
             dag,
         )
@@ -86,13 +87,14 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
                 Workflow(
                     dag_id="google_books",
                     name="My Google Books Telescope",
-                    class_name="oaebu_workflows.google_books_telescope.google_books_telescope.GoogleBooksTelescope",
+                    class_name="oaebu_workflows.google_books_telescope.google_books_telescope.create_dag",
                     cloud_workspace=self.fake_cloud_workspace,
                 )
             ]
         )
         with env.create():
-            self.assert_dag_load_from_config("google_books")
+            dag_file = os.path.join(module_file_path("dags"), "load_dags.py")
+            self.assert_dag_load_from_config("google_books", dag_file)
 
     def test_telescope(self):
         """Test the Google Books telescope end to end."""
@@ -130,70 +132,43 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
                 sales_partner.bq_dataset_id = dataset_id
                 traffic_partner = partner_from_str("google_books_traffic")
                 traffic_partner.bq_dataset_id = dataset_id
-                telescope = GoogleBooksTelescope(
+                dag = create_dag(
                     dag_id="google_books_test",
                     cloud_workspace=env.cloud_workspace,
                     sftp_root="/",
                     sales_partner=sales_partner,
                     traffic_partner=traffic_partner,
+                    sftp_service_conn_id="sftp_service",
                 )
-                dag = telescope.make_dag()
 
                 # Add SFTP connection
-                conn = Connection(
-                    conn_id=telescope.sftp_service_conn_id, uri=f"ssh://:password@localhost:{self.sftp_port}"
+                env.add_connection(
+                    Connection(conn_id="sftp_service", uri=f"ssh://:password@localhost:{self.sftp_port}")
                 )
-                env.add_connection(conn)
                 with env.create_dag_run(dag, execution_date):
                     # Test that all dependencies are specified: no error should be thrown
-                    ti = env.run_task(telescope.check_dependencies.__name__)
+                    ti = env.run_task("check_dependencies")
                     self.assertEqual(ti.state, State.SUCCESS)
 
+                    # Test that make release is successful
+                    ti = env.run_task("make_release")
+                    self.assertEqual(ti.state, State.SUCCESS)
+                    release_dict = ti.xcom_pull(task_ids="make_release", include_prior_dates=False)
+                    expected_release_dict = {}
+                    self.assertEqual(release_dict, expected_release_dict)
+                    release = GoogleBooksRelease.from_dict(release_dict)
+
                     # Add file to SFTP server
-                    local_sftp_folders = SftpFolders(telescope.dag_id, telescope.sftp_service_conn_id, sftp_root)
+                    local_sftp_folders = SftpFolders(
+                        dag_id="google_books_test", sftp_conn_id="sftp_service", sftp_root="/"
+                    )
                     os.makedirs(local_sftp_folders.upload, exist_ok=True)
                     for file_name, file_path in params["test_files"].items():
                         upload_file = os.path.join(local_sftp_folders.upload, file_name)
                         shutil.copy(file_path, upload_file)
 
-                    # Check that the correct release info is returned via Xcom
-                    ti = env.run_task(telescope.list_release_info.__name__)
-                    self.assertEqual(ti.state, State.SUCCESS)
-                    release_info = ti.xcom_pull(
-                        key=GoogleBooksTelescope.RELEASE_INFO,
-                        task_ids=telescope.list_release_info.__name__,
-                        include_prior_dates=False,
-                    )
-
-                    # Get release info from SFTP server and create expected release info
-                    expected_release_info = defaultdict(list)
-                    for file_name, file_path in params["test_files"].items():
-                        expected_release_date = pendulum.from_format(file_name[-11:].strip(".csv"), "YYYY_MM").end_of(
-                            "month"
-                        )
-                        release_date_str = expected_release_date.format("YYYYMMDD")
-                        if release_date_str == "20200229":
-                            expected_release_file = os.path.join(telescope.sftp_folders.in_progress, file_name)
-                            expected_release_info[release_date_str].append(expected_release_file)
-                    self.assertTrue(1, len(release_info))
-                    self.assertEqual(expected_release_info["20200229"].sort(), release_info["20200229"].sort())
-
-                    # Use release info for other tasks
-                    releases = []
-                    for release_date, sftp_files in release_info.items():
-                        releases.append(
-                            GoogleBooksRelease(
-                                dag_id=telescope.dag_id,
-                                run_id=env.dag_run.run_id,
-                                partition_date=pendulum.parse(release_date),
-                                sftp_files=sftp_files,
-                            )
-                        )
-                    self.assertTrue(1, len(releases))
-                    release = releases[0]
-
                     # Test move file to in progress
-                    ti = env.run_task(telescope.move_files_to_in_progress.__name__)
+                    ti = env.run_task("move_files_to_in_progress")
                     self.assertEqual(ti.state, State.SUCCESS)
                     for file in release.sftp_files:
                         file_name = os.path.basename(file)
@@ -203,15 +178,11 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
                         self.assertTrue(os.path.isfile(in_progress_file))
 
                     # Run main telescope tasks
-                    ti = env.run_task(telescope.download.__name__)
+                    ti = env.run_task("download")
                     self.assertEqual(ti.state, State.SUCCESS)
-                    ti = env.run_task(telescope.upload_downloaded.__name__)
+                    ti = env.run_task("transform")
                     self.assertEqual(ti.state, State.SUCCESS)
-                    ti = env.run_task(telescope.transform.__name__)
-                    self.assertEqual(ti.state, State.SUCCESS)
-                    ti = env.run_task(telescope.upload_transformed.__name__)
-                    self.assertEqual(ti.state, State.SUCCESS)
-                    ti = env.run_task(telescope.bq_load.__name__)
+                    ti = env.run_task("bq_load")
                     self.assertEqual(ti.state, State.SUCCESS)
 
                     # Make assertions for the above tasks
@@ -255,20 +226,20 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
 
                     # Test that data loaded into BigQuery
                     table_id = bq_table_id(
-                        telescope.cloud_workspace.project_id,
-                        telescope.sales_partner.bq_dataset_id,
-                        telescope.sales_partner.bq_table_name,
+                        env.cloud_workspace.project_id,
+                        sales_partner.bq_dataset_id,
+                        sales_partner.bq_table_name,
                     )
                     self.assert_table_integrity(table_id, params["bq_rows"])
                     table_id = bq_table_id(
-                        telescope.cloud_workspace.project_id,
-                        telescope.traffic_partner.bq_dataset_id,
-                        telescope.traffic_partner.bq_table_name,
+                        env.cloud_workspace.project_id,
+                        traffic_partner.bq_dataset_id,
+                        traffic_partner.bq_table_name,
                     )
                     self.assert_table_integrity(table_id, params["bq_rows"])
 
                     # Test move files to finished
-                    ti = env.run_task(telescope.move_files_to_finished.__name__)
+                    ti = env.run_task("move_files_to_finished")
                     self.assertEqual(ti.state, State.SUCCESS)
                     for file in release.sftp_files:
                         file_name = os.path.basename(file)
@@ -279,79 +250,56 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
                         self.assertTrue(os.path.isfile(finished_file))
 
                     # Add_dataset_release_task
-                    dataset_releases = get_dataset_releases(
-                        dag_id=telescope.dag_id, dataset_id=telescope.api_dataset_id
-                    )
+                    dataset_releases = get_dataset_releases(dag_id="google_books_test", dataset_id="google_books")
                     self.assertEqual(len(dataset_releases), 0)
-                    ti = env.run_task(telescope.add_new_dataset_releases.__name__)
+                    ti = env.run_task("add_new_dataset_releases")
                     self.assertEqual(ti.state, State.SUCCESS)
-                    dataset_releases = get_dataset_releases(
-                        dag_id=telescope.dag_id, dataset_id=telescope.api_dataset_id
-                    )
+                    dataset_releases = get_dataset_releases(dag_id="google_books_test", dataset_id="google_books")
                     self.assertEqual(len(dataset_releases), 1)
 
                     # Test cleanup
-                    ti = env.run_task(telescope.cleanup.__name__)
+                    workflow_folder_path = release.workflow_folder
+                    ti = env.run_task("cleanup_workflow")
                     self.assertEqual(ti.state, State.SUCCESS)
-                    self.assert_cleanup(release.workflow_folder)
+                    self.assert_cleanup(workflow_folder_path)
 
-    @patch("observatory.platform.airflow.Variable.get")
-    def test_gb_transform(self, mock_variable_get):
-        """Test sanity check in transform method when transaction date falls outside release month
-
-        :param mock_variable_get: Mock Airflow Variable 'data'
-        """
+    def test_gb_transform(self):
+        """Test sanity check in transform method when transaction date falls outside release month"""
         with CliRunner().isolated_filesystem():
-            mock_variable_get.return_value = os.path.join(os.getcwd(), "data")
 
-            # Objects to create release instance
-            telescope = GoogleBooksTelescope(
-                dag_id="google_books_test",
-                cloud_workspace=self.fake_cloud_workspace,
-                sftp_root="/",
-                sales_partner=partner_from_str("google_books_sales"),
-                traffic_partner=partner_from_str("google_books_traffic"),
-            )
+            # Files and folders
+            transform_dir = os.path.join(os.getcwd(), "transform")
+            os.makedirs(transform_dir)
             fixtures_folder = test_fixtures_folder(workflow_module="google_books_telescope")
             sales_file_path = os.path.join(fixtures_folder, "GoogleSalesTransactionReport_2020_02.csv")
             traffic_file_path = os.path.join(fixtures_folder, "GoogleBooksTrafficReport_2020_02.csv")
-            sftp_files = [
-                os.path.join(telescope.sftp_folders.in_progress, os.path.basename(sales_file_path)),
-                os.path.join(telescope.sftp_folders.in_progress, os.path.basename(traffic_file_path)),
-            ]
+            transform_sales_path = os.path.join(transform_dir, "GoogleSalesTransactionReport_2020_02.csv")
+            transform_traffic_path = os.path.join(transform_dir, "GoogleBooksTrafficReport_2020_02.csv")
 
             # test transaction date inside of release month
-            release = GoogleBooksRelease(
-                dag_id=telescope.dag_id,
-                run_id=random_id(),
-                partition_date=pendulum.parse("2020-02-01"),
-                sftp_files=sftp_files,
+            gb_transform(
+                [sales_file_path, traffic_file_path],
+                transform_sales_path,
+                transform_traffic_path,
+                pendulum.parse("2020-02-01"),
             )
-            shutil.copy(sales_file_path, os.path.join(release.download_folder, "google_books_sales.csv"))
-            shutil.copy(traffic_file_path, os.path.join(release.download_folder, "google_books_traffic.csv"))
-            telescope.transform([release])
-            self.assertTrue(os.path.exists(release.transform_sales_path))
+            self.assertTrue(os.path.exists(transform_sales_path))
+            self.assertTrue(os.path.exists(transform_traffic_path))
 
             # test transaction date before release month
-            release = GoogleBooksRelease(
-                dag_id=telescope.dag_id,
-                run_id=random_id(),
-                partition_date=pendulum.parse("2020-01-31"),
-                sftp_files=sftp_files,
-            )
-            shutil.copy(sales_file_path, os.path.join(release.download_folder, "google_books_sales.csv"))
-            shutil.copy(traffic_file_path, os.path.join(release.download_folder, "google_books_traffic.csv"))
             with self.assertRaises(AirflowException):
-                telescope.transform([release])
+                gb_transform(
+                    [sales_file_path, traffic_file_path],
+                    transform_sales_path,
+                    transform_traffic_path,
+                    pendulum.parse("2020-01-31"),
+                )
 
             # test transaction date after release month
-            release = GoogleBooksRelease(
-                dag_id=telescope.dag_id,
-                run_id=random_id(),
-                partition_date=pendulum.parse("2020-03-01"),
-                sftp_files=sftp_files,
-            )
-            shutil.copy(sales_file_path, os.path.join(release.download_folder, "google_books_sales.csv"))
-            shutil.copy(traffic_file_path, os.path.join(release.download_folder, "google_books_traffic.csv"))
             with self.assertRaises(AirflowException):
-                telescope.transform([release])
+                gb_transform(
+                    [sales_file_path, traffic_file_path],
+                    transform_sales_path,
+                    transform_traffic_path,
+                    pendulum.parse("2020-03-01"),
+                )
