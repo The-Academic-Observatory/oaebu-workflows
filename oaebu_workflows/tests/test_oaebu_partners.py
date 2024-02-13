@@ -1,4 +1,4 @@
-# Copyright 2023 Curtin University
+# Copyright 2023-2024 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,13 +18,43 @@
 import unittest
 from unittest.mock import patch
 
-from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str, OAEBU_DATA_PARTNERS, OAEBU_METADATA_PARTNERS
+from oaebu_workflows.oaebu_partners import (
+    OaebuPartner,
+    DataPartner,
+    partner_from_str,
+    OAEBU_DATA_PARTNERS,
+    OAEBU_METADATA_PARTNERS,
+)
 
 MOCK_DATA_PARTNERS = {
-    "data_partner": OaebuPartner("data_partner", "dataset1", "table1", "isbn1", "title1", False, "schema_folder1")
+    "data_partner": DataPartner(
+        type_id="data_partner",
+        bq_dataset_id="dataset1",
+        bq_table_name="table1",
+        isbn_field_name="isbn1",
+        title_field_name="title1",
+        sharded=False,
+        schema_path="schema_folder1",
+        schema_directory="path/to/schema",
+        sql_directory="path/to/sql",
+        book_product_functions=True,
+        export_author=True,
+        export_book_metrics=True,
+        export_country=True,
+        export_subject=True,
+        has_metdata=True,
+    )
 }
 MOCK_METADATA_PARTNERS = {
-    "md_partner": OaebuPartner("md_partner", "dataset1", "table1", "isbn1", "title1", False, "schema_folder1")
+    "md_partner": OaebuPartner(
+        type_id="md_partner",
+        bq_dataset_id="dataset1",
+        bq_table_name="table1",
+        isbn_field_name="isbn1",
+        title_field_name="title1",
+        sharded=False,
+        schema_path="schema_folder1",
+    )
 }
 
 

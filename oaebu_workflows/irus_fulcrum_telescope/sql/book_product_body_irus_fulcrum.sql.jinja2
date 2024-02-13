@@ -1,0 +1,32 @@
+# The purpose of this block of SQL is to organise the metrics from IRUS Fulcrum for easier consumption of downstream queries.
+# Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'irus_fulcrum_table_id'.
+irus_fulcrum_metrics as (
+    SELECT
+        ISBN as ISBN13,
+        release_date,
+        STRUCT(
+            SUM(total_item_investigations) as total_item_investigations,
+            SUM(total_item_requests) as total_item_requests,
+            SUM(unique_item_investigations) as unique_item_investigations,
+            SUM(unique_item_requests) as unique_item_requests,
+            group_items_irus_fulcrum_country(ARRAY_CONCAT_AGG(country)) as country
+        ) as metrics
+    FROM
+        `{{ irus_fulcrum_table_id }}`
+    GROUP BY
+        ISBN,
+        release_date
+),
+
+# The purpose of this block of SQL is to organise the Metadata from IRUS OAPEN for easier consumption of downstream queries.
+# Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'irus_fulcrum_table_id'.
+irus_fulcrum_metadata as (
+    SELECT
+        ISBN as ISBN13,
+        MAX(book_title) as book_title,
+        MAX(publisher) as publisher
+    FROM
+        `{{ irus_fulcrum_table_id }}`
+    GROUP BY
+        ISBN
+)

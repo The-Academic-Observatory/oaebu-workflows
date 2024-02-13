@@ -1,0 +1,78 @@
+[
+  {
+    "mode": "NULLABLE",
+    "name": "product_id",
+    "type": "STRING",
+    "description": "Book Product ID"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "work_id",
+    "type": "STRING",
+    "description": "Book Work ID"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "work_family_id",
+    "type": "STRING",
+    "description": "Book Work Family ID"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "title",
+    "type": "STRING",
+    "description": "The title of the book"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "PersonName",
+        "type": "STRING",
+        "description": "The author's full name in the format '[first name] [last name]'"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "PersonNameInverted",
+        "type": "STRING",
+        "description": "The author's full name in the format '[last name], [first name]'"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "ORCID",
+        "type": "STRING",
+        "description": "The Authors ORCID ID"
+      }
+    ],
+    "mode": "REPEATED",
+    "name": "authors",
+    "type": "RECORD",
+    "description": "A list of Book Authors"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "published_year",
+    "type": "INTEGER",
+    "description": "The Books published year"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "month",
+    "type": "DATE",
+    "description": "The month in which the metrics took place"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "count",
+        "type": "INTEGER",
+        "description": "Count of events"
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "crossref_events",
+    "type": "RECORD",
+    "description": "Metrics from Crossref Events"
+  }
+]

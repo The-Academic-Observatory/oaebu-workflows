@@ -1,0 +1,1 @@
+ARRAY_LENGTH(month.jstor_country) > 0

@@ -1,0 +1,61 @@
+{# Copyright 2020-2024 Curtin University
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Author: Richard Hosking, Keegan Smith #}
+{#
+The purpose of this script it to export the BIC subject metrics section from the book_product table
+Primarily, the goal is to create a flat structure which is suitable for graphing in Kibana
+#}
+
+# Helper Function: Sum up the total number of values for the given bucket
+CREATE TEMP FUNCTION group_counts(counts ARRAY<STRUCT<name STRING, value INT64>>) AS (
+  (SELECT
+    SUM(value) as value
+  FROM UNNEST(counts))
+);
+
+# Helper Function: Get just the unique set of top level BIC Subjects from the provided list
+CREATE TEMP FUNCTION top_level_subjects(subjects ARRAY<STRING>) AS (
+  ARRAY(SELECT
+    DISTINCT(SUBSTRING(subject, 0, 1)) as top_level
+  FROM UNNEST(subjects) as subject)
+);
+
+SELECT
+  bic.name as subject,
+  metrics.subject as subject_code,
+  metrics.* EXCEPT (subject)
+FROM(
+    SELECT
+        subject,
+        count(ISBN13) as unique_books,
+        month.month,
+
+        {% for dp in data_partners | selectattr("export_subject", "equalto", True) %}
+            {% include dp.files.month_metrics_sum_sql %},
+        {% endfor %}
+        
+        STRUCT(group_counts(ARRAY_CONCAT_AGG(month.crossref_events)) as count) as crossref_events
+        
+    FROM `{{ book_product_table_id }}`, UNNEST(top_level_subjects(onix.bic_subjects)) as subject, UNNEST(months) as month
+    WHERE 
+
+    {% for dp in data_partners | selectattr("export_subject", "equalto", True) %}
+        {% include dp.files.month_null_sql %} OR 
+    {% endfor %}
+    
+    ARRAY_LENGTH(month.crossref_events) > 0 
+    GROUP BY subject, month
+    ORDER BY subject ASC, month DESC) as metrics
+LEFT JOIN `{{ bic_table_id }}` as bic on bic.code = subject

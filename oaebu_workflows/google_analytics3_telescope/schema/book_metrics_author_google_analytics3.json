@@ -1,0 +1,62 @@
+{
+    "fields": [
+        {
+            "mode": "NULLABLE",
+            "name": "views",
+            "type": "INTEGER",
+            "description": "Number of views/sessions aggregated over all countries"
+        },
+        {
+            "mode": "NULLABLE",
+            "name": "downloads",
+            "type": "INTEGER",
+            "description": "Number of total downloads"
+        },
+        {
+            "mode": "NULLABLE",
+            "name": "downloads_pdf_book",
+            "type": "INTEGER",
+            "description": "Number of PDF book downloads"
+        },
+        {
+            "mode": "NULLABLE",
+            "name": "downloads_pdf_chapter",
+            "type": "INTEGER",
+            "description": "Number of PDF chapter downloads"
+        },
+        {
+            "mode": "NULLABLE",
+            "name": "downloads_html_chapter",
+            "type": "INTEGER",
+            "description": "Number of HTML chapter downloads"
+        },
+        {
+            "mode": "NULLABLE",
+            "name": "downloads_epub_book",
+            "type": "INTEGER",
+            "description": "Number of ePUB book downloads"
+        },
+        {
+            "mode": "NULLABLE",
+            "name": "downloads_epub_chapter",
+            "type": "INTEGER",
+            "description": "Number of ePUB chapter downloads"
+        },
+        {
+            "mode": "NULLABLE",
+            "name": "downloads_mobi_book",
+            "type": "INTEGER",
+            "description": "Number of MOBI book downloads"
+        },
+        {
+            "mode": "NULLABLE",
+            "name": "downloads_mobi_chapter",
+            "type": "INTEGER",
+            "description": "Number of MOBI chapter downloads"
+        }
+    ],
+    "mode": "NULLABLE",
+    "name": "google_analytics3",
+    "type": "RECORD",
+    "description": "Metrics from Google Analytics"
+}
