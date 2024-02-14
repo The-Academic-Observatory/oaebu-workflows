@@ -113,19 +113,19 @@ class JstorRelease(PartitionRelease):
         return os.path.join(self.transform_folder, self.transform_institution_file_name)
 
     @property
-    def download_country_blob(self):
+    def download_country_blob_name(self):
         return gcs_blob_name_from_path(self.download_country_path)
 
     @property
-    def download_institution_blob(self):
+    def download_institution_blob_name(self):
         return gcs_blob_name_from_path(self.download_institution_path)
 
     @property
-    def transform_country_blob(self):
+    def transform_country_blob_name(self):
         return gcs_blob_name_from_path(self.transform_country_path)
 
     @property
-    def transform_institution_blob(self):
+    def transform_institution_blob_name(self):
         return gcs_blob_name_from_path(self.transform_institution_path)
 
     @staticmethod

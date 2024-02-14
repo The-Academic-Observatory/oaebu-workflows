@@ -45,7 +45,7 @@ from observatory.platform.observatory_environment import (
     load_and_parse_json,
 )
 from observatory.platform.observatory_config import Workflow
-from observatory.platform.gcs import gcs_blob_name_from_path
+from observatory.platform.gcs import gcs_blob_name_from_path, gcs_upload_files
 from observatory.platform.bigquery import bq_table_id
 from observatory.platform.api import get_dataset_releases
 
@@ -70,7 +70,7 @@ class TestTelescopeSetup(ObservatoryTestCase):
             env.add_connection(dummy_gmail_connection())
             for entity_type in ["publisher", "collection"]:
                 dag = create_dag(
-                    "jstor",
+                    dag_id="jstor_test",
                     cloud_workspace=self.fake_cloud_workspace,
                     entity_id=self.entity_id,
                     entity_type=entity_type,
@@ -82,8 +82,8 @@ class TestTelescopeSetup(ObservatoryTestCase):
                         "download": ["transform", "bq_load", "add_new_dataset_releases", "cleanup_workflow"],
                         "transform": ["bq_load"],
                         "bq_load": ["add_new_dataset_releases"],
-                        "add_new_dataset_releases": ["cleanup"],
-                        "cleanup": [],
+                        "add_new_dataset_releases": ["cleanup_workflow"],
+                        "cleanup_workflow": [],
                     },
                     dag,
                 )
@@ -173,12 +173,12 @@ class TestJstorTelescopePublisher(ObservatoryTestCase):
 
         mock_account_credentials.from_json_keyfile_dict.return_value = ""
 
-        # http = HttpMockSequence(
-        #     publisher_http_mock_sequence(
-        #         self.country_report["url"], self.institution_report["url"], self.wrong_publisher_report["url"]
-        #     )
-        # )
-        # mock_build.return_value = build("gmail", "v1", http=http)
+        http = HttpMockSequence(
+            publisher_http_mock_sequence(
+                self.country_report["url"], self.institution_report["url"], self.wrong_publisher_report["url"]
+            )
+        )
+        mock_build.return_value = build("gmail", "v1", http=http)
 
         # Setup Observatory environment
         env = ObservatoryEnvironment(
@@ -242,33 +242,46 @@ class TestJstorTelescopePublisher(ObservatoryTestCase):
 
                 # use release info for other tasks
                 release_dicts = ti.xcom_pull(task_ids="download", include_prior_dates=False)
+                expected_releases = [
+                    {
+                        "dag_id": "jstor_test_telescope",
+                        "run_id": "scheduled__2020-11-01T00:00:00+00:00",
+                        "data_interval_start": "2022-07-01",
+                        "data_interval_end": "2022-08-01",
+                        "partition_date": "2022-07-31",
+                        "reports": [
+                            {
+                                "type": "country",
+                                "url": "https://www.jstor.org/admin/reports/download/249192019",
+                                "id": "1788ec9e91f3de62",
+                            },
+                            {
+                                "type": "institution",
+                                "url": "https://www.jstor.org/admin/reports/download/129518301",
+                                "id": "1788ebe4ecbab055",
+                            },
+                        ],
+                    }
+                ]
+                self.assertEqual(release_dicts, expected_releases)
+                release = JstorRelease.from_dict(release_dicts[0])
 
-                release = JstorRelease.from_dict(release_dicts)
-
-                # self.assertIsInstance(release_dicts, dict)
-                # self.assertEqual(1, len(available_releases))
-                # for release_date, reports in available_releases.items():
-                #     self.assertEqual(self.release_date.date(), pendulum.parse(release_date).date())
-                #     self.assertIsInstance(reports, list)
-                #     self.assertListEqual(expected_reports_info, reports)
-                # release = JstorRelease(
-                #     dag_id=telescope.dag_id,
-                #     run_id=env.dag_run.run_id,
-                #     data_interval_start=pendulum.parse(release_date).start_of("month"),
-                #     data_interval_end=pendulum.parse(release_date).add(days=1).start_of("month"),
-                #     partition_date=pendulum.parse(release_date),
-                #     reports=reports,
-                # )
-
+                # Check that the files were "downloaded"
                 self.assertTrue(os.path.exists(release.download_country_path))
                 self.assertTrue(os.path.exists(release.download_institution_path))
                 self.assert_file_integrity(release.download_country_path, self.country_report["download_hash"], "md5")
                 self.assert_file_integrity(
                     release.download_institution_path, self.institution_report["download_hash"], "md5"
                 )
+
+                # Do the upload that we patched above
+                success = gcs_upload_files(
+                    bucket_name=env.cloud_workspace.download_bucket,
+                    file_paths=[release.download_institution_path, release.download_country_path],
+                )
+                self.assertTrue(success)
+
                 # Test that file uploaded
-                ti = env.run_task(telescope.upload_downloaded.__name__)
-                self.assertEqual(ti.state, State.SUCCESS)
                 self.assert_blob_integrity(
                     env.download_bucket,
                     gcs_blob_name_from_path(release.download_country_path),
@@ -281,7 +294,7 @@ class TestJstorTelescopePublisher(ObservatoryTestCase):
                 )
 
                 # Test that file transformed
-                ti = env.run_task(telescope.transform.__name__)
+                ti = env.run_task("transform")
                 self.assertEqual(ti.state, State.SUCCESS)
                 self.assertTrue(os.path.exists(release.transform_country_path))
                 self.assertTrue(os.path.exists(release.transform_institution_path))
@@ -292,8 +305,7 @@ class TestJstorTelescopePublisher(ObservatoryTestCase):
                     release.transform_institution_path, self.institution_report["transform_hash"], "gzip_crc"
                 )
 
-                # Test that transformed file uploaded
-                ti = env.run_task(telescope.upload_transformed.__name__)
+                # Test that transformed file was uploaded
                 self.assertEqual(ti.state, State.SUCCESS)
                 self.assert_blob_integrity(
                     env.transform_bucket,
@@ -306,34 +318,35 @@ class TestJstorTelescopePublisher(ObservatoryTestCase):
                     release.transform_institution_path,
                 )
 
-                # Test that data loaded into BigQuery
-                ti = env.run_task(telescope.bq_load.__name__)
+                # Test that data is loaded into BigQuery
+                ti = env.run_task("bq_load")
                 self.assertEqual(ti.state, State.SUCCESS)
                 country_table_id = bq_table_id(
-                    telescope.cloud_workspace.project_id,
-                    telescope.country_partner.bq_dataset_id,
-                    telescope.country_partner.bq_table_name,
+                    env.cloud_workspace.project_id,
+                    country_partner.bq_dataset_id,
+                    country_partner.bq_table_name,
                 )
                 institution_table_id = bq_table_id(
-                    telescope.cloud_workspace.project_id,
-                    telescope.institution_partner.bq_dataset_id,
-                    telescope.institution_partner.bq_table_name,
+                    env.cloud_workspace.project_id,
+                    institution_partner.bq_dataset_id,
+                    institution_partner.bq_table_name,
                 )
                 self.assert_table_integrity(country_table_id, self.country_report["table_rows"])
                 self.assert_table_integrity(institution_table_id, self.institution_report["table_rows"])
 
                 # Add_dataset_release_task
-                dataset_releases = get_dataset_releases(dag_id=telescope.dag_id, dataset_id=telescope.api_dataset_id)
+                dataset_releases = get_dataset_releases(dag_id=dag_id, dataset_id="jstor")
                 self.assertEqual(len(dataset_releases), 0)
-                ti = env.run_task(telescope.add_new_dataset_releases.__name__)
+                ti = env.run_task("add_new_dataset_releases")
                 self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = get_dataset_releases(dag_id=telescope.dag_id, dataset_id=telescope.api_dataset_id)
+                dataset_releases = get_dataset_releases(dag_id=dag_id, dataset_id="jstor")
                 self.assertEqual(len(dataset_releases), 1)
 
                 # Test that all telescope data deleted
-                ti = env.run_task(telescope.cleanup.__name__)
+                workflow_folder_path = release.workflow_folder
+                ti = env.run_task("cleanup_workflow")
                 self.assertEqual(ti.state, State.SUCCESS)
-                self.assert_cleanup(release.workflow_folder)
+                self.assert_cleanup(workflow_folder_path)
 
     def test_get_release_date(self):
         """Test that the get_release_date returns the correct release date and raises an exception when dates are
@@ -438,29 +451,28 @@ class TestJstorTelescopeCollection(ObservatoryTestCase):
             country_partner.bq_dataset_id = dataset_id
             institution_partner = partner_from_str("jstor_institution_collection")
             institution_partner.bq_dataset_id = dataset_id
-            telescope = JstorTelescope(
-                dag_id="jstor_test_telescope",
+            dag_id = "jstor_test_telescope"
+            entity_type = "collection"
+            dag = create_dag(
+                dag_id=dag_id,
                 cloud_workspace=env.cloud_workspace,
                 entity_id=self.entity_id,
-                entity_type="collection",
+                entity_type=entity_type,
                 country_partner=country_partner,
                 institution_partner=institution_partner,
             )
-            dag = telescope.make_dag()
 
             # Begin DAG run
             with env.create_dag_run(dag, execution_date):
                 # Test that all dependencies are specified: no error should be thrown
-                ti = env.run_task(telescope.check_dependencies.__name__)
+                ti = env.run_task("check_dependencies")
                 self.assertEqual(ti.state, State.SUCCESS)
 
                 # Test list releases task with files available
-                ti = env.run_task(telescope.list_reports.__name__)
+                ti = env.run_task("list_reports")
                 self.assertEqual(ti.state, State.SUCCESS)
 
-                available_reports = ti.xcom_pull(
-                    key=REPORTS_INFO, task_ids=telescope.list_reports.__name__, include_prior_dates=False
-                )
+                available_reports = ti.xcom_pull(task_ids="list_reports", include_prior_dates=False)
                 self.assertIsInstance(available_reports, list)
                 expected_reports_info = [
                     {"type": "country", "attachment_id": "2", "id": "18af0b40b64fe408"},
@@ -469,31 +481,28 @@ class TestJstorTelescopeCollection(ObservatoryTestCase):
                 self.assertListEqual(expected_reports_info, available_reports)
 
                 # Test download_reports task
-                ti = env.run_task(telescope.download_reports.__name__)
+                ti = env.run_task("download")
                 self.assertEqual(ti.state, State.SUCCESS)
 
                 # use release info for other tasks
-                available_releases = ti.xcom_pull(
-                    task_ids=telescope.download_reports.__name__,
-                    include_prior_dates=False,
-                )
-                self.assertIsInstance(available_releases, dict)
-                self.assertEqual(1, len(available_releases))
-                for release_date, reports in available_releases.items():
-                    self.assertEqual(self.release_date.date(), pendulum.parse(release_date).date())
-                    self.assertIsInstance(reports, list)
-                    self.assertListEqual(expected_reports_info, reports)
+                release_dicts = ti.xcom_pull(task_ids="download", include_prior_dates=False)
+                expected_releases = [
+                    {
+                        "dag_id": "jstor_test_telescope",
+                        "run_id": "scheduled__2023-10-04T00:00:00+00:00",
+                        "data_interval_start": "2023-09-01",
+                        "data_interval_end": "2023-10-01",
+                        "partition_date": "2023-09-30",
+                        "reports": [
+                            {"type": "country", "attachment_id": "2", "id": "18af0b40b64fe408"},
+                            {"type": "institution", "attachment_id": "3", "id": "18af0b40b64fe408"},
+                        ],
+                    }
+                ]
+                self.assertEqual(release_dicts, expected_releases)
+                release = JstorRelease.from_dict(release_dicts[0])
 
-                release = JstorRelease(
-                    dag_id=telescope.dag_id,
-                    run_id=env.dag_run.run_id,
-                    data_interval_start=pendulum.parse(release_date).start_of("month"),
-                    data_interval_end=pendulum.parse(release_date).add(days=1).start_of("month"),
-                    partition_date=pendulum.parse(release_date),
-                    reports=reports,
-                )
-
-                # Test that files download
+                # Check that the files were "downloaded"
                 self.assertTrue(os.path.exists(release.download_country_path))
                 self.assertTrue(os.path.exists(release.download_institution_path))
                 self.assert_file_integrity(release.download_country_path, self.country_report["download_hash"], "md5")
@@ -501,9 +510,14 @@ class TestJstorTelescopeCollection(ObservatoryTestCase):
                     release.download_institution_path, self.institution_report["download_hash"], "md5"
                 )
 
+                # Do the upload that we patched above
+                # success = gcs_upload_files(
+                #     bucket_name=env.cloud_workspace.download_bucket,
+                #     file_paths=[release.download_institution_path, release.download_country_path],
+                # )
+                # self.assertTrue(success)
+
                 # Test that file uploaded
-                ti = env.run_task(telescope.upload_downloaded.__name__)
-                self.assertEqual(ti.state, State.SUCCESS)
                 self.assert_blob_integrity(
                     env.download_bucket,
                     gcs_blob_name_from_path(release.download_country_path),
@@ -516,7 +530,7 @@ class TestJstorTelescopeCollection(ObservatoryTestCase):
                 )
 
                 # Test that file transformed
-                ti = env.run_task(telescope.transform.__name__)
+                ti = env.run_task("transform")
                 self.assertEqual(ti.state, State.SUCCESS)
                 self.assertTrue(os.path.exists(release.transform_country_path))
                 self.assertTrue(os.path.exists(release.transform_institution_path))
@@ -528,8 +542,6 @@ class TestJstorTelescopeCollection(ObservatoryTestCase):
                 )
 
                 # Test that transformed file uploaded
-                ti = env.run_task(telescope.upload_transformed.__name__)
-                self.assertEqual(ti.state, State.SUCCESS)
                 self.assert_blob_integrity(
                     env.transform_bucket,
                     gcs_blob_name_from_path(release.transform_country_path),
@@ -542,17 +554,17 @@ class TestJstorTelescopeCollection(ObservatoryTestCase):
                 )
 
                 # Test that data loaded into BigQuery
-                ti = env.run_task(telescope.bq_load.__name__)
+                ti = env.run_task("bq_load")
                 self.assertEqual(ti.state, State.SUCCESS)
                 country_table_id = bq_table_id(
-                    telescope.cloud_workspace.project_id,
-                    telescope.country_partner.bq_dataset_id,
-                    telescope.country_partner.bq_table_name,
+                    env.cloud_workspace.project_id,
+                    country_partner.bq_dataset_id,
+                    country_partner.bq_table_name,
                 )
                 institution_table_id = bq_table_id(
-                    telescope.cloud_workspace.project_id,
-                    telescope.institution_partner.bq_dataset_id,
-                    telescope.institution_partner.bq_table_name,
+                    env.cloud_workspace.project_id,
+                    institution_partner.bq_dataset_id,
+                    institution_partner.bq_table_name,
                 )
                 self.assert_table_integrity(country_table_id, self.country_report["table_rows"])
                 self.assert_table_integrity(institution_table_id, self.institution_report["table_rows"])
@@ -562,17 +574,18 @@ class TestJstorTelescopeCollection(ObservatoryTestCase):
                 self.assert_table_content(institution_table_id, expected, primary_key="ISBN")
 
                 # Add_dataset_release_task
-                dataset_releases = get_dataset_releases(dag_id=telescope.dag_id, dataset_id=telescope.api_dataset_id)
+                dataset_releases = get_dataset_releases(dag_id=dag_id, dataset_id="jstor")
                 self.assertEqual(len(dataset_releases), 0)
-                ti = env.run_task(telescope.add_new_dataset_releases.__name__)
+                ti = env.run_task("add_new_dataset_releases")
                 self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = get_dataset_releases(dag_id=telescope.dag_id, dataset_id=telescope.api_dataset_id)
+                dataset_releases = get_dataset_releases(dag_id=dag_id, dataset_id="jstor")
                 self.assertEqual(len(dataset_releases), 1)
 
                 # Test that all telescope data deleted
-                ti = env.run_task(telescope.cleanup.__name__)
+                workflow_folder_path = release.workflow_folder
+                ti = env.run_task("cleanup_workflow")
                 self.assertEqual(ti.state, State.SUCCESS)
-                self.assert_cleanup(release.workflow_folder)
+                self.assert_cleanup(workflow_folder_path)
 
     def test_get_release_date(self):
         """Test that the get_release_date returns the correct release date and raises an exception when dates are
