@@ -71,3 +71,9 @@ def construct_module_path(*parts: str) -> str:
         raise FileNotFoundError(f"construct_module_path: directory {file_path} does not exist!")
 
     return file_path
+
+
+def oaebu_user_agent_header() -> dict:
+    return {
+        "User-Agent": "oaebu-workflows v1.0.0 (+https://github.com/The-Academic-Observatory/oaebu-workflows; mailto:agent@observatory.academy) "
+    }
