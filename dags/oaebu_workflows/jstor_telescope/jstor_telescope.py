@@ -43,7 +43,7 @@ from observatory.api.client.model.dataset_release import DatasetRelease
 from observatory.platform.api import make_observatory_api
 from observatory.platform.airflow import AirflowConns
 from observatory.platform.files import save_jsonl_gz
-from observatory.platform.utils.url_utils import get_user_agent, retry_get_url
+from observatory.platform.utils.url_utils import retry_get_url
 from observatory.platform.gcs import gcs_upload_files, gcs_blob_uri, gcs_blob_name_from_path, gcs_download_blob
 from observatory.platform.bigquery import bq_load_table, bq_table_id, bq_create_dataset
 from observatory.platform.observatory_config import CloudWorkspace
@@ -51,7 +51,6 @@ from observatory.platform.tasks import check_dependencies
 from observatory.platform.files import add_partition_date, convert
 from observatory.platform.workflows.workflow import PartitionRelease, set_task_state, cleanup
 
-JSTOR_REPORTS_INFO = "reports"
 JSTOR_PROCESSED_LABEL_NAME = "processed_report"
 
 # download settings
@@ -275,7 +274,7 @@ def create_dag(
             for release in releases:
                 success = gcs_upload_files(
                     bucket_name=cloud_workspace.download_bucket,
-                    file_paths=[release.download_totals_path, release.download_country_path],
+                    file_paths=[release.download_institution_path, release.download_country_path],
                 )
                 set_task_state(success, context["ti"].task_id, release=release)
 
@@ -388,7 +387,7 @@ def create_dag(
                 set_task_state(success, context["ti"].task_id, release=release)
 
         # Define DAG tasks
-        task_check = check_dependencies(
+        task_check_dependencies = check_dependencies(
             airflow_conns=[observatory_api_conn_id, gmail_api_conn_id], start_date=start_date
         )
         xcom_reports = list_reports()
@@ -399,7 +398,7 @@ def create_dag(
         task_cleanup_workflow = cleanup_workflow(xcom_releases)
 
         (
-            task_check
+            task_check_dependencies
             >> xcom_reports
             >> xcom_releases
             >> task_transform
@@ -555,7 +554,7 @@ class JstorPublishersAPI(JstorAPI):
                     f"Can't find download link for report in e-mail, message snippet: {message.snippet}"
                 )
 
-            # Get filename and extension from head
+            # Get filename and extension from headXX
             filename, extension = self.get_header_info(download_url)
 
             # Get publisher
@@ -601,7 +600,9 @@ class JstorPublishersAPI(JstorAPI):
             raise KeyError(f"'url' not found in report: {report}")
 
         logging.info(f"Downloading report: {url} to: {download_path}")
-        headers = {"User-Agent": get_user_agent(package_name="oaebu_workflows")}
+        headers = {
+            "User-Agent": "oaebu-workflows v1.0.0 (+https://github.com/The-Academic-Observatory/oaebu-workflows; mailto:agent@observatory.academy) "
+        }
         response = retry_get_url(url, headers=headers, wait=JSTOR_WAIT_FN, num_retries=JSTOR_MAX_ATTEMPTS)
         content = response.content.decode("utf-8")
         with open(download_path, "w") as f:
@@ -619,7 +620,9 @@ class JstorPublishersAPI(JstorAPI):
             f'attempt: {self.get_header_info.retry.statistics["attempt_number"]}, '
             f'idle for: {self.get_header_info.retry.statistics["idle_for"]}'
         )
-        headers = {"User-Agent": get_user_agent(package_name="oaebu_workflows")}
+        headers = {
+            "User-Agent": "oaebu-workflows v1.0.0 (+https://github.com/The-Academic-Observatory/oaebu-workflows; mailto:agent@observatory.academy) "
+        }
         response = requests.head(url, allow_redirects=True, headers=headers)
         if response.status_code != 200:
             raise AirflowException(

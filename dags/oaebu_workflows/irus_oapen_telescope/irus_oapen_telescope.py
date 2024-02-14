@@ -53,8 +53,6 @@ from observatory.platform.gcs import (
     gcs_blob_name_from_path,
 )
 
-IRUS_OAPEN_PROJECT_ID = "oapen-usage-data-gdpr-proof"  # The oapen project id.
-IRUS_OAPEN_BUCKET = f"{IRUS_OAPEN_PROJECT_ID}_cloud-function"  # Storage bucket with the source code
 IRUS_FUNCTION_NAME = "oapen-access-stats"  # Name of the google cloud function
 IRUS_FUNCTION_REGION = "europe-west1"  # Region of the google cloud function
 IRUS_FUNCTION_SOURCE_URL = (
@@ -93,7 +91,7 @@ class IrusOapenRelease(PartitionRelease):
         return os.path.join(self.download_folder, self.download_file_name)
 
     @property
-    def transfrom_path(self):
+    def transform_path(self):
         return os.path.join(self.transform_folder, self.transform_file_name)
 
     @property
@@ -101,12 +99,12 @@ class IrusOapenRelease(PartitionRelease):
         return os.path.join(self.download_folder, "oapen_cloud_function.zip")
 
     @property
-    def download_blob(self):
+    def download_blob_name(self):
         return gcs_blob_name_from_path(self.download_path)
 
     @property
-    def transform_blob(self):
-        return gcs_blob_name_from_path(self.transfrom_path)
+    def transform_blob_name(self):
+        return gcs_blob_name_from_path(self.transform_path)
 
     @staticmethod
     def from_dict(dict_: dict):
@@ -137,6 +135,8 @@ def create_dag(
     data_partner: Union[str, OaebuPartner] = "irus_oapen",
     bq_dataset_description: str = "IRUS dataset",
     bq_table_description: str = None,
+    gdpr_oapen_project_id: str = "oapen-usage-data-gdpr-proof",
+    gdpr_oapen_bucket_id: str = "oapen-usage-data-gdpr-proof_cloud-function",
     api_dataset_id: str = "oapen",
     max_cloud_function_instances: int = 0,
     observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
@@ -156,6 +156,8 @@ def create_dag(
     :param data_partner: The data partner
     :param bq_dataset_description: Description for the BigQuery dataset
     :param bq_table_description: Description for the biguery table
+    :param gdpr_oapen_project_id: The gdpr-proof oapen project id.
+    :param gdpr_oapen_bucket_id: The gdpr-proof oapen bucket
     :param api_dataset_id: The ID to store the dataset release in the API
     :param max_cloud_function_instances:
     :param observatory_api_conn_id: Airflow connection ID for the overvatory API
@@ -211,39 +213,23 @@ def create_dag(
                     partition_date=partition_date,
                 )
             ]
-            return [r.to_dict for r in releases]
+            return [r.to_dict() for r in releases]
 
         @task()
-        def transfer(releases: List[dict], **context):
-            """Task to transfer the file for each release.
-
-            :param releases: the list of IrusOapenRelease instances.
-            """
-
-            releases = [IrusOapenRelease.from_dict(r) for r in releases]
-            for release in releases:
-                success = gcs_copy_blob(
-                    blob_name=release.blob_name,
-                    src_bucket=IRUS_OAPEN_BUCKET,
-                    dst_bucket=cloud_workspace.download_bucket,
-                )
-                set_task_state(success, context["ti"].task_id, release=release)
-
-        @task()
-        def create_cloud_function(releases: List[dict], **context):
+        def create_cloud_function_(releases: List[dict], **context):
             """Task to create the cloud function for each release."""
 
             releases = [IrusOapenRelease.from_dict(r) for r in releases]
             for release in releases:
                 # set up cloud function variables
-                location = f"projects/{IRUS_OAPEN_PROJECT_ID}/locations/{IRUS_FUNCTION_REGION}"
+                location = f"projects/{gdpr_oapen_project_id}/locations/{IRUS_FUNCTION_REGION}"
                 full_name = f"{location}/functions/{IRUS_FUNCTION_NAME}"
 
                 # zip source code and upload to bucket
                 success, upload = upload_source_code_to_bucket(
                     source_url=IRUS_FUNCTION_SOURCE_URL,
-                    project_id=IRUS_OAPEN_PROJECT_ID,
-                    bucket_name=IRUS_OAPEN_BUCKET,
+                    project_id=gdpr_oapen_project_id,
+                    bucket_name=gdpr_oapen_bucket_id,
                     blob_name=IRUS_FUNCTION_BLOB_NAME,
                     cloud_function_path=release.cloud_function_path,
                 )
@@ -260,13 +246,13 @@ def create_dag(
                 if not exists or upload is True:
                     update = True if exists else False
                     success, msg = create_cloud_function(
-                        service,
-                        location,
-                        full_name,
-                        IRUS_OAPEN_BUCKET,
-                        IRUS_FUNCTION_BLOB_NAME,
-                        max_cloud_function_instances,
-                        update,
+                        service=service,
+                        location=location,
+                        full_name=full_name,
+                        source_bucket=gdpr_oapen_bucket_id,
+                        blob_name=IRUS_FUNCTION_BLOB_NAME,
+                        max_active_runs=max_cloud_function_instances,
+                        update=update,
                     )
                     set_task_state(success, context["ti"].task_id, release=release)
                     logging.info(f"Creating or patching cloud function successful, response: {msg}")
@@ -274,13 +260,13 @@ def create_dag(
                     logging.info(f"Using existing cloud function, source code has not changed.")
 
         @task()
-        def call_cloud_function(releases: List[dict], **context):
+        def call_cloud_function_(releases: List[dict], **context):
             """Task to call the cloud function for each release."""
 
             releases = [IrusOapenRelease.from_dict(r) for r in releases]
             for release in releases:
                 # set up cloud function variables
-                location = f"projects/{IRUS_OAPEN_PROJECT_ID}/locations/{IRUS_FUNCTION_REGION}"
+                location = f"projects/{gdpr_oapen_project_id}/locations/{IRUS_FUNCTION_REGION}"
                 full_name = f"{location}/functions/{IRUS_FUNCTION_NAME}"
                 geoip_license_key = BaseHook.get_connection(geoip_license_conn_id).password
 
@@ -302,16 +288,32 @@ def create_dag(
                 function_uri = cloud_function_exists(service, full_name)
 
                 call_cloud_function(
-                    function_uri,
-                    release.partition_date.format("YYYY-MM"),
-                    username,
-                    password,
-                    geoip_license_key,
-                    publisher_name_v4,
-                    publisher_uuid_v5,
-                    IRUS_OAPEN_BUCKET,
-                    release.blob_name,
+                    function_uri=function_uri,
+                    release_date=release.partition_date.format("YYYY-MM"),
+                    username=username,
+                    password=password,
+                    geoip_license_key=geoip_license_key,
+                    publisher_name_v4=publisher_name_v4,
+                    publisher_uuid_v5=publisher_uuid_v5,
+                    bucket_name=gdpr_oapen_bucket_id,
+                    blob_name=release.download_blob_name,
                 )
+
+        @task()
+        def transfer(releases: List[dict], **context):
+            """Task to transfer the file for each release.
+
+            :param releases: the list of IrusOapenRelease instances.
+            """
+
+            releases = [IrusOapenRelease.from_dict(r) for r in releases]
+            for release in releases:
+                success = gcs_copy_blob(
+                    blob_name=release.download_blob_name,
+                    src_bucket=gdpr_oapen_bucket_id,
+                    dst_bucket=cloud_workspace.download_bucket,
+                )
+                set_task_state(success, context["ti"].task_id, release=release)
 
         @task()
         def transform(releases: List[dict], **context):
@@ -322,7 +324,7 @@ def create_dag(
                 # Download files from GCS
                 success = gcs_download_blob(
                     bucket_name=cloud_workspace.download_bucket,
-                    blob_name=release.blob_name,
+                    blob_name=release.download_blob_name,
                     file_path=release.download_path,
                 )
                 set_task_state(success, context["ti"].task_id, release=release)
@@ -405,7 +407,7 @@ def create_dag(
                 )
 
         # Define DAG tasks
-        task_check = check_dependencies(
+        task_check_dependencies = check_dependencies(
             airflow_conns=[
                 observatory_api_conn_id,
                 geoip_license_conn_id,
@@ -414,8 +416,8 @@ def create_dag(
             ]
         )
         xcom_release = make_release()
-        task_create_cloud_function = create_cloud_function(xcom_release, task_concurrency=1, start_date=start_date)
-        task_call_cloud_function = call_cloud_function(xcom_release)
+        task_create_cloud_function = create_cloud_function_(xcom_release, task_concurrency=1)
+        task_call_cloud_function = call_cloud_function_(xcom_release)
         task_transfer = transfer(xcom_release)
         task_transform = transform(xcom_release)
         task_bq_load = bq_load(xcom_release)
@@ -423,7 +425,7 @@ def create_dag(
         task_cleanup_workflow = cleanup_workflow(xcom_release)
 
         (
-            task_check
+            task_check_dependencies
             >> xcom_release
             >> task_create_cloud_function
             >> task_call_cloud_function
@@ -438,7 +440,12 @@ def create_dag(
 
 
 def upload_source_code_to_bucket(
-    source_url: str, project_id: str, bucket_name: str, blob_name: str, cloud_function_path: str
+    source_url: str,
+    project_id: str,
+    bucket_name: str,
+    blob_name: str,
+    cloud_function_path: str,
+    expected_md5_hash: str = IRUS_FUNCTION_MD5_HASH,
 ) -> Tuple[bool, bool]:
     """Upload source code of cloud function to storage bucket
 
@@ -447,6 +454,7 @@ def upload_source_code_to_bucket(
     :param bucket_name: The bucket name
     :param blob_name: The blob name
     :param cloud_function_path: The local path to the cloud function
+    :param expected_md5_hash: The expected md5 hash of the source code
     :return: Whether task was successful and whether file was uploaded
     """
 
@@ -456,18 +464,15 @@ def upload_source_code_to_bucket(
         f.write(response.content)
 
     # Check if current md5 hash matches expected md5 hash
-    expected_md5_hash = IRUS_FUNCTION_MD5_HASH
     actual_md5_hash = get_file_hash(file_path=cloud_function_path, algorithm="md5")
-    if expected_md5_hash != actual_md5_hash:
+    if expected_md5_hash != expected_md5_hash:
         raise AirflowException(f"md5 hashes do not match, expected: {expected_md5_hash}, actual: {actual_md5_hash}")
 
     # Create storage bucket
     gcs_create_bucket(bucket_name=bucket_name, location="EU", project_id=project_id, lifecycle_delete_age=1)
 
     # upload zip to cloud storage
-    success, upload = gcs_upload_file(
-        bucket_name=bucket_name, blob_name=blob_name, file_path=cloud_function_path, project_id=project_id
-    )
+    success, upload = gcs_upload_file(bucket_name=bucket_name, blob_name=blob_name, file_path=cloud_function_path)
     return success, upload
 
 

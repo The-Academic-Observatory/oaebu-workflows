@@ -58,7 +58,7 @@ class GoogleBooksRelease(PartitionRelease):
         self.download_traffic_file_name = "google_books_traffic.csv"
         self.transform_sales_file_name = "google_books_sales.jsonl.gz"
         self.transform_traffic_file_name = "google_books_traffic.jsonl.gz"
-        sftp_files = sftp_files
+        self.sftp_files = sftp_files
 
     @property
     def download_sales_path(self):
@@ -221,7 +221,7 @@ def create_dag(
                             sftp.get(file, localpath=release.download_traffic_path)
                         elif "Transaction" in file:
                             sftp.get(file, localpath=release.download_sales_path)
-                if not os.path.exists(release.download_traffic_path) or os.path.exists(release.download_sales_path):
+                if not os.path.exists(release.download_traffic_path) or not os.path.exists(release.download_sales_path):
                     raise FileNotFoundError(
                         f"Release files not found. {release.download_traffic_path} | {release.download_sales_path}"
                     )
@@ -343,9 +343,7 @@ def create_dag(
                 )
 
         # Define dag tasks
-        task_check_dependencies = check_dependencies(
-            airflow_conns=[observatory_api_conn_id, sftp_service_conn_id], start_date=start_date
-        )
+        task_check_dependencies = check_dependencies(airflow_conns=[observatory_api_conn_id, sftp_service_conn_id])
         xcom_release = make_release()
         task_move_in_progress = move_files_to_in_progress(xcom_release)
         task_download = download(xcom_release)

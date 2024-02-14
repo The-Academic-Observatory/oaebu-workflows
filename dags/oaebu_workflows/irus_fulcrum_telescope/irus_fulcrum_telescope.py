@@ -287,9 +287,7 @@ def create_dag(
             cleanup(dag_id, execution_date=context["execution_date"], workflow_folder=release.workflow_folder)
 
         # Define DAG tasks
-        task_check = check_dependencies(
-            airflow_conns=[observatory_api_conn_id, irus_oapen_api_conn_id], start_date=start_date
-        )
+        task_check = check_dependencies(airflow_conns=[observatory_api_conn_id, irus_oapen_api_conn_id])
         xcom_release = make_release()
         task_download = download(xcom_release)
         task_transform = transform(xcom_release)

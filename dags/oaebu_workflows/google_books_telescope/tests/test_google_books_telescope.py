@@ -126,61 +126,74 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
         # Create the Observatory environment and run tests
         with env.create():
             with sftp_server.create() as sftp_root:
+
                 # Setup Telescope
                 execution_date = pendulum.datetime(year=2021, month=3, day=31)
                 sales_partner = partner_from_str("google_books_sales")
                 sales_partner.bq_dataset_id = dataset_id
                 traffic_partner = partner_from_str("google_books_traffic")
                 traffic_partner.bq_dataset_id = dataset_id
+                sftp_service_conn_id = "sftp_service"
+                dag_id = "google_books_test"
                 dag = create_dag(
-                    dag_id="google_books_test",
+                    dag_id=dag_id,
                     cloud_workspace=env.cloud_workspace,
-                    sftp_root="/",
+                    sftp_root="/",  # Unintuitive, but this is correct
                     sales_partner=sales_partner,
                     traffic_partner=traffic_partner,
-                    sftp_service_conn_id="sftp_service",
+                    sftp_service_conn_id=sftp_service_conn_id,
                 )
 
                 # Add SFTP connection
                 env.add_connection(
-                    Connection(conn_id="sftp_service", uri=f"ssh://:password@localhost:{self.sftp_port}")
+                    Connection(conn_id=sftp_service_conn_id, uri=f"ssh://:password@localhost:{self.sftp_port}")
                 )
                 with env.create_dag_run(dag, execution_date):
                     # Test that all dependencies are specified: no error should be thrown
                     ti = env.run_task("check_dependencies")
                     self.assertEqual(ti.state, State.SUCCESS)
 
+                    # Add file to SFTP server
+                    sftp_folders = SftpFolders(dag_id, sftp_conn_id=sftp_service_conn_id, sftp_root=sftp_root)
+                    os.makedirs(sftp_folders.upload, exist_ok=True)
+                    for file_name, file_path in params["test_files"].items():
+                        upload_file = os.path.join(sftp_folders.upload, file_name)
+                        shutil.copy(file_path, upload_file)
+
                     # Test that make release is successful
                     ti = env.run_task("make_release")
                     self.assertEqual(ti.state, State.SUCCESS)
-                    release_dict = ti.xcom_pull(task_ids="make_release", include_prior_dates=False)
-                    expected_release_dict = {}
-                    self.assertEqual(release_dict, expected_release_dict)
-                    release = GoogleBooksRelease.from_dict(release_dict)
-
-                    # Add file to SFTP server
-                    local_sftp_folders = SftpFolders(
-                        dag_id="google_books_test", sftp_conn_id="sftp_service", sftp_root="/"
-                    )
-                    os.makedirs(local_sftp_folders.upload, exist_ok=True)
-                    for file_name, file_path in params["test_files"].items():
-                        upload_file = os.path.join(local_sftp_folders.upload, file_name)
-                        shutil.copy(file_path, upload_file)
+                    release_dicts = ti.xcom_pull(task_ids="make_release", include_prior_dates=False)
+                    expected_release_dicts = [
+                        {
+                            "dag_id": "google_books_test",
+                            "run_id": "scheduled__2021-03-31T00:00:00+00:00",
+                            "partition_date": "2020-02-29",
+                            "sftp_files": [
+                                "/workflows/google_books_test/in_progress/GoogleBooksTrafficReport_2020_02.csv",
+                                "/workflows/google_books_test/in_progress/GoogleSalesTransactionReport_2020_02.csv",
+                            ],
+                        }
+                    ]
+                    self.assertEqual(release_dicts, expected_release_dicts)
+                    release = GoogleBooksRelease.from_dict(release_dicts[0])
 
                     # Test move file to in progress
                     ti = env.run_task("move_files_to_in_progress")
                     self.assertEqual(ti.state, State.SUCCESS)
                     for file in release.sftp_files:
                         file_name = os.path.basename(file)
-                        upload_file = os.path.join(local_sftp_folders.upload, file_name)
+                        upload_file = os.path.join(sftp_folders.upload, file_name)
                         self.assertFalse(os.path.isfile(upload_file))
-                        in_progress_file = os.path.join(local_sftp_folders.in_progress, file_name)
+                        in_progress_file = os.path.join(sftp_folders.in_progress, file_name)
                         self.assertTrue(os.path.isfile(in_progress_file))
 
                     # Run main telescope tasks
                     ti = env.run_task("download")
                     self.assertEqual(ti.state, State.SUCCESS)
                     ti = env.run_task("transform")
+                    self.assertEqual(ti.state, State.SUCCESS)
+                    ti = env.run_task("move_files_to_finished")
                     self.assertEqual(ti.state, State.SUCCESS)
                     ti = env.run_task("bq_load")
                     self.assertEqual(ti.state, State.SUCCESS)
@@ -224,6 +237,15 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
                         release.transform_sales_path,
                     )
 
+                    # Test that files correctly moved to "finished"
+                    for file in release.sftp_files:
+                        file_name = os.path.basename(file)
+                        in_progress_file = os.path.join(sftp_folders.in_progress, file_name)
+                        self.assertFalse(os.path.isfile(in_progress_file))
+
+                        finished_file = os.path.join(sftp_folders.finished, file_name)
+                        self.assertTrue(os.path.isfile(finished_file))
+
                     # Test that data loaded into BigQuery
                     table_id = bq_table_id(
                         env.cloud_workspace.project_id,
@@ -237,17 +259,6 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
                         traffic_partner.bq_table_name,
                     )
                     self.assert_table_integrity(table_id, params["bq_rows"])
-
-                    # Test move files to finished
-                    ti = env.run_task("move_files_to_finished")
-                    self.assertEqual(ti.state, State.SUCCESS)
-                    for file in release.sftp_files:
-                        file_name = os.path.basename(file)
-                        in_progress_file = os.path.join(local_sftp_folders.in_progress, file_name)
-                        self.assertFalse(os.path.isfile(in_progress_file))
-
-                        finished_file = os.path.join(local_sftp_folders.finished, file_name)
-                        self.assertTrue(os.path.isfile(finished_file))
 
                     # Add_dataset_release_task
                     dataset_releases = get_dataset_releases(dag_id="google_books_test", dataset_id="google_books")
