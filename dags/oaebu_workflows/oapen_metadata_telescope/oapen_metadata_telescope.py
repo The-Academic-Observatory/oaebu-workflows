@@ -36,7 +36,7 @@ from tenacity import (
 )
 
 from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
-from oaebu_workflows.config import schema_folder
+from oaebu_workflows.config import schema_folder, oaebu_user_agent_header
 from oaebu_workflows.onix_utils import OnixTransformer
 from observatory.api.client.model.dataset_release import DatasetRelease
 from observatory.platform.api import make_observatory_api
@@ -79,11 +79,11 @@ class OapenMetadataRelease(SnapshotRelease):
         return [os.path.join(self.transform_folder, f) for f in files]
 
     @property
-    def download_blob(self):
+    def download_blob_name(self):
         return gcs_blob_name_from_path(self.download_path)
 
     @property
-    def transform_blob(self):
+    def transform_blob_name(self):
         return gcs_blob_name_from_path(self.transform_path)
 
     @staticmethod
@@ -98,7 +98,7 @@ class OapenMetadataRelease(SnapshotRelease):
         return {
             "dag_id": self.dag_id,
             "run_id": self.run_id,
-            "snapshot_date": self.snapshot_date.isoformat(),
+            "snapshot_date": self.snapshot_date.to_date_string(),
         }
 
 
@@ -271,7 +271,7 @@ def create_dag(
                 workflow_folder=release.workflow_folder,
             )
 
-        task_check = check_dependencies(airflow_conns=[observatory_api_conn_id], start_date=start_date)
+        task_check_dependencies = check_dependencies(airflow_conns=[observatory_api_conn_id])
         xcom_release = make_release()
         task_download = download(xcom_release)
         task_transform = transform(xcom_release)
@@ -280,7 +280,7 @@ def create_dag(
         task_cleanup_workflow = cleanup_workflow(xcom_release)
 
         (
-            task_check
+            task_check_dependencies
             >> xcom_release
             >> task_download
             >> task_transform
@@ -311,8 +311,7 @@ def download_metadata(uri: str, download_path: str) -> None:
     :raises ConnectionError: raised if the response from the metadata server does not have code 200
     :raises AirflowException: raised if the response does not contain any Product fields
     """
-    headers = {"User-Agent": f"{get_user_agent(package_name='oaebu_workflows')}"}
-    response = requests.get(uri, headers=headers)
+    response = requests.get(uri, headers=oaebu_user_agent_header())
     if response.status_code != 200:
         raise ConnectionError(f"Expected status code 200 from url {uri}, instead got response: {response.text}")
     with open(download_path, "w") as f:

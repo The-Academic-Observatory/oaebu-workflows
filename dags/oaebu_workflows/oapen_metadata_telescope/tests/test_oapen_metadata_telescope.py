@@ -26,9 +26,13 @@ from airflow.exceptions import AirflowException
 from airflow.utils.state import State
 from tenacity import stop_after_attempt
 
-from oaebu_workflows.config import test_fixtures_folder
+from oaebu_workflows.config import test_fixtures_folder, module_file_path
 from oaebu_workflows.oaebu_partners import partner_from_str
-from oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope import download_metadata
+from oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope import (
+    OapenMetadataRelease,
+    download_metadata,
+    create_dag,
+)
 from observatory.platform.api import get_dataset_releases
 from observatory.platform.observatory_config import Workflow
 from observatory.platform.gcs import gcs_blob_name_from_path
@@ -61,21 +65,20 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
 
     def test_dag_structure(self):
         """Test that the Oapen Metadata DAG has the correct structure"""
-        dag = OapenMetadataTelescope(
+        dag = create_dag(
             dag_id="oapen_metadata",
             cloud_workspace=self.fake_cloud_workspace,
             metadata_uri="",
-        ).make_dag()
+        )
         self.assert_dag_structure(
             {
-                "check_dependencies": ["download"],
-                "download": ["upload_downloaded"],
-                "upload_downloaded": ["transform"],
-                "transform": ["upload_transformed"],
-                "upload_transformed": ["bq_load"],
+                "check_dependencies": ["make_release"],
+                "make_release": ["download", "transform", "bq_load", "add_new_dataset_releases", "cleanup_workflow"],
+                "download": ["transform"],
+                "transform": ["bq_load"],
                 "bq_load": ["add_new_dataset_releases"],
-                "add_new_dataset_releases": ["cleanup"],
-                "cleanup": [],
+                "add_new_dataset_releases": ["cleanup_workflow"],
+                "cleanup_workflow": [],
             },
             dag,
         )
@@ -87,14 +90,15 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
                 Workflow(
                     dag_id="oapen_metadata",
                     name="OAPEN Metadata Telescope",
-                    class_name="oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope.OapenMetadataTelescope",
+                    class_name="oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope.create_dag",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(metadata_uri=""),
                 )
             ],
         )
         with env.create():
-            self.assert_dag_load_from_config("oapen_metadata")
+            dag_file = os.path.join(module_file_path("dags"), "load_dags.py")
+            self.assert_dag_load_from_config("oapen_metadata", dag_file)
 
     def test_telescope(self):
         """Test telescope task execution."""
@@ -105,51 +109,53 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
         dataset_id = env.add_dataset()
 
         with env.create():
-            partner = partner_from_str("oapen_metadata", metadata_partner=True)
-            partner.bq_dataset_id = dataset_id
-            telescope = OapenMetadataTelescope(
-                dag_id="oapen_metadata",
+            metadata_partner = partner_from_str("oapen_metadata", metadata_partner=True)
+            metadata_partner.bq_dataset_id = dataset_id
+            dag_id = "oapen_metadata"
+            dag = create_dag(
+                dag_id=dag_id,
                 cloud_workspace=env.cloud_workspace,
                 metadata_uri=self.metadata_uri,
-                metadata_partner=partner,
+                metadata_partner=metadata_partner,
                 elevate_related_products=True,
-                bq_dataset_id=dataset_id,
             )
-            dag = telescope.make_dag()
 
             # first run
             with env.create_dag_run(dag, pendulum.datetime(year=2021, month=2, day=1)):
                 # Test that all dependencies are specified: no error should be thrown
-                ti = env.run_task(telescope.check_dependencies.__name__)
+                ti = env.run_task("check_dependencies")
                 self.assertEqual(ti.state, State.SUCCESS)
+
+                # Make release task
+                ti = env.run_task("make_release")
+                self.assertEqual(ti.state, State.SUCCESS)
+                release_dict = ti.xcom_pull(task_ids="make_release", include_prior_dates=False)
+                expected_release_dict = {
+                    "dag_id": "oapen_metadata",
+                    "run_id": "scheduled__2021-02-01T00:00:00+00:00",
+                    "snapshot_date": "2021-02-07",
+                }
+                self.assertEqual(release_dict, expected_release_dict)
+                release = OapenMetadataRelease.from_dict(release_dict)
 
                 # Download task
-                with vcr.VCR().use_cassette(self.valid_download_cassette, record_mode="None"):
-                    ti = env.run_task(telescope.download.__name__)
+                with vcr.VCR().use_cassette(
+                    self.valid_download_cassette,
+                    record_mode="None",
+                    ignore_hosts=["oauth2.googleapis.com", "storage.googleapis.com"],
+                ):
+                    ti = env.run_task("download")
                     self.assertEqual(ti.state, State.SUCCESS)
 
-                # Upload download task
-                ti = env.run_task(telescope.upload_downloaded.__name__)
-                self.assertEqual(ti.state, State.SUCCESS)
-
                 # Transform task
-                ti = env.run_task(telescope.transform.__name__)
-                self.assertEqual(ti.state, State.SUCCESS)
-
-                # Upload transform task
-                ti = env.run_task(telescope.upload_transformed.__name__)
+                ti = env.run_task("transform")
                 self.assertEqual(ti.state, State.SUCCESS)
 
                 # Bigquery load task
-                ti = env.run_task(telescope.bq_load.__name__)
+                ti = env.run_task("bq_load")
                 self.assertEqual(ti.state, State.SUCCESS)
 
                 ### Make Assertions ###
-
-                # Create the release
-                release = telescope.make_release(
-                    run_id=env.dag_run.run_id, data_interval_end=pendulum.parse(str(env.dag_run.data_interval_end))
-                )
 
                 # Test download task
                 self.assertTrue(os.path.exists(release.download_path))
@@ -177,26 +183,27 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
 
                 # Test that table is loaded to BQ
                 table_id = bq_sharded_table_id(
-                    telescope.cloud_workspace.project_id,
-                    telescope.metadata_partner.bq_dataset_id,
-                    telescope.metadata_partner.bq_table_name,
+                    env.cloud_workspace.project_id,
+                    metadata_partner.bq_dataset_id,
+                    metadata_partner.bq_table_name,
                     release.snapshot_date,
                 )
                 self.assert_table_integrity(table_id, expected_rows=5)
                 self.assert_table_content(table_id, load_and_parse_json(self.test_table), primary_key="ISBN13")
 
                 # Add_dataset_release_task
-                dataset_releases = get_dataset_releases(dag_id=telescope.dag_id, dataset_id=telescope.api_dataset_id)
+                dataset_releases = get_dataset_releases(dag_id=dag_id, dataset_id="oapen")
                 self.assertEqual(len(dataset_releases), 0)
-                ti = env.run_task(telescope.add_new_dataset_releases.__name__)
+                ti = env.run_task("add_new_dataset_releases")
                 self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = get_dataset_releases(dag_id=telescope.dag_id, dataset_id=telescope.api_dataset_id)
+                dataset_releases = get_dataset_releases(dag_id=dag_id, dataset_id="oapen")
                 self.assertEqual(len(dataset_releases), 1)
 
                 # Test that all data deleted
-                ti = env.run_task(telescope.cleanup.__name__)
+                workflow_folder_path = release.workflow_folder
+                ti = env.run_task("cleanup_workflow")
                 self.assertEqual(ti.state, State.SUCCESS)
-                self.assert_cleanup(release.workflow_folder)
+                self.assert_cleanup(workflow_folder_path)
 
 
 class TestDownloadMetadata(unittest.TestCase):

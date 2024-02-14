@@ -66,19 +66,36 @@ class OnixRelease(SnapshotRelease):
 
     @property
     def parsed_path(self):
-        return os.path.join(self.parsed_folder, self.parsed_file_name)
+        return os.path.join(self.transform_folder, self.parsed_file_name)
 
     @property
     def transform_path(self):
-        return os.path.join(self.transform_folder, self.transfrom_file_name)
+        return os.path.join(self.transform_folder, self.transform_file_name)
 
     @property
-    def download_blob(self):
+    def download_blob_name(self):
         return gcs_blob_name_from_path(self.download_path)
 
     @property
-    def transform_blob(self):
+    def transform_blob_name(self):
         return gcs_blob_name_from_path(self.transform_path)
+
+    @staticmethod
+    def from_dict(dict_: dict):
+        return OnixRelease(
+            dag_id=dict_["dag_id"],
+            run_id=dict_["run_id"],
+            snapshot_date=pendulum.from_format(dict_["snapshot_date"], "YYYY-MM-DD"),
+            onix_file_name=dict_["onix_file_name"],
+        )
+
+    def to_dict(self) -> dict:
+        return {
+            "dag_id": self.dag_id,
+            "run_id": self.run_id,
+            "snapshot_date": self.snapshot_date.to_date_string(),
+            "onix_file_name": self.onix_file_name,
+        }
 
 
 def create_dag(
@@ -190,18 +207,21 @@ def create_dag(
             """Task to transform the ONIX releases."""
 
             releases = [OnixRelease.from_dict(r) for r in releases]
-            # Download files from GCS
-            success = gcs_download_blob(
-                bucket_name=cloud_workspace.download_bucket,
-                blob_name=release.download_blob_name,
-                file_path=release.download_path,
-            )
-            if not success:
-                raise FileNotFoundError(f"Error downloading file {release.download_blob_name}")
 
+            # Download the parser
             success, parser_path = onix_parser_download()
             set_task_state(success, context["ti"].task_id)
+
             for release in releases:
+                # Download files from GCS
+                success = gcs_download_blob(
+                    bucket_name=cloud_workspace.download_bucket,
+                    blob_name=release.download_blob_name,
+                    file_path=release.download_path,
+                )
+                if not success:
+                    raise FileNotFoundError(f"Error downloading file {release.download_blob_name}")
+
                 onix_parser_execute(
                     parser_path=parser_path, input_dir=release.download_folder, output_dir=release.transform_folder
                 )
@@ -275,12 +295,10 @@ def create_dag(
                     dag_id=dag_id, execution_date=context["execution_date"], workflow_folder=release.workflow_folder
                 )
 
-        task_check_dependencies = check_dependencies(
-            airflow_conns=[observatory_api_conn_id, sftp_service_conn_id], start_date=start_date
-        )
+        task_check_dependencies = check_dependencies(airflow_conns=[observatory_api_conn_id, sftp_service_conn_id])
         xcom_release = make_release()
-        task_download = download(xcom_release)
         task_move_files_to_in_progress = move_files_to_in_progress(xcom_release)
+        task_download = download(xcom_release)
         task_transform = transform(xcom_release)
         task_bq_load = bq_load(xcom_release)
         task_move_files_to_finished = move_files_to_finished(xcom_release)

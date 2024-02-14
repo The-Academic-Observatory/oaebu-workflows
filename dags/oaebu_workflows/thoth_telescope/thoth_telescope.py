@@ -64,14 +64,14 @@ class ThothRelease(SnapshotRelease):
 
     @property
     def transform_path(self) -> str:
-        return os.path.join(self.download_folder, self.transform_file_name)
+        return os.path.join(self.transform_folder, self.transform_file_name)
 
     @property
-    def download_blob(self):
+    def download_blob_name(self):
         return gcs_blob_name_from_path(self.download_path)
 
     @property
-    def tranform_blob(self):
+    def tranform_blob_name(self):
         return gcs_blob_name_from_path(self.transform_path)
 
     @staticmethod
@@ -79,14 +79,14 @@ class ThothRelease(SnapshotRelease):
         return ThothRelease(
             dag_id=dict_["dag_id"],
             run_id=dict_["run_id"],
-            snapshot_date=dict_["snapshot_date"],
+            snapshot_date=pendulum.from_format(dict_["snapshot_date"], "YYYY-MM-DD"),
         )
 
     def to_dict(self) -> dict:
         return {
             "dag_id": self.dag_id,
             "run_id": self.run_id,
-            "snapshot_date": self.snapshot_date.isoformat(),
+            "snapshot_date": self.snapshot_date.to_date_string(),
         }
 
 
@@ -246,7 +246,7 @@ def create_dag(
             release = ThothRelease.from_dict(release)
             cleanup(dag_id=dag_id, execution_date=content["execution_date"], workflow_folder=release.workflow_folder)
 
-        task_check_dependencies = check_dependencies(airflow_conns=[observatory_api_conn_id], start_date=start_date)
+        task_check_dependencies = check_dependencies(airflow_conns=[observatory_api_conn_id])
         xcom_release = make_release()
         task_download = download(xcom_release)
         task_transform = transform(xcom_release)

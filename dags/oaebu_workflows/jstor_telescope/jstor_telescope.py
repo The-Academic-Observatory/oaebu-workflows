@@ -38,6 +38,7 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import Resource, build
 from tenacity import retry, stop_after_attempt, wait_exponential, wait_fixed
 
+from oaebu_workflows.config import oaebu_user_agent_header
 from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from observatory.api.client.model.dataset_release import DatasetRelease
 from observatory.platform.api import make_observatory_api
@@ -600,10 +601,9 @@ class JstorPublishersAPI(JstorAPI):
             raise KeyError(f"'url' not found in report: {report}")
 
         logging.info(f"Downloading report: {url} to: {download_path}")
-        headers = {
-            "User-Agent": "oaebu-workflows v1.0.0 (+https://github.com/The-Academic-Observatory/oaebu-workflows; mailto:agent@observatory.academy) "
-        }
-        response = retry_get_url(url, headers=headers, wait=JSTOR_WAIT_FN, num_retries=JSTOR_MAX_ATTEMPTS)
+        response = retry_get_url(
+            url, headers=oaebu_user_agent_header(), wait=JSTOR_WAIT_FN, num_retries=JSTOR_MAX_ATTEMPTS
+        )
         content = response.content.decode("utf-8")
         with open(download_path, "w") as f:
             f.write(content)
@@ -620,10 +620,7 @@ class JstorPublishersAPI(JstorAPI):
             f'attempt: {self.get_header_info.retry.statistics["attempt_number"]}, '
             f'idle for: {self.get_header_info.retry.statistics["idle_for"]}'
         )
-        headers = {
-            "User-Agent": "oaebu-workflows v1.0.0 (+https://github.com/The-Academic-Observatory/oaebu-workflows; mailto:agent@observatory.academy) "
-        }
-        response = requests.head(url, allow_redirects=True, headers=headers)
+        response = requests.head(url, allow_redirects=True, headers=oaebu_user_agent_header())
         if response.status_code != 200:
             raise AirflowException(
                 f"Could not get HEAD of report download url, reason: {response.reason}, "

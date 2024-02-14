@@ -22,8 +22,13 @@ import vcr
 from airflow.utils.state import State
 
 from oaebu_workflows.oaebu_partners import partner_from_str
-from oaebu_workflows.thoth_telescope.thoth_telescope import thoth_download_onix, DEFAULT_HOST_NAME
-from oaebu_workflows.config import test_fixtures_folder
+from oaebu_workflows.thoth_telescope.thoth_telescope import (
+    DEFAULT_HOST_NAME,
+    ThothRelease,
+    thoth_download_onix,
+    create_dag,
+)
+from oaebu_workflows.config import test_fixtures_folder, module_file_path
 from observatory.platform.api import get_dataset_releases
 from observatory.platform.bigquery import bq_sharded_table_id
 from observatory.platform.gcs import gcs_blob_name_from_path
@@ -67,23 +72,22 @@ class TestThothTelescope(ObservatoryTestCase):
     def test_dag_structure(self):
         """Test that the ONIX DAG has the correct structure."""
 
-        dag = ThothTelescope(
+        dag = create_dag(
             dag_id="thoth_telescope_test",
             cloud_workspace=self.fake_cloud_workspace,
             publisher_id=FAKE_PUBLISHER_ID,
             format_specification="onix_3.0::jstor",
-        ).make_dag()
+        )
 
         self.assert_dag_structure(
             {
-                "check_dependencies": ["download"],
-                "download": ["upload_downloaded"],
-                "upload_downloaded": ["transform"],
-                "transform": ["upload_transformed"],
-                "upload_transformed": ["bq_load"],
+                "check_dependencies": ["make_release"],
+                "make_release": ["download", "transform", "bq_load", "add_new_dataset_releases", "cleanup_workflow"],
+                "download": ["transform"],
+                "transform": ["bq_load"],
                 "bq_load": ["add_new_dataset_releases"],
-                "add_new_dataset_releases": ["cleanup"],
-                "cleanup": [],
+                "add_new_dataset_releases": ["cleanup_workflow"],
+                "cleanup_workflow": [],
             },
             dag,
         )
@@ -95,20 +99,21 @@ class TestThothTelescope(ObservatoryTestCase):
                 Workflow(
                     dag_id="thoth_telescope_test",
                     name="Thoth Telescope",
-                    class_name="oaebu_workflows.thoth_telescope.thoth_telescope.ThothTelescope",
+                    class_name="oaebu_workflows.thoth_telescope.thoth_telescope.create_dag",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(publisher_id=FAKE_PUBLISHER_ID, format_specification="onix::oapen"),
                 )
             ],
         )
         with env.create():
-            self.assert_dag_load_from_config("thoth_telescope_test")
+            dag_file = os.path.join(module_file_path("dags"), "load_dags.py")
+            self.assert_dag_load_from_config("thoth_telescope_test", dag_file)
 
         # Error should be raised for no publisher_id
         env.workflows[0].kwargs = {}
         with env.create():
             with self.assertRaises(AssertionError) as cm:
-                self.assert_dag_load_from_config("onix_workflow_test_dag_load")
+                self.assert_dag_load_from_config("onix_workflow_test_dag_load", dag_file)
             msg = cm.exception.args[0]
             self.assertIn("missing 2 required keyword-only arguments", msg)
             self.assertIn("publisher_id", msg)
@@ -126,38 +131,51 @@ class TestThothTelescope(ObservatoryTestCase):
             execution_date = pendulum.datetime(year=2022, month=12, day=1)
             metadata_partner = partner_from_str("thoth", metadata_partner=True)
             metadata_partner.bq_dataset_id = env.add_dataset()
-            telescope = ThothTelescope(
-                dag_id="thoth_telescope_test",
+            dag_id = "thoth_telescope_test"
+            dag = create_dag(
+                dag_id=dag_id,
                 cloud_workspace=env.cloud_workspace,
                 format_specification="onix_3.0::oapen",
                 elevate_related_products=True,
                 publisher_id=FAKE_PUBLISHER_ID,
                 metadata_partner=metadata_partner,
             )
-            dag = telescope.make_dag()
 
             with env.create_dag_run(dag, execution_date):
-                ti = env.run_task(telescope.check_dependencies.__name__)
+                # Check dependencies task
+                ti = env.run_task("check_dependencies")
                 self.assertEqual(ti.state, State.SUCCESS)
-                thoth_vcr = vcr.VCR(record_mode="none")
+
+                # Make release task
+                ti = env.run_task("make_release")
+                self.assertEqual(ti.state, State.SUCCESS)
+                release_dict = ti.xcom_pull(task_ids="make_release", include_prior_dates=False)
+                expected_release_dict = {
+                    "dag_id": "thoth_telescope_test",
+                    "run_id": "scheduled__2022-12-01T00:00:00+00:00",
+                    "snapshot_date": "2022-12-04",
+                }
+                self.assertEqual(release_dict, expected_release_dict)
+                release = ThothRelease.from_dict(release_dict)
+
+                # Download task
+                # Ignore the googleapis host so the upload step works
+                thoth_vcr = vcr.VCR(
+                    record_mode="none", ignore_hosts=["oauth2.googleapis.com", "storage.googleapis.com"]
+                )
                 with thoth_vcr.use_cassette(self.download_cassette):
-                    ti = env.run_task(telescope.download.__name__)
+                    ti = env.run_task("download")
                     self.assertEqual(ti.state, State.SUCCESS)
-                ti = env.run_task(telescope.upload_downloaded.__name__)
+
+                # Transform task
+                ti = env.run_task("transform")
                 self.assertEqual(ti.state, State.SUCCESS)
-                ti = env.run_task(telescope.transform.__name__)
-                self.assertEqual(ti.state, State.SUCCESS)
-                ti = env.run_task(telescope.upload_transformed.__name__)
-                self.assertEqual(ti.state, State.SUCCESS)
-                ti = env.run_task(telescope.bq_load.__name__)
+
+                # Bigquery load task
+                ti = env.run_task("bq_load")
                 self.assertEqual(ti.state, State.SUCCESS)
 
                 ### Make assertions ###
-
-                # Make the release
-                release = telescope.make_release(
-                    run_id=env.dag_run.run_id, data_interval_end=pendulum.parse(str(env.dag_run.data_interval_end))
-                )
 
                 # Downloaded file
                 self.assert_file_integrity(release.download_path, "043e9c474e14e2776b22fc590ea1773c", "md5")
@@ -174,26 +192,27 @@ class TestThothTelescope(ObservatoryTestCase):
 
                 # Uploaded table
                 table_id = bq_sharded_table_id(
-                    telescope.cloud_workspace.project_id,
-                    telescope.metadata_partner.bq_dataset_id,
-                    telescope.metadata_partner.bq_table_name,
+                    env.cloud_workspace.project_id,
+                    metadata_partner.bq_dataset_id,
+                    metadata_partner.bq_table_name,
                     release.snapshot_date,
                 )
                 self.assert_table_integrity(table_id, expected_rows=5)
                 self.assert_table_content(table_id, load_and_parse_json(self.test_table), primary_key="ISBN13")
 
                 # add_dataset_release_task
-                dataset_releases = get_dataset_releases(dag_id=telescope.dag_id, dataset_id=telescope.api_dataset_id)
+                dataset_releases = get_dataset_releases(dag_id=dag_id, dataset_id="onix")
                 self.assertEqual(len(dataset_releases), 0)
-                ti = env.run_task(telescope.add_new_dataset_releases.__name__)
+                ti = env.run_task("add_new_dataset_releases")
                 self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = get_dataset_releases(dag_id=telescope.dag_id, dataset_id=telescope.api_dataset_id)
+                dataset_releases = get_dataset_releases(dag_id=dag_id, dataset_id="onix")
                 self.assertEqual(len(dataset_releases), 1)
 
                 # Test cleanup
-                ti = env.run_task(telescope.cleanup.__name__)
+                workflow_folder_path = release.workflow_folder
+                ti = env.run_task("cleanup_workflow")
                 self.assertEqual(ti.state, State.SUCCESS)
-                self.assert_cleanup(release.workflow_folder)
+                self.assert_cleanup(workflow_folder_path)
 
     # Function tests
     def test_download_onix(self):
