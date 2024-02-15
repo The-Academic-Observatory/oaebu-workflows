@@ -23,9 +23,11 @@ from airflow.utils.state import State
 from airflow.models.connection import Connection
 import vcr
 
-from oaebu_workflows.config import test_fixtures_folder
+from oaebu_workflows.config import test_fixtures_folder, module_file_path
 from oaebu_workflows.oaebu_partners import partner_from_str
 from oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope import (
+    UclDiscoveryRelease,
+    create_dag,
     get_isbn_eprint_mappings,
     download_discovery_stats,
     transform_discovery_stats,
@@ -57,19 +59,16 @@ class TestUclDiscoveryTelescope(ObservatoryTestCase):
     def test_dag_structure(self):
         """Test that the UCL Discovery DAG has the correct structure."""
 
-        dag = UclDiscoveryTelescope(
-            dag_id="Test_Dag", cloud_workspace=self.fake_cloud_workspace, sheet_id="foo"
-        ).make_dag()
+        dag = create_dag(dag_id="Test_Dag", cloud_workspace=self.fake_cloud_workspace, sheet_id="foo")
         self.assert_dag_structure(
             {
-                "check_dependencies": ["download"],
-                "download": ["upload_downloaded"],
-                "upload_downloaded": ["transform"],
-                "transform": ["upload_transformed"],
-                "upload_transformed": ["bq_load"],
+                "check_dependencies": ["make_release"],
+                "make_release": ["download", "transform", "bq_load", "add_new_dataset_releases", "cleanup_workflow"],
+                "download": ["transform"],
+                "transform": ["bq_load"],
                 "bq_load": ["add_new_dataset_releases"],
-                "add_new_dataset_releases": ["cleanup"],
-                "cleanup": [],
+                "add_new_dataset_releases": ["cleanup_workflow"],
+                "cleanup_workflow": [],
             },
             dag,
         )
@@ -81,14 +80,15 @@ class TestUclDiscoveryTelescope(ObservatoryTestCase):
                 Workflow(
                     dag_id="ucl_discovery",
                     name="UCL Discovery Telescope",
-                    class_name="oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.UclDiscoveryTelescope",
+                    class_name="oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.create_dag",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(sheet_id="foo"),
                 )
             ]
         )
         with env.create():
-            self.assert_dag_load_from_config("ucl_discovery")
+            dag_file = os.path.join(module_file_path("dags"), "load_dags.py")
+            self.assert_dag_load_from_config("ucl_discovery", dag_file)
 
     def test_telescope(self):
         """Test the UCL Discovery telescope end to end."""
@@ -100,14 +100,14 @@ class TestUclDiscoveryTelescope(ObservatoryTestCase):
         # Setup Telescope
         data_partner = partner_from_str("ucl_discovery")
         data_partner.bq_dataset_id = env.add_dataset()
-        telescope = UclDiscoveryTelescope(
-            dag_id="ucl_discovery",
+        dag_id = "ucl_discovery"
+        dag = create_dag(
+            dag_id=dag_id,
             cloud_workspace=env.cloud_workspace,
             sheet_id="foo",
             data_partner=data_partner,
             max_threads=1,
         )
-        dag = telescope.make_dag()
         execution_date = pendulum.datetime(year=2023, month=6, day=1)
 
         # Create the Observatory environment and run tests
@@ -138,7 +138,22 @@ class TestUclDiscoveryTelescope(ObservatoryTestCase):
             ############################
 
             # Test that all dependencies are specified: no error should be thrown
-            ti = env.run_task(telescope.check_dependencies.__name__)
+            ti = env.run_task("check_dependencies")
+            self.assertEqual(ti.state, State.SUCCESS)
+
+            # Make the release
+            ti = env.run_task("make_release")
+            self.assertEqual(ti.state, State.SUCCESS)
+            release_dict = ti.xcom_pull(task_ids="make_release", include_prior_dates=False)
+            expected_release_dict = {
+                "dag_id": "ucl_discovery",
+                "run_id": "scheduled__2023-06-01T00:00:00+00:00",
+                "data_interval_start": "2023-06-01",
+                "data_interval_end": "2023-06-01",
+                "partition_date": "2023-06-30",
+            }
+            self.assertEqual(release_dict, expected_release_dict)
+            release = UclDiscoveryRelease.from_dict(release_dict)
 
             # download
             cassette = vcr.VCR(record_mode="none")
@@ -147,46 +162,34 @@ class TestUclDiscoveryTelescope(ObservatoryTestCase):
                 "oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.BaseHook.get_connection"
             )
             build_patch = patch("oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.discovery.build")
-            with sa_patch, conn_patch, build_patch as mock_build, cassette.use_cassette(self.download_cassette):
+            with sa_patch, conn_patch, build_patch as mock_build, cassette.use_cassette(
+                self.download_cassette, ignore_hosts=["oauth2.googleapis.com", "storage.googleapis.com"]
+            ):
                 mock_service = mock_build.return_value.spreadsheets.return_value.values.return_value.get.return_value
                 mock_service.execute.return_value = {"values": sheet_return}
-                ti = env.run_task(telescope.download.__name__)
-            self.assertEqual(ti.state, State.SUCCESS)
-
-            # upload_downloaded
-            ti = env.run_task(telescope.upload_downloaded.__name__)
+                ti = env.run_task("download")
             self.assertEqual(ti.state, State.SUCCESS)
 
             # transform
             with sa_patch, conn_patch, build_patch as mock_build:
                 mock_service = mock_build.return_value.spreadsheets.return_value.values.return_value.get.return_value
                 mock_service.execute.return_value = {"values": sheet_return}
-                ti = env.run_task(telescope.transform.__name__)
-            self.assertEqual(ti.state, State.SUCCESS)
-
-            # upload_transformed
-            ti = env.run_task(telescope.upload_transformed.__name__)
+                ti = env.run_task("transform")
             self.assertEqual(ti.state, State.SUCCESS)
 
             # bq_load
-            ti = env.run_task(telescope.bq_load.__name__)
+            ti = env.run_task("bq_load")
             self.assertEqual(ti.state, State.SUCCESS)
 
-            ##############################################
-            ### Create the release and make assertions ###
-            ##############################################
-
-            release = telescope.make_release(
-                run_id=env.dag_run.run_id,
-                data_interval_start=pendulum.parse(str(env.dag_run.data_interval_start)),
-                data_interval_end=pendulum.parse(str(env.dag_run.data_interval_end)),
-            )
+            #######################
+            ### Make Assertions ###
+            #######################
 
             # Download
             self.assertTrue(os.path.exists(release.download_country_path))
             self.assertTrue(os.path.exists(release.download_totals_path))
 
-            # Upload Downloaded
+            # Check downloaded files uploaded
             download_country_blob = gcs_blob_name_from_path(release.download_country_path)
             self.assert_blob_integrity(env.download_bucket, download_country_blob, release.download_country_path)
             download_totals_blob = gcs_blob_name_from_path(release.download_totals_path)
@@ -195,16 +198,16 @@ class TestUclDiscoveryTelescope(ObservatoryTestCase):
             # Transform
             self.assertTrue(os.path.exists(release.transform_path))
 
-            # Upload Transform
+            # Check transformed files uploaded
             self.assert_blob_integrity(
                 env.transform_bucket, gcs_blob_name_from_path(release.transform_path), release.transform_path
             )
 
             # Bigquery load
             table_id = bq_table_id(
-                telescope.cloud_workspace.project_id,
-                telescope.data_partner.bq_dataset_id,
-                telescope.data_partner.bq_table_name,
+                env.cloud_workspace.project_id,
+                data_partner.bq_dataset_id,
+                data_partner.bq_table_name,
             )
             self.assert_table_integrity(table_id, 2)
             self.assert_table_content(
@@ -216,17 +219,18 @@ class TestUclDiscoveryTelescope(ObservatoryTestCase):
             ###################
 
             # Add_dataset_release_task
-            dataset_releases = get_dataset_releases(dag_id=telescope.dag_id, dataset_id=telescope.api_dataset_id)
+            dataset_releases = get_dataset_releases(dag_id=dag_id, dataset_id="ucl")
             self.assertEqual(len(dataset_releases), 0)
-            ti = env.run_task(telescope.add_new_dataset_releases.__name__)
+            ti = env.run_task("add_new_dataset_releases")
             self.assertEqual(ti.state, State.SUCCESS)
-            dataset_releases = get_dataset_releases(dag_id=telescope.dag_id, dataset_id=telescope.api_dataset_id)
+            dataset_releases = get_dataset_releases(dag_id=dag_id, dataset_id="ucl")
             self.assertEqual(len(dataset_releases), 1)
 
             # Test that all telescope data deleted
-            ti = env.run_task(telescope.cleanup.__name__)
+            workflow_folder_path = release.workflow_folder
+            ti = env.run_task("cleanup_workflow")
             self.assertEqual(ti.state, State.SUCCESS)
-            self.assert_cleanup(release.workflow_folder)
+            self.assert_cleanup(workflow_folder_path)
 
 
 class TestGetIsbnEprintMappings(TestCase):

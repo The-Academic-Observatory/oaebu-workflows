@@ -61,10 +61,52 @@ class UclDiscoveryRelease(PartitionRelease):
         super().__init__(dag_id=dag_id, run_id=run_id, partition_date=partition_date)
         self.data_interval_start = data_interval_start
         self.data_interval_end = data_interval_end
+        self.download_country_file_name = "ucl_discovery_country.jsonl.gz"
+        self.download_totals_file_name = "ucl_discovery_totals.jsonl.gz"
+        self.transform_file_name = "ucl_discovery.jsonl.gz"
 
-        self.download_country_path = os.path.join(self.download_folder, "ucl_discovery_country.jsonl.gz")
-        self.download_totals_path = os.path.join(self.download_folder, "ucl_discovery_totals.jsonl.gz")
-        self.transform_path = os.path.join(self.transform_folder, "ucl_discovery.jsonl.gz")
+    @property
+    def download_country_path(self):
+        return os.path.join(self.download_folder, "ucl_discovery_country.jsonl.gz")
+
+    @property
+    def download_totals_path(self):
+        return os.path.join(self.download_folder, "ucl_discovery_totals.jsonl.gz")
+
+    @property
+    def transform_path(self):
+        return os.path.join(self.transform_folder, "ucl_discovery.jsonl.gz")
+
+    @property
+    def download_country_blob_name(self):
+        return gcs_blob_name_from_path(self.download_country_path)
+
+    @property
+    def download_totals_blob_name(self):
+        return gcs_blob_name_from_path(self.download_totals_path)
+
+    @property
+    def transform_blob_name(self):
+        return gcs_blob_name_from_path(self.transform_path)
+
+    @staticmethod
+    def from_dict(dict_: dict):
+        return UclDiscoveryRelease(
+            dag_id=dict_["dag_id"],
+            run_id=dict_["run_id"],
+            data_interval_start=pendulum.from_format(dict_["data_interval_start"], "YYYY-MM-DD"),
+            data_interval_end=pendulum.from_format(dict_["data_interval_end"], "YYYY-MM-DD"),
+            partition_date=pendulum.from_format(dict_["partition_date"], "YYYY-MM-DD"),
+        )
+
+    def to_dict(self) -> dict:
+        return {
+            "dag_id": self.dag_id,
+            "run_id": self.run_id,
+            "data_interval_start": self.data_interval_start.to_date_string(),
+            "data_interval_end": self.data_interval_end.to_date_string(),
+            "partition_date": self.partition_date.to_date_string(),
+        }
 
 
 def create_dag(
@@ -181,15 +223,21 @@ def create_dag(
             # Download files from GCS
             success = gcs_download_blob(
                 bucket_name=cloud_workspace.download_bucket,
-                blob_name=release.download_blob_name,
-                file_path=release.download_path,
+                blob_name=release.download_country_blob_name,
+                file_path=release.download_country_path,
             )
             if not success:
-                raise FileNotFoundError(f"Error downloading file: {release.download_blob_name}")
-
-            mappings = get_isbn_eprint_mappings(sheet_id, oaebu_service_account_conn_id, release.partition_date)
+                raise FileNotFoundError(f"Error downloading file: {release.download_country_blob_name}")
+            success = gcs_download_blob(
+                bucket_name=cloud_workspace.download_bucket,
+                blob_name=release.download_totals_blob_name,
+                file_path=release.download_totals_path,
+            )
+            if not success:
+                raise FileNotFoundError(f"Error downloading file: {release.download_totals_blob_name}")
 
             # Load the records and sort them by eprint id
+            mappings = get_isbn_eprint_mappings(sheet_id, oaebu_service_account_conn_id, release.partition_date)
             country_records = load_jsonl(release.download_country_path)
             totals_records = load_jsonl(release.download_totals_path)
             country_records = sorted(country_records, key=lambda x: x["set"]["value"])  # ["set"]["value"] = eprint_id
@@ -270,7 +318,7 @@ def create_dag(
             cleanup(dag_id=dag_id, execution_date=context["execution_date"], workflow_folder=release.workflow_folder)
 
         task_check_dependencies = check_dependencies(
-            airflow_conns=[observatory_api_conn_id, oaebu_service_account_conn_id], start_date=start_date
+            airflow_conns=[observatory_api_conn_id, oaebu_service_account_conn_id]
         )
         xcom_release = make_release()
         task_download = download(xcom_release)
