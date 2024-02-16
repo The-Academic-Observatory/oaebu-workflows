@@ -22,7 +22,7 @@ import shutil
 from typing import List
 
 import pendulum
-from airflow.models import DagBag
+from airflow.models import DagBag, TaskInstance
 from airflow.utils.state import State
 
 from oaebu_workflows.config import schema_folder as default_schema_folder
@@ -31,6 +31,7 @@ from oaebu_workflows.oaebu_partners import OaebuPartner, OAEBU_DATA_PARTNERS, pa
 from oaebu_workflows.onix_workflow.onix_workflow import (
     OnixWorkflowRelease,
     CROSSREF_EVENT_URL_TEMPLATE,
+    create_dag,
     download_crossref_events,
     transform_crossref_events,
     transform_event,
@@ -150,19 +151,19 @@ class TestOnixWorkflow(ObservatoryTestCase):
             self.gcp_project_id, self.data_location, api_host="localhost", api_port=find_free_port()
         )
         with env.create():
-            wf = OnixWorkflow(
+            dag = create_dag(
                 dag_id="test_make_release",
                 cloud_workspace=self.fake_cloud_workspace,
                 data_partners=[self.fake_onix_data_partner],
                 metadata_partner="onix",
             )
-            dag = wf.make_dag()
             with env.create_dag_run(dag, self.snapshot_date.add(days=1)):
-                release = wf.make_release(
-                    data_interval_end=pendulum.parse(str(env.dag_run.data_interval_end)),
-                    run_id=env.dag_run.run_id,
-                )
-                self.assertEqual(release.dag_id, wf.dag_id)
+                task = dag.get_task("make_release")
+                ti = TaskInstance(task, self.snapshot_date.add(days=1))
+                ti.run()
+                release_dict = ti.xcom_pull(task_ids="make_release", include_prior_dates=False)
+                release = OnixWorkflowRelease.from_dict(release_dict)
+                self.assertEqual(release.dag_id, dag.dag_id)
 
                 # Test release file names are as expected
                 self.assertEqual(release.workslookup_path, os.path.join(release.transform_folder, "worksid.jsonl.gz"))
@@ -186,48 +187,18 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 self.assertEqual(crossref_snapshot_date, release.crossref_master_snapshot_date)
 
                 # Test for case - no ONIX releases found
+                dag.clear(task_ids=["make_release"])
                 mock_sel_table_suffixes.side_effect = [[]]
                 with self.assertRaisesRegex(RuntimeError, "ONIX"):
-                    release = wf.make_release(
-                        data_interval_end=pendulum.parse(str(env.dag_run.data_interval_end)),
-                        run_id=env.dag_run.run_id,
-                    )
+                    ti = TaskInstance(task, self.snapshot_date.add(days=1))
+                    ti.run()
 
                 # Test for case - no Crossref releases found
+                dag.clear(task_ids=["make_release"])
                 mock_sel_table_suffixes.side_effect = [[onix_snapshot_date], []]  # No crossref releases
                 with self.assertRaisesRegex(RuntimeError, "Crossref"):
-                    release = wf.make_release(
-                        data_interval_end=pendulum.parse(str(env.dag_run.data_interval_end)),
-                        run_id=env.dag_run.run_id,
-                    )
-
-    def test_cleanup(self):
-        """Tests the cleanup function of the workflow"""
-        env = ObservatoryEnvironment(
-            self.gcp_project_id,
-            self.data_location,
-            api_host="localhost",
-            api_port=find_free_port(),
-        )
-        with env.create():
-            wf = OnixWorkflow(
-                dag_id="test_cleanup",
-                cloud_workspace=self.fake_cloud_workspace,
-                data_partners=[self.fake_onix_data_partner],
-                metadata_partner="onix",
-            )
-            release = OnixWorkflowRelease(
-                dag_id=wf.dag_id,
-                run_id="test_run_id",
-                snapshot_date=self.snapshot_date,
-                onix_snapshot_date=self.snapshot_date,
-                crossref_master_snapshot_date=self.snapshot_date,
-            )
-            self.assertTrue(os.path.exists(release.download_folder))
-            self.assertTrue(os.path.exists(release.extract_folder))
-            self.assertTrue(os.path.exists(release.transform_folder))
-            wf.cleanup(release, execution_date=self.snapshot_date)
-            self.assert_cleanup(release.workflow_folder)
+                    ti = TaskInstance(task, self.snapshot_date.add(days=1))
+                    ti.run()
 
     def test_dag_load(self):
         """Test that the DAG loads"""
@@ -236,7 +207,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 Workflow(
                     dag_id="onix_workflow_test_dag_load",
                     name="Onix Workflow Test Dag Load",
-                    class_name="oaebu_workflows.onix_workflow.onix_workflow.OnixWorkflow",
+                    class_name="oaebu_workflows.onix_workflow.onix_workflow.create_dag",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(
                         sensor_dag_ids=[
@@ -256,18 +227,18 @@ class TestOnixWorkflow(ObservatoryTestCase):
 
         with env.create() as dag_folder:
             # This should raise one error for nonexistent partner
-            shutil.copy(
-                os.path.join(module_file_path("observatory.platform.dags"), "load_workflows.py"), "load_workflows.py"
-            )
+            shutil.copy(os.path.join(module_file_path("dags"), "load_dags.py"), "load_dags.py")
             dag_bag = DagBag(dag_folder=dag_folder)
             self.assertNotEqual({}, dag_bag.import_errors)
             self.assertEqual(len(dag_bag.import_errors), 1)
+            dag_file = os.path.join(module_file_path("dags"), "load_dags.py")
 
         # Remove the nonexistent partner and onix partner
         env.workflows[0].kwargs["data_partners"] = env.workflows[0].kwargs["data_partners"][:-1]
         with env.create():
             # Should not raise any errors
-            self.assert_dag_load_from_config("onix_workflow_test_dag_load")
+            dag_file = os.path.join(module_file_path("dags"), "load_dags.py")
+            self.assert_dag_load_from_config("onix_workflow_test_dag_load", dag_file)
 
     def test_dag_structure(self):
         """Tests that the dag structure is created as expected on dag load"""
@@ -277,24 +248,41 @@ class TestOnixWorkflow(ObservatoryTestCase):
             self.gcp_project_id, self.data_location, api_host="localhost", api_port=find_free_port()
         )
         with env.create():
-            dag = OnixWorkflow(
+            dag = create_dag(
                 dag_id=self.dag_id,
                 cloud_workspace=self.fake_cloud_workspace,
                 data_partners=[],
                 metadata_partner="onix",
                 sensor_dag_ids=[],
-            ).make_dag()
+            )
             expected_dag_structure = {
+                "check_dependencies": [],
+                "make_release": [
+                    "export_tables.export_book_metrics_author",
+                    "export_tables.export_book_list",
+                    "export_tables.export_book_metrics_country",
+                    "aggregate_works",
+                    "export_tables.export_book_metrics",
+                    "create_book_product_table",
+                    "export_tables.export_book_metrics_events",
+                    "add_new_dataset_releases",
+                    "create_crossref_metadata_table",
+                    "create_book_table",
+                    "update_latest_export_tables",
+                    "cleanup_workflow",
+                    "export_tables.export_book_metrics_subjects",
+                    "create_crossref_events_table",
+                ],
                 "aggregate_works": ["create_crossref_metadata_table"],
                 "create_crossref_metadata_table": ["create_crossref_events_table"],
                 "create_crossref_events_table": ["create_book_table"],
                 "create_book_table": [],
                 "create_book_product_table": [
-                    "export_tables.export_book_list",
-                    "export_tables.export_book_metrics_events",
-                    "export_tables.export_book_metrics",
-                    "export_tables.export_book_metrics_country",
                     "export_tables.export_book_metrics_author",
+                    "export_tables.export_book_list",
+                    "export_tables.export_book_metrics_country",
+                    "export_tables.export_book_metrics",
+                    "export_tables.export_book_metrics_events",
                     "export_tables.export_book_metrics_subjects",
                 ],
                 "export_tables.export_book_list": ["update_latest_export_tables"],
@@ -304,8 +292,8 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 "export_tables.export_book_metrics_author": ["update_latest_export_tables"],
                 "export_tables.export_book_metrics_subjects": ["update_latest_export_tables"],
                 "update_latest_export_tables": ["add_new_dataset_releases"],
-                "add_new_dataset_releases": ["cleanup"],
-                "cleanup": [],
+                "add_new_dataset_releases": ["cleanup_workflow"],
+                "cleanup_workflow": [],
             }
             self.assert_dag_structure(expected_dag_structure, dag)
 
@@ -315,33 +303,69 @@ class TestOnixWorkflow(ObservatoryTestCase):
         )
         with env.create():
             sensor_dag_ids = ["jstor", "irus_oapen", "google_books", "onix", "google_analytics3"]
-            dag = OnixWorkflow(
+            dag = create_dag(
                 dag_id=self.dag_id,
                 cloud_workspace=self.fake_cloud_workspace,
                 data_partners=self.data_partner_list,
                 metadata_partner="onix",
                 sensor_dag_ids=sensor_dag_ids,
-            ).make_dag()
+            )
             expected_dag_structure = {
-                "sensors.jstor_sensor": ["aggregate_works"],
-                "sensors.irus_oapen_sensor": ["aggregate_works"],
-                "sensors.google_books_sensor": ["aggregate_works"],
-                "sensors.onix_sensor": ["aggregate_works"],
-                "sensors.google_analytics3_sensor": ["aggregate_works"],
+                "check_dependencies": [
+                    "sensors.onix_sensor",
+                    "sensors.google_analytics3_sensor",
+                    "sensors.jstor_sensor",
+                    "sensors.google_books_sensor",
+                    "sensors.irus_oapen_sensor",
+                ],
+                "sensors.jstor_sensor": ["make_release"],
+                "sensors.irus_oapen_sensor": ["make_release"],
+                "sensors.google_books_sensor": ["make_release"],
+                "sensors.onix_sensor": ["make_release"],
+                "sensors.google_analytics3_sensor": ["make_release"],
+                "make_release": [
+                    "aggregate_works",
+                    "intermediate_tables.intermediate_irus_fulcrum",
+                    "export_tables.export_book_metrics_author",
+                    "intermediate_tables.intermediate_google_books_sales",
+                    "export_tables.export_book_institution_list",
+                    "create_crossref_events_table",
+                    "export_tables.export_book_metrics",
+                    "add_new_dataset_releases",
+                    "intermediate_tables.intermediate_jstor_country",
+                    "intermediate_tables.intermediate_google_analytics3",
+                    "intermediate_tables.intermediate_irus_oapen",
+                    "intermediate_tables.intermediate_google_books_traffic",
+                    "create_book_table",
+                    "export_tables.export_book_metrics_events",
+                    "export_tables.export_book_metrics_subjects",
+                    "update_latest_export_tables",
+                    "export_tables.export_book_list",
+                    "cleanup_workflow",
+                    "intermediate_tables.intermediate_worldreader",
+                    "create_book_product_table",
+                    "intermediate_tables.intermediate_jstor_institution",
+                    "intermediate_tables.intermediate_ucl_discovery",
+                    "export_tables.export_book_metrics_country",
+                    "intermediate_tables.intermediate_internet_archive",
+                    "export_tables.export_book_metrics_city",
+                    "create_crossref_metadata_table",
+                    "export_tables.export_book_metrics_institution",
+                ],
                 "aggregate_works": ["create_crossref_metadata_table"],
                 "create_crossref_metadata_table": ["create_crossref_events_table"],
                 "create_crossref_events_table": ["create_book_table"],
                 "create_book_table": [
-                    "intermediate_tables.intermediate_google_analytics3",
-                    "intermediate_tables.intermediate_google_books_sales",
-                    "intermediate_tables.intermediate_google_books_traffic",
+                    "intermediate_tables.intermediate_worldreader",
                     "intermediate_tables.intermediate_jstor_country",
+                    "intermediate_tables.intermediate_google_analytics3",
                     "intermediate_tables.intermediate_jstor_institution",
                     "intermediate_tables.intermediate_irus_oapen",
+                    "intermediate_tables.intermediate_google_books_sales",
                     "intermediate_tables.intermediate_irus_fulcrum",
                     "intermediate_tables.intermediate_ucl_discovery",
+                    "intermediate_tables.intermediate_google_books_traffic",
                     "intermediate_tables.intermediate_internet_archive",
-                    "intermediate_tables.intermediate_worldreader",
                 ],
                 "intermediate_tables.intermediate_google_analytics3": ["create_book_product_table"],
                 "intermediate_tables.intermediate_google_books_sales": ["create_book_product_table"],
@@ -354,28 +378,28 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 "intermediate_tables.intermediate_internet_archive": ["create_book_product_table"],
                 "intermediate_tables.intermediate_worldreader": ["create_book_product_table"],
                 "create_book_product_table": [
-                    "export_tables.export_book_list",
-                    "export_tables.export_book_institution_list",
-                    "export_tables.export_book_metrics_institution",
-                    "export_tables.export_book_metrics_city",
-                    "export_tables.export_book_metrics_events",
-                    "export_tables.export_book_metrics",
-                    "export_tables.export_book_metrics_country",
                     "export_tables.export_book_metrics_author",
+                    "export_tables.export_book_institution_list",
+                    "export_tables.export_book_metrics_country",
+                    "export_tables.export_book_metrics_events",
+                    "export_tables.export_book_metrics_city",
+                    "export_tables.export_book_metrics_institution",
                     "export_tables.export_book_metrics_subjects",
+                    "export_tables.export_book_list",
+                    "export_tables.export_book_metrics",
                 ],
                 "export_tables.export_book_list": ["update_latest_export_tables"],
+                "export_tables.export_book_metrics_events": ["update_latest_export_tables"],
                 "export_tables.export_book_institution_list": ["update_latest_export_tables"],
                 "export_tables.export_book_metrics_institution": ["update_latest_export_tables"],
                 "export_tables.export_book_metrics_city": ["update_latest_export_tables"],
-                "export_tables.export_book_metrics_events": ["update_latest_export_tables"],
                 "export_tables.export_book_metrics": ["update_latest_export_tables"],
                 "export_tables.export_book_metrics_country": ["update_latest_export_tables"],
                 "export_tables.export_book_metrics_author": ["update_latest_export_tables"],
                 "export_tables.export_book_metrics_subjects": ["update_latest_export_tables"],
                 "update_latest_export_tables": ["add_new_dataset_releases"],
-                "add_new_dataset_releases": ["cleanup"],
-                "cleanup": [],
+                "add_new_dataset_releases": ["cleanup_workflow"],
+                "cleanup_workflow": [],
             }
             self.assert_dag_structure(expected_dag_structure, dag)
 
@@ -401,23 +425,30 @@ class TestOnixWorkflow(ObservatoryTestCase):
             self.gcp_project_id, self.data_location, api_host="localhost", api_port=find_free_port()
         )
         with env.create():
-            wf = OnixWorkflow(
+            bq_onix_workflow_dataset = env.add_dataset()
+            bq_worksid_table_name = "onix_workid_isbn"
+            bq_worksid_error_table_name = "onix_workid_isbn_errors"
+            bq_workfamilyid_table_name = "onix_workfamilyid_isbn"
+            dag = create_dag(
                 dag_id=self.dag_id,
                 cloud_workspace=env.cloud_workspace,
                 data_partners=[self.fake_onix_data_partner],
-                bq_onix_workflow_dataset=env.add_dataset(),
+                bq_onix_workflow_dataset=bq_onix_workflow_dataset,
+                bq_worksid_table_name=bq_worksid_table_name,
+                bq_worksid_error_table_name=bq_worksid_error_table_name,
+                bq_workfamilyid_table_name=bq_workfamilyid_table_name,
                 metadata_partner="onix",
             )
-            dag = wf.make_dag()
             with env.create_dag_run(dag, self.snapshot_date.add(days=1)):
-                release = OnixWorkflowRelease(
-                    dag_id="aggregation_test",
-                    run_id=env.dag_run.run_id,
-                    snapshot_date=self.snapshot_date,
-                    onix_snapshot_date=self.snapshot_date,
-                    crossref_master_snapshot_date=self.snapshot_date,
-                )
-                wf.aggregate_works(release, ti=MagicMock(task_id=""))  # Test works aggregation
+                # Mock the table shard dates so the release can be made
+                with patch("oaebu_workflows.onix_workflow.onix_workflow.bq_select_table_shard_dates") as mock_date:
+                    mock_date.return_value = [self.snapshot_date]
+                    ti = env.run_task("make_release")
+                release_dict = ti.xcom_pull(task_ids="make_release", include_prior_dates=False)
+                release = OnixWorkflowRelease.from_dict(release_dict)
+
+                # Run aggregations
+                env.run_task("aggregate_works")
 
                 ### Make Assertions ###
                 self.assertTrue(os.path.exists(release.workslookup_path))
@@ -441,9 +472,9 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 )
 
                 table_id = bq_sharded_table_id(
-                    wf.cloud_workspace.project_id,
-                    wf.bq_onix_workflow_dataset,
-                    wf.bq_worksid_table_name,
+                    env.cloud_workspace.project_id,
+                    bq_onix_workflow_dataset,
+                    bq_worksid_table_name,
                     release.snapshot_date,
                 )
                 self.assert_table_integrity(table_id, len(workslookup_expected))
@@ -451,9 +482,9 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 self.assert_table_content(table_id, workslookup_expected, primary_key="isbn13")
 
                 table_id = bq_sharded_table_id(
-                    wf.cloud_workspace.project_id,
-                    wf.bq_onix_workflow_dataset,
-                    wf.bq_worksid_error_table_name,
+                    env.cloud_workspace.project_id,
+                    bq_onix_workflow_dataset,
+                    bq_worksid_error_table_name,
                     release.snapshot_date,
                 )
                 self.assert_table_integrity(table_id, len(workslookup_errors_expected))
@@ -461,9 +492,9 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 self.assert_table_content(table_id, workslookup_errors_expected, primary_key="Error")
 
                 table_id = bq_sharded_table_id(
-                    wf.cloud_workspace.project_id,
-                    wf.bq_onix_workflow_dataset,
-                    wf.bq_workfamilyid_table_name,
+                    env.cloud_workspace.project_id,
+                    bq_onix_workflow_dataset,
+                    bq_workfamilyid_table_name,
                     release.snapshot_date,
                 )
                 self.assert_table_integrity(table_id, len(worksfamilylookup_expected))
@@ -491,13 +522,12 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 end_date=events_end.strftime("%Y-%m-%d"),
             )
             events = download_crossref_event_url(event_url)
-            assert events == [{"passed": True}], f"Event return incorrect. Got {events}"
+            self.assertListEqual(events, [{"passed": True}], f"Event return incorrect. Got {events}")
 
         good_events = download_crossref_events([good_test_doi], events_start, events_end, mailto, max_threads=1)
         bad_events = download_crossref_events([bad_test_doi], events_start, events_end, mailto, max_threads=1)
-        assert good_events, "Events should have returned something"
-        assert len(good_events) == 4
-        assert not bad_events, f"Events should have returned nothing, instead returned {bad_events}"
+        self.assertEqual(len(good_events), 4)
+        self.assertIsNot(bad_events, f"Events should have returned nothing, instead returned {bad_events}")
 
     @patch("oaebu_workflows.onix_workflow.onix_workflow.bq_run_query")
     def test_get_onix_records(self, mock_bq_query):
@@ -569,11 +599,11 @@ class TestOnixWorkflow(ObservatoryTestCase):
         ]
         # Standalone transform
         actual_transformed_events = transform_event(input_events[0])
-        assert expected_transformed_events[0] == actual_transformed_events
+        self.assertEqual(expected_transformed_events[0], actual_transformed_events)
         # List transform
         actual_transformed_events = transform_crossref_events(input_events)
-        assert len(actual_transformed_events) == 1
-        assert expected_transformed_events == actual_transformed_events
+        self.assertEqual(len(actual_transformed_events), 1)
+        self.assertEqual(expected_transformed_events, actual_transformed_events)
 
     def test_insert_into_schema(self):
         """Tests the instert_into_schema function"""
@@ -636,14 +666,14 @@ class TestOnixWorkflow(ObservatoryTestCase):
             fake_doi_isbns = [entry["DOI"] for entry in fake_doi_isbn_table]
 
             # Check there are no duplicates and the contents are the same
-            assert len(actual_dois) == len(set(fake_doi_isbns))
-            assert set(actual_dois) == set(fake_doi_isbns)
+            self.assertEqual(len(actual_dois), len(set(fake_doi_isbns)))
+            self.assertEqual(set(actual_dois), set(fake_doi_isbns))
 
             # Do the same but allow duplicates
             actual_dois = dois_from_table(table_id, doi_column_name="DOI", distinct=False)
             fake_doi_isbns = [entry["DOI"] for entry in fake_doi_isbn_table]
-            assert len(actual_dois) == len(fake_doi_isbns)
-            assert sorted(actual_dois) == sorted(fake_doi_isbns)
+            self.assertEqual(len(actual_dois), len(fake_doi_isbns))
+            self.assertEqual(sorted(actual_dois), sorted(fake_doi_isbns))
 
             #############################################
             ### Test copy_latest_export_tables ###
@@ -677,11 +707,11 @@ class TestOnixWorkflow(ObservatoryTestCase):
             actual_isbns = [entry["ISBN13"] for entry in fake_doi_isbn_table]
             actual_dois = [entry["DOI"] for entry in fake_doi_isbn_table]
 
-            assert len(copied_data) == len(fake_doi_isbn_table)
-            assert len(actual_isbns) == len(copied_isbns)
-            assert sorted(actual_isbns) == sorted(copied_isbns)
-            assert len(actual_dois) == len(copied_dois)
-            assert sorted(actual_dois) == sorted(copied_dois)
+            self.assertEqual(len(copied_data), len(fake_doi_isbn_table))
+            self.assertEqual(len(actual_isbns), len(copied_isbns))
+            self.assertEqual(sorted(actual_isbns), sorted(copied_isbns))
+            self.assertEqual(len(actual_dois), len(copied_dois))
+            self.assertEqual(sorted(actual_dois), sorted(copied_dois))
 
     def setup_fake_lookup_tables(
         self, settings_dataset_id: str, fixtures_dataset_id: str, release_date: pendulum.DateTime, bucket_name: str
@@ -875,14 +905,27 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 else []
             )
 
-            workflow = OnixWorkflow(
-                dag_id=f"onix_workflow_test",
+            start_date = pendulum.datetime(year=2021, month=5, day=9)
+            dag_id = "onix_workflow_test"
+            bq_oaebu_crossref_metadata_table_name = "crossref_metadata"
+            bq_crossref_events_table_name = "crossref_events"
+            bq_book_table_name = "book"
+            bq_book_product_table_name = "book_product"
+            bq_worksid_table_name = "onix_workid_isbn"
+            bq_worksid_error_table_name = "onix_workid_isbn_errors"
+            bq_workfamilyid_table_name = "onix_workfamilyid_isbn"
+            dag = create_dag(
+                dag_id=dag_id,
                 cloud_workspace=env.cloud_workspace,
                 metadata_partner=metadata_partner,
                 bq_master_crossref_project_id=env.cloud_workspace.project_id,
                 bq_master_crossref_dataset_id=master_crossref_dataset_id,
                 bq_oaebu_crossref_dataset_id=oaebu_crossref_dataset_id,
+                bq_oaebu_crossref_metadata_table_name=bq_oaebu_crossref_metadata_table_name,
                 bq_master_crossref_metadata_table_name="crossref_metadata_master",  # Set in setup_input_data()
+                bq_crossref_events_table_name=bq_crossref_events_table_name,
+                bq_book_table_name=bq_book_table_name,
+                bq_book_product_table_name=bq_book_product_table_name,
                 bq_country_project_id=env.cloud_workspace.project_id,
                 bq_country_dataset_id=oaebu_settings_dataset_id,
                 bq_subject_project_id=env.cloud_workspace.project_id,
@@ -890,64 +933,76 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 bq_onix_workflow_dataset=onix_workflow_dataset_id,
                 bq_oaebu_intermediate_dataset=oaebu_intermediate_dataset_id,
                 bq_oaebu_dataset=oaebu_output_dataset_id,
+                bq_worksid_table_name=bq_worksid_table_name,
+                bq_worksid_error_table_name=bq_worksid_error_table_name,
+                bq_workfamilyid_table_name=bq_workfamilyid_table_name,
                 bq_oaebu_export_dataset=oaebu_export_dataset_id,
                 bq_oaebu_latest_export_dataset=oaebu_latest_export_dataset_id,
                 data_partners=data_partners,
                 sensor_dag_ids=sensor_dag_ids,
-                start_date=pendulum.datetime(year=2021, month=5, day=9),
+                start_date=start_date,
                 crossref_start_date=pendulum.datetime(year=2018, month=5, day=14),
                 max_threads=1,  # Use 1 thread for tests
             )
 
-            workflow_dag = workflow.make_dag()
             # Skip dag existence check in sensor.
-            for sensor in [task for task in workflow_dag.tasks if task.node_id.startswith("sensors.")]:
+            for sensor in [task for task in dag.tasks if task.node_id.startswith("sensors.")]:
                 sensor.check_exists = False
                 sensor.grace_period = timedelta(seconds=1)
 
             # If there is no dag run in the search interval, sensor will return success.
-            expected_state = "success"
-            with env.create_dag_run(workflow_dag, workflow.start_date):
+            with env.create_dag_run(dag, start_date):
+                ti = env.run_task("check_dependencies")
+                self.assertEqual(ti.state, State.SUCCESS)
+
                 for sensor_id in sensor_dag_ids:
                     ti = env.run_task(f"sensors.{sensor_id}_sensor")
                     self.assertEqual(ti.state, State.SUCCESS)
 
             # Run Dummy Dags
             execution_date = pendulum.datetime(year=2021, month=5, day=16)
-            for dag_id in sensor_dag_ids:
-                dag = make_dummy_dag(dag_id, execution_date)
-                with env.create_dag_run(dag, execution_date):
+            for sensor_id in sensor_dag_ids:
+                dummy_dag = make_dummy_dag(sensor_id, execution_date)
+                with env.create_dag_run(dummy_dag, execution_date):
                     # Running all of a DAGs tasks sets the DAG to finished
                     ti = env.run_task("dummy_task")
                     self.assertEqual(ti.state, State.SUCCESS)
 
             # Run end to end tests for DOI DAG
-            with env.create_dag_run(workflow_dag, execution_date):
+            with env.create_dag_run(dag, execution_date):
+                # Run dependency check
+                ti = env.run_task("check_dependencies")
+                self.assertEqual(ti.state, State.SUCCESS)
+
                 # Test that sensors go into 'success' state as the DAGs that they are waiting for have finished
-                for dag_id in sensor_dag_ids:
-                    ti = env.run_task(f"sensors.{dag_id}_sensor")
+                for sensor_id in sensor_dag_ids:
+                    ti = env.run_task(f"sensors.{sensor_id}_sensor")
                     self.assertEqual(ti.state, State.SUCCESS)
 
                 # Mock make_release
                 release_date = pendulum.datetime(year=2021, month=5, day=22)
-                workflow.make_release = MagicMock(
-                    return_value=OnixWorkflowRelease(
-                        dag_id=workflow.dag_id,
-                        run_id=env.dag_run.run_id,
-                        snapshot_date=release_date,
-                        onix_snapshot_date=partner_release_date,
-                        crossref_master_snapshot_date=partner_release_date,
-                    )
-                )
-                release = workflow.make_release()
+                with patch("oaebu_workflows.onix_workflow.onix_workflow.bq_select_table_shard_dates") as mock_date:
+                    mock_date.return_value = [partner_release_date]
+                    ti = env.run_task("make_release")
+                self.assertEqual(ti.state, State.SUCCESS)
+                release_dict = ti.xcom_pull(task_ids="make_release", include_prior_dates=False)
+                expected_release_dict = {
+                    "dag_id": "onix_workflow_test",
+                    "run_id": "scheduled__2021-05-16T00:00:00+00:00",
+                    "snapshot_date": "2021-05-23",
+                    "onix_snapshot_date": "2021-05-15",
+                    "crossref_master_snapshot_date": "2021-05-15",
+                }
+                self.assertEqual(release_dict, expected_release_dict)
+                release = OnixWorkflowRelease.from_dict(release_dict)
                 release_suffix = release.snapshot_date.strftime("%Y%m%d")
 
                 # Aggregate works
-                ti = env.run_task(workflow.aggregate_works.__name__)
+                ti = env.run_task("aggregate_works")
                 self.assertEqual(ti.state, State.SUCCESS)
 
                 table_id = bq_sharded_table_id(
-                    self.gcp_project_id, onix_workflow_dataset_id, workflow.bq_worksid_table_name, release_date
+                    self.gcp_project_id, onix_workflow_dataset_id, bq_worksid_table_name, release.snapshot_date
                 )
                 self.assert_table_content(
                     table_id,
@@ -955,7 +1010,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     primary_key="isbn13",
                 )
                 table_id = bq_sharded_table_id(
-                    self.gcp_project_id, onix_workflow_dataset_id, workflow.bq_worksid_error_table_name, release_date
+                    self.gcp_project_id, onix_workflow_dataset_id, bq_worksid_error_table_name, release.snapshot_date
                 )
                 self.assert_table_content(
                     table_id,
@@ -965,7 +1020,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     primary_key="Error",
                 )
                 table_id = bq_sharded_table_id(
-                    self.gcp_project_id, onix_workflow_dataset_id, workflow.bq_workfamilyid_table_name, release_date
+                    self.gcp_project_id, onix_workflow_dataset_id, bq_workfamilyid_table_name, release.snapshot_date
                 )
                 self.assert_table_content(
                     table_id,
@@ -976,14 +1031,14 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 )
 
                 # Load crossref metadata table into bigquery
-                ti = env.run_task(workflow.create_crossref_metadata_table.__name__)
+                ti = env.run_task("create_crossref_metadata_table")
                 self.assertEqual(ti.state, State.SUCCESS)
 
                 table_id = bq_sharded_table_id(
                     self.gcp_project_id,
                     oaebu_crossref_dataset_id,
-                    workflow.bq_oaebu_crossref_metadata_table_name,
-                    release_date,
+                    bq_oaebu_crossref_metadata_table_name,
+                    release.snapshot_date,
                 )
                 self.assert_table_content(
                     table_id,
@@ -995,13 +1050,13 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 with vcr.use_cassette(
                     self.events_cassette, record_mode="none", before_record_request=vcr_ignore_condition
                 ):
-                    ti = env.run_task(workflow.create_crossref_events_table.__name__)
+                    ti = env.run_task("create_crossref_events_table")
                 self.assertEqual(ti.state, State.SUCCESS)
                 table_id = bq_sharded_table_id(
                     self.gcp_project_id,
                     oaebu_crossref_dataset_id,
-                    workflow.bq_crossref_events_table_name,
-                    release_date,
+                    bq_crossref_events_table_name,
+                    release.snapshot_date,
                 )
                 crossref_fixture_table = load_and_parse_json(
                     os.path.join(self.fixtures_folder, "e2e_outputs", "crossref_events.json"),
@@ -1010,10 +1065,10 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 self.assert_table_content(table_id, crossref_fixture_table, primary_key="id")
 
                 # Create book table in bigquery
-                ti = env.run_task(workflow.create_book_table.__name__)
+                ti = env.run_task("create_book_table")
                 self.assertEqual(ti.state, State.SUCCESS)
                 table_id = bq_sharded_table_id(
-                    self.gcp_project_id, oaebu_output_dataset_id, workflow.bq_book_table_name, release_date
+                    self.gcp_project_id, oaebu_output_dataset_id, bq_book_table_name, release.snapshot_date
                 )
                 self.assert_table_content(
                     table_id,
@@ -1027,10 +1082,10 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     self.assertEqual(ti.state, State.SUCCESS)
 
                 # Create book product table
-                ti = env.run_task(workflow.create_book_product_table.__name__)
+                ti = env.run_task("create_book_product_table")
                 self.assertEqual(ti.state, State.SUCCESS)
                 table_id = bq_sharded_table_id(
-                    self.gcp_project_id, oaebu_output_dataset_id, workflow.bq_book_product_table_name, release_date
+                    self.gcp_project_id, oaebu_output_dataset_id, bq_book_product_table_name, release.snapshot_date
                 )
                 expected_book_product_table = "book_product.json" if not dry_run else "book_product_dry.json"
                 self.assert_table_content(
@@ -1100,13 +1155,13 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 # Check that the data_export tables tables exist and have the correct number of rows
                 for table, exp_rows in export_tables:
                     table_id = bq_sharded_table_id(
-                        self.gcp_project_id, oaebu_export_dataset_id, f"{export_prefix}_{table}", release_date
+                        self.gcp_project_id, oaebu_export_dataset_id, f"{export_prefix}_{table}", release.snapshot_date
                     )
                     self.assert_table_integrity(table_id, expected_rows=exp_rows)
 
                 # Book product list content assertion
                 table_id = bq_sharded_table_id(
-                    self.gcp_project_id, oaebu_export_dataset_id, f"{export_prefix}_book_list", release_date
+                    self.gcp_project_id, oaebu_export_dataset_id, f"{export_prefix}_book_list", release.snapshot_date
                 )
                 expected_book_list_table = "book_list.json" if not dry_run else "book_list_dry.json"
                 fixture_table = load_and_parse_json(
@@ -1165,7 +1220,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 ### Create and validate export copies ###
                 #########################################
 
-                ti = env.run_task(workflow.update_latest_export_tables.__name__)
+                ti = env.run_task("update_latest_export_tables")
                 self.assertEqual(ti.state, State.SUCCESS)
 
                 # Check export views are the same as the tables
@@ -1173,7 +1228,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                     export_copy = bq_run_query(
                         f"SELECT * FROM {self.gcp_project_id}.{oaebu_latest_export_dataset_id}.{self.gcp_project_id.replace('-', '_')}_{export_table}"
                     )
-                    self.assertEqual(expected_state, ti.state, msg=f"table: {table}")
+                    self.assertEqual(ti.state, State.SUCCESS, msg=f"table: {table}")
                     # Check that the data_export table has the correct number of rows
                     self.assertEqual(len(export_copy), exp_rows)
 
@@ -1182,17 +1237,18 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 ################################
 
                 # Add_dataset_release_task
-                dataset_releases = get_dataset_releases(dag_id=workflow.dag_id, dataset_id=workflow.api_dataset_id)
+                dataset_releases = get_dataset_releases(dag_id=dag_id, dataset_id="onix_workflow")
                 self.assertEqual(len(dataset_releases), 0)
-                ti = env.run_task(workflow.add_new_dataset_releases.__name__)
+                ti = env.run_task("add_new_dataset_releases")
                 self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = get_dataset_releases(dag_id=workflow.dag_id, dataset_id=workflow.api_dataset_id)
+                dataset_releases = get_dataset_releases(dag_id=dag_id, dataset_id="onix_workflow")
                 self.assertEqual(len(dataset_releases), 1)
 
                 # Test cleanup
-                ti = env.run_task(workflow.cleanup.__name__)
+                release_workflow_folder = release.workflow_folder
+                ti = env.run_task("cleanup_workflow")
                 self.assertEqual(ti.state, State.SUCCESS)
-                self.assert_cleanup(release.workflow_folder)
+                self.assert_cleanup(release_workflow_folder)
 
     def test_workflow_e2e(self):
         """Test that ONIX Workflow works as expected"""

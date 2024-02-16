@@ -33,7 +33,7 @@ from airflow.models.baseoperator import chain
 
 from oaebu_workflows.airflow_pools import CrossrefEventsPool
 from oaebu_workflows.config import schema_folder as default_schema_folder
-from oaebu_workflows.config import sql_folder
+from oaebu_workflows.config import sql_folder, oaebu_user_agent_header
 from oaebu_workflows.oaebu_partners import OaebuPartner, DataPartner, partner_from_str
 from oaebu_workflows.onix_workflow.onix_work_aggregation import BookWorkAggregator, BookWorkFamilyAggregator
 from observatory.api.client.model.dataset_release import DatasetRelease
@@ -160,23 +160,23 @@ class OnixWorkflowRelease(SnapshotRelease):
 
     ## Blob Names ##
     @property
-    def workslookup_blob(self):
+    def workslookup_blob_name(self):
         return gcs_blob_name_from_path(self.workslookup_path)
 
     @property
-    def workslookup_errors_blob(self):
+    def workslookup_errors_blob_name(self):
         return gcs_blob_name_from_path(self.workslookup_errors_path)
 
     @property
-    def worksfamilylookup_blob(self):
+    def worksfamilylookup_blob_name(self):
         return gcs_blob_name_from_path(self.worksfamilylookup_path)
 
     @property
-    def crossref_metadata_blob(self):
+    def crossref_metadata_blob_name(self):
         return gcs_blob_name_from_path(self.crossref_metadata_path)
 
     @property
-    def crossref_events_blob(self):
+    def crossref_events_blob_name(self):
         return gcs_blob_name_from_path(self.crossref_events_path)
 
     @staticmethod
@@ -184,18 +184,18 @@ class OnixWorkflowRelease(SnapshotRelease):
         return OnixWorkflowRelease(
             dag_id=dict_["dag_id"],
             run_id=dict_["run_id"],
-            snapshot_date=pendulum.parse(dict_["snapshot_date"]),
-            onix_snapshot_date=pendulum.parse(dict_["onix_snapshot_date"]),
-            crossref_master_snapshot_date=pendulum.parse(dict_["crossref_master_snapshot_date"]),
+            snapshot_date=pendulum.from_format(dict_["snapshot_date"], "YYYY-MM-DD"),
+            onix_snapshot_date=pendulum.from_format(dict_["onix_snapshot_date"], "YYYY-MM-DD"),
+            crossref_master_snapshot_date=pendulum.from_format(dict_["crossref_master_snapshot_date"], "YYYY-MM-DD"),
         )
 
     def to_dict(self):
         return {
             "dag_id": self.dag_id,
             "run_id": self.run_id,
-            "snapshot_date": self.snapshot_date.isoformat(),
-            "onix_snapshot_date": self.onix_snapshot_date.isoformat(),
-            "crossref_master_snapshot_date": self.crossref_master_snapshot_date.isoformat(),
+            "snapshot_date": self.snapshot_date.to_date_string(),
+            "onix_snapshot_date": self.onix_snapshot_date.to_date_string(),
+            "crossref_master_snapshot_date": self.crossref_master_snapshot_date.to_date_string(),
         }
 
 
@@ -416,7 +416,7 @@ def create_dag(
 
             # Load the 'WorkID lookup', 'WorkID lookup table errors' and 'WorkFamilyID lookup' tables into BigQuery
             aggregation_blobs = [
-                release.worklookup_blob_name,
+                release.workslookup_blob_name,
                 release.workslookup_errors_blob_name,
                 release.worksfamilylookup_blob_name,
             ]
@@ -498,7 +498,7 @@ def create_dag(
 
             # Download and transform all events
             start_date = crossref_start_date
-            end_date = release.snapshot_date.subtract(days=1).date()
+            end_date = release.snapshot_date
             events = download_crossref_events(dois, start_date, end_date, mailto, max_threads=max_threads)
             events = transform_crossref_events(events, max_threads=max_threads)
 
@@ -564,14 +564,13 @@ def create_dag(
         def create_tasks_intermediate_tables(release: dict):
             tasks = []
             for data_partner in data_partners:
-                task = create_intermediate_table(
+                task = create_intermediate_table.override(task_id=f"intermediate_{data_partner.bq_table_name}")(
                     release,
                     orig_project_id=cloud_workspace.project_id,
                     orig_dataset=data_partner.bq_dataset_id,
                     orig_table=data_partner.bq_table_name,
                     orig_isbn=data_partner.isbn_field_name,
                     sharded=data_partner.sharded,
-                    task_id=f"intermediate_{data_partner.bq_table_name}",
                 )
                 tasks.append(task)
             chain(tasks)
@@ -787,13 +786,13 @@ def create_dag(
 
             # Create each export table in BiqQuery
             tasks = []
+
             for export_table in generic_export_tables:
-                task = export_oaebu_table(
+                task = export_oaebu_table.override(task_id=f"export_{export_table['output_table']}")(
                     release,
                     output_table=export_table["output_table"],
                     query_template_path=export_table["query_template"],
                     schema_file_path=export_table["schema"],
-                    task_id=f"export_{export_table['output_table']}",
                 )
                 tasks.append(task)
 
@@ -813,10 +812,16 @@ def create_dag(
             :param output_table: The name of the table to create
             :param query_template: The name of the template SQL file
             :param schema_file_path: The path to the schema
-            :return: Whether the table creation was a success
             """
-
             release = OnixWorkflowRelease.from_dict(release)
+            _export_oaebu_table(release, output_table, query_template_path, schema_file_path)
+
+        def _export_oaebu_table(
+            release: OnixWorkflowRelease, output_table, query_template_path, schema_file_path
+        ) -> bool:
+            """Non-task version of export_oaebu_table()
+
+            :return: Whether the table creation was a success"""
             bq_create_dataset(
                 project_id=cloud_workspace.project_id,
                 dataset_id=bq_oaebu_export_dataset,
@@ -877,7 +882,7 @@ def create_dag(
             query_template_path = os.path.join(
                 sql_folder(workflow_module="onix_workflow"), "book_metrics_country.sql.jinja2"
             )
-            status = export_oaebu_table(
+            status = _export_oaebu_table(
                 release=release,
                 output_table="book_metrics_country",
                 query_template_path=query_template_path,
@@ -906,7 +911,7 @@ def create_dag(
             query_template_path = os.path.join(
                 sql_folder(workflow_module="onix_workflow"), "book_metrics_author.sql.jinja2"
             )
-            status = export_oaebu_table(
+            status = _export_oaebu_table(
                 release=release,
                 output_table="book_metrics_author",
                 query_template_path=query_template_path,
@@ -933,7 +938,7 @@ def create_dag(
                 json.dump(book_schema, f)
 
             query_template_path = os.path.join(sql_folder(workflow_module="onix_workflow"), "book_metrics.sql.jinja2")
-            status = export_oaebu_table(
+            status = _export_oaebu_table(
                 release=release,
                 output_table="book_metrics",
                 query_template_path=query_template_path,
@@ -969,7 +974,7 @@ def create_dag(
                 query_template_path = os.path.join(
                     sql_folder(workflow_module="onix_workflow"), f"book_metrics_subject_{sub}.sql.jinja2"
                 )
-                status = export_oaebu_table(
+                status = _export_oaebu_table(
                     release=release,
                     output_table=f"book_metrics_subject_{sub}",
                     query_template_path=query_template_path,
@@ -1091,19 +1096,18 @@ def download_crossref_events(
     :return: All events for the input DOIs
     """
 
-    event_url_template = CROSSREF_EVENT_URL_TEMPLATE
     url_start_date = start_date.strftime("%Y-%m-%d")
     url_end_date = end_date.strftime("%Y-%m-%d")
     max_threads = min(max_threads, 15)
 
     event_urls = [
-        event_url_template.format(doi=doi, mailto=mailto, start_date=url_start_date, end_date=url_end_date)
+        CROSSREF_EVENT_URL_TEMPLATE.format(doi=doi, mailto=mailto, start_date=url_start_date, end_date=url_end_date)
         for doi in dois
     ]
 
     logging.info(f"Beginning crossref event data download from {len(event_urls)} URLs with {max_threads} workers")
     logging.info(
-        f"Downloading DOI data using URL: {event_url_template.format(doi='***', mailto=mailto, start_date=url_start_date, end_date=url_end_date)}"
+        f"Downloading DOI data using URL: {CROSSREF_EVENT_URL_TEMPLATE.format(doi='***', mailto=mailto, start_date=url_start_date, end_date=url_end_date)}"
     )
     all_events = []
     with ThreadPoolExecutor(max_workers=max_threads) as executor:
@@ -1126,7 +1130,7 @@ def download_crossref_event_url(url: str, i: int = 0) -> List[dict]:
     """
 
     events = []
-    headers = {"User-Agent": get_user_agent(package_name="oaebu_workflows")}
+    headers = oaebu_user_agent_header()
     next_cursor, page_counts, total_events, page_events = download_crossref_page_events(url, headers)
     events.extend(page_events)
     total_counts = page_counts
