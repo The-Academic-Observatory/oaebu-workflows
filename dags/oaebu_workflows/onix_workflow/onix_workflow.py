@@ -341,7 +341,8 @@ def create_dag(
                 table_id=metadata_partner.bq_table_name,
             )
             snapshot_date = make_snapshot_date(**context)
-            onix_snapshot_dates = bq_select_table_shard_dates(table_id=onix_table_id, end_date=snapshot_date)
+            client = Client(project = cloud_workspace.project_id)
+            onix_snapshot_dates = bq_select_table_shard_dates(table_id=onix_table_id, end_date=snapshot_date, client=client)
             if not len(onix_snapshot_dates):
                 raise RuntimeError("OnixWorkflow.make_release: no ONIX releases found")
 
@@ -354,7 +355,7 @@ def create_dag(
                 table_id=bq_master_crossref_metadata_table_name,
             )
             crossref_metadata_snapshot_dates = bq_select_table_shard_dates(
-                table_id=crossref_table_id, end_date=snapshot_date
+                table_id=crossref_table_id, end_date=snapshot_date, client=client
             )
             if not len(crossref_metadata_snapshot_dates):
                 raise RuntimeError("OnixWorkflow.make_release: no Crossref Metadata releases found")
@@ -392,7 +393,8 @@ def create_dag(
                 metadata_partner.bq_table_name,
                 release.onix_snapshot_date,
             )
-            products = get_onix_records(sharded_onix_table)
+            client = Client(project=cloud_workspace.project_id)
+            products = get_onix_records(sharded_onix_table, client=client)
 
             # Aggregate into works
             agg = BookWorkAggregator(products)
@@ -436,6 +438,7 @@ def create_dag(
                     schema_file_path=bq_find_schema(path=schema_folder, table_name=table_name),
                     source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
                     write_disposition="WRITE_TRUNCATE",
+                    client=client,
                 )
                 set_task_state(state, context["ti"].task_id, release=release)
 
@@ -476,8 +479,9 @@ def create_dag(
                 bq_oaebu_crossref_metadata_table_name,
                 release.snapshot_date,
             )
+            client = Client(project=cloud_workspace.project_id)
             state = bq_create_table_from_query(
-                sql=sql, table_id=oaebu_crossref_metadata_table_id, schema_file_path=schema_file_path
+                sql=sql, table_id=oaebu_crossref_metadata_table_id, schema_file_path=schema_file_path, client=client
             )
             set_task_state(state, context["ti"].task_id, release=release)
 
@@ -494,7 +498,8 @@ def create_dag(
                 bq_oaebu_crossref_metadata_table_name,
                 release.snapshot_date,
             )
-            dois = dois_from_table(metadata_table_id, doi_column_name="DOI", distinct=True)
+            client = Client(project=cloud_workspace.project_id)
+            dois = dois_from_table(metadata_table_id, doi_column_name="DOI", distinct=True, client=client)
 
             # Download and transform all events
             start_date = crossref_start_date
@@ -511,12 +516,14 @@ def create_dag(
                 bq_crossref_events_table_name,
                 release.snapshot_date,
             )
+            
             state = bq_load_table(
                 uri=gcs_blob_uri(cloud_workspace.transform_bucket, release.crossref_events_blob_name),
                 table_id=table_id,
                 schema_file_path=bq_find_schema(path=schema_folder, table_name=bq_crossref_events_table_name),
                 source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
                 write_disposition="WRITE_TRUNCATE",
+                client=client,
             )
             set_task_state(state, context["ti"].task_id, release=release)
 
@@ -553,10 +560,12 @@ def create_dag(
             )
             logging.info(sql)
 
+            client = Client(project=cloud_workspace.project_id)
             status = bq_create_table_from_query(
                 sql=sql,
                 table_id=book_table_id,
                 schema_file_path=os.path.join(schema_folder, "book.json"),
+                client=client
             )
             set_task_state(status, context["ti"].task_id, release=release)
 
@@ -632,6 +641,7 @@ def create_dag(
             )
 
             # Make the table from SQL query
+            client = Client(project=cloud_workspace.project_id)
             sql = render_template(
                 template_path,
                 orig_table_id=orig_table_id,
@@ -639,7 +649,7 @@ def create_dag(
                 wid_table_id=wid_table_id,
                 wfam_table_id=wfam_table_id,
             )
-            status = bq_create_table_from_query(sql=sql, table_id=output_table_id)
+            status = bq_create_table_from_query(sql=sql, table_id=output_table_id, client=client)
             set_task_state(status, context["ti"].task_id, release=release)
 
         @task()
@@ -735,8 +745,9 @@ def create_dag(
             # Run the query
             with open(release.book_product_schema_path, mode="w+") as f:
                 json.dump(schema, f)
+            client = Client(project=cloud_workspace.project_id)
             status = bq_create_table_from_query(
-                sql=sql, table_id=table_id, schema_file_path=release.book_product_schema_path
+                sql=sql, table_id=table_id, schema_file_path=release.book_product_schema_path, client=client
             )
             set_task_state(status, context["ti"].task_id, release=release)
 
@@ -858,7 +869,8 @@ def create_dag(
             )
             logging.info(f"{output_table} SQL:\n{sql}")
 
-            status = bq_create_table_from_query(sql=sql, table_id=output_table_id, schema_file_path=schema_file_path)
+            client = Client(project=cloud_workspace.project_id)
+            status = bq_create_table_from_query(sql=sql, table_id=output_table_id, schema_file_path=schema_file_path, client=client)
             return status
 
         @task()
@@ -1056,7 +1068,7 @@ def create_dag(
     return onix_workflow()
 
 
-def dois_from_table(table_id: str, doi_column_name: str = "DOI", distinct: str = True) -> List[str]:
+def dois_from_table(table_id: str, doi_column_name: str = "DOI", distinct: str = True, client:Client=None) -> List[str]:
     """
     Queries a metadata table to retrieve the unique DOIs. Provided the DOIs are not in a nested structure.
 
@@ -1068,7 +1080,7 @@ def dois_from_table(table_id: str, doi_column_name: str = "DOI", distinct: str =
 
     select_field = f"DISTINCT({doi_column_name})" if distinct else doi_column_name
     sql = f"SELECT {select_field} FROM `{table_id}`"
-    query_results = bq_run_query(sql)
+    query_results = bq_run_query(sql, client=client)
     dois = [r["DOI"] for r in query_results]
     return dois
 
@@ -1262,17 +1274,17 @@ def copy_latest_export_tables(
         table_id = bq_table_id(project_id, from_dataset, table)
         unsharded_name = re.match(r"(.*?)\d{8}$", table).group(1)  # Drop the date from the table for copied table
         copy_table_id = bq_table_id(project_id, to_dataset, unsharded_name)
-        bq_copy_table(src_table_id=table_id, dst_table_id=copy_table_id, write_disposition="WRITE_TRUNCATE")
+        bq_copy_table(src_table_id=table_id, dst_table_id=copy_table_id, write_disposition="WRITE_TRUNCATE", client=client)
 
 
-def get_onix_records(table_id: str) -> List[dict]:
+def get_onix_records(table_id: str, client: Client=None) -> List[dict]:
     """Fetch the latest onix snapshot from BigQuery.
     :param table_id: Fully qualified table ID.
     :return: List of onix product records.
     """
 
     sql = f"SELECT * FROM {table_id}"
-    records = bq_run_query(sql)
+    records = bq_run_query(sql, client=client)
     products = [{key: records[i][key] for key in records[i].keys()} for i in range(len(records))]
     return products
 

@@ -22,7 +22,7 @@ from typing import List, Union
 import pendulum
 from airflow.decorators import dag, task
 from airflow.exceptions import AirflowException, AirflowSkipException
-from google.cloud.bigquery import SourceFormat
+from google.cloud.bigquery import SourceFormat, Client
 
 from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from oaebu_workflows.onix_utils import collapse_subjects, onix_parser_download, onix_parser_execute
@@ -243,6 +243,7 @@ def create_dag(
                 location=cloud_workspace.data_location,
                 description=bq_dataset_description,
             )
+            client = Client(project=cloud_workspace.project_id)
             # Load each transformed release
             for release in releases:
                 table_id = bq_sharded_table_id(
@@ -258,6 +259,7 @@ def create_dag(
                     schema_file_path=metadata_partner.schema_path,
                     source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
                     table_description=bq_table_description,
+                    client=client,
                 )
                 set_task_state(state, context["ti"].task_id, release=release)
 

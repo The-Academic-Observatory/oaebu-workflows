@@ -26,7 +26,7 @@ from typing import Union
 import pendulum
 from airflow.decorators import dag, task
 from airflow.exceptions import AirflowException
-from google.cloud.bigquery import SourceFormat
+from google.cloud.bigquery import SourceFormat, Client
 from tenacity import (
     retry,
     stop_after_attempt,
@@ -235,12 +235,14 @@ def create_dag(
                 metadata_partner.bq_table_name,
                 release.snapshot_date,
             )
+            client = Client(project=cloud_workspace.project_id)
             state = bq_load_table(
                 uri=uri,
                 table_id=table_id,
                 schema_file_path=metadata_partner.schema_path,
                 source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
                 table_description=bq_table_description,
+                client=client,
             )
             set_task_state(state, context["ti"].task_id, release=release)
 

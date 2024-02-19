@@ -21,7 +21,7 @@ from typing import List, Tuple, Union
 import pendulum
 from airflow.hooks.base import BaseHook
 from airflow.decorators import dag, task
-from google.cloud.bigquery import SourceFormat, WriteDisposition
+from google.cloud.bigquery import SourceFormat, WriteDisposition, Client
 from google.cloud.bigquery.table import TimePartitioningType
 
 from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
@@ -251,6 +251,7 @@ def create_dag(
             # Load each transformed release
             uri = gcs_blob_uri(cloud_workspace.transform_bucket, release.transform_blob_name)
             table_id = bq_table_id(cloud_workspace.project_id, data_partner.bq_dataset_id, data_partner.bq_table_name)
+            client = Client(project=cloud_workspace.project_id)
             success = bq_load_table(
                 uri=uri,
                 table_id=table_id,
@@ -262,6 +263,7 @@ def create_dag(
                 write_disposition=WriteDisposition.WRITE_APPEND,
                 partition_field="release_date",
                 ignore_unknown_values=True,
+                client=client,
             )
             set_task_state(success, context["ti"].task_id, release=release)
 

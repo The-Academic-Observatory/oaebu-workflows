@@ -33,7 +33,7 @@ from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.hooks.base import BaseHook
 from airflow.decorators import dag, task
 from bs4 import BeautifulSoup, SoupStrainer
-from google.cloud.bigquery import TimePartitioningType, SourceFormat, WriteDisposition
+from google.cloud.bigquery import TimePartitioningType, SourceFormat, WriteDisposition, Client
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import Resource, build
 from tenacity import retry, stop_after_attempt, wait_exponential, wait_fixed
@@ -323,6 +323,7 @@ def create_dag(
             """Loads the sales and traffic data into BigQuery"""
 
             releases = [JstorRelease.from_dict(r) for r in releases]
+            client = Client(project=cloud_workspace.project_id)
             for release in releases:
                 for partner, table_description, file_path in [
                     (country_partner, bq_country_table_description, release.transform_country_path),
@@ -351,6 +352,7 @@ def create_dag(
                         write_disposition=WriteDisposition.WRITE_APPEND,
                         table_description=table_description,
                         ignore_unknown_values=True,
+                        client=client,
                     )
                     set_task_state(state, context["ti"].task_id, release=release)
 

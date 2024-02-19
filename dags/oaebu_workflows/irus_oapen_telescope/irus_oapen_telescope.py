@@ -28,7 +28,7 @@ from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.hooks.base import BaseHook
 from google.auth import environment_vars
 from google.auth.transport.requests import AuthorizedSession
-from google.cloud.bigquery import TimePartitioningType, SourceFormat, WriteDisposition
+from google.cloud.bigquery import TimePartitioningType, SourceFormat, WriteDisposition, Client
 from google.oauth2.service_account import IDTokenCredentials
 from googleapiclient.discovery import Resource, build
 from googleapiclient.errors import HttpError
@@ -358,6 +358,7 @@ def create_dag(
                 location=cloud_workspace.data_location,
                 description=bq_dataset_description,
             )
+            client = Client(project=cloud_workspace.project_id)
             for release in releases:
                 uri = gcs_blob_uri(cloud_workspace.transform_bucket, gcs_blob_name_from_path(release.transform_path))
                 table_id = bq_table_id(
@@ -374,6 +375,7 @@ def create_dag(
                     write_disposition=WriteDisposition.WRITE_APPEND,
                     table_description=bq_table_description,
                     ignore_unknown_values=True,
+                    client=client,
                 )
                 set_task_state(state, context["ti"].task_id, release=release)
 

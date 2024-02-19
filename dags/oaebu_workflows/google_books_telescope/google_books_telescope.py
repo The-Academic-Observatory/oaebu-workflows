@@ -23,7 +23,7 @@ from typing import List, Tuple, Union
 import pendulum
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.decorators import dag, task
-from google.cloud.bigquery import TimePartitioningType, SourceFormat, WriteDisposition
+from google.cloud.bigquery import TimePartitioningType, SourceFormat, WriteDisposition, Client
 
 from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from observatory.api.client.model.dataset_release import DatasetRelease
@@ -288,6 +288,7 @@ def create_dag(
             """Loads the sales and traffic data into BigQuery"""
 
             releases = [GoogleBooksRelease.from_dict(r) for r in releases]
+            client = Client(project=cloud_workspace.project_id)
             for release in releases:
                 for partner, table_description, file_path in [
                     [sales_partner, bq_sales_table_description, release.transform_sales_path],
@@ -312,6 +313,7 @@ def create_dag(
                         write_disposition=WriteDisposition.WRITE_APPEND,
                         table_description=table_description,
                         ignore_unknown_values=True,
+                        client=client,
                     )
                     set_task_state(success, context["ti"].task_id, release=release)
 

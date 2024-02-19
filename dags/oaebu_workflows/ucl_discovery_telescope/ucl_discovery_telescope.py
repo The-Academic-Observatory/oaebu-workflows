@@ -23,7 +23,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import pendulum
 from airflow.decorators import dag, task
 from airflow.hooks.base import BaseHook
-from google.cloud.bigquery import SourceFormat, TimePartitioningType, WriteDisposition
+from google.cloud.bigquery import SourceFormat, TimePartitioningType, WriteDisposition, Client
 from google.oauth2 import service_account
 from apiclient import discovery
 
@@ -280,6 +280,7 @@ def create_dag(
 
             uri = gcs_blob_uri(cloud_workspace.transform_bucket, gcs_blob_name_from_path(release.transform_path))
             table_id = bq_table_id(cloud_workspace.project_id, data_partner.bq_dataset_id, data_partner.bq_table_name)
+            client = Client(project=cloud_workspace.project_id)
             state = bq_load_table(
                 uri=uri,
                 table_id=table_id,
@@ -291,6 +292,7 @@ def create_dag(
                 write_disposition=WriteDisposition.WRITE_APPEND,
                 table_description=bq_table_description,
                 ignore_unknown_values=True,
+                client=client,
             )
             set_task_state(state, context["ti"].task_id, release=release)
 
