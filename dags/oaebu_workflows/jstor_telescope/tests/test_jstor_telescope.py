@@ -38,16 +38,16 @@ from oaebu_workflows.jstor_telescope.jstor_telescope import (
     create_dag,
     make_jstor_api,
 )
-from observatory.platform.observatory_environment import (
+from observatory_platform.observatory_environment import (
     ObservatoryEnvironment,
     ObservatoryTestCase,
     find_free_port,
     load_and_parse_json,
 )
-from observatory.platform.observatory_config import Workflow
-from observatory.platform.gcs import gcs_blob_name_from_path, gcs_upload_files
-from observatory.platform.bigquery import bq_table_id
-from observatory.platform.api import get_dataset_releases
+from observatory_platform.observatory_config import Workflow
+from observatory_platform.gcs import gcs_blob_name_from_path, gcs_upload_files
+from observatory_platform.bigquery import bq_table_id
+from observatory_platform.dataset_api import DatasetAPI
 
 
 def dummy_gmail_connection() -> Connection:
@@ -335,11 +335,12 @@ class TestJstorTelescopePublisher(ObservatoryTestCase):
                 self.assert_table_integrity(institution_table_id, self.institution_report["table_rows"])
 
                 # Add_dataset_release_task
-                dataset_releases = get_dataset_releases(dag_id=dag_id, dataset_id="jstor")
+                api = DatasetAPI(project_id=self.project_id)
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id="jstor")
                 self.assertEqual(len(dataset_releases), 0)
                 ti = env.run_task("add_new_dataset_releases")
                 self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = get_dataset_releases(dag_id=dag_id, dataset_id="jstor")
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id="jstor")
                 self.assertEqual(len(dataset_releases), 1)
 
                 # Test that all telescope data deleted
@@ -445,7 +446,7 @@ class TestJstorTelescopeCollection(ObservatoryTestCase):
             # Add gmail connection
             env.add_connection(dummy_gmail_connection())
 
-            # Setup Telescope
+            # Setup DAG
             execution_date = pendulum.datetime(year=2023, month=10, day=4)
             country_partner = partner_from_str("jstor_country_collection")
             country_partner.bq_dataset_id = dataset_id
@@ -510,13 +511,6 @@ class TestJstorTelescopeCollection(ObservatoryTestCase):
                     release.download_institution_path, self.institution_report["download_hash"], "md5"
                 )
 
-                # Do the upload that we patched above
-                # success = gcs_upload_files(
-                #     bucket_name=env.cloud_workspace.download_bucket,
-                #     file_paths=[release.download_institution_path, release.download_country_path],
-                # )
-                # self.assertTrue(success)
-
                 # Test that file uploaded
                 self.assert_blob_integrity(
                     env.download_bucket,
@@ -574,11 +568,12 @@ class TestJstorTelescopeCollection(ObservatoryTestCase):
                 self.assert_table_content(institution_table_id, expected, primary_key="ISBN")
 
                 # Add_dataset_release_task
-                dataset_releases = get_dataset_releases(dag_id=dag_id, dataset_id="jstor")
+                api = DatasetAPI(project_id=self.project_id)
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id="jstor")
                 self.assertEqual(len(dataset_releases), 0)
                 ti = env.run_task("add_new_dataset_releases")
                 self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = get_dataset_releases(dag_id=dag_id, dataset_id="jstor")
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id="jstor")
                 self.assertEqual(len(dataset_releases), 1)
 
                 # Test that all telescope data deleted

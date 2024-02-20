@@ -35,15 +35,14 @@ from googleapiclient.errors import HttpError
 from oauth2client.service_account import ServiceAccountCredentials
 
 from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
-from observatory.api.client.model.dataset_release import DatasetRelease
-from observatory.platform.api import make_observatory_api
-from observatory.platform.airflow import AirflowConns
-from observatory.platform.files import get_file_hash, save_jsonl_gz, add_partition_date
-from observatory.platform.tasks import check_dependencies
-from observatory.platform.bigquery import bq_load_table, bq_table_id, bq_create_dataset
-from observatory.platform.observatory_config import CloudWorkspace
-from observatory.platform.workflows.workflow import PartitionRelease, set_task_state, cleanup
-from observatory.platform.gcs import (
+from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
+from observatory_platform.airflow import AirflowConns
+from observatory_platform.files import get_file_hash, save_jsonl_gz, add_partition_date
+from observatory_platform.tasks import check_dependencies
+from observatory_platform.bigquery import bq_load_table, bq_table_id, bq_create_dataset
+from observatory_platform.observatory_config import CloudWorkspace
+from observatory_platform.workflow import PartitionRelease, set_task_state, cleanup
+from observatory_platform.gcs import (
     gcs_copy_blob,
     gcs_create_bucket,
     gcs_download_blob,
@@ -384,17 +383,20 @@ def create_dag(
             """Adds release information to API."""
 
             releases = [IrusOapenRelease.from_dict(r) for r in releases]
-            api = make_observatory_api(observatory_api_conn_id=observatory_api_conn_id)
+            api = DatasetAPI(project_id=cloud_workspace.project_id)
+            api.seed_db()
             for release in releases:
                 dataset_release = DatasetRelease(
                     dag_id=dag_id,
                     dataset_id=api_dataset_id,
                     dag_run_id=release.run_id,
+                    created=pendulum.now(),
+                    modified=pendulum.now(),
                     data_interval_start=release.data_interval_start,
                     data_interval_end=release.data_interval_end,
                     partition_date=release.partition_date,
                 )
-                api.post_dataset_release(dataset_release)
+                api.add_dataset_release(dataset_release)
 
         @task()
         def cleanup_workflow(releases: List[dict], **context) -> None:

@@ -32,11 +32,11 @@ from oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope import (
     download_discovery_stats,
     transform_discovery_stats,
 )
-from observatory.platform.api import get_dataset_releases
-from observatory.platform.observatory_config import Workflow
-from observatory.platform.bigquery import bq_table_id
-from observatory.platform.gcs import gcs_blob_name_from_path
-from observatory.platform.observatory_environment import (
+from observatory_platform.dataset_api import DatasetAPI
+from observatory_platform.observatory_config import Workflow
+from observatory_platform.bigquery import bq_table_id
+from observatory_platform.gcs import gcs_blob_name_from_path
+from observatory_platform.observatory_environment import (
     ObservatoryEnvironment,
     ObservatoryTestCase,
     find_free_port,
@@ -97,7 +97,7 @@ class TestUclDiscoveryTelescope(ObservatoryTestCase):
             self.project_id, self.data_location, api_host="localhost", api_port=find_free_port()
         )
 
-        # Setup Telescope
+        # Setup DAG
         data_partner = partner_from_str("ucl_discovery")
         data_partner.bq_dataset_id = env.add_dataset()
         dag_id = "ucl_discovery"
@@ -219,11 +219,12 @@ class TestUclDiscoveryTelescope(ObservatoryTestCase):
             ###################
 
             # Add_dataset_release_task
-            dataset_releases = get_dataset_releases(dag_id=dag_id, dataset_id="ucl")
+            api = DatasetAPI(project_id=self.project_id)
+            dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id="ucl")
             self.assertEqual(len(dataset_releases), 0)
             ti = env.run_task("add_new_dataset_releases")
             self.assertEqual(ti.state, State.SUCCESS)
-            dataset_releases = get_dataset_releases(dag_id=dag_id, dataset_id="ucl")
+            dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id="ucl")
             self.assertEqual(len(dataset_releases), 1)
 
             # Test that all telescope data deleted

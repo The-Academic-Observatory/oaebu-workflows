@@ -36,11 +36,11 @@ from oaebu_workflows.onix_utils import (
     deduplicate_related_products,
 )
 from oaebu_workflows.config import test_fixtures_folder, schema_folder
-from observatory.platform.observatory_environment import (
+from observatory_platform.observatory_environment import (
     ObservatoryTestCase,
     compare_lists_of_dicts,
 )
-from observatory.platform.files import load_jsonl
+from observatory_platform.files import load_jsonl
 
 FIXTURES_FOLDER = os.path.join(test_fixtures_folder(), "onix_utils")
 

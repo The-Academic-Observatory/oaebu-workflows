@@ -41,13 +41,13 @@ from oaebu_workflows.onix_workflow.onix_workflow import (
     get_onix_records,
     insert_into_schema,
 )
-from observatory.platform.api import get_dataset_releases
-from observatory.platform.observatory_config import Workflow
-from observatory.platform.files import load_jsonl
-from observatory.platform.bigquery import bq_find_schema, bq_run_query, bq_sharded_table_id, bq_table_id
-from observatory.platform.gcs import gcs_blob_name_from_path
-from observatory.platform.config import module_file_path
-from observatory.platform.observatory_environment import (
+from observatory_platform.dataset_api import DatasetAPI
+from observatory_platform.observatory_config import Workflow
+from observatory_platform.files import load_jsonl
+from observatory_platform.bigquery import bq_find_schema, bq_run_query, bq_sharded_table_id, bq_table_id
+from observatory_platform.gcs import gcs_blob_name_from_path
+from observatory_platform.config import module_file_path
+from observatory_platform.observatory_environment import (
     ObservatoryEnvironment,
     ObservatoryTestCase,
     Table,
@@ -158,9 +158,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 metadata_partner="onix",
             )
             with env.create_dag_run(dag, self.snapshot_date.add(days=1)):
-                task = dag.get_task("make_release")
-                ti = TaskInstance(task, self.snapshot_date.add(days=1))
-                ti.run()
+                ti = env.run_task("make_release")
                 release_dict = ti.xcom_pull(task_ids="make_release", include_prior_dates=False)
                 release = OnixWorkflowRelease.from_dict(release_dict)
                 self.assertEqual(release.dag_id, dag.dag_id)
@@ -1237,11 +1235,12 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 ################################
 
                 # Add_dataset_release_task
-                dataset_releases = get_dataset_releases(dag_id=dag_id, dataset_id="onix_workflow")
+                api = DatasetAPI(project_id=self.project_id)
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id="onix_workflow")
                 self.assertEqual(len(dataset_releases), 0)
                 ti = env.run_task("add_new_dataset_releases")
                 self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = get_dataset_releases(dag_id=dag_id, dataset_id="onix_workflow")
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id="onix_workflow")
                 self.assertEqual(len(dataset_releases), 1)
 
                 # Test cleanup

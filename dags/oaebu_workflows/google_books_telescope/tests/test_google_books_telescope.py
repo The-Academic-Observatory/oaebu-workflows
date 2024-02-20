@@ -26,17 +26,17 @@ from click.testing import CliRunner
 from oaebu_workflows.config import test_fixtures_folder, module_file_path
 from oaebu_workflows.oaebu_partners import partner_from_str
 from oaebu_workflows.google_books_telescope.google_books_telescope import GoogleBooksRelease, create_dag, gb_transform
-from observatory.platform.observatory_environment import (
+from observatory_platform.observatory_environment import (
     ObservatoryEnvironment,
     ObservatoryTestCase,
     SftpServer,
     find_free_port,
 )
-from observatory.platform.bigquery import bq_table_id
-from observatory.platform.observatory_config import Workflow
-from observatory.platform.sftp import SftpFolders
-from observatory.platform.gcs import gcs_blob_name_from_path
-from observatory.platform.api import get_dataset_releases
+from observatory_platform.bigquery import bq_table_id
+from observatory_platform.observatory_config import Workflow
+from observatory_platform.sftp import SftpFolders
+from observatory_platform.gcs import gcs_blob_name_from_path
+from observatory_platform.dataset_api import DatasetAPI
 
 
 class TestGoogleBooksTelescope(ObservatoryTestCase):
@@ -127,7 +127,7 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
         with env.create():
             with sftp_server.create() as sftp_root:
 
-                # Setup Telescope
+                # Setup DAG
                 execution_date = pendulum.datetime(year=2021, month=3, day=31)
                 sales_partner = partner_from_str("google_books_sales")
                 sales_partner.bq_dataset_id = dataset_id
@@ -261,11 +261,12 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
                     self.assert_table_integrity(table_id, params["bq_rows"])
 
                     # Add_dataset_release_task
-                    dataset_releases = get_dataset_releases(dag_id="google_books_test", dataset_id="google_books")
+                    api = DatasetAPI(project_id=self.project_id)
+                    dataset_releases = api.get_dataset_releases(dag_id="google_books_test", dataset_id="google_books")
                     self.assertEqual(len(dataset_releases), 0)
                     ti = env.run_task("add_new_dataset_releases")
                     self.assertEqual(ti.state, State.SUCCESS)
-                    dataset_releases = get_dataset_releases(dag_id="google_books_test", dataset_id="google_books")
+                    dataset_releases = api.get_dataset_releases(dag_id="google_books_test", dataset_id="google_books")
                     self.assertEqual(len(dataset_releases), 1)
 
                     # Test cleanup

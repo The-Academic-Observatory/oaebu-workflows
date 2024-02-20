@@ -33,11 +33,11 @@ from oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope import (
     download_metadata,
     create_dag,
 )
-from observatory.platform.api import get_dataset_releases
-from observatory.platform.observatory_config import Workflow
-from observatory.platform.gcs import gcs_blob_name_from_path
-from observatory.platform.bigquery import bq_sharded_table_id
-from observatory.platform.observatory_environment import (
+from observatory_platform.dataset_api import DatasetAPI
+from observatory_platform.observatory_config import Workflow
+from observatory_platform.gcs import gcs_blob_name_from_path
+from observatory_platform.bigquery import bq_sharded_table_id
+from observatory_platform.observatory_environment import (
     ObservatoryEnvironment,
     ObservatoryTestCase,
     find_free_port,
@@ -192,11 +192,12 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
                 self.assert_table_content(table_id, load_and_parse_json(self.test_table), primary_key="ISBN13")
 
                 # Add_dataset_release_task
-                dataset_releases = get_dataset_releases(dag_id=dag_id, dataset_id="oapen")
+                api = DatasetAPI(project_id=self.project_id)
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id="oapen")
                 self.assertEqual(len(dataset_releases), 0)
                 ti = env.run_task("add_new_dataset_releases")
                 self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = get_dataset_releases(dag_id=dag_id, dataset_id="oapen")
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id="oapen")
                 self.assertEqual(len(dataset_releases), 1)
 
                 # Test that all data deleted

@@ -25,15 +25,15 @@ from google.cloud.bigquery import SourceFormat, WriteDisposition, Client
 from google.cloud.bigquery.table import TimePartitioningType
 
 from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
-from observatory.platform.api import make_observatory_api, DatasetRelease
-from observatory.platform.airflow import AirflowConns
-from observatory.platform.observatory_config import CloudWorkspace
-from observatory.platform.files import save_jsonl_gz, load_jsonl, add_partition_date
-from observatory.platform.gcs import gcs_blob_name_from_path, gcs_upload_files, gcs_blob_uri, gcs_download_blob
-from observatory.platform.bigquery import bq_load_table, bq_create_dataset, bq_table_id
-from observatory.platform.tasks import check_dependencies
-from observatory.platform.workflows.workflow import PartitionRelease, set_task_state, cleanup
-from observatory.platform.utils.url_utils import retry_get_url
+from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
+from observatory_platform.airflow import AirflowConns
+from observatory_platform.observatory_config import CloudWorkspace
+from observatory_platform.files import save_jsonl_gz, load_jsonl, add_partition_date
+from observatory_platform.gcs import gcs_blob_name_from_path, gcs_upload_files, gcs_blob_uri, gcs_download_blob
+from observatory_platform.bigquery import bq_load_table, bq_create_dataset, bq_table_id
+from observatory_platform.tasks import check_dependencies
+from observatory_platform.workflow import PartitionRelease, set_task_state, cleanup
+from observatory_platform.url_utils import retry_get_url
 
 IRUS_FULCRUM_ENDPOINT_TEMPLATE = (
     "https://irus.jisc.ac.uk/api/v3/irus/reports/irus_ir/?platform=235"
@@ -271,16 +271,20 @@ def create_dag(
         def add_new_dataset_releases(release: dict, **context) -> None:
             """Adds release information to API."""
             release = IrusFulcrumRelease.from_dict(release)
-            api = make_observatory_api(observatory_api_conn_id=observatory_api_conn_id)
+
+            api = DatasetAPI(project_id=cloud_workspace.project_id)
+            api.seed_db()
             dataset_release = DatasetRelease(
                 dag_id=dag_id,
                 dataset_id=api_dataset_id,
                 dag_run_id=release.run_id,
+                created=pendulum.now(),
+                modified=pendulum.now(),
                 data_interval_start=release.data_interval_start,
                 data_interval_end=release.data_interval_end,
                 partition_date=release.partition_date,
             )
-            api.post_dataset_release(dataset_release)
+            api.add_dataset_release(dataset_release)
 
         @task
         def cleanup_workflow(release: dict, **context) -> None:

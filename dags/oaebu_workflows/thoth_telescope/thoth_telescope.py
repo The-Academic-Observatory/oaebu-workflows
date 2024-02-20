@@ -26,15 +26,14 @@ from google.cloud.bigquery import SourceFormat, Client
 
 from oaebu_workflows.onix_utils import OnixTransformer
 from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
-from observatory.api.client.model.dataset_release import DatasetRelease
-from observatory.platform.api import make_observatory_api
-from observatory.platform.airflow import AirflowConns
-from observatory.platform.bigquery import bq_load_table, bq_sharded_table_id, bq_create_dataset
-from observatory.platform.observatory_config import CloudWorkspace
-from observatory.platform.tasks import check_dependencies
-from observatory.platform.utils.url_utils import retry_get_url
-from observatory.platform.gcs import gcs_upload_files, gcs_blob_name_from_path, gcs_blob_uri, gcs_download_blob
-from observatory.platform.workflows.workflow import SnapshotRelease, make_snapshot_date, cleanup, set_task_state
+from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
+from observatory_platform.airflow import AirflowConns
+from observatory_platform.bigquery import bq_load_table, bq_sharded_table_id, bq_create_dataset
+from observatory_platform.observatory_config import CloudWorkspace
+from observatory_platform.tasks import check_dependencies
+from observatory_platform.url_utils import retry_get_url
+from observatory_platform.gcs import gcs_upload_files, gcs_blob_name_from_path, gcs_blob_uri, gcs_download_blob
+from observatory_platform.workflow import SnapshotRelease, make_snapshot_date, cleanup, set_task_state
 
 
 THOTH_URL = "{host_name}/specifications/{format_specification}/publisher/{publisher_id}"
@@ -106,7 +105,7 @@ def create_dag(
     start_date: DateTime = pendulum.datetime(2022, 12, 1),
     schedule: str = "@weekly",
 ):
-    """Construct an ThothOnixTelescope instance.
+    """Construct an Thoth DAG.
     :param dag_id: The ID of the DAG
     :param cloud_workspace: The CloudWorkspace object for this DAG
     :param publisher_id: The Thoth ID for this publisher
@@ -230,16 +229,19 @@ def create_dag(
             """Adds release information to API."""
 
             release = ThothRelease.from_dict(release)
+            api = DatasetAPI(project_id=cloud_workspace.project_id)
+            api.seed_db()
             dataset_release = DatasetRelease(
                 dag_id=dag_id,
                 dataset_id=api_dataset_id,
                 dag_run_id=release.run_id,
+                created=pendulum.now(),
+                modified=pendulum.now(),
                 snapshot_date=release.snapshot_date,
                 data_interval_start=content["data_interval_start"],
                 data_interval_end=content["data_interval_end"],
             )
-            api = make_observatory_api(observatory_api_conn_id=observatory_api_conn_id)
-            api.post_dataset_release(dataset_release)
+            api.add_dataset_release(dataset_release)
 
         @task()
         def cleanup_workflow(release: dict, **content) -> None:

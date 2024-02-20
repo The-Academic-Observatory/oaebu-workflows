@@ -36,18 +36,17 @@ from oaebu_workflows.config import schema_folder as default_schema_folder
 from oaebu_workflows.config import sql_folder, oaebu_user_agent_header
 from oaebu_workflows.oaebu_partners import OaebuPartner, DataPartner, partner_from_str
 from oaebu_workflows.onix_workflow.onix_work_aggregation import BookWorkAggregator, BookWorkFamilyAggregator
-from observatory.api.client.model.dataset_release import DatasetRelease
-from observatory.platform.observatory_config import CloudWorkspace
-from observatory.platform.utils.dag_run_sensor import DagRunSensor
-from observatory.platform.airflow import AirflowConns
-from observatory.platform.files import save_jsonl_gz
-from observatory.platform.tasks import check_dependencies
-from observatory.platform.utils.url_utils import get_user_agent, retry_get_url
-from observatory.platform.gcs import gcs_upload_files, gcs_blob_uri, gcs_blob_name_from_path
-from observatory.platform.utils.jinja2_utils import render_template
-from observatory.platform.api import make_observatory_api
-from observatory.platform.workflows.workflow import SnapshotRelease, make_snapshot_date, cleanup, set_task_state
-from observatory.platform.bigquery import (
+from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
+from observatory_platform.observatory_config import CloudWorkspace
+from observatory_platform.dag_run_sensor import DagRunSensor
+from observatory_platform.airflow import AirflowConns
+from observatory_platform.files import save_jsonl_gz
+from observatory_platform.tasks import check_dependencies
+from observatory_platform.url_utils import retry_get_url
+from observatory_platform.gcs import gcs_upload_files, gcs_blob_uri, gcs_blob_name_from_path
+from observatory_platform.jinja2_utils import render_template
+from observatory_platform.workflow import SnapshotRelease, make_snapshot_date, cleanup, set_task_state
+from observatory_platform.bigquery import (
     bq_load_table,
     bq_table_id,
     bq_sharded_table_id,
@@ -341,8 +340,10 @@ def create_dag(
                 table_id=metadata_partner.bq_table_name,
             )
             snapshot_date = make_snapshot_date(**context)
-            client = Client(project = cloud_workspace.project_id)
-            onix_snapshot_dates = bq_select_table_shard_dates(table_id=onix_table_id, end_date=snapshot_date, client=client)
+            client = Client(project=cloud_workspace.project_id)
+            onix_snapshot_dates = bq_select_table_shard_dates(
+                table_id=onix_table_id, end_date=snapshot_date, client=client
+            )
             if not len(onix_snapshot_dates):
                 raise RuntimeError("OnixWorkflow.make_release: no ONIX releases found")
 
@@ -516,7 +517,7 @@ def create_dag(
                 bq_crossref_events_table_name,
                 release.snapshot_date,
             )
-            
+
             state = bq_load_table(
                 uri=gcs_blob_uri(cloud_workspace.transform_bucket, release.crossref_events_blob_name),
                 table_id=table_id,
@@ -565,7 +566,7 @@ def create_dag(
                 sql=sql,
                 table_id=book_table_id,
                 schema_file_path=os.path.join(schema_folder, "book.json"),
-                client=client
+                client=client,
             )
             set_task_state(status, context["ti"].task_id, release=release)
 
@@ -870,7 +871,9 @@ def create_dag(
             logging.info(f"{output_table} SQL:\n{sql}")
 
             client = Client(project=cloud_workspace.project_id)
-            status = bq_create_table_from_query(sql=sql, table_id=output_table_id, schema_file_path=schema_file_path, client=client)
+            status = bq_create_table_from_query(
+                sql=sql, table_id=output_table_id, schema_file_path=schema_file_path, client=client
+            )
             return status
 
         @task()
@@ -1012,16 +1015,20 @@ def create_dag(
             """Adds release information to API."""
 
             release = OnixWorkflowRelease.from_dict(release)
-            api = make_observatory_api(observatory_api_conn_id=observatory_api_conn_id)
+
+            api = DatasetAPI(project_id=cloud_workspace.project_id)
+            api.seed_db()
             dataset_release = DatasetRelease(
                 dag_id=dag_id,
                 dataset_id=api_dataset_id,
                 dag_run_id=release.run_id,
+                created=pendulum.now(),
+                modified=pendulum.now(),
                 snapshot_date=release.snapshot_date,
                 data_interval_start=context["data_interval_start"],
                 data_interval_end=context["data_interval_end"],
             )
-            api.post_dataset_release(dataset_release)
+            api.add_dataset_release(dataset_release)
 
         @task()
         def cleanup_workflow(release: dict, **context):
@@ -1068,7 +1075,9 @@ def create_dag(
     return onix_workflow()
 
 
-def dois_from_table(table_id: str, doi_column_name: str = "DOI", distinct: str = True, client:Client=None) -> List[str]:
+def dois_from_table(
+    table_id: str, doi_column_name: str = "DOI", distinct: str = True, client: Client = None
+) -> List[str]:
     """
     Queries a metadata table to retrieve the unique DOIs. Provided the DOIs are not in a nested structure.
 
@@ -1274,10 +1283,12 @@ def copy_latest_export_tables(
         table_id = bq_table_id(project_id, from_dataset, table)
         unsharded_name = re.match(r"(.*?)\d{8}$", table).group(1)  # Drop the date from the table for copied table
         copy_table_id = bq_table_id(project_id, to_dataset, unsharded_name)
-        bq_copy_table(src_table_id=table_id, dst_table_id=copy_table_id, write_disposition="WRITE_TRUNCATE", client=client)
+        bq_copy_table(
+            src_table_id=table_id, dst_table_id=copy_table_id, write_disposition="WRITE_TRUNCATE", client=client
+        )
 
 
-def get_onix_records(table_id: str, client: Client=None) -> List[dict]:
+def get_onix_records(table_id: str, client: Client = None) -> List[dict]:
     """Fetch the latest onix snapshot from BigQuery.
     :param table_id: Fully qualified table ID.
     :return: List of onix product records.

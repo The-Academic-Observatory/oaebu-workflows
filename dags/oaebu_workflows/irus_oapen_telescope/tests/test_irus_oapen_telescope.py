@@ -35,6 +35,8 @@ from oaebu_workflows.oaebu_partners import partner_from_str
 from oaebu_workflows.irus_oapen_telescope.irus_oapen_telescope import (
     IRUS_FUNCTION_SOURCE_URL,
     IRUS_FUNCTION_BLOB_NAME,
+    IRUS_FUNCTION_NAME,
+    IRUS_FUNCTION_REGION,
     IrusOapenRelease,
     call_cloud_function,
     cloud_function_exists,
@@ -42,11 +44,11 @@ from oaebu_workflows.irus_oapen_telescope.irus_oapen_telescope import (
     upload_source_code_to_bucket,
     create_dag,
 )
-from observatory.platform.api import get_dataset_releases
-from observatory.platform.observatory_config import CloudWorkspace, Workflow
-from observatory.platform.gcs import gcs_blob_name_from_path, gcs_upload_file
-from observatory.platform.bigquery import bq_table_id
-from observatory.platform.observatory_environment import (
+from observatory_platform.dataset_api import DatasetAPI
+from observatory_platform.observatory_config import CloudWorkspace, Workflow
+from observatory_platform.gcs import gcs_blob_name_from_path, gcs_upload_file
+from observatory_platform.bigquery import bq_table_id
+from observatory_platform.observatory_environment import (
     ObservatoryEnvironment,
     ObservatoryTestCase,
     find_free_port,
@@ -131,7 +133,7 @@ class TestIrusOapenTelescope(ObservatoryTestCase):
             self.project_id, self.data_location, api_host="localhost", api_port=find_free_port()
         )
 
-        # Setup Telescope
+        # Setup DAG
         execution_date = pendulum.datetime(year=2021, month=2, day=14)
         data_partner = partner_from_str("irus_oapen")
         data_partner.bq_dataset_id = env.add_dataset()
@@ -271,11 +273,12 @@ class TestIrusOapenTelescope(ObservatoryTestCase):
                 env._delete_bucket(gdpr_bucket_id)
 
                 # Add_dataset_release_task
-                dataset_releases = get_dataset_releases(dag_id=dag_id, dataset_id="oapen")
+                api = DatasetAPI(project_id=self.project_id)
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id="oapen")
                 self.assertEqual(len(dataset_releases), 0)
                 ti = env.run_task("add_new_dataset_releases")
                 self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = get_dataset_releases(dag_id=dag_id, dataset_id="oapen")
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id="oapen")
                 self.assertEqual(len(dataset_releases), 1)
 
                 # Test that all telescope data deleted
@@ -301,10 +304,10 @@ class TestIrusOapenTelescope(ObservatoryTestCase):
 
         def assert_mocks(create: bool, update: bool):
             mock_upload.assert_called_once_with(
-                telescope.FUNCTION_SOURCE_URL,
-                telescope.OAPEN_PROJECT_ID,
-                telescope.OAPEN_BUCKET,
-                telescope.FUNCTION_BLOB_NAME,
+                IRUS_FUNCTION_SOURCE_URL,
+                gdpr_oapen_project_id,
+                gdpr_oapen_bucket_id,
+                IRUS_FUNCTION_BLOB_NAME,
                 release.cloud_function_path,
             )
             mock_function_exists.assert_called_once_with(ANY, full_name)
@@ -313,9 +316,9 @@ class TestIrusOapenTelescope(ObservatoryTestCase):
                     ANY,
                     location,
                     full_name,
-                    telescope.OAPEN_BUCKET,
-                    telescope.FUNCTION_BLOB_NAME,
-                    telescope.max_active_runs,
+                    gdpr_oapen_bucket_id,
+                    IRUS_FUNCTION_BLOB_NAME,
+                    max_active_runs,
                     update,
                 )
             else:
@@ -330,56 +333,73 @@ class TestIrusOapenTelescope(ObservatoryTestCase):
                 transform_bucket="transform_bucket",
                 data_location="us",
             )
-            telescope = IrusOapenTelescope(
-                dag_id="irus_oapen_test",
+            dag_id = "irus_oapen_test"
+            publisher_name_v4 = "publisher"
+            publisher_uuid_v5 = "publisherUUID"
+            bq_dataset_id = "dataset_id"
+            gdpr_oapen_project_id = "oapen-usage-data-gdpr-proof"
+            gdpr_oapen_bucket_id = "oapen-usage-data-gdpr-proof_cloud-function"
+            max_active_runs = 5
+            dag = create_dag(
+                dag_id=dag_id,
                 cloud_workspace=cloud_workspace,
-                publisher_name_v4="publisher",
-                publisher_uuid_v5="publisherUUID",
-                bq_dataset_id="dataset_id",
+                publisher_name_v4=publisher_name_v4,
+                publisher_uuid_v5=publisher_uuid_v5,
+                bq_dataset_id=bq_dataset_id,
+                gdpr_oapen_project_id=gdpr_oapen_project_id,
+                gdpr_oapen_bucket_id=gdpr_oapen_bucket_id,
+                max_active_runs=max_active_runs,
             )
-            release = IrusOapenRelease(
-                dag_id=telescope.dag_id, run_id=random_id(), partition_date=pendulum.parse("2020-02-01")
+            release = IrusOapenRelease(dag_id=dag_id, run_id=random_id(), partition_date=pendulum.parse("2020-02-01"))
+            location = f"projects/{gdpr_oapen_project_id}/locations/{IRUS_FUNCTION_REGION}"
+            full_name = f"{location}/functions/{IRUS_FUNCTION_NAME}"
+
+            env = ObservatoryEnvironment(
+                self.project_id, self.data_location, api_host="localhost", api_port=find_free_port()
             )
-            location = f"projects/{telescope.OAPEN_PROJECT_ID}/locations/{telescope.FUNCTION_REGION}"
-            full_name = f"{location}/functions/{telescope.FUNCTION_NAME}"
+            with env.create_dag_run(dag, pendulum.datetime(year=2023, month=1, day=1)):
 
-            # Test when source code upload was unsuccessful
-            mock_upload.return_value = False, False
-            task_instance = MagicMock()
-            # context = dict(ti=task_instance)
-            with self.assertRaises(AirflowException):
-                telescope.create_cloud_function(releases=[release], ti=task_instance)
+                ti = env.run_task("make_release")
 
-            # Test when cloud function does not exist
-            reset_mocks()
-            mock_upload.return_value = True, True
-            mock_function_exists.return_value = False
-            mock_create_function.return_value = True, "response"
-            telescope.create_cloud_function(releases=[release], ti=task_instance)
-            assert_mocks(create=True, update=False)
+                # Test when source code upload was unsuccessful
+                mock_upload.return_value = False, False
+                with self.assertRaises(AirflowException):
+                    env.run_task("create_cloud_function")
+                dag.clear(task_ids=["create_cloud_function"])
 
-            # Test when cloud function exists, but source code has changed
-            reset_mocks()
-            mock_upload.return_value = True, True
-            mock_function_exists.return_value = True
-            mock_create_function.return_value = True, "response"
-            telescope.create_cloud_function(telescope.max_active_runs)
-            assert_mocks(create=False, update=True)
+                # Test when cloud function does not exist
+                reset_mocks()
+                mock_upload.return_value = True, True
+                mock_function_exists.return_value = False
+                mock_create_function.return_value = True, "response"
+                env.run_task("create_cloud_function")
+                assert_mocks(create=True, update=False)
+                dag.clear(task_ids=["create_cloud_function"])
 
-            # Test when cloud function exists and source code has not changed
-            reset_mocks()
-            mock_upload.return_value = True, False
-            mock_function_exists.return_value = True
-            telescope.create_cloud_function(releases=[release], ti=task_instance)
-            assert_mocks(create=False, update=False)
+                # Test when cloud function exists, but source code has changed
+                reset_mocks()
+                mock_upload.return_value = True, True
+                mock_function_exists.return_value = True
+                mock_create_function.return_value = True, "response"
+                env.run_task("create_cloud_function")
+                assert_mocks(create=False, update=True)
+                dag.clear(task_ids=["create_cloud_function"])
 
-            # Test when create cloud function was unsuccessful
-            reset_mocks()
-            mock_upload.return_value = True, True
-            mock_function_exists.return_value = True
-            mock_create_function.return_value = False, "response"
-            with self.assertRaises(AirflowException):
-                telescope.create_cloud_function(releases=[release], ti=task_instance)
+                # Test when cloud function exists and source code has not changed
+                reset_mocks()
+                mock_upload.return_value = True, False
+                mock_function_exists.return_value = True
+                env.run_task("create_cloud_function")
+                assert_mocks(create=False, update=False)
+                dag.clear(task_ids=["create_cloud_function"])
+
+                # Test when create cloud function was unsuccessful
+                reset_mocks()
+                mock_upload.return_value = True, True
+                mock_function_exists.return_value = True
+                mock_create_function.return_value = False, "response"
+                with self.assertRaises(AirflowException):
+                    env.run_task("create_cloud_function")
 
     @patch("oaebu_workflows.irus_oapen_telescope.irus_oapen_telescope.gcs_upload_file")
     @patch("oaebu_workflows.irus_oapen_telescope.irus_oapen_telescope.gcs_create_bucket")

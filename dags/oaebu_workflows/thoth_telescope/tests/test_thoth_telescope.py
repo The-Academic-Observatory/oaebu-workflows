@@ -29,12 +29,12 @@ from oaebu_workflows.thoth_telescope.thoth_telescope import (
     create_dag,
 )
 from oaebu_workflows.config import test_fixtures_folder, module_file_path
-from observatory.platform.api import get_dataset_releases
-from observatory.platform.bigquery import bq_sharded_table_id
-from observatory.platform.gcs import gcs_blob_name_from_path
-from observatory.platform.utils.url_utils import retry_get_url
-from observatory.platform.observatory_config import Workflow
-from observatory.platform.observatory_environment import (
+from observatory_platform.dataset_api import DatasetAPI
+from observatory_platform.bigquery import bq_sharded_table_id
+from observatory_platform.gcs import gcs_blob_name_from_path
+from observatory_platform.url_utils import retry_get_url
+from observatory_platform.observatory_config import Workflow
+from observatory_platform.observatory_environment import (
     ObservatoryEnvironment,
     ObservatoryTestCase,
     find_free_port,
@@ -201,11 +201,12 @@ class TestThothTelescope(ObservatoryTestCase):
                 self.assert_table_content(table_id, load_and_parse_json(self.test_table), primary_key="ISBN13")
 
                 # add_dataset_release_task
-                dataset_releases = get_dataset_releases(dag_id=dag_id, dataset_id="onix")
+                api = DatasetAPI(project_id=self.project_id)
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id="onix")
                 self.assertEqual(len(dataset_releases), 0)
                 ti = env.run_task("add_new_dataset_releases")
                 self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = get_dataset_releases(dag_id=dag_id, dataset_id="onix")
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id="onix")
                 self.assertEqual(len(dataset_releases), 1)
 
                 # Test cleanup

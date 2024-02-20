@@ -26,16 +26,15 @@ from google.cloud.bigquery import SourceFormat, Client
 
 from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from oaebu_workflows.onix_utils import collapse_subjects, onix_parser_download, onix_parser_execute
-from observatory.api.client.model.dataset_release import DatasetRelease
-from observatory.platform.api import make_observatory_api
-from observatory.platform.airflow import AirflowConns
-from observatory.platform.files import load_jsonl, save_jsonl_gz
-from observatory.platform.gcs import gcs_blob_uri, gcs_upload_files, gcs_blob_name_from_path, gcs_download_blob
-from observatory.platform.bigquery import bq_load_table, bq_sharded_table_id, bq_create_dataset
-from observatory.platform.tasks import check_dependencies
-from observatory.platform.observatory_config import CloudWorkspace
-from observatory.platform.sftp import SftpFolders, make_sftp_connection
-from observatory.platform.workflows.workflow import SnapshotRelease, cleanup, set_task_state
+from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
+from observatory_platform.airflow import AirflowConns
+from observatory_platform.files import load_jsonl, save_jsonl_gz
+from observatory_platform.gcs import gcs_blob_uri, gcs_upload_files, gcs_blob_name_from_path, gcs_download_blob
+from observatory_platform.bigquery import bq_load_table, bq_sharded_table_id, bq_create_dataset
+from observatory_platform.tasks import check_dependencies
+from observatory_platform.observatory_config import CloudWorkspace
+from observatory_platform.sftp import SftpFolders, make_sftp_connection
+from observatory_platform.workflow import SnapshotRelease, cleanup, set_task_state
 
 
 class OnixRelease(SnapshotRelease):
@@ -114,7 +113,7 @@ def create_dag(
     schedule: str = "@weekly",
     start_date: pendulum.DateTime = pendulum.datetime(2021, 3, 28),
 ):
-    """Construct an OnixTelescope instance.
+    """Construct an OINX DAG.
     :param dag_id: The ID of the DAG
     :param cloud_workspace: The CloudWorkspace object for this DAG
     :param sftp_root: The working root of the SFTP server, passed to the SftoFolders class
@@ -275,17 +274,20 @@ def create_dag(
             """Adds release information to API."""
 
             releases = [OnixRelease.from_dict(r) for r in releases]
-            api = make_observatory_api(observatory_api_conn_id=observatory_api_conn_id)
+            api = DatasetAPI(project_id=cloud_workspace.project_id)
+            api.seed_db()
             for release in releases:
                 dataset_release = DatasetRelease(
                     dag_id=dag_id,
                     dataset_id=api_dataset_id,
                     dag_run_id=release.run_id,
+                    created=pendulum.now(),
+                    modified=pendulum.now(),
                     snapshot_date=release.snapshot_date,
                     data_interval_start=context["data_interval_start"],
                     data_interval_end=context["data_interval_end"],
                 )
-                api.post_dataset_release(dataset_release)
+                api.add_dataset_release(dataset_release)
 
         @task()
         def cleanup_workflow(releases: List[dict], **context) -> None:

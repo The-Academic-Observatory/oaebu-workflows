@@ -29,18 +29,18 @@ from oaebu_workflows.irus_fulcrum_telescope.irus_fulcrum_telescope import (
     download_fulcrum_month_data,
     transform_fulcrum_data,
 )
-from observatory.platform.files import load_jsonl
-from observatory.platform.config import module_file_path
-from observatory.platform.observatory_environment import (
+from observatory_platform.files import load_jsonl
+from observatory_platform.config import module_file_path
+from observatory_platform.observatory_environment import (
     ObservatoryEnvironment,
     ObservatoryTestCase,
     find_free_port,
     load_and_parse_json,
 )
-from observatory.platform.api import get_dataset_releases
-from observatory.platform.gcs import gcs_blob_name_from_path
-from observatory.platform.bigquery import bq_table_id
-from observatory.platform.observatory_config import Workflow
+from observatory_platform.dataset_api import DatasetAPI
+from observatory_platform.gcs import gcs_blob_name_from_path
+from observatory_platform.bigquery import bq_table_id
+from observatory_platform.observatory_config import Workflow
 
 FAKE_PUBLISHERS = ["Fake Publisher 1", "Fake Publisher 2", "Fake Publisher 3"]
 
@@ -109,7 +109,7 @@ class TestIrusFulcrumTelescope(ObservatoryTestCase):
 
         # Create the Observatory environment and run tests
         with env.create():
-            # Setup Telescope
+            # Setup DAG
             execution_date = pendulum.datetime(year=2022, month=4, day=7)
             data_partner = partner_from_str("irus_fulcrum")
             data_partner.bq_dataset_id = env.add_dataset()
@@ -200,11 +200,12 @@ class TestIrusFulcrumTelescope(ObservatoryTestCase):
                 )
 
                 # Add_dataset_release_task
-                dataset_releases = get_dataset_releases(dag_id="fulcrum_test", dataset_id=api_dataset_id)
+                api = DatasetAPI(project_id=self.project_id)
+                dataset_releases = api.get_dataset_releases(dag_id="fulcrum_test", dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 0)
                 ti = env.run_task("add_new_dataset_releases")
                 self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = get_dataset_releases(dag_id="fulcrum_test", dataset_id=api_dataset_id)
+                dataset_releases = api.get_dataset_releases(dag_id="fulcrum_test", dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 1)
 
                 # Test cleanup

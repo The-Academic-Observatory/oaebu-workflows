@@ -28,17 +28,16 @@ from google.oauth2 import service_account
 from apiclient import discovery
 
 from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
-from observatory.api.client.model.dataset_release import DatasetRelease
-from observatory.platform.api import make_observatory_api
-from observatory.platform.airflow import AirflowConns
-from observatory.platform.files import save_jsonl_gz, load_jsonl
-from observatory.platform.gcs import gcs_blob_uri, gcs_upload_files, gcs_blob_name_from_path, gcs_download_blob
-from observatory.platform.bigquery import bq_load_table, bq_table_id, bq_create_dataset
-from observatory.platform.utils.url_utils import retry_get_url
-from observatory.platform.observatory_config import CloudWorkspace
-from observatory.platform.tasks import check_dependencies
-from observatory.platform.files import add_partition_date
-from observatory.platform.workflows.workflow import PartitionRelease, cleanup, set_task_state
+from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
+from observatory_platform.airflow import AirflowConns
+from observatory_platform.files import save_jsonl_gz, load_jsonl
+from observatory_platform.gcs import gcs_blob_uri, gcs_upload_files, gcs_blob_name_from_path, gcs_download_blob
+from observatory_platform.bigquery import bq_load_table, bq_table_id, bq_create_dataset
+from observatory_platform.url_utils import retry_get_url
+from observatory_platform.observatory_config import CloudWorkspace
+from observatory_platform.tasks import check_dependencies
+from observatory_platform.files import add_partition_date
+from observatory_platform.workflow import PartitionRelease, cleanup, set_task_state
 
 
 class UclDiscoveryRelease(PartitionRelease):
@@ -126,7 +125,7 @@ def create_dag(
     catchup: bool = True,
     max_active_runs: int = 10,
 ):
-    """Construct a UclDiscoveryTelescope instance.
+    """Construct a UclDiscovery DAG.
 
     :param dag_id: The ID of the DAG
     :param cloud_workspace: The CloudWorkspace object for this DAG
@@ -157,9 +156,7 @@ def create_dag(
     def ucl_discovery():
         @task()
         def make_release(**context) -> List[dict]:
-            """Make release instances. The release is passed as an argument to the function (TelescopeFunction) that is
-            called in 'task_callable'. There will only be 1 release, but it is passed on as a list so the
-            SnapshotTelescope template methods can be used.
+            """Creates a new ucl discovery release instance
 
             :param context: the context passed from the PythonOperator.
             See https://airflow.apache.org/docs/stable/macros-ref.html for the keyword arguments that can be passed
@@ -301,16 +298,19 @@ def create_dag(
             """Adds release information to API."""
 
             release = UclDiscoveryRelease.from_dict(release)
-            api = make_observatory_api(observatory_api_conn_id=observatory_api_conn_id)
+            api = DatasetAPI(project_id=cloud_workspace.project_id)
+            api.seed_db()
             dataset_release = DatasetRelease(
                 dag_id=dag_id,
                 dataset_id=api_dataset_id,
                 dag_run_id=release.run_id,
+                created=pendulum.now(),
+                modified=pendulum.now(),
                 data_interval_start=context["data_interval_start"],
                 data_interval_end=context["data_interval_end"],
                 partition_date=release.partition_date,
             )
-            api.post_dataset_release(dataset_release)
+            api.add_dataset_release(dataset_release)
 
         @task()
         def cleanup_workflow(release: dict, **context) -> None:

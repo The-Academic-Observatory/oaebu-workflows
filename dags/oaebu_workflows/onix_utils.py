@@ -31,10 +31,10 @@ from copy import deepcopy
 from onixcheck import validate as validate_onix
 
 from oaebu_workflows.config import schema_folder
-from observatory.platform.config import observatory_home
-from observatory.platform.utils.http_download import download_file
-from observatory.platform.utils.proc_utils import wait_for_process
-from observatory.platform.files import save_jsonl_gz, load_jsonl
+from observatory_platform.config import observatory_home
+from observatory_platform.http_download import download_file
+from observatory_platform.proc_utils import wait_for_process
+from observatory_platform.files import save_jsonl_gz, load_jsonl
 
 
 @dataclass

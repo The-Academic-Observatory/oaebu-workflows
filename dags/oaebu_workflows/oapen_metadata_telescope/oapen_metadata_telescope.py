@@ -38,15 +38,13 @@ from tenacity import (
 from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from oaebu_workflows.config import schema_folder, oaebu_user_agent_header
 from oaebu_workflows.onix_utils import OnixTransformer
-from observatory.api.client.model.dataset_release import DatasetRelease
-from observatory.platform.api import make_observatory_api
-from observatory.platform.airflow import AirflowConns
-from observatory.platform.utils.url_utils import get_user_agent
-from observatory.platform.observatory_config import CloudWorkspace
-from observatory.platform.tasks import check_dependencies
-from observatory.platform.gcs import gcs_upload_files, gcs_blob_uri, gcs_blob_name_from_path, gcs_download_blob
-from observatory.platform.bigquery import bq_load_table, bq_sharded_table_id, bq_create_dataset
-from observatory.platform.workflows.workflow import SnapshotRelease, make_snapshot_date, cleanup, set_task_state
+from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
+from observatory_platform.airflow import AirflowConns
+from observatory_platform.observatory_config import CloudWorkspace
+from observatory_platform.tasks import check_dependencies
+from observatory_platform.gcs import gcs_upload_files, gcs_blob_uri, gcs_blob_name_from_path, gcs_download_blob
+from observatory_platform.bigquery import bq_load_table, bq_sharded_table_id, bq_create_dataset
+from observatory_platform.workflow import SnapshotRelease, make_snapshot_date, cleanup, set_task_state
 
 
 # Download job will wait 120 seconds between first 2 attempts, then 30 minutes for the following 3
@@ -117,7 +115,7 @@ def create_dag(
     start_date: pendulum.DateTime = pendulum.datetime(2018, 5, 14),
     schedule: str = "0 12 * * Sun",  # Midday every sunday
 ):
-    """Construct a OapenMetadataTelescope instance.
+    """Construct a OapenMetadata DAG.
     :param dag_id: The ID of the DAG
     :param cloud_workspace: The CloudWorkspace object for this DAG
     :param metadata_uri: The URI of the metadata XML file
@@ -251,16 +249,19 @@ def create_dag(
             """Adds release information to API."""
 
             release = OapenMetadataRelease.from_dict(release)
-            api = make_observatory_api(observatory_api_conn_id=observatory_api_conn_id)
+            api = DatasetAPI(project_id=cloud_workspace.project_id)
+            api.seed_db()
             dataset_release = DatasetRelease(
                 dag_id=dag_id,
                 dataset_id=api_dataset_id,
                 dag_run_id=release.run_id,
+                created=pendulum.now(),
+                modified=pendulum.now(),
                 snapshot_date=release.snapshot_date,
                 data_interval_start=context["data_interval_start"],
                 data_interval_end=context["data_interval_end"],
             )
-            api.post_dataset_release(dataset_release)
+            api.add_dataset_release(dataset_release)
 
         @task()
         def cleanup_workflow(release: dict, **context) -> None:

@@ -17,7 +17,7 @@
 import os
 from typing import Optional
 
-from observatory.platform.config import module_file_path
+from observatory_platform.config import module_file_path
 
 
 def test_fixtures_folder(workflow_module: Optional[str] = None) -> str:
