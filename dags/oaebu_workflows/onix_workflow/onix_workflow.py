@@ -234,7 +234,6 @@ def create_dag(
     api_dataset_id: str = "onix_workflow",
     max_threads: int = 2 * os.cpu_count() - 1,
     # Ariflow parameters
-    observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
     sensor_dag_ids: List[str] = None,
     catchup: Optional[bool] = False,
     start_date: Optional[pendulum.DateTime] = pendulum.datetime(2022, 8, 1),
@@ -276,7 +275,6 @@ def create_dag(
     :param api_dataset_id: The ID to store the dataset release in the API
     :param max_threads: The maximum number of threads to use for parallel tasks.
 
-    :param observatory_api_conn_id: The connection ID for the observatory API
     :param sensor_dag_ids: Dag IDs for dependent tasks
     :param catchup: Whether to catch up missed DAG runs.
     :param start_date: Start date of the DAG.
@@ -1038,7 +1036,7 @@ def create_dag(
             cleanup(dag_id=dag_id, execution_date=context["execution_date"], workflow_folder=release.workflow_folder)
 
         # Define DAG tasks
-        task_check_dependencies = check_dependencies(airflow_conns=[observatory_api_conn_id], start_date=start_date)
+        task_check_dependencies = check_dependencies()
         task_group_sensors = make_sensors()
         xcom_release = make_release()
         task_aggregate_works = aggregate_works(xcom_release)

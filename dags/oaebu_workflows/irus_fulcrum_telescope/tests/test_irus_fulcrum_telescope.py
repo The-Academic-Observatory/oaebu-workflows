@@ -15,6 +15,7 @@
 # Author: Keegan Smith
 
 import os
+from unittest.mock import patch
 
 import pendulum
 import vcr
@@ -37,7 +38,7 @@ from observatory_platform.observatory_environment import (
     find_free_port,
     load_and_parse_json,
 )
-from observatory_platform.dataset_api import DatasetAPI
+from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
 from observatory_platform.gcs import gcs_blob_name_from_path
 from observatory_platform.bigquery import bq_table_id
 from observatory_platform.observatory_config import Workflow
@@ -103,9 +104,7 @@ class TestIrusFulcrumTelescope(ObservatoryTestCase):
         """Test the Fulcrum telescope end to end."""
 
         # Setup Observatory environment
-        env = ObservatoryEnvironment(
-            self.project_id, self.data_location, api_host="localhost", api_port=find_free_port()
-        )
+        env = ObservatoryEnvironment(self.project_id, self.data_location)
 
         # Create the Observatory environment and run tests
         with env.create():
@@ -113,9 +112,10 @@ class TestIrusFulcrumTelescope(ObservatoryTestCase):
             execution_date = pendulum.datetime(year=2022, month=4, day=7)
             data_partner = partner_from_str("irus_fulcrum")
             data_partner.bq_dataset_id = env.add_dataset()
-            api_dataset_id = "fulcrum"
+            api_dataset_id = env.add_dataset()
+            dag_id = "fulcrum_test"
             dag = create_dag(
-                dag_id="fulcrum_test",
+                dag_id=dag_id,
                 cloud_workspace=env.cloud_workspace,
                 publishers=FAKE_PUBLISHERS,
                 data_partner=data_partner,
@@ -199,14 +199,36 @@ class TestIrusFulcrumTelescope(ObservatoryTestCase):
                     primary_key="proprietary_id",
                 )
 
-                # Add_dataset_release_task
+                # Set up the API
                 api = DatasetAPI(project_id=self.project_id)
-                dataset_releases = api.get_dataset_releases(dag_id="fulcrum_test", dataset_id=api_dataset_id)
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 0)
-                ti = env.run_task("add_new_dataset_releases")
+
+                # Add_dataset_release_task
+                now = pendulum.now()
+                with patch("oaebu_workflows.irus_fulcrum_telescope.irus_fulcrum_telescope.pendulum.now") as mock_now:
+                    mock_now.return_value = now
+                    ti = env.run_task("add_new_dataset_releases")
                 self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = api.get_dataset_releases(dag_id="fulcrum_test", dataset_id=api_dataset_id)
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 1)
+                expected_release = {
+                    "dag_id": dag_id,
+                    "dataset_id": api_dataset_id,
+                    "dag_run_id": release.run_id,
+                    "created": now.to_iso8601_string(),
+                    "modified": now.to_iso8601_string(),
+                    "data_interval_start": "2022-04-01T00:00:00+00:00",
+                    "data_interval_end": "2022-05-01T00:00:00+00:00",
+                    "snapshot_date": None,
+                    "partition_date": "2022-04-30T00:00:00+00:00",
+                    "changefile_start_date": None,
+                    "changefile_end_date": None,
+                    "sequence_start": None,
+                    "sequence_end": None,
+                    "extra": None,
+                }
+                self.assertEqual(expected_release, dataset_releases[0].to_dict())
 
                 # Test cleanup
                 workflow_folder_path = release.workflow_folder

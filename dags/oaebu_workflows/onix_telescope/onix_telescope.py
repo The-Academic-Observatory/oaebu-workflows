@@ -107,7 +107,6 @@ def create_dag(
     bq_dataset_description: str = "ONIX data provided by Org",
     bq_table_description: str = None,
     api_dataset_id: str = "onix",
-    observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
     sftp_service_conn_id: str = "sftp_service",
     catchup: bool = False,
     schedule: str = "@weekly",
@@ -122,7 +121,6 @@ def create_dag(
     :param bq_dataset_description: Description for the BigQuery dataset
     :param bq_table_description: Description for the biguery table
     :param api_dataset_id: The ID to store the dataset release in the API
-    :param observatory_api_conn_id: Airflow connection ID for the overvatory API
     :param sftp_service_conn_id: Airflow connection ID for the SFTP service
     :param catchup: Whether to catchup the DAG or not
     :param schedule: The schedule interval of the DAG
@@ -299,7 +297,7 @@ def create_dag(
                     dag_id=dag_id, execution_date=context["execution_date"], workflow_folder=release.workflow_folder
                 )
 
-        task_check_dependencies = check_dependencies(airflow_conns=[observatory_api_conn_id, sftp_service_conn_id])
+        task_check_dependencies = check_dependencies(airflow_conns=[sftp_service_conn_id])
         xcom_release = make_release()
         task_move_files_to_in_progress = move_files_to_in_progress(xcom_release)
         task_download = download(xcom_release)

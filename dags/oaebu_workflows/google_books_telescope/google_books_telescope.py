@@ -27,7 +27,6 @@ from google.cloud.bigquery import TimePartitioningType, SourceFormat, WriteDispo
 
 from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
-from observatory_platform.airflow import AirflowConns
 from observatory_platform.files import convert, add_partition_date, save_jsonl_gz
 from observatory_platform.gcs import gcs_upload_files, gcs_blob_uri, gcs_blob_name_from_path, gcs_download_blob
 from observatory_platform.observatory_config import CloudWorkspace
@@ -121,7 +120,6 @@ def create_dag(
     bq_traffic_table_description: str = None,
     api_dataset_id: str = "google_books",
     sftp_service_conn_id: str = "sftp_service",
-    observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
     catchup: bool = False,
     schedule: str = "@weekly",
     start_date: pendulum.DateTime = pendulum.datetime(2018, 1, 1),
@@ -137,7 +135,6 @@ def create_dag(
     :param bq_traffic_table_description: Description for the BigQuery Google Books Traffic table
     :param api_dataset_id: The ID to store the dataset release in the API
     :param sftp_service_conn_id: Airflow connection ID for the SFTP service
-    :param observatory_api_conn_id: Airflow connection ID for the overvatory API
     :param catchup: Whether to catchup the DAG or not
     :param schedule: The schedule interval of the DAG
     :param start_date: The start date of the DAG
@@ -348,7 +345,7 @@ def create_dag(
                 )
 
         # Define dag tasks
-        task_check_dependencies = check_dependencies(airflow_conns=[observatory_api_conn_id, sftp_service_conn_id])
+        task_check_dependencies = check_dependencies(airflow_conns=[sftp_service_conn_id])
         xcom_release = make_release()
         task_move_in_progress = move_files_to_in_progress(xcom_release)
         task_download = download(xcom_release)

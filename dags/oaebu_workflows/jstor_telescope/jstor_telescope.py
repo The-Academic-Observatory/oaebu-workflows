@@ -163,7 +163,6 @@ def create_dag(
     bq_institution_table_description: Optional[str] = None,
     api_dataset_id: str = "jstor",
     gmail_api_conn_id: str = "gmail_api",
-    observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
     catchup: bool = False,
     schedule: str = "0 0 4 * *",  # 4th day of every month
     start_date: pendulum.DateTime = pendulum.datetime(2016, 10, 1),
@@ -180,7 +179,6 @@ def create_dag(
     :param bq_institution_table_description: Description for the BigQuery JSTOR institution table
     :param api_dataset_id: The ID to store the dataset release in the API
     :param gmail_api_conn_id: Airflow connection ID for the Gmail API
-    :param observatory_api_conn_id: Airflow connection ID for the overvatory API
     :param catchup: Whether to catchup the DAG or not
     :param max_active_runs: The maximum number of DAG runs that can be run concurrently
     :param schedule: The schedule interval of the DAG
@@ -392,9 +390,7 @@ def create_dag(
                 set_task_state(success, context["ti"].task_id, release=release)
 
         # Define DAG tasks
-        task_check_dependencies = check_dependencies(
-            airflow_conns=[observatory_api_conn_id, gmail_api_conn_id], start_date=start_date
-        )
+        task_check_dependencies = check_dependencies(airflow_conns=[gmail_api_conn_id], start_date=start_date)
         xcom_reports = list_reports()
         xcom_releases = download(xcom_reports)
         task_transform = transform(xcom_releases)

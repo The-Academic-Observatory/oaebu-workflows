@@ -117,7 +117,6 @@ def create_dag(
     bq_dataset_description: str = "UCL Discovery dataset",
     bq_table_description: str = "UCL Discovery table",
     api_dataset_id: str = "ucl",
-    observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
     oaebu_service_account_conn_id: str = "oaebu_service_account",
     max_threads: int = os.cpu_count() * 2,
     schedule: str = "0 0 4 * *",  # run on the 4th of every month
@@ -134,7 +133,6 @@ def create_dag(
     :param bq_dataset_description: Description for the BigQuery dataset
     :param bq_table_description: Description for the biguery table
     :param api_dataset_id: The ID to store the dataset release in the API
-    :param observatory_api_conn_id: Airflow connection ID for the overvatory API
     :param oaebu_service_account_conn_id: Airflow connection ID for the oaebu service account
     :param max_threads: The maximum number threads to utilise for parallel processes
     :param schedule: The schedule interval of the DAG
@@ -319,9 +317,7 @@ def create_dag(
             release = UclDiscoveryRelease.from_dict(release)
             cleanup(dag_id=dag_id, execution_date=context["execution_date"], workflow_folder=release.workflow_folder)
 
-        task_check_dependencies = check_dependencies(
-            airflow_conns=[observatory_api_conn_id, oaebu_service_account_conn_id]
-        )
+        task_check_dependencies = check_dependencies(airflow_conns=[oaebu_service_account_conn_id])
         xcom_release = make_release()
         task_download = download(xcom_release)
         task_transform = transform(xcom_release)

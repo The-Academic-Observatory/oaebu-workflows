@@ -16,6 +16,7 @@
 
 import os
 import shutil
+from unittest.mock import patch
 
 import pendulum
 from airflow.exceptions import AirflowException
@@ -117,9 +118,7 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
         }
 
         # Setup Observatory environment
-        env = ObservatoryEnvironment(
-            self.project_id, self.data_location, api_host="localhost", api_port=find_free_port()
-        )
+        env = ObservatoryEnvironment(project_id=self.project_id, data_location=self.data_location)
         sftp_server = SftpServer(host="localhost", port=self.sftp_port)
         dataset_id = env.add_dataset()
 
@@ -135,6 +134,7 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
                 traffic_partner.bq_dataset_id = dataset_id
                 sftp_service_conn_id = "sftp_service"
                 dag_id = "google_books_test"
+                api_dataset_id = env.add_dataset()
                 dag = create_dag(
                     dag_id=dag_id,
                     cloud_workspace=env.cloud_workspace,
@@ -142,6 +142,7 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
                     sales_partner=sales_partner,
                     traffic_partner=traffic_partner,
                     sftp_service_conn_id=sftp_service_conn_id,
+                    api_dataset_id=api_dataset_id,
                 )
 
                 # Add SFTP connection
@@ -260,14 +261,38 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
                     )
                     self.assert_table_integrity(table_id, params["bq_rows"])
 
-                    # Add_dataset_release_task
+                    # Set up the API and check
                     api = DatasetAPI(project_id=self.project_id)
-                    dataset_releases = api.get_dataset_releases(dag_id="google_books_test", dataset_id="google_books")
+                    dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                     self.assertEqual(len(dataset_releases), 0)
-                    ti = env.run_task("add_new_dataset_releases")
+
+                    # Add_dataset_release_task
+                    now = pendulum.now()
+                    with patch(
+                        "oaebu_workflows.google_books_telescope.google_books_telescope.pendulum.now"
+                    ) as mock_now:
+                        mock_now.return_value = now
+                        ti = env.run_task("add_new_dataset_releases")
                     self.assertEqual(ti.state, State.SUCCESS)
-                    dataset_releases = api.get_dataset_releases(dag_id="google_books_test", dataset_id="google_books")
+                    dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                     self.assertEqual(len(dataset_releases), 1)
+                    expected_release = {
+                        "dag_id": dag_id,
+                        "dataset_id": api_dataset_id,
+                        "dag_run_id": release.run_id,
+                        "created": now.to_iso8601_string(),
+                        "modified": now.to_iso8601_string(),
+                        "data_interval_start": "2021-03-31T00:00:00+00:00",
+                        "data_interval_end": "2021-04-04T00:00:00+00:00",
+                        "snapshot_date": None,
+                        "partition_date": "2020-02-29T00:00:00+00:00",
+                        "changefile_start_date": None,
+                        "changefile_end_date": None,
+                        "sequence_start": None,
+                        "sequence_end": None,
+                        "extra": None,
+                    }
+                    self.assertEqual(expected_release, dataset_releases[0].to_dict())
 
                     # Test cleanup
                     workflow_folder_path = release.workflow_folder

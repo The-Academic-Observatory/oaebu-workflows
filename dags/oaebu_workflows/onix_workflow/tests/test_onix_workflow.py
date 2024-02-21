@@ -16,7 +16,7 @@
 
 import os
 from datetime import timedelta
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 import vcr
 import shutil
 from typing import List
@@ -854,9 +854,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
             return request
 
         # Setup Observatory environment
-        env = ObservatoryEnvironment(
-            self.gcp_project_id, self.data_location, api_host="localhost", api_port=find_free_port()
-        )
+        env = ObservatoryEnvironment(self.gcp_project_id, self.data_location)
 
         # Create workflow datasets
         onix_workflow_dataset_id = env.add_dataset(prefix="onix_workflow")
@@ -912,6 +910,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
             bq_worksid_table_name = "onix_workid_isbn"
             bq_worksid_error_table_name = "onix_workid_isbn_errors"
             bq_workfamilyid_table_name = "onix_workfamilyid_isbn"
+            api_dataset_id = env.add_dataset()
             dag = create_dag(
                 dag_id=dag_id,
                 cloud_workspace=env.cloud_workspace,
@@ -936,6 +935,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 bq_workfamilyid_table_name=bq_workfamilyid_table_name,
                 bq_oaebu_export_dataset=oaebu_export_dataset_id,
                 bq_oaebu_latest_export_dataset=oaebu_latest_export_dataset_id,
+                api_dataset_id=api_dataset_id,
                 data_partners=data_partners,
                 sensor_dag_ids=sensor_dag_ids,
                 start_date=start_date,
@@ -1234,14 +1234,36 @@ class TestOnixWorkflow(ObservatoryTestCase):
                 ### Add releases and Cleanup ###
                 ################################
 
-                # Add_dataset_release_task
-                api = DatasetAPI(project_id=self.project_id)
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id="onix_workflow")
+                # Set up the API
+                api = DatasetAPI(project_id=self.gcp_project_id)
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 0)
-                ti = env.run_task("add_new_dataset_releases")
+
+                # Add_dataset_release_task
+                now = pendulum.now()
+                with patch("oaebu_workflows.onix_workflow.onix_workflow.pendulum.now") as mock_now:
+                    mock_now.return_value = now
+                    ti = env.run_task("add_new_dataset_releases")
                 self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id="onix_workflow")
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 1)
+                expected_release = {
+                    "dag_id": dag_id,
+                    "dataset_id": api_dataset_id,
+                    "dag_run_id": release.run_id,
+                    "created": now.to_iso8601_string(),
+                    "modified": now.to_iso8601_string(),
+                    "data_interval_start": "2021-05-16T00:00:00+00:00",
+                    "data_interval_end": "2021-05-23T00:00:00+00:00",
+                    "snapshot_date": "2021-05-23T00:00:00+00:00",
+                    "partition_date": None,
+                    "changefile_start_date": None,
+                    "changefile_end_date": None,
+                    "sequence_start": None,
+                    "sequence_end": None,
+                    "extra": None,
+                }
+                self.assertEqual(expected_release, dataset_releases[0].to_dict())
 
                 # Test cleanup
                 release_workflow_folder = release.workflow_folder

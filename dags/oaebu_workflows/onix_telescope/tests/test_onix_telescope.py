@@ -16,6 +16,7 @@
 
 import os
 import shutil
+from unittest.mock import patch
 
 import pendulum
 from airflow.models import Connection
@@ -120,19 +121,15 @@ class TestOnixTelescope(ObservatoryTestCase):
     def test_telescope(self):
         """Test the ONIX telescope end to end."""
         # Setup Observatory environment
-        env = ObservatoryEnvironment(
-            self.project_id, self.data_location, api_host="localhost", api_port=find_free_port()
-        )
+        env = ObservatoryEnvironment(self.project_id, self.data_location)
         sftp_server = SftpServer(host="localhost", port=self.sftp_port)
-        dataset_id = env.add_dataset()
-
-        # Create the Observatory environment and run tests
 
         with env.create(), sftp_server.create() as sftp_root:
             # Setup DAG
             execution_date = pendulum.datetime(year=2021, month=3, day=31)
             metadata_partner = partner_from_str("onix", metadata_partner=True)
-            metadata_partner.bq_dataset_id = dataset_id
+            metadata_partner.bq_dataset_id = env.add_dataset()
+            api_dataset_id = env.add_dataset()
             sftp_service_conn_id = "sftp_service"
             dag_id = "onix_telescope_test"
             dag = create_dag(
@@ -142,6 +139,7 @@ class TestOnixTelescope(ObservatoryTestCase):
                 date_regex=self.date_regex,
                 metadata_partner=metadata_partner,
                 sftp_service_conn_id=sftp_service_conn_id,
+                api_dataset_id=api_dataset_id,
             )
 
             # Add SFTP connection
@@ -216,14 +214,36 @@ class TestOnixTelescope(ObservatoryTestCase):
                 self.assertFalse(os.path.isfile(local_sftp_folders.in_progress))
                 self.assertTrue(os.path.isfile(finished_path))
 
-                # Add_dataset_release_task
+                # Set up the API
                 api = DatasetAPI(project_id=self.project_id)
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id="onix")
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 0)
-                ti = env.run_task("add_new_dataset_releases")
+
+                # Set up the API
+                now = pendulum.now()
+                with patch("oaebu_workflows.onix_telescope.onix_telescope.pendulum.now") as mock_now:
+                    mock_now.return_value = now
+                    ti = env.run_task("add_new_dataset_releases")
                 self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id="onix")
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 1)
+                expected_release = {
+                    "dag_id": dag_id,
+                    "dataset_id": api_dataset_id,
+                    "dag_run_id": release.run_id,
+                    "created": now.to_iso8601_string(),
+                    "modified": now.to_iso8601_string(),
+                    "data_interval_start": "2021-03-31T00:00:00+00:00",
+                    "data_interval_end": "2021-04-04T00:00:00+00:00",
+                    "snapshot_date": "2021-03-30T00:00:00+00:00",
+                    "partition_date": None,
+                    "changefile_start_date": None,
+                    "changefile_end_date": None,
+                    "sequence_start": None,
+                    "sequence_end": None,
+                    "extra": None,
+                }
+                self.assertEqual(expected_release, dataset_releases[0].to_dict())
 
                 # Test cleanup
                 workflow_folder_path = release.workflow_folder

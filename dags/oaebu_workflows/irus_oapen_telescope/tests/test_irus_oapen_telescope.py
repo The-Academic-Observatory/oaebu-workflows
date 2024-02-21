@@ -129,9 +129,7 @@ class TestIrusOapenTelescope(ObservatoryTestCase):
         """Test the IRUS OAPEN telescope end to end."""
 
         # Setup Observatory environment
-        env = ObservatoryEnvironment(
-            self.project_id, self.data_location, api_host="localhost", api_port=find_free_port()
-        )
+        env = ObservatoryEnvironment(self.project_id, self.data_location)
 
         # Setup DAG
         execution_date = pendulum.datetime(year=2021, month=2, day=14)
@@ -139,6 +137,7 @@ class TestIrusOapenTelescope(ObservatoryTestCase):
         data_partner.bq_dataset_id = env.add_dataset()
         dag_id = "irus_oapen_test"
         gdpr_bucket_id = env.add_bucket()
+        api_dataset_id = env.add_dataset()
         dag = create_dag(
             dag_id=dag_id,
             cloud_workspace=env.cloud_workspace,
@@ -147,6 +146,7 @@ class TestIrusOapenTelescope(ObservatoryTestCase):
             data_partner=data_partner,
             gdpr_oapen_project_id=env.project_id,
             gdpr_oapen_bucket_id=gdpr_bucket_id,
+            api_dataset_id=api_dataset_id,
         )
         # Fake oapen project and bucket
 
@@ -274,12 +274,34 @@ class TestIrusOapenTelescope(ObservatoryTestCase):
 
                 # Add_dataset_release_task
                 api = DatasetAPI(project_id=self.project_id)
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id="oapen")
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 0)
-                ti = env.run_task("add_new_dataset_releases")
+
+                # Add_dataset_release_task
+                now = pendulum.now()
+                with patch("oaebu_workflows.irus_oapen_telescope.irus_oapen_telescope.pendulum.now") as mock_now:
+                    mock_now.return_value = now
+                    ti = env.run_task("add_new_dataset_releases")
                 self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id="oapen")
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 1)
+                expected_release = {
+                    "dag_id": dag_id,
+                    "dataset_id": api_dataset_id,
+                    "dag_run_id": release.run_id,
+                    "created": now.to_iso8601_string(),
+                    "modified": now.to_iso8601_string(),
+                    "data_interval_start": "2021-02-01T00:00:00+00:00",
+                    "data_interval_end": "2021-03-01T00:00:00+00:00",
+                    "snapshot_date": None,
+                    "partition_date": "2021-02-28T23:59:59.999999+00:00",
+                    "changefile_start_date": None,
+                    "changefile_end_date": None,
+                    "sequence_start": None,
+                    "sequence_end": None,
+                    "extra": None,
+                }
+                self.assertEqual(expected_release, dataset_releases[0].to_dict())
 
                 # Test that all telescope data deleted
                 workflow_folder_path = release.workflow_folder

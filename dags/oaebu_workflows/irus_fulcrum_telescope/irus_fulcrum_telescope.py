@@ -26,7 +26,6 @@ from google.cloud.bigquery.table import TimePartitioningType
 
 from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
-from observatory_platform.airflow import AirflowConns
 from observatory_platform.observatory_config import CloudWorkspace
 from observatory_platform.files import save_jsonl_gz, load_jsonl, add_partition_date
 from observatory_platform.gcs import gcs_blob_name_from_path, gcs_upload_files, gcs_blob_uri, gcs_download_blob
@@ -118,7 +117,6 @@ def create_dag(
     bq_dataset_description: str = "IRUS dataset",
     bq_table_description: str = None,
     api_dataset_id: str = "fulcrum",
-    observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
     irus_oapen_api_conn_id: str = "irus_api",
     catchup: bool = True,
     schedule: str = "0 0 4 * *",  # Run on the 4th of every month
@@ -132,7 +130,6 @@ def create_dag(
     :param bq_dataset_description: Description for the BigQuery dataset
     :param bq_table_description: Description for the biguery table
     :param api_dataset_id: The ID to store the dataset release in the API
-    :param observatory_api_conn_id: Airflow connection ID for the overvatory API
     :param irus_oapen_api_conn_id: Airflow connection ID OAPEN IRUS UK (counter 5)
     :param catchup: Whether to catchup the DAG or not
     :param schedule: The schedule interval of the DAG
@@ -293,7 +290,7 @@ def create_dag(
             cleanup(dag_id, execution_date=context["execution_date"], workflow_folder=release.workflow_folder)
 
         # Define DAG tasks
-        task_check = check_dependencies(airflow_conns=[observatory_api_conn_id, irus_oapen_api_conn_id])
+        task_check = check_dependencies(airflow_conns=[irus_oapen_api_conn_id])
         xcom_release = make_release()
         task_download = download(xcom_release)
         task_transform = transform(xcom_release)

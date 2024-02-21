@@ -138,7 +138,6 @@ def create_dag(
     gdpr_oapen_bucket_id: str = "oapen-usage-data-gdpr-proof_cloud-function",
     api_dataset_id: str = "oapen",
     max_cloud_function_instances: int = 0,
-    observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
     geoip_license_conn_id: str = "geoip_license_key",
     irus_oapen_api_conn_id: str = "irus_api",
     irus_oapen_login_conn_id: str = "irus_login",
@@ -159,7 +158,6 @@ def create_dag(
     :param gdpr_oapen_bucket_id: The gdpr-proof oapen bucket
     :param api_dataset_id: The ID to store the dataset release in the API
     :param max_cloud_function_instances:
-    :param observatory_api_conn_id: Airflow connection ID for the overvatory API
     :param geoip_license_conn_id: The Airflow connection ID for the GEOIP license
     :param irus_oapen_api_conn_id: The Airflow connection ID for IRUS API - for counter 5
     :param irus_oapen_login_conn_id: The Airflow connection ID for IRUS API (login) - for counter 4
@@ -412,12 +410,7 @@ def create_dag(
 
         # Define DAG tasks
         task_check_dependencies = check_dependencies(
-            airflow_conns=[
-                observatory_api_conn_id,
-                geoip_license_conn_id,
-                irus_oapen_api_conn_id,
-                irus_oapen_login_conn_id,
-            ]
+            airflow_conns=[geoip_license_conn_id, irus_oapen_api_conn_id, irus_oapen_login_conn_id]
         )
         xcom_release = make_release()
         task_create_cloud_function = create_cloud_function_(xcom_release, task_concurrency=1)

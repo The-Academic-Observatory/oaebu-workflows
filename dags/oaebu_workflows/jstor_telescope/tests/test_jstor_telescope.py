@@ -181,10 +181,7 @@ class TestJstorTelescopePublisher(ObservatoryTestCase):
         mock_build.return_value = build("gmail", "v1", http=http)
 
         # Setup Observatory environment
-        env = ObservatoryEnvironment(
-            self.project_id, self.data_location, api_host="localhost", api_port=find_free_port()
-        )
-        dataset_id = env.add_dataset()
+        env = ObservatoryEnvironment(self.project_id, self.data_location)
 
         # Create the Observatory environment and run tests
         with env.create(task_logging=True):
@@ -194,9 +191,11 @@ class TestJstorTelescopePublisher(ObservatoryTestCase):
             # Setup Telescope
             execution_date = pendulum.datetime(year=2020, month=11, day=1)
             country_partner = partner_from_str("jstor_country")
+            dataset_id = env.add_dataset()
             country_partner.bq_dataset_id = dataset_id
             institution_partner = partner_from_str("jstor_institution")
             institution_partner.bq_dataset_id = dataset_id
+            api_dataset_id = env.add_dataset()
             dag_id = "jstor_test_telescope"
             entity_type = "publisher"
             dag = create_dag(
@@ -206,6 +205,7 @@ class TestJstorTelescopePublisher(ObservatoryTestCase):
                 entity_type=entity_type,
                 country_partner=country_partner,
                 institution_partner=institution_partner,
+                api_dataset_id=api_dataset_id,
             )
 
             # Begin DAG run
@@ -334,14 +334,36 @@ class TestJstorTelescopePublisher(ObservatoryTestCase):
                 self.assert_table_integrity(country_table_id, self.country_report["table_rows"])
                 self.assert_table_integrity(institution_table_id, self.institution_report["table_rows"])
 
-                # Add_dataset_release_task
+                # Set up the API
                 api = DatasetAPI(project_id=self.project_id)
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id="jstor")
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 0)
-                ti = env.run_task("add_new_dataset_releases")
+
+                # Add_dataset_release_task
+                now = pendulum.now()
+                with patch("oaebu_workflows.jstor_telescope.jstor_telescope.pendulum.now") as mock_now:
+                    mock_now.return_value = now
+                    ti = env.run_task("add_new_dataset_releases")
                 self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id="jstor")
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 1)
+                expected_release = {
+                    "dag_id": dag_id,
+                    "dataset_id": api_dataset_id,
+                    "dag_run_id": release.run_id,
+                    "created": now.to_iso8601_string(),
+                    "modified": now.to_iso8601_string(),
+                    "data_interval_start": "2022-07-01T00:00:00+00:00",
+                    "data_interval_end": "2022-08-01T00:00:00+00:00",
+                    "snapshot_date": None,
+                    "partition_date": "2022-07-31T00:00:00+00:00",
+                    "changefile_start_date": None,
+                    "changefile_end_date": None,
+                    "sequence_start": None,
+                    "sequence_end": None,
+                    "extra": None,
+                }
+                self.assertEqual(expected_release, dataset_releases[0].to_dict())
 
                 # Test that all telescope data deleted
                 workflow_folder_path = release.workflow_folder
@@ -436,10 +458,7 @@ class TestJstorTelescopeCollection(ObservatoryTestCase):
         mock_build.return_value = build("gmail", "v1", http=http)
 
         # Setup Observatory environment
-        env = ObservatoryEnvironment(
-            self.project_id, self.data_location, api_host="localhost", api_port=find_free_port()
-        )
-        dataset_id = env.add_dataset()
+        env = ObservatoryEnvironment(self.project_id, self.data_location)
 
         # Create the Observatory environment and run tests
         with env.create(task_logging=True):
@@ -449,9 +468,11 @@ class TestJstorTelescopeCollection(ObservatoryTestCase):
             # Setup DAG
             execution_date = pendulum.datetime(year=2023, month=10, day=4)
             country_partner = partner_from_str("jstor_country_collection")
+            dataset_id = env.add_dataset()
             country_partner.bq_dataset_id = dataset_id
             institution_partner = partner_from_str("jstor_institution_collection")
             institution_partner.bq_dataset_id = dataset_id
+            api_dataset_id = env.add_dataset()
             dag_id = "jstor_test_telescope"
             entity_type = "collection"
             dag = create_dag(
@@ -461,6 +482,7 @@ class TestJstorTelescopeCollection(ObservatoryTestCase):
                 entity_type=entity_type,
                 country_partner=country_partner,
                 institution_partner=institution_partner,
+                api_dataset_id=api_dataset_id,
             )
 
             # Begin DAG run
@@ -567,14 +589,36 @@ class TestJstorTelescopeCollection(ObservatoryTestCase):
                 expected = load_and_parse_json(self.institution_report["table"], date_fields=["release_date"])
                 self.assert_table_content(institution_table_id, expected, primary_key="ISBN")
 
-                # Add_dataset_release_task
+                # Set up the API
                 api = DatasetAPI(project_id=self.project_id)
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id="jstor")
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 0)
-                ti = env.run_task("add_new_dataset_releases")
+
+                # Add_dataset_release_task
+                now = pendulum.now()
+                with patch("oaebu_workflows.jstor_telescope.jstor_telescope.pendulum.now") as mock_now:
+                    mock_now.return_value = now
+                    ti = env.run_task("add_new_dataset_releases")
                 self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id="jstor")
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 1)
+                expected_release = {
+                    "dag_id": dag_id,
+                    "dataset_id": api_dataset_id,
+                    "dag_run_id": release.run_id,
+                    "created": now.to_iso8601_string(),
+                    "modified": now.to_iso8601_string(),
+                    "data_interval_start": "2023-09-01T00:00:00+00:00",
+                    "data_interval_end": "2023-10-01T00:00:00+00:00",
+                    "snapshot_date": None,
+                    "partition_date": "2023-09-30T00:00:00+00:00",
+                    "changefile_start_date": None,
+                    "changefile_end_date": None,
+                    "sequence_start": None,
+                    "sequence_end": None,
+                    "extra": None,
+                }
+                self.assertEqual(expected_release, dataset_releases[0].to_dict())
 
                 # Test that all telescope data deleted
                 workflow_folder_path = release.workflow_folder

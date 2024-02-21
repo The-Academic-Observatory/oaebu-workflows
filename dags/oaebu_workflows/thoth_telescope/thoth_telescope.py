@@ -100,7 +100,6 @@ def create_dag(
     bq_dataset_description: str = "Thoth ONIX Feed",
     bq_table_description: Optional[str] = None,
     api_dataset_id: str = "onix",
-    observatory_api_conn_id: str = AirflowConns.OBSERVATORY_API,
     catchup: bool = False,
     start_date: DateTime = pendulum.datetime(2022, 12, 1),
     schedule: str = "@weekly",
@@ -115,7 +114,6 @@ def create_dag(
     :param bq_dataset_description: Description for the BigQuery dataset
     :param bq_table_description: Description for the biguery table
     :param api_dataset_id: The ID to store the dataset release in the API
-    :param observatory_api_conn_id: Airflow connection ID for the overvatory API
     :param catchup: Whether to catchup the DAG or not
     :param start_date: The start date of the DAG
     :param schedule: The schedule interval of the DAG
@@ -250,7 +248,7 @@ def create_dag(
             release = ThothRelease.from_dict(release)
             cleanup(dag_id=dag_id, execution_date=content["execution_date"], workflow_folder=release.workflow_folder)
 
-        task_check_dependencies = check_dependencies(airflow_conns=[observatory_api_conn_id])
+        task_check_dependencies = check_dependencies()
         xcom_release = make_release()
         task_download = download(xcom_release)
         task_transform = transform(xcom_release)

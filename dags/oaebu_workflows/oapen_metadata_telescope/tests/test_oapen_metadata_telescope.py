@@ -16,7 +16,7 @@
 
 import os
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from tempfile import NamedTemporaryFile
 from xml.parsers.expat import ExpatError
 
@@ -103,10 +103,9 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
     def test_telescope(self):
         """Test telescope task execution."""
 
-        env = ObservatoryEnvironment(
-            self.project_id, self.data_location, api_host="localhost", api_port=find_free_port()
-        )
+        env = ObservatoryEnvironment(self.project_id, self.data_location)
         dataset_id = env.add_dataset()
+        api_dataset_id = env.add_dataset()
 
         with env.create():
             metadata_partner = partner_from_str("oapen_metadata", metadata_partner=True)
@@ -118,6 +117,7 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
                 metadata_uri=self.metadata_uri,
                 metadata_partner=metadata_partner,
                 elevate_related_products=True,
+                api_dataset_id=api_dataset_id,
             )
 
             # first run
@@ -191,14 +191,37 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
                 self.assert_table_integrity(table_id, expected_rows=5)
                 self.assert_table_content(table_id, load_and_parse_json(self.test_table), primary_key="ISBN13")
 
-                # Add_dataset_release_task
+                # Set up the API
                 api = DatasetAPI(project_id=self.project_id)
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id="oapen")
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 0)
-                ti = env.run_task("add_new_dataset_releases")
+
+                now = pendulum.now()
+                with patch(
+                    "oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope.pendulum.now"
+                ) as mock_now:
+                    mock_now.return_value = now
+                    ti = env.run_task("add_new_dataset_releases")
                 self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id="oapen")
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 1)
+                expected_release = {
+                    "dag_id": dag_id,
+                    "dataset_id": api_dataset_id,
+                    "dag_run_id": release.run_id,
+                    "created": now.to_iso8601_string(),
+                    "modified": now.to_iso8601_string(),
+                    "data_interval_start": "2021-02-01T00:00:00+00:00",
+                    "data_interval_end": "2021-02-07T12:00:00+00:00",
+                    "snapshot_date": "2021-02-07T00:00:00+00:00",
+                    "partition_date": None,
+                    "changefile_start_date": None,
+                    "changefile_end_date": None,
+                    "sequence_start": None,
+                    "sequence_end": None,
+                    "extra": None,
+                }
+                self.assertEqual(expected_release, dataset_releases[0].to_dict())
 
                 # Test that all data deleted
                 workflow_folder_path = release.workflow_folder

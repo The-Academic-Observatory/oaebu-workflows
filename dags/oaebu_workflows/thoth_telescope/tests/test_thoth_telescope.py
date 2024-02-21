@@ -16,6 +16,7 @@
 
 import os
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 import pendulum
 import vcr
@@ -121,9 +122,7 @@ class TestThothTelescope(ObservatoryTestCase):
 
     def test_telescope(self):
         """Test the Thoth telescope end to end."""
-        env = ObservatoryEnvironment(
-            self.project_id, self.data_location, api_host="localhost", api_port=find_free_port()
-        )
+        env = ObservatoryEnvironment(self.project_id, self.data_location)
 
         # Create the Observatory environment and run tests
         with env.create():
@@ -132,6 +131,7 @@ class TestThothTelescope(ObservatoryTestCase):
             metadata_partner = partner_from_str("thoth", metadata_partner=True)
             metadata_partner.bq_dataset_id = env.add_dataset()
             dag_id = "thoth_telescope_test"
+            api_dataset_id = env.add_dataset()
             dag = create_dag(
                 dag_id=dag_id,
                 cloud_workspace=env.cloud_workspace,
@@ -139,6 +139,7 @@ class TestThothTelescope(ObservatoryTestCase):
                 elevate_related_products=True,
                 publisher_id=FAKE_PUBLISHER_ID,
                 metadata_partner=metadata_partner,
+                api_dataset_id=api_dataset_id,
             )
 
             with env.create_dag_run(dag, execution_date):
@@ -200,14 +201,35 @@ class TestThothTelescope(ObservatoryTestCase):
                 self.assert_table_integrity(table_id, expected_rows=5)
                 self.assert_table_content(table_id, load_and_parse_json(self.test_table), primary_key="ISBN13")
 
-                # add_dataset_release_task
+                # Set up the API
                 api = DatasetAPI(project_id=self.project_id)
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id="onix")
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 0)
-                ti = env.run_task("add_new_dataset_releases")
+
+                now = pendulum.now()
+                with patch("oaebu_workflows.thoth_telescope.thoth_telescope.pendulum.now") as mock_now:
+                    mock_now.return_value = now
+                    ti = env.run_task("add_new_dataset_releases")
                 self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id="onix")
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 1)
+                expected_release = {
+                    "dag_id": dag_id,
+                    "dataset_id": api_dataset_id,
+                    "dag_run_id": release.run_id,
+                    "created": now.to_iso8601_string(),
+                    "modified": now.to_iso8601_string(),
+                    "data_interval_start": "2022-12-01T00:00:00+00:00",
+                    "data_interval_end": "2022-12-04T00:00:00+00:00",
+                    "snapshot_date": "2022-12-04T00:00:00+00:00",
+                    "partition_date": None,
+                    "changefile_start_date": None,
+                    "changefile_end_date": None,
+                    "sequence_start": None,
+                    "sequence_end": None,
+                    "extra": None,
+                }
+                self.assertEqual(expected_release, dataset_releases[0].to_dict())
 
                 # Test cleanup
                 workflow_folder_path = release.workflow_folder
