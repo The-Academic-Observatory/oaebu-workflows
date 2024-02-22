@@ -19,3 +19,4 @@ __pycache__
 
 # Astronomer
 /tests/
+airflow_settings.yaml
