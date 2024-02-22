@@ -22,7 +22,7 @@ import shutil
 from typing import List
 
 import pendulum
-from airflow.models import DagBag, TaskInstance
+from airflow.models import DagBag
 from airflow.utils.state import State
 
 from oaebu_workflows.config import schema_folder as default_schema_folder
@@ -53,7 +53,6 @@ from observatory_platform.sandbox.test_utils import (
     SandboxTestCase,
     Table,
     bq_load_tables,
-    find_free_port,
     load_and_parse_json,
     random_id,
     make_dummy_dag,
