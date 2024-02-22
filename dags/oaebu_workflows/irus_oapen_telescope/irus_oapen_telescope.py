@@ -462,7 +462,7 @@ def upload_source_code_to_bucket(
 
     # Check if current md5 hash matches expected md5 hash
     actual_md5_hash = get_file_hash(file_path=cloud_function_path, algorithm="md5")
-    if expected_md5_hash != expected_md5_hash:
+    if actual_md5_hash != expected_md5_hash:
         raise AirflowException(f"md5 hashes do not match, expected: {expected_md5_hash}, actual: {actual_md5_hash}")
 
     # Create storage bucket

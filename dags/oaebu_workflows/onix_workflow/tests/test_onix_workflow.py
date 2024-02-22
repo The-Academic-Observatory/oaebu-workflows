@@ -144,13 +144,12 @@ class TestOnixWorkflow(SandboxTestCase):
     @patch("oaebu_workflows.onix_workflow.onix_workflow.bq_select_table_shard_dates")
     def test_make_release(self, mock_sel_table_suffixes):
         """Tests that the make_release function works as intended"""
+
         # Use a different onix snapshot date for testing purposes
         onix_snapshot_date = self.snapshot_date.add(days=1)
         crossref_snapshot_date = self.snapshot_date
         mock_sel_table_suffixes.side_effect = [[onix_snapshot_date], [crossref_snapshot_date]]
-        env = SandboxEnvironment(
-            self.gcp_project_id, self.data_location, api_host="localhost", api_port=find_free_port()
-        )
+        env = SandboxEnvironment(self.gcp_project_id, self.data_location)
         with env.create():
             dag = create_dag(
                 dag_id="test_make_release",
@@ -189,18 +188,17 @@ class TestOnixWorkflow(SandboxTestCase):
                 dag.clear(task_ids=["make_release"])
                 mock_sel_table_suffixes.side_effect = [[]]
                 with self.assertRaisesRegex(RuntimeError, "ONIX"):
-                    ti = TaskInstance(task, self.snapshot_date.add(days=1))
-                    ti.run()
+                    env.run_task("make_release")
 
                 # Test for case - no Crossref releases found
                 dag.clear(task_ids=["make_release"])
                 mock_sel_table_suffixes.side_effect = [[onix_snapshot_date], []]  # No crossref releases
                 with self.assertRaisesRegex(RuntimeError, "Crossref"):
-                    ti = TaskInstance(task, self.snapshot_date.add(days=1))
-                    ti.run()
+                    env.run_task("make_release")
 
     def test_dag_load(self):
         """Test that the DAG loads"""
+
         env = SandboxEnvironment(
             workflows=[
                 Workflow(
@@ -243,9 +241,7 @@ class TestOnixWorkflow(SandboxTestCase):
         """Tests that the dag structure is created as expected on dag load"""
 
         ## No data partners - dry run
-        env = SandboxEnvironment(
-            self.gcp_project_id, self.data_location, api_host="localhost", api_port=find_free_port()
-        )
+        env = SandboxEnvironment(self.gcp_project_id, self.data_location)
         with env.create():
             dag = create_dag(
                 dag_id=self.dag_id,
@@ -297,9 +293,7 @@ class TestOnixWorkflow(SandboxTestCase):
             self.assert_dag_structure(expected_dag_structure, dag)
 
         ## All data partners
-        env = SandboxEnvironment(
-            self.gcp_project_id, self.data_location, api_host="localhost", api_port=find_free_port()
-        )
+        env = SandboxEnvironment(self.gcp_project_id, self.data_location)
         with env.create():
             sensor_dag_ids = ["jstor", "irus_oapen", "google_books", "onix", "google_analytics3"]
             dag = create_dag(
@@ -420,9 +414,7 @@ class TestOnixWorkflow(SandboxTestCase):
             {"isbn13": "111", "work_family_id": "111"},
             {"isbn13": "211", "work_family_id": "111"},
         ]
-        env = SandboxEnvironment(
-            self.gcp_project_id, self.data_location, api_host="localhost", api_port=find_free_port()
-        )
+        env = SandboxEnvironment(self.gcp_project_id, self.data_location)
         with env.create():
             bq_onix_workflow_dataset = env.add_dataset()
             bq_worksid_table_name = "onix_workid_isbn"
@@ -634,9 +626,7 @@ class TestOnixWorkflow(SandboxTestCase):
         ### Test dois_from_table ###
         ############################
 
-        env = SandboxEnvironment(
-            self.gcp_project_id, self.data_location, api_host="localhost", api_port=find_free_port()
-        )
+        env = SandboxEnvironment(self.gcp_project_id, self.data_location)
         fake_doi_isbn_dataset_id = env.add_dataset(prefix="doi_isbn_test")
         fake_sharded_dataset = env.add_dataset(prefix="sharded_data")
         fake_copied_export_dataset = env.add_dataset(prefix="copied_export")
