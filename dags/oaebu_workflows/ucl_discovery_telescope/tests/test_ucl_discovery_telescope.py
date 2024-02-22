@@ -1,4 +1,4 @@
-# Copyright 2020-2023 Curtin University
+# Copyright 2020-2024 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,18 +33,14 @@ from oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope import (
     transform_discovery_stats,
 )
 from observatory_platform.dataset_api import DatasetAPI
-from observatory_platform.observatory_config import Workflow
-from observatory_platform.bigquery import bq_table_id
-from observatory_platform.gcs import gcs_blob_name_from_path
-from observatory_platform.observatory_environment import (
-    ObservatoryEnvironment,
-    ObservatoryTestCase,
-    find_free_port,
-    load_and_parse_json,
-)
+from observatory_platform.google.bigquery import bq_table_id
+from observatory_platform.google.gcs import gcs_blob_name_from_path
+from observatory_platform.airflow.workflow import Workflow
+from observatory_platform.sandbox.test_utils import SandboxTestCase, load_and_parse_json
+from observatory_platform.sandbox.sandbox_environment import SandboxEnvironment
 
 
-class TestUclDiscoveryTelescope(ObservatoryTestCase):
+class TestUclDiscoveryTelescope(SandboxTestCase):
     """Tests for the Ucl Discovery telescope"""
 
     def __init__(self, *args, **kwargs):
@@ -75,7 +71,7 @@ class TestUclDiscoveryTelescope(ObservatoryTestCase):
 
     def test_dag_load(self):
         """Test that the UCL Discovery DAG can be loaded from a DAG bag."""
-        env = ObservatoryEnvironment(
+        env = SandboxEnvironment(
             workflows=[
                 Workflow(
                     dag_id="ucl_discovery",
@@ -93,7 +89,7 @@ class TestUclDiscoveryTelescope(ObservatoryTestCase):
     def test_telescope(self):
         """Test the UCL Discovery telescope end to end."""
         # Setup Observatory environment
-        env = ObservatoryEnvironment(self.project_id, self.data_location)
+        env = SandboxEnvironment(self.project_id, self.data_location)
 
         # Setup DAG
         data_partner = partner_from_str("ucl_discovery")

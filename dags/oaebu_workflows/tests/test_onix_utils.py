@@ -36,16 +36,13 @@ from oaebu_workflows.onix_utils import (
     deduplicate_related_products,
 )
 from oaebu_workflows.config import test_fixtures_folder, schema_folder
-from observatory_platform.observatory_environment import (
-    ObservatoryTestCase,
-    compare_lists_of_dicts,
-)
 from observatory_platform.files import load_jsonl
+from observatory_platform.sandbox.test_utils import SandboxTestCase, compare_lists_of_dicts
 
 FIXTURES_FOLDER = os.path.join(test_fixtures_folder(), "onix_utils")
 
 
-class TestOnixTransformer(ObservatoryTestCase):
+class TestOnixTransformer(SandboxTestCase):
     """Tests for the ONIX transformer end to end"""
 
     filtered_name = "filtered.xml"
@@ -155,7 +152,7 @@ class TestOnixTransformer(ObservatoryTestCase):
                 loader(transformer_output_path)
 
 
-class TestOnixFunctions(ObservatoryTestCase):
+class TestOnixFunctions(SandboxTestCase):
     """Tests for the ONIX telescope"""
 
     def test_onix_parser_download_execute(self):

@@ -26,12 +26,12 @@ from google.cloud.bigquery.table import TimePartitioningType
 
 from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
-from observatory_platform.observatory_config import CloudWorkspace
 from observatory_platform.files import save_jsonl_gz, load_jsonl, add_partition_date
-from observatory_platform.gcs import gcs_blob_name_from_path, gcs_upload_files, gcs_blob_uri, gcs_download_blob
-from observatory_platform.bigquery import bq_load_table, bq_create_dataset, bq_table_id
-from observatory_platform.tasks import check_dependencies
-from observatory_platform.workflow import PartitionRelease, set_task_state, cleanup
+from observatory_platform.google.gcs import gcs_blob_name_from_path, gcs_upload_files, gcs_blob_uri, gcs_download_blob
+from observatory_platform.google.bigquery import bq_load_table, bq_create_dataset, bq_table_id
+from observatory_platform.airflow.tasks import check_dependencies
+from observatory_platform.airflow.workflow import CloudWorkspace, cleanup
+from observatory_platform.airflow.release import PartitionRelease, set_task_state
 from observatory_platform.url_utils import retry_get_url
 
 IRUS_FULCRUM_ENDPOINT_TEMPLATE = (
@@ -267,9 +267,10 @@ def create_dag(
         @task
         def add_new_dataset_releases(release: dict, **context) -> None:
             """Adds release information to API."""
-            release = IrusFulcrumRelease.from_dict(release)
 
-            api = DatasetAPI(project_id=cloud_workspace.project_id)
+            release = IrusFulcrumRelease.from_dict(release)
+            client = Client(project=cloud_workspace.project_id)
+            api = DatasetAPI(project_id=cloud_workspace.project_id, client=client)
             api.seed_db()
             dataset_release = DatasetRelease(
                 dag_id=dag_id,

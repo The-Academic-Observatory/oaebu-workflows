@@ -1,4 +1,4 @@
-# Copyright 2020-2023 Curtin University
+# Copyright 2020-2024 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -34,18 +34,14 @@ from oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope import (
     create_dag,
 )
 from observatory_platform.dataset_api import DatasetAPI
-from observatory_platform.observatory_config import Workflow
-from observatory_platform.gcs import gcs_blob_name_from_path
-from observatory_platform.bigquery import bq_sharded_table_id
-from observatory_platform.observatory_environment import (
-    ObservatoryEnvironment,
-    ObservatoryTestCase,
-    find_free_port,
-    load_and_parse_json,
-)
+from observatory_platform.google.gcs import gcs_blob_name_from_path
+from observatory_platform.google.bigquery import bq_sharded_table_id
+from observatory_platform.airflow.workflow import Workflow
+from observatory_platform.sandbox.test_utils import SandboxTestCase, load_and_parse_json
+from observatory_platform.sandbox.sandbox_environment import SandboxEnvironment
 
 
-class TestOapenMetadataTelescope(ObservatoryTestCase):
+class TestOapenMetadataTelescope(SandboxTestCase):
     """Tests for the Oapen Metadata Telescope DAG"""
 
     def __init__(self, *args, **kwargs):
@@ -85,7 +81,7 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
 
     def test_dag_load(self):
         """Test that the OapenMetadata DAG can be loaded from a DAG bag"""
-        env = ObservatoryEnvironment(
+        env = SandboxEnvironment(
             workflows=[
                 Workflow(
                     dag_id="oapen_metadata",
@@ -103,7 +99,7 @@ class TestOapenMetadataTelescope(ObservatoryTestCase):
     def test_telescope(self):
         """Test telescope task execution."""
 
-        env = ObservatoryEnvironment(self.project_id, self.data_location)
+        env = SandboxEnvironment(self.project_id, self.data_location)
         dataset_id = env.add_dataset()
         api_dataset_id = env.add_dataset()
 

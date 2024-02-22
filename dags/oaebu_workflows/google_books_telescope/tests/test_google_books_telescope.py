@@ -27,20 +27,17 @@ from click.testing import CliRunner
 from oaebu_workflows.config import test_fixtures_folder, module_file_path
 from oaebu_workflows.oaebu_partners import partner_from_str
 from oaebu_workflows.google_books_telescope.google_books_telescope import GoogleBooksRelease, create_dag, gb_transform
-from observatory_platform.observatory_environment import (
-    ObservatoryEnvironment,
-    ObservatoryTestCase,
-    SftpServer,
-    find_free_port,
-)
-from observatory_platform.bigquery import bq_table_id
-from observatory_platform.observatory_config import Workflow
+from observatory_platform.sandbox.sandbox_environment import SandboxEnvironment
+from observatory_platform.sandbox.test_utils import SandboxTestCase, find_free_port
+from observatory_platform.sandbox.sftp_server import SftpServer
+from observatory_platform.google.bigquery import bq_table_id
 from observatory_platform.sftp import SftpFolders
-from observatory_platform.gcs import gcs_blob_name_from_path
+from observatory_platform.google.gcs import gcs_blob_name_from_path
 from observatory_platform.dataset_api import DatasetAPI
+from observatory_platform.airflow.workflow import Workflow
 
 
-class TestGoogleBooksTelescope(ObservatoryTestCase):
+class TestGoogleBooksTelescope(SandboxTestCase):
     """Tests for the GoogleBooks telescope"""
 
     def __init__(self, *args, **kwargs):
@@ -83,7 +80,7 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
     def test_dag_load(self):
         """Test that the Google Books DAG can be loaded from a DAG bag."""
         # Run tests both for telescope with file suffixes and without
-        env = ObservatoryEnvironment(
+        env = SandboxEnvironment(
             workflows=[
                 Workflow(
                     dag_id="google_books",
@@ -118,7 +115,7 @@ class TestGoogleBooksTelescope(ObservatoryTestCase):
         }
 
         # Setup Observatory environment
-        env = ObservatoryEnvironment(project_id=self.project_id, data_location=self.data_location)
+        env = SandboxEnvironment(project_id=self.project_id, data_location=self.data_location)
         sftp_server = SftpServer(host="localhost", port=self.sftp_port)
         dataset_id = env.add_dataset()
 

@@ -1,4 +1,4 @@
-# Copyright 2020-2023 Curtin University
+# Copyright 2020-2024 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -45,18 +45,14 @@ from oaebu_workflows.irus_oapen_telescope.irus_oapen_telescope import (
     create_dag,
 )
 from observatory_platform.dataset_api import DatasetAPI
-from observatory_platform.observatory_config import CloudWorkspace, Workflow
-from observatory_platform.gcs import gcs_blob_name_from_path, gcs_upload_file
-from observatory_platform.bigquery import bq_table_id
-from observatory_platform.observatory_environment import (
-    ObservatoryEnvironment,
-    ObservatoryTestCase,
-    find_free_port,
-    random_id,
-)
+from observatory_platform.airflow.workflow import CloudWorkspace, Workflow
+from observatory_platform.google.gcs import gcs_blob_name_from_path, gcs_upload_file
+from observatory_platform.google.bigquery import bq_table_id
+from observatory_platform.sandbox.test_utils import SandboxTestCase, find_free_port, random_id
+from observatory_platform.sandbox.sandbox_environment import SandboxEnvironment
 
 
-class TestIrusOapenTelescope(ObservatoryTestCase):
+class TestIrusOapenTelescope(SandboxTestCase):
     """Tests for the Oapen Irus Uk telescope"""
 
     def __init__(self, *args, **kwargs):
@@ -107,7 +103,7 @@ class TestIrusOapenTelescope(ObservatoryTestCase):
     def test_dag_load(self):
         """Test that the Oapen Irus Uk DAG can be loaded from a DAG bag."""
 
-        env = ObservatoryEnvironment(
+        env = SandboxEnvironment(
             workflows=[
                 Workflow(
                     dag_id="irus_oapen_test",
@@ -129,7 +125,7 @@ class TestIrusOapenTelescope(ObservatoryTestCase):
         """Test the IRUS OAPEN telescope end to end."""
 
         # Setup Observatory environment
-        env = ObservatoryEnvironment(self.project_id, self.data_location)
+        env = SandboxEnvironment(self.project_id, self.data_location)
 
         # Setup DAG
         execution_date = pendulum.datetime(year=2021, month=2, day=14)
@@ -376,7 +372,7 @@ class TestIrusOapenTelescope(ObservatoryTestCase):
             location = f"projects/{gdpr_oapen_project_id}/locations/{IRUS_FUNCTION_REGION}"
             full_name = f"{location}/functions/{IRUS_FUNCTION_NAME}"
 
-            env = ObservatoryEnvironment(
+            env = SandboxEnvironment(
                 self.project_id, self.data_location, api_host="localhost", api_port=find_free_port()
             )
             with env.create_dag_run(dag, pendulum.datetime(year=2023, month=1, day=1)):

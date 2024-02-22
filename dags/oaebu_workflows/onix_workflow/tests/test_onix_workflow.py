@@ -1,4 +1,4 @@
-# Copyright 2020-2023 Curtin University
+# Copyright 2020-2024 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -42,24 +42,25 @@ from oaebu_workflows.onix_workflow.onix_workflow import (
     insert_into_schema,
 )
 from observatory_platform.dataset_api import DatasetAPI
-from observatory_platform.observatory_config import Workflow
 from observatory_platform.files import load_jsonl
-from observatory_platform.bigquery import bq_find_schema, bq_run_query, bq_sharded_table_id, bq_table_id
-from observatory_platform.gcs import gcs_blob_name_from_path
+from observatory_platform.google.bigquery import bq_find_schema, bq_run_query, bq_sharded_table_id, bq_table_id
+from observatory_platform.google.gcs import gcs_blob_name_from_path
 from observatory_platform.config import module_file_path
-from observatory_platform.observatory_environment import (
-    ObservatoryEnvironment,
-    ObservatoryTestCase,
+
+from observatory_platform.airflow.workflow import Workflow
+from observatory_platform.sandbox.sandbox_environment import SandboxEnvironment
+from observatory_platform.sandbox.test_utils import (
+    SandboxTestCase,
     Table,
+    bq_load_tables,
     find_free_port,
+    load_and_parse_json,
     random_id,
     make_dummy_dag,
-    bq_load_tables,
-    load_and_parse_json,
 )
 
 
-class TestOnixWorkflow(ObservatoryTestCase):
+class TestOnixWorkflow(SandboxTestCase):
     """Functionally test the workflow"""
 
     onix_data = [
@@ -147,7 +148,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         onix_snapshot_date = self.snapshot_date.add(days=1)
         crossref_snapshot_date = self.snapshot_date
         mock_sel_table_suffixes.side_effect = [[onix_snapshot_date], [crossref_snapshot_date]]
-        env = ObservatoryEnvironment(
+        env = SandboxEnvironment(
             self.gcp_project_id, self.data_location, api_host="localhost", api_port=find_free_port()
         )
         with env.create():
@@ -200,7 +201,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
 
     def test_dag_load(self):
         """Test that the DAG loads"""
-        env = ObservatoryEnvironment(
+        env = SandboxEnvironment(
             workflows=[
                 Workflow(
                     dag_id="onix_workflow_test_dag_load",
@@ -242,7 +243,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         """Tests that the dag structure is created as expected on dag load"""
 
         ## No data partners - dry run
-        env = ObservatoryEnvironment(
+        env = SandboxEnvironment(
             self.gcp_project_id, self.data_location, api_host="localhost", api_port=find_free_port()
         )
         with env.create():
@@ -296,7 +297,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
             self.assert_dag_structure(expected_dag_structure, dag)
 
         ## All data partners
-        env = ObservatoryEnvironment(
+        env = SandboxEnvironment(
             self.gcp_project_id, self.data_location, api_host="localhost", api_port=find_free_port()
         )
         with env.create():
@@ -419,7 +420,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
             {"isbn13": "111", "work_family_id": "111"},
             {"isbn13": "211", "work_family_id": "111"},
         ]
-        env = ObservatoryEnvironment(
+        env = SandboxEnvironment(
             self.gcp_project_id, self.data_location, api_host="localhost", api_port=find_free_port()
         )
         with env.create():
@@ -633,7 +634,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
         ### Test dois_from_table ###
         ############################
 
-        env = ObservatoryEnvironment(
+        env = SandboxEnvironment(
             self.gcp_project_id, self.data_location, api_host="localhost", api_port=find_free_port()
         )
         fake_doi_isbn_dataset_id = env.add_dataset(prefix="doi_isbn_test")
@@ -854,7 +855,7 @@ class TestOnixWorkflow(ObservatoryTestCase):
             return request
 
         # Setup Observatory environment
-        env = ObservatoryEnvironment(self.gcp_project_id, self.data_location)
+        env = SandboxEnvironment(self.gcp_project_id, self.data_location)
 
         # Create workflow datasets
         onix_workflow_dataset_id = env.add_dataset(prefix="onix_workflow")

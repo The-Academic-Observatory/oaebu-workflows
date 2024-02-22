@@ -32,21 +32,17 @@ from oaebu_workflows.irus_fulcrum_telescope.irus_fulcrum_telescope import (
 )
 from observatory_platform.files import load_jsonl
 from observatory_platform.config import module_file_path
-from observatory_platform.observatory_environment import (
-    ObservatoryEnvironment,
-    ObservatoryTestCase,
-    find_free_port,
-    load_and_parse_json,
-)
-from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
-from observatory_platform.gcs import gcs_blob_name_from_path
-from observatory_platform.bigquery import bq_table_id
-from observatory_platform.observatory_config import Workflow
+from observatory_platform.airflow.workflow import Workflow
+from observatory_platform.sandbox.test_utils import SandboxTestCase, load_and_parse_json
+from observatory_platform.sandbox.sandbox_environment import SandboxEnvironment
+from observatory_platform.dataset_api import DatasetAPI
+from observatory_platform.google.gcs import gcs_blob_name_from_path
+from observatory_platform.google.bigquery import bq_table_id
 
 FAKE_PUBLISHERS = ["Fake Publisher 1", "Fake Publisher 2", "Fake Publisher 3"]
 
 
-class TestIrusFulcrumTelescope(ObservatoryTestCase):
+class TestIrusFulcrumTelescope(SandboxTestCase):
     """Tests for the Fulcrum telescope"""
 
     def __init__(self, *args, **kwargs):
@@ -85,7 +81,7 @@ class TestIrusFulcrumTelescope(ObservatoryTestCase):
 
     def test_dag_load(self):
         """Test that the DAG can be loaded from a DAG bag."""
-        env = ObservatoryEnvironment(
+        env = SandboxEnvironment(
             workflows=[
                 Workflow(
                     dag_id="fulcrum_test",
@@ -104,7 +100,7 @@ class TestIrusFulcrumTelescope(ObservatoryTestCase):
         """Test the Fulcrum telescope end to end."""
 
         # Setup Observatory environment
-        env = ObservatoryEnvironment(self.project_id, self.data_location)
+        env = SandboxEnvironment(self.project_id, self.data_location)
 
         # Create the Observatory environment and run tests
         with env.create():

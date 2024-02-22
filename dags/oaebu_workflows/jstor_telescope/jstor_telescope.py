@@ -41,15 +41,14 @@ from tenacity import retry, stop_after_attempt, wait_exponential, wait_fixed
 from oaebu_workflows.config import oaebu_user_agent_header
 from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
-from observatory_platform.airflow import AirflowConns
 from observatory_platform.files import save_jsonl_gz
 from observatory_platform.url_utils import retry_get_url
-from observatory_platform.gcs import gcs_upload_files, gcs_blob_uri, gcs_blob_name_from_path, gcs_download_blob
-from observatory_platform.bigquery import bq_load_table, bq_table_id, bq_create_dataset
-from observatory_platform.observatory_config import CloudWorkspace
-from observatory_platform.tasks import check_dependencies
+from observatory_platform.google.gcs import gcs_upload_files, gcs_blob_uri, gcs_blob_name_from_path, gcs_download_blob
+from observatory_platform.google.bigquery import bq_load_table, bq_table_id, bq_create_dataset
+from observatory_platform.airflow.tasks import check_dependencies
 from observatory_platform.files import add_partition_date, convert
-from observatory_platform.workflow import PartitionRelease, set_task_state, cleanup
+from observatory_platform.airflow.release import PartitionRelease, set_task_state
+from observatory_platform.airflow.workflow import CloudWorkspace, cleanup
 
 JSTOR_PROCESSED_LABEL_NAME = "processed_report"
 
@@ -358,7 +357,8 @@ def create_dag(
             """Adds release information to API."""
 
             releases = [JstorRelease.from_dict(r) for r in releases]
-            api = DatasetAPI(project_id=cloud_workspace.project_id)
+            client=Client(project=cloud_workspace.project_id)
+            api = DatasetAPI(project_id=cloud_workspace.project_id, client=client)
             api.seed_db()
             for release in releases:
                 dataset_release = DatasetRelease(

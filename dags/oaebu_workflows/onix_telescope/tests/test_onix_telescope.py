@@ -1,4 +1,4 @@
-# Copyright 2021-2023 Curtin University
+# Copyright 2021-2024 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,20 +26,16 @@ from oaebu_workflows.onix_telescope.onix_telescope import OnixRelease, create_da
 from oaebu_workflows.oaebu_partners import partner_from_str
 from oaebu_workflows.config import test_fixtures_folder, module_file_path
 from observatory_platform.dataset_api import DatasetAPI
-from observatory_platform.bigquery import bq_sharded_table_id
-from observatory_platform.gcs import gcs_blob_name_from_path
+from observatory_platform.google.bigquery import bq_sharded_table_id
+from observatory_platform.google.gcs import gcs_blob_name_from_path
 from observatory_platform.sftp import SftpFolders
-from observatory_platform.observatory_config import Workflow
-from observatory_platform.observatory_environment import (
-    ObservatoryEnvironment,
-    ObservatoryTestCase,
-    SftpServer,
-    find_free_port,
-    load_and_parse_json,
-)
+from observatory_platform.airflow.workflow import Workflow
+from observatory_platform.sandbox.test_utils import SandboxTestCase, find_free_port, load_and_parse_json
+from observatory_platform.sandbox.sftp_server import SftpServer
+from observatory_platform.sandbox.sandbox_environment import SandboxEnvironment
 
 
-class TestOnixTelescope(ObservatoryTestCase):
+class TestOnixTelescope(SandboxTestCase):
     """Tests for the ONIX telescope"""
 
     def __init__(self, *args, **kwargs):
@@ -94,7 +90,7 @@ class TestOnixTelescope(ObservatoryTestCase):
 
     def test_dag_load(self):
         """Test that the Geonames DAG can be loaded from a DAG bag."""
-        env = ObservatoryEnvironment(
+        env = SandboxEnvironment(
             workflows=[
                 Workflow(
                     dag_id="onix",
@@ -121,7 +117,7 @@ class TestOnixTelescope(ObservatoryTestCase):
     def test_telescope(self):
         """Test the ONIX telescope end to end."""
         # Setup Observatory environment
-        env = ObservatoryEnvironment(self.project_id, self.data_location)
+        env = SandboxEnvironment(self.project_id, self.data_location)
         sftp_server = SftpServer(host="localhost", port=self.sftp_port)
 
         with env.create(), sftp_server.create() as sftp_root:

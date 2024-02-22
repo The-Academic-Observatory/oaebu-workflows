@@ -37,16 +37,15 @@ from oaebu_workflows.config import sql_folder, oaebu_user_agent_header
 from oaebu_workflows.oaebu_partners import OaebuPartner, DataPartner, partner_from_str
 from oaebu_workflows.onix_workflow.onix_work_aggregation import BookWorkAggregator, BookWorkFamilyAggregator
 from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
-from observatory_platform.observatory_config import CloudWorkspace
-from observatory_platform.dag_run_sensor import DagRunSensor
-from observatory_platform.airflow import AirflowConns
+from observatory_platform.airflow.sensors import DagRunSensor
 from observatory_platform.files import save_jsonl_gz
-from observatory_platform.tasks import check_dependencies
+from observatory_platform.airflow.tasks import check_dependencies
 from observatory_platform.url_utils import retry_get_url
-from observatory_platform.gcs import gcs_upload_files, gcs_blob_uri, gcs_blob_name_from_path
+from observatory_platform.google.gcs import gcs_upload_files, gcs_blob_uri, gcs_blob_name_from_path
 from observatory_platform.jinja2_utils import render_template
-from observatory_platform.workflow import SnapshotRelease, make_snapshot_date, cleanup, set_task_state
-from observatory_platform.bigquery import (
+from observatory_platform.airflow.release import SnapshotRelease, make_snapshot_date, set_task_state
+from observatory_platform.airflow.workflow import CloudWorkspace, cleanup
+from observatory_platform.google.bigquery import (
     bq_load_table,
     bq_table_id,
     bq_sharded_table_id,
@@ -1013,8 +1012,8 @@ def create_dag(
             """Adds release information to API."""
 
             release = OnixWorkflowRelease.from_dict(release)
-
-            api = DatasetAPI(project_id=cloud_workspace.project_id)
+            client=Client(project=cloud_workspace.project_id)
+            api = DatasetAPI(project_id=cloud_workspace.project_id, client=client)
             api.seed_db()
             dataset_release = DatasetRelease(
                 dag_id=dag_id,

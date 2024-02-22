@@ -1,4 +1,4 @@
-# Copyright 2020-2023 Curtin University
+# Copyright 2020-2024 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -38,15 +38,12 @@ from oaebu_workflows.jstor_telescope.jstor_telescope import (
     create_dag,
     make_jstor_api,
 )
-from observatory_platform.observatory_environment import (
-    ObservatoryEnvironment,
-    ObservatoryTestCase,
-    find_free_port,
-    load_and_parse_json,
-)
-from observatory_platform.observatory_config import Workflow
-from observatory_platform.gcs import gcs_blob_name_from_path, gcs_upload_files
-from observatory_platform.bigquery import bq_table_id
+
+from observatory_platform.airflow.workflow import Workflow
+from observatory_platform.sandbox.test_utils import SandboxTestCase, load_and_parse_json
+from observatory_platform.sandbox.sandbox_environment import SandboxEnvironment
+from observatory_platform.google.gcs import gcs_blob_name_from_path, gcs_upload_files
+from observatory_platform.google.bigquery import bq_table_id
 from observatory_platform.dataset_api import DatasetAPI
 
 
@@ -58,14 +55,14 @@ def dummy_gmail_connection() -> Connection:
     )
 
 
-class TestTelescopeSetup(ObservatoryTestCase):
+class TestTelescopeSetup(SandboxTestCase):
     def __init__(self, *args, **kwargs):
         super(TestTelescopeSetup, self).__init__(*args, **kwargs)
         self.entity_id = "anupress"
 
     def test_dag_structure(self):
         """Test that the Jstor DAG has the correct structure."""
-        env = ObservatoryEnvironment()
+        env = SandboxEnvironment()
         with env.create():
             env.add_connection(dummy_gmail_connection())
             for entity_type in ["publisher", "collection"]:
@@ -91,7 +88,7 @@ class TestTelescopeSetup(ObservatoryTestCase):
     def test_dag_load(self):
         """Test that the Jstor DAG can be loaded from a DAG bag."""
         for entity_type in ["publisher", "collection"]:
-            env = ObservatoryEnvironment(
+            env = SandboxEnvironment(
                 workflows=[
                     Workflow(
                         dag_id="jstor_test_telescope",
@@ -110,7 +107,7 @@ class TestTelescopeSetup(ObservatoryTestCase):
 
     def test_entity_type(self):
         """Test that the correct entity type is enforced."""
-        env = ObservatoryEnvironment()
+        env = SandboxEnvironment()
         with env.create():
             env.add_connection(dummy_gmail_connection())
             for entity_type in ["collection", "publisher"]:
@@ -119,7 +116,7 @@ class TestTelescopeSetup(ObservatoryTestCase):
                 make_jstor_api("invalid", self.entity_id)
 
 
-class TestJstorTelescopePublisher(ObservatoryTestCase):
+class TestJstorTelescopePublisher(SandboxTestCase):
     """Tests for the Jstor telescope"""
 
     def __init__(self, *args, **kwargs):
@@ -181,7 +178,7 @@ class TestJstorTelescopePublisher(ObservatoryTestCase):
         mock_build.return_value = build("gmail", "v1", http=http)
 
         # Setup Observatory environment
-        env = ObservatoryEnvironment(self.project_id, self.data_location)
+        env = SandboxEnvironment(self.project_id, self.data_location)
 
         # Create the Observatory environment and run tests
         with env.create(task_logging=True):
@@ -418,7 +415,7 @@ class TestJstorTelescopePublisher(ObservatoryTestCase):
                 api.get_release_date(reports[3]["file"])
 
 
-class TestJstorTelescopeCollection(ObservatoryTestCase):
+class TestJstorTelescopeCollection(SandboxTestCase):
     """Tests for the Jstor telescope"""
 
     def __init__(self, *args, **kwargs):
@@ -458,7 +455,7 @@ class TestJstorTelescopeCollection(ObservatoryTestCase):
         mock_build.return_value = build("gmail", "v1", http=http)
 
         # Setup Observatory environment
-        env = ObservatoryEnvironment(self.project_id, self.data_location)
+        env = SandboxEnvironment(self.project_id, self.data_location)
 
         # Create the Observatory environment and run tests
         with env.create(task_logging=True):

@@ -36,13 +36,12 @@ from oauth2client.service_account import ServiceAccountCredentials
 
 from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
-from observatory_platform.airflow import AirflowConns
 from observatory_platform.files import get_file_hash, save_jsonl_gz, add_partition_date
-from observatory_platform.tasks import check_dependencies
-from observatory_platform.bigquery import bq_load_table, bq_table_id, bq_create_dataset
-from observatory_platform.observatory_config import CloudWorkspace
-from observatory_platform.workflow import PartitionRelease, set_task_state, cleanup
-from observatory_platform.gcs import (
+from observatory_platform.airflow.tasks import check_dependencies
+from observatory_platform.google.bigquery import bq_load_table, bq_table_id, bq_create_dataset
+from observatory_platform.airflow.release import PartitionRelease, set_task_state
+from observatory_platform.airflow.workflow import CloudWorkspace, cleanup
+from observatory_platform.google.gcs import (
     gcs_copy_blob,
     gcs_create_bucket,
     gcs_download_blob,
@@ -381,7 +380,8 @@ def create_dag(
             """Adds release information to API."""
 
             releases = [IrusOapenRelease.from_dict(r) for r in releases]
-            api = DatasetAPI(project_id=cloud_workspace.project_id)
+            client = Client(project=cloud_workspace.project_id)
+            api = DatasetAPI(project_id=cloud_workspace.project_id, client=client)
             api.seed_db()
             for release in releases:
                 dataset_release = DatasetRelease(
