@@ -3,7 +3,6 @@ venv
 dist
 .vscode
 docs/_build
-config.yaml
 *.pkrvars.hcl
 .coverage
 coverage.xml
