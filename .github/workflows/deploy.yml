@@ -2,8 +2,10 @@ name: Astronomer CI - Deploy code
 
 on:
   push:
+    tags:
+      - 'v*'
     branches:
-      - taskflow_api
+      - main
 
 env:
   ## Set API Token as an environment variable
@@ -16,4 +18,4 @@ jobs:
     - name: Deploy to Astro
       uses: astronomer/deploy-action@v0.4
       with:
-        deployment-id: clssbgp1q07v201j6mm2ra8m1
+        deployment-id: ${{ secrets.ASTRO_DEPLOYMENT_ID }}
