@@ -16,7 +16,7 @@
 # Author: Tuan Chien, Richard Hosking, Keegan Smith
 
 import os
-from datetime import timedelta
+from datetime import timedelta, datetime
 from typing import List, Optional, Tuple, Union, Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import re
@@ -28,8 +28,12 @@ from google.cloud.bigquery import SourceFormat, Client
 from ratelimit import limits, sleep_and_retry
 from tenacity import wait_exponential_jitter
 from jinja2 import Environment, FileSystemLoader
+from airflow.sensors.external_task import ExternalTaskSensor
 from airflow.decorators import dag, task, task_group
 from airflow.models.baseoperator import chain
+from airflow.models import DagRun
+from airflow.utils.session import provide_session
+from sqlalchemy.orm.scoping import scoped_session
 
 from oaebu_workflows.airflow_pools import CrossrefEventsPool
 from oaebu_workflows.config import schema_folder as default_schema_folder
@@ -37,7 +41,6 @@ from oaebu_workflows.config import sql_folder, oaebu_user_agent_header
 from oaebu_workflows.oaebu_partners import OaebuPartner, DataPartner, partner_from_str
 from oaebu_workflows.onix_workflow.onix_work_aggregation import BookWorkAggregator, BookWorkFamilyAggregator
 from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
-from observatory_platform.airflow.sensors import DagRunSensor
 from observatory_platform.files import save_jsonl_gz
 from observatory_platform.airflow.tasks import check_dependencies
 from observatory_platform.url_utils import retry_get_url
@@ -236,7 +239,7 @@ def create_dag(
     sensor_dag_ids: List[str] = None,
     catchup: Optional[bool] = False,
     start_date: Optional[pendulum.DateTime] = pendulum.datetime(2022, 8, 1),
-    schedule: Optional[str] = "@weekly",
+    schedule: Optional[str] = "0 0 * * 1",  # Mondays at midnight
 ):
     """
     Initialises the workflow object.
@@ -306,19 +309,22 @@ def create_dag(
         """Construct the DAG"""
 
         @task_group(group_id="sensors")
-        def make_sensors(**context):
+        def make_sensors():
             """Create the sensor tasks for the DAG. These check that the data partner dag runs are complete"""
 
             tasks = []
             for ext_dag_id in sensor_dag_ids:
-                sensor = DagRunSensor(
+                sensor = ExternalTaskSensor(
                     task_id=f"{ext_dag_id}_sensor",
                     external_dag_id=ext_dag_id,
                     mode="reschedule",
-                    duration=timedelta(days=7),  # Look back up to 7 days from execution date
-                    poke_interval=int(timedelta(hours=1).total_seconds()),  # Check at this interval if dag run is ready
-                    timeout=int(timedelta(days=2).total_seconds()),  # Sensor will fail after 2 days of waiting
+                    poke_interval=int(1200),  # Check if dag run is ready every 20 minutes
+                    timeout=int(timedelta(days=1).total_seconds()),  # Sensor will fail after 1 day of waiting
+                    check_existence=True,
+                    # Custom date retrieval fn. Airflow expects a callable with the execution_date as an argument only.
+                    execution_date_fn=lambda dt: latest_execution_timedelta(dt, ext_dag_id),
                 )
+
                 tasks.append(sensor)
             chain(tasks)
 
@@ -1012,7 +1018,7 @@ def create_dag(
             """Adds release information to API."""
 
             release = OnixWorkflowRelease.from_dict(release)
-            client=Client(project=cloud_workspace.project_id)
+            client = Client(project=cloud_workspace.project_id)
             api = DatasetAPI(project_id=cloud_workspace.project_id, client=client)
             api.seed_db()
             dataset_release = DatasetRelease(
@@ -1353,3 +1359,30 @@ def insert_into_schema(schema_base: List[dict], insert_field: dict, schema_field
         schema_base.append(insert_field)
 
     return schema_base
+
+
+@provide_session
+def latest_execution_timedelta(
+    data_interval_start: datetime, ext_dag_id: str, session: scoped_session = None, **context
+) -> int:
+    """
+    Get the latest execution for a given external dag and returns its data_interval_start (logical date)
+
+    :param ext_dag_id: The dag_id to get the latest execution date for.
+    :return: The latest execution date in the window.
+    """
+    dagruns = (
+        session.query(DagRun)
+        .filter(
+            DagRun.dag_id == ext_dag_id,
+        )
+        .all()
+    )
+    dates = [d.data_interval_start for d in dagruns]  # data_interval start is what ExternalTaskSensor checks
+    dates.sort(reverse=True)
+
+    if not len(dates):  # If no execution is found return the logical date for the Workflow
+        logging.warn(f"No Executions found for dag id: {ext_dag_id}")
+        return data_interval_start
+
+    return dates[0]
