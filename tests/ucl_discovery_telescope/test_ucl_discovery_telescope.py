@@ -23,9 +23,9 @@ from airflow.utils.state import State
 from airflow.models.connection import Connection
 import vcr
 
-from oaebu_workflows.config import test_fixtures_folder, module_file_path
-from oaebu_workflows.oaebu_partners import partner_from_str
-from oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope import (
+from dags.oaebu_workflows.config import test_fixtures_folder, module_file_path
+from dags.oaebu_workflows.oaebu_partners import partner_from_str
+from dags.oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope import (
     UclDiscoveryRelease,
     create_dag,
     get_isbn_eprint_mappings,
@@ -76,7 +76,7 @@ class TestUclDiscoveryTelescope(SandboxTestCase):
                 Workflow(
                     dag_id="ucl_discovery",
                     name="UCL Discovery Telescope",
-                    class_name="oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.create_dag",
+                    class_name="dags.oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.create_dag",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(sheet_id="foo"),
                 )
@@ -152,11 +152,11 @@ class TestUclDiscoveryTelescope(SandboxTestCase):
 
             # download
             cassette = vcr.VCR(record_mode="none")
-            sa_patch = patch("oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.service_account")
+            sa_patch = patch("dags.oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.service_account")
             conn_patch = patch(
-                "oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.BaseHook.get_connection"
+                "dags.oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.BaseHook.get_connection"
             )
-            build_patch = patch("oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.discovery.build")
+            build_patch = patch("dags.oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.discovery.build")
             with sa_patch, conn_patch, build_patch as mock_build, cassette.use_cassette(
                 self.download_cassette, ignore_hosts=["oauth2.googleapis.com", "storage.googleapis.com"]
             ):
@@ -219,8 +219,8 @@ class TestUclDiscoveryTelescope(SandboxTestCase):
             self.assertEqual(len(dataset_releases), 0)
 
             # Add_dataset_release_task
-            now = pendulum.now()
-            with patch("oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.pendulum.now") as mock_now:
+            now = pendulum.now("Europe/London")  # Use Europe/London to ensure +00UTC timezone
+            with patch("dags.oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.pendulum.now") as mock_now:
                 mock_now.return_value = now
                 ti = env.run_task("add_new_dataset_releases")
             self.assertEqual(ti.state, State.SUCCESS)
@@ -240,7 +240,7 @@ class TestUclDiscoveryTelescope(SandboxTestCase):
                 "changefile_end_date": None,
                 "sequence_start": None,
                 "sequence_end": None,
-                "extra": None,
+                "extra": "null",
             }
             self.assertEqual(expected_release, dataset_releases[0].to_dict())
 
@@ -259,9 +259,9 @@ class TestGetIsbnEprintMappings(TestCase):
         # Set the cutoff date for the tests
         self.cutoff_date = pendulum.datetime(year=2023, month=6, day=30)
 
-    @patch("oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.service_account")
-    @patch("oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.BaseHook.get_connection")
-    @patch("oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.discovery.build")
+    @patch("dags.oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.service_account")
+    @patch("dags.oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.BaseHook.get_connection")
+    @patch("dags.oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.discovery.build")
     def test_get_isbn_eprint_mappings(self, mock_build, mock_get_connection, mock_sa):
         # Mock the Google Sheets API response
         sheet_contents = [
@@ -284,9 +284,9 @@ class TestGetIsbnEprintMappings(TestCase):
         }
         self.assertEqual(mappings, expected_mappings)
 
-    @patch("oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.service_account")
-    @patch("oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.BaseHook.get_connection")
-    @patch("oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.discovery.build")
+    @patch("dags.oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.service_account")
+    @patch("dags.oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.BaseHook.get_connection")
+    @patch("dags.oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.discovery.build")
     def test_invalid_header(self, mock_build, mock_get_connection, mock_sa):
         # Mock the Google Sheets API response with an invalid header
         invalid_sheet_contents = [
@@ -304,9 +304,9 @@ class TestGetIsbnEprintMappings(TestCase):
         with self.assertRaisesRegex(ValueError, "Invalid header found"):
             get_isbn_eprint_mappings("sheet_id", "service_account_conn_id", self.cutoff_date)
 
-    @patch("oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.service_account")
-    @patch("oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.BaseHook.get_connection")
-    @patch("oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.discovery.build")
+    @patch("dags.oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.service_account")
+    @patch("dags.oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.BaseHook.get_connection")
+    @patch("dags.oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.discovery.build")
     def test_empty_sheet(self, mock_build, mock_get_connection, mock_sa):
         # Mock the Google Sheets API response with an empty sheet
         mock_build.return_value.spreadsheets.return_value.values.return_value.get.return_value.execute.return_value = {}
@@ -314,9 +314,9 @@ class TestGetIsbnEprintMappings(TestCase):
         with self.assertRaisesRegex(ValueError, "No content found"):
             get_isbn_eprint_mappings("sheet_id", "service_account_conn_id", self.cutoff_date)
 
-    @patch("oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.service_account")
-    @patch("oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.BaseHook.get_connection")
-    @patch("oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.discovery.build")
+    @patch("dags.oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.service_account")
+    @patch("dags.oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.BaseHook.get_connection")
+    @patch("dags.oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.discovery.build")
     def test_missing_values(self, mock_build, mock_get_connection, mock_sa):
         # Mock the Google Sheets API response with a missing value
         sheet_contents = [
@@ -345,7 +345,7 @@ class TestDownloadDiscoveryStats(TestCase):
         self.end_formatted = self.end_date.format("YYYYMMDD")
         self.eprint_id = "12345"
 
-    @patch("oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.retry_get_url")
+    @patch("dags.oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.retry_get_url")
     def test_download_discovery_stats(self, mock_retry_get_url):
         """Test the download_discovery_stats function works with correct inputs"""
         expected_countries_url = (
@@ -377,7 +377,7 @@ class TestDownloadDiscoveryStats(TestCase):
         self.assertEqual(result[0], http_returns[0])
         self.assertEqual(result[1], http_returns[1])
 
-    @patch("oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.retry_get_url")
+    @patch("dags.oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.retry_get_url")
     def test_download_discovery_stats_invalid_timescale(self, mock_retry_get_url):
         """Check if exceptions raised when timescale is inconsistent with inputs"""
         mock_retry_get_url.return_value.json.side_effect = [
@@ -388,7 +388,7 @@ class TestDownloadDiscoveryStats(TestCase):
             ValueError, "timescale", download_discovery_stats, self.eprint_id, self.start_date, self.end_date
         )
 
-    @patch("oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.retry_get_url")
+    @patch("dags.oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.retry_get_url")
     def test_download_discovery_stats_invalid_eprint_id(self, mock_retry_get_url):
         """Check if exceptions raised when eprint ID is inconsistent with inputs"""
         mock_retry_get_url.return_value.json.side_effect = [

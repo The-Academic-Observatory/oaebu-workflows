@@ -22,14 +22,14 @@ import pendulum
 import vcr
 from airflow.utils.state import State
 
-from oaebu_workflows.oaebu_partners import partner_from_str
-from oaebu_workflows.thoth_telescope.thoth_telescope import (
+from dags.oaebu_workflows.oaebu_partners import partner_from_str
+from dags.oaebu_workflows.thoth_telescope.thoth_telescope import (
     DEFAULT_HOST_NAME,
     ThothRelease,
     thoth_download_onix,
     create_dag,
 )
-from oaebu_workflows.config import test_fixtures_folder, module_file_path
+from dags.oaebu_workflows.config import test_fixtures_folder, module_file_path
 from observatory_platform.dataset_api import DatasetAPI
 from observatory_platform.google.bigquery import bq_sharded_table_id
 from observatory_platform.google.gcs import gcs_blob_name_from_path
@@ -96,7 +96,7 @@ class TestThothTelescope(SandboxTestCase):
                 Workflow(
                     dag_id="thoth_telescope_test",
                     name="Thoth Telescope",
-                    class_name="oaebu_workflows.thoth_telescope.thoth_telescope.create_dag",
+                    class_name="dags.oaebu_workflows.thoth_telescope.thoth_telescope.create_dag",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(publisher_id=FAKE_PUBLISHER_ID, format_specification="onix::oapen"),
                 )
@@ -202,8 +202,8 @@ class TestThothTelescope(SandboxTestCase):
                 dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 0)
 
-                now = pendulum.now()
-                with patch("oaebu_workflows.thoth_telescope.thoth_telescope.pendulum.now") as mock_now:
+                now = pendulum.now("Europe/London")  # Use Europe/London to ensure +00UTC timezone
+                with patch("dags.oaebu_workflows.thoth_telescope.thoth_telescope.pendulum.now") as mock_now:
                     mock_now.return_value = now
                     ti = env.run_task("add_new_dataset_releases")
                 self.assertEqual(ti.state, State.SUCCESS)
@@ -223,7 +223,7 @@ class TestThothTelescope(SandboxTestCase):
                     "changefile_end_date": None,
                     "sequence_start": None,
                     "sequence_end": None,
-                    "extra": None,
+                    "extra": "null",
                 }
                 self.assertEqual(expected_release, dataset_releases[0].to_dict())
 

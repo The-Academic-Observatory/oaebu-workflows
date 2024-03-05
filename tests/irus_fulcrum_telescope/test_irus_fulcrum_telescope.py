@@ -22,9 +22,9 @@ import vcr
 from airflow.utils.state import State
 from airflow.models.connection import Connection
 
-from oaebu_workflows.config import test_fixtures_folder
-from oaebu_workflows.oaebu_partners import partner_from_str
-from oaebu_workflows.irus_fulcrum_telescope.irus_fulcrum_telescope import (
+from dags.oaebu_workflows.config import test_fixtures_folder
+from dags.oaebu_workflows.oaebu_partners import partner_from_str
+from dags.oaebu_workflows.irus_fulcrum_telescope.irus_fulcrum_telescope import (
     IrusFulcrumRelease,
     create_dag,
     download_fulcrum_month_data,
@@ -86,7 +86,7 @@ class TestIrusFulcrumTelescope(SandboxTestCase):
                 Workflow(
                     dag_id="fulcrum_test",
                     name="Fulcrum Telescope",
-                    class_name="oaebu_workflows.irus_fulcrum_telescope.irus_fulcrum_telescope.create_dag",
+                    class_name="dags.oaebu_workflows.irus_fulcrum_telescope.irus_fulcrum_telescope.create_dag",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(publishers=[FAKE_PUBLISHERS]),
                 )
@@ -201,8 +201,10 @@ class TestIrusFulcrumTelescope(SandboxTestCase):
                 self.assertEqual(len(dataset_releases), 0)
 
                 # Add_dataset_release_task
-                now = pendulum.now()
-                with patch("oaebu_workflows.irus_fulcrum_telescope.irus_fulcrum_telescope.pendulum.now") as mock_now:
+                now = pendulum.now("Europe/London")  # Use Europe/London to ensure +00UTC timezone
+                with patch(
+                    "dags.oaebu_workflows.irus_fulcrum_telescope.irus_fulcrum_telescope.pendulum.now"
+                ) as mock_now:
                     mock_now.return_value = now
                     ti = env.run_task("add_new_dataset_releases")
                 self.assertEqual(ti.state, State.SUCCESS)
@@ -222,7 +224,7 @@ class TestIrusFulcrumTelescope(SandboxTestCase):
                     "changefile_end_date": None,
                     "sequence_start": None,
                     "sequence_end": None,
-                    "extra": None,
+                    "extra": "null",
                 }
                 self.assertEqual(expected_release, dataset_releases[0].to_dict())
 

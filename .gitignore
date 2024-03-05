@@ -17,5 +17,4 @@ __pycache__
 /oaebu-workflows/build
 
 # Astronomer
-/tests/
 airflow_settings.yaml

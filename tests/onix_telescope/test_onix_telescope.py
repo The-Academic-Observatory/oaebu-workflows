@@ -22,9 +22,9 @@ import pendulum
 from airflow.models import Connection
 from airflow.utils.state import State
 
-from oaebu_workflows.onix_telescope.onix_telescope import OnixRelease, create_dag
-from oaebu_workflows.oaebu_partners import partner_from_str
-from oaebu_workflows.config import test_fixtures_folder, module_file_path
+from dags.oaebu_workflows.onix_telescope.onix_telescope import OnixRelease, create_dag
+from dags.oaebu_workflows.oaebu_partners import partner_from_str
+from dags.oaebu_workflows.config import test_fixtures_folder, module_file_path
 from observatory_platform.dataset_api import DatasetAPI
 from observatory_platform.google.bigquery import bq_sharded_table_id
 from observatory_platform.google.gcs import gcs_blob_name_from_path
@@ -95,7 +95,7 @@ class TestOnixTelescope(SandboxTestCase):
                 Workflow(
                     dag_id="onix",
                     name="ONIX Telescope",
-                    class_name="oaebu_workflows.onix_telescope.onix_telescope.create_dag",
+                    class_name="dags.oaebu_workflows.onix_telescope.onix_telescope.create_dag",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(date_regex=self.date_regex),
                 )
@@ -216,8 +216,8 @@ class TestOnixTelescope(SandboxTestCase):
                 self.assertEqual(len(dataset_releases), 0)
 
                 # Set up the API
-                now = pendulum.now()
-                with patch("oaebu_workflows.onix_telescope.onix_telescope.pendulum.now") as mock_now:
+                now = pendulum.now("Europe/London")  # Use Europe/London to ensure +00UTC timezone
+                with patch("dags.oaebu_workflows.onix_telescope.onix_telescope.pendulum.now") as mock_now:
                     mock_now.return_value = now
                     ti = env.run_task("add_new_dataset_releases")
                 self.assertEqual(ti.state, State.SUCCESS)
@@ -237,7 +237,7 @@ class TestOnixTelescope(SandboxTestCase):
                     "changefile_end_date": None,
                     "sequence_start": None,
                     "sequence_end": None,
-                    "extra": None,
+                    "extra": "null",
                 }
                 self.assertEqual(expected_release, dataset_releases[0].to_dict())
 

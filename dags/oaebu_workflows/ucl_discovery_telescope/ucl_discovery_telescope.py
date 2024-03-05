@@ -27,7 +27,7 @@ from google.cloud.bigquery import SourceFormat, TimePartitioningType, WriteDispo
 from google.oauth2 import service_account
 from apiclient import discovery
 
-from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
+from dags.oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
 from observatory_platform.files import save_jsonl_gz, load_jsonl
 from observatory_platform.google.gcs import gcs_blob_uri, gcs_upload_files, gcs_blob_name_from_path, gcs_download_blob
@@ -295,7 +295,7 @@ def create_dag(
             """Adds release information to API."""
 
             release = UclDiscoveryRelease.from_dict(release)
-            client=Client(project=cloud_workspace.project_id)
+            client = Client(project=cloud_workspace.project_id)
             api = DatasetAPI(project_id=cloud_workspace.project_id, client=client)
             api.seed_db()
             dataset_release = DatasetRelease(

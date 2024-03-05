@@ -19,7 +19,7 @@ import os
 from typing import Union
 from dataclasses import dataclass
 
-from oaebu_workflows.config import schema_folder, sql_folder
+from dags.oaebu_workflows.config import schema_folder, sql_folder
 
 
 class DataPartnerFiles:

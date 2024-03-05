@@ -34,7 +34,7 @@ from googleapiclient.discovery import Resource, build
 from googleapiclient.errors import HttpError
 from oauth2client.service_account import ServiceAccountCredentials
 
-from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
+from dags.oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
 from observatory_platform.files import get_file_hash, save_jsonl_gz, add_partition_date
 from observatory_platform.airflow.tasks import check_dependencies

@@ -29,9 +29,9 @@ def test_fixtures_folder(workflow_module: Optional[str] = None) -> str:
     """
 
     if workflow_module is not None:
-        return construct_module_path("oaebu_workflows", workflow_module, "tests", "fixtures")
+        return construct_module_path("tests", workflow_module, "fixtures")
 
-    return construct_module_path("oaebu_workflows", "tests", "fixtures")
+    return construct_module_path("tests", "fixtures")
 
 
 def schema_folder(workflow_module: Optional[str] = None) -> str:
@@ -43,9 +43,9 @@ def schema_folder(workflow_module: Optional[str] = None) -> str:
     """
 
     if workflow_module is not None:
-        return construct_module_path("oaebu_workflows", workflow_module, "schema")
+        return construct_module_path("dags", "oaebu_workflows", workflow_module, "schema")
 
-    return construct_module_path("oaebu_workflows", "schema")
+    return construct_module_path("dags", "oaebu_workflows", "schema")
 
 
 def sql_folder(workflow_module: Optional[str] = None) -> str:
@@ -57,9 +57,9 @@ def sql_folder(workflow_module: Optional[str] = None) -> str:
     """
 
     if workflow_module is not None:
-        return construct_module_path("oaebu_workflows", workflow_module, "sql")
+        return construct_module_path("dags", "oaebu_workflows", workflow_module, "sql")
 
-    return construct_module_path("oaebu_workflows", "sql")
+    return construct_module_path("dags", "oaebu_workflows", "sql")
 
 
 def construct_module_path(*parts: str) -> str:

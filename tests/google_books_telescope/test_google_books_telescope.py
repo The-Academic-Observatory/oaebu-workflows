@@ -24,9 +24,13 @@ from airflow.models.connection import Connection
 from airflow.utils.state import State
 from click.testing import CliRunner
 
-from oaebu_workflows.config import test_fixtures_folder, module_file_path
-from oaebu_workflows.oaebu_partners import partner_from_str
-from oaebu_workflows.google_books_telescope.google_books_telescope import GoogleBooksRelease, create_dag, gb_transform
+from dags.oaebu_workflows.config import test_fixtures_folder, module_file_path
+from dags.oaebu_workflows.oaebu_partners import partner_from_str
+from dags.oaebu_workflows.google_books_telescope.google_books_telescope import (
+    GoogleBooksRelease,
+    create_dag,
+    gb_transform,
+)
 from observatory_platform.sandbox.sandbox_environment import SandboxEnvironment
 from observatory_platform.sandbox.test_utils import SandboxTestCase, find_free_port
 from observatory_platform.sandbox.sftp_server import SftpServer
@@ -85,7 +89,7 @@ class TestGoogleBooksTelescope(SandboxTestCase):
                 Workflow(
                     dag_id="google_books",
                     name="My Google Books Telescope",
-                    class_name="oaebu_workflows.google_books_telescope.google_books_telescope.create_dag",
+                    class_name="dags.oaebu_workflows.google_books_telescope.google_books_telescope.create_dag",
                     cloud_workspace=self.fake_cloud_workspace,
                 )
             ]
@@ -264,9 +268,9 @@ class TestGoogleBooksTelescope(SandboxTestCase):
                     self.assertEqual(len(dataset_releases), 0)
 
                     # Add_dataset_release_task
-                    now = pendulum.now()
+                    now = pendulum.now("Europe/London")  # Use Europe/London to ensure +00UTC timezone
                     with patch(
-                        "oaebu_workflows.google_books_telescope.google_books_telescope.pendulum.now"
+                        "dags.oaebu_workflows.google_books_telescope.google_books_telescope.pendulum.now"
                     ) as mock_now:
                         mock_now.return_value = now
                         ti = env.run_task("add_new_dataset_releases")
@@ -287,7 +291,7 @@ class TestGoogleBooksTelescope(SandboxTestCase):
                         "changefile_end_date": None,
                         "sequence_start": None,
                         "sequence_end": None,
-                        "extra": None,
+                        "extra": "null",
                     }
                     self.assertEqual(expected_release, dataset_releases[0].to_dict())
 

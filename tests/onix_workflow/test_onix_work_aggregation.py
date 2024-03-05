@@ -17,7 +17,7 @@
 
 import unittest
 
-from oaebu_workflows.onix_workflow.onix_work_aggregation import (
+from dags.oaebu_workflows.onix_workflow.onix_work_aggregation import (
     BookWork,
     BookWorkAggregator,
     BookWorkFamily,

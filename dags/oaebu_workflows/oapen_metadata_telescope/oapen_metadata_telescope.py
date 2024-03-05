@@ -35,9 +35,9 @@ from tenacity import (
     retry_if_exception_type,
 )
 
-from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
-from oaebu_workflows.config import schema_folder, oaebu_user_agent_header
-from oaebu_workflows.onix_utils import OnixTransformer
+from dags.oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
+from dags.oaebu_workflows.config import schema_folder, oaebu_user_agent_header
+from dags.oaebu_workflows.onix_utils import OnixTransformer
 from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
 from observatory_platform.airflow.tasks import check_dependencies
 from observatory_platform.google.gcs import gcs_upload_files, gcs_blob_uri, gcs_blob_name_from_path, gcs_download_blob

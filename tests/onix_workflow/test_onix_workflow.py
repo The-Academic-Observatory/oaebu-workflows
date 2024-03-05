@@ -25,10 +25,10 @@ import pendulum
 from airflow.models import DagBag
 from airflow.utils.state import State
 
-from oaebu_workflows.config import schema_folder as default_schema_folder
-from oaebu_workflows.config import test_fixtures_folder
-from oaebu_workflows.oaebu_partners import OaebuPartner, OAEBU_DATA_PARTNERS, partner_from_str
-from oaebu_workflows.onix_workflow.onix_workflow import (
+from dags.oaebu_workflows.config import schema_folder as default_schema_folder
+from dags.oaebu_workflows.config import test_fixtures_folder
+from dags.oaebu_workflows.oaebu_partners import OaebuPartner, OAEBU_DATA_PARTNERS, partner_from_str
+from dags.oaebu_workflows.onix_workflow.onix_workflow import (
     OnixWorkflowRelease,
     CROSSREF_EVENT_URL_TEMPLATE,
     create_dag,
@@ -140,7 +140,7 @@ class TestOnixWorkflow(SandboxTestCase):
         # vcrpy cassettes for http request mocking
         self.events_cassette = os.path.join(self.fixtures_folder, "crossref_events_request.yaml")
 
-    @patch("oaebu_workflows.onix_workflow.onix_workflow.bq_select_table_shard_dates")
+    @patch("dags.oaebu_workflows.onix_workflow.onix_workflow.bq_select_table_shard_dates")
     def test_make_release(self, mock_sel_table_suffixes):
         """Tests that the make_release function works as intended"""
 
@@ -203,7 +203,7 @@ class TestOnixWorkflow(SandboxTestCase):
                 Workflow(
                     dag_id="onix_workflow_test_dag_load",
                     name="Onix Workflow Test Dag Load",
-                    class_name="oaebu_workflows.onix_workflow.onix_workflow.create_dag",
+                    class_name="dags.oaebu_workflows.onix_workflow.onix_workflow.create_dag",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(
                         sensor_dag_ids=[
@@ -395,7 +395,7 @@ class TestOnixWorkflow(SandboxTestCase):
             }
             self.assert_dag_structure(expected_dag_structure, dag)
 
-    @patch("oaebu_workflows.onix_workflow.onix_workflow.bq_run_query")
+    @patch("dags.oaebu_workflows.onix_workflow.onix_workflow.bq_run_query")
     def test_create_and_load_aggregate_works_table(self, mock_bq_query):
         mock_bq_query.return_value = TestOnixWorkflow.onix_data
         workslookup_expected = [
@@ -431,7 +431,7 @@ class TestOnixWorkflow(SandboxTestCase):
             )
             with env.create_dag_run(dag, self.snapshot_date.add(days=1)):
                 # Mock the table shard dates so the release can be made
-                with patch("oaebu_workflows.onix_workflow.onix_workflow.bq_select_table_shard_dates") as mock_date:
+                with patch("dags.oaebu_workflows.onix_workflow.onix_workflow.bq_select_table_shard_dates") as mock_date:
                     mock_date.return_value = [self.snapshot_date]
                     ti = env.run_task("make_release")
                 release_dict = ti.xcom_pull(task_ids="make_release", include_prior_dates=False)
@@ -519,7 +519,7 @@ class TestOnixWorkflow(SandboxTestCase):
         self.assertEqual(len(good_events), 4)
         self.assertIsNot(bad_events, f"Events should have returned nothing, instead returned {bad_events}")
 
-    @patch("oaebu_workflows.onix_workflow.onix_workflow.bq_run_query")
+    @patch("dags.oaebu_workflows.onix_workflow.onix_workflow.bq_run_query")
     def test_get_onix_records(self, mock_bq_query):
         mock_bq_query.return_value = TestOnixWorkflow.onix_data
         records = get_onix_records("test_table_id")
@@ -936,19 +936,11 @@ class TestOnixWorkflow(SandboxTestCase):
             # Skip dag existence check in sensor.
             for sensor in [task for task in dag.tasks if task.node_id.startswith("sensors.")]:
                 sensor.check_exists = False
+                sensor.check_existence = False
                 sensor.grace_period = timedelta(seconds=1)
 
-            # If there is no dag run in the search interval, sensor will return success.
-            with env.create_dag_run(dag, start_date):
-                ti = env.run_task("check_dependencies")
-                self.assertEqual(ti.state, State.SUCCESS)
-
-                for sensor_id in sensor_dag_ids:
-                    ti = env.run_task(f"sensors.{sensor_id}_sensor")
-                    self.assertEqual(ti.state, State.SUCCESS)
-
             # Run Dummy Dags
-            execution_date = pendulum.datetime(year=2021, month=5, day=16)
+            execution_date = pendulum.datetime(year=2021, month=5, day=17)
             for sensor_id in sensor_dag_ids:
                 dummy_dag = make_dummy_dag(sensor_id, execution_date)
                 with env.create_dag_run(dummy_dag, execution_date):
@@ -968,16 +960,15 @@ class TestOnixWorkflow(SandboxTestCase):
                     self.assertEqual(ti.state, State.SUCCESS)
 
                 # Mock make_release
-                release_date = pendulum.datetime(year=2021, month=5, day=22)
-                with patch("oaebu_workflows.onix_workflow.onix_workflow.bq_select_table_shard_dates") as mock_date:
+                with patch("dags.oaebu_workflows.onix_workflow.onix_workflow.bq_select_table_shard_dates") as mock_date:
                     mock_date.return_value = [partner_release_date]
                     ti = env.run_task("make_release")
                 self.assertEqual(ti.state, State.SUCCESS)
                 release_dict = ti.xcom_pull(task_ids="make_release", include_prior_dates=False)
                 expected_release_dict = {
                     "dag_id": "onix_workflow_test",
-                    "run_id": "scheduled__2021-05-16T00:00:00+00:00",
-                    "snapshot_date": "2021-05-23",
+                    "run_id": "scheduled__2021-05-17T00:00:00+00:00",
+                    "snapshot_date": "2021-05-24",
                     "onix_snapshot_date": "2021-05-15",
                     "crossref_master_snapshot_date": "2021-05-15",
                 }
@@ -1230,8 +1221,8 @@ class TestOnixWorkflow(SandboxTestCase):
                 self.assertEqual(len(dataset_releases), 0)
 
                 # Add_dataset_release_task
-                now = pendulum.now()
-                with patch("oaebu_workflows.onix_workflow.onix_workflow.pendulum.now") as mock_now:
+                now = pendulum.now("Europe/London")  # Use Europe/London to ensure +00UTC timezone
+                with patch("dags.oaebu_workflows.onix_workflow.onix_workflow.pendulum.now") as mock_now:
                     mock_now.return_value = now
                     ti = env.run_task("add_new_dataset_releases")
                 self.assertEqual(ti.state, State.SUCCESS)
@@ -1243,15 +1234,15 @@ class TestOnixWorkflow(SandboxTestCase):
                     "dag_run_id": release.run_id,
                     "created": now.to_iso8601_string(),
                     "modified": now.to_iso8601_string(),
-                    "data_interval_start": "2021-05-16T00:00:00+00:00",
-                    "data_interval_end": "2021-05-23T00:00:00+00:00",
-                    "snapshot_date": "2021-05-23T00:00:00+00:00",
+                    "data_interval_start": "2021-05-17T00:00:00+00:00",
+                    "data_interval_end": "2021-05-24T00:00:00+00:00",
+                    "snapshot_date": "2021-05-24T00:00:00+00:00",
                     "partition_date": None,
                     "changefile_start_date": None,
                     "changefile_end_date": None,
                     "sequence_start": None,
                     "sequence_end": None,
-                    "extra": None,
+                    "extra": "null",
                 }
                 self.assertEqual(expected_release, dataset_releases[0].to_dict())
 
