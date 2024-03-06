@@ -24,8 +24,8 @@ from airflow.decorators import dag, task
 from airflow.exceptions import AirflowException
 from google.cloud.bigquery import SourceFormat, Client
 
-from dags.oaebu_workflows.onix_utils import OnixTransformer
-from dags.oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
+from oaebu_workflows.onix_utils import OnixTransformer
+from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
 from observatory_platform.google.bigquery import bq_load_table, bq_sharded_table_id, bq_create_dataset
 from observatory_platform.airflow.tasks import check_dependencies

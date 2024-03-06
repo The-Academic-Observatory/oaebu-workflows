@@ -24,7 +24,7 @@ from airflow.decorators import dag, task
 from google.cloud.bigquery import SourceFormat, WriteDisposition, Client
 from google.cloud.bigquery.table import TimePartitioningType
 
-from dags.oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
+from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
 from observatory_platform.files import save_jsonl_gz, load_jsonl, add_partition_date
 from observatory_platform.google.gcs import gcs_blob_name_from_path, gcs_upload_files, gcs_blob_uri, gcs_download_blob

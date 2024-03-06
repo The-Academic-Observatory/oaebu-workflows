@@ -27,7 +27,7 @@ from google.cloud.bigquery import SourceFormat, TimePartitioningType, WriteDispo
 from google.oauth2 import service_account
 from apiclient import discovery
 
-from dags.oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
+from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
 from observatory_platform.files import save_jsonl_gz, load_jsonl
 from observatory_platform.google.gcs import gcs_blob_uri, gcs_upload_files, gcs_blob_name_from_path, gcs_download_blob

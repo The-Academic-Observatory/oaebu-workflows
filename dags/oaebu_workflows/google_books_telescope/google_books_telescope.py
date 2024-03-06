@@ -25,7 +25,7 @@ from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.decorators import dag, task
 from google.cloud.bigquery import TimePartitioningType, SourceFormat, WriteDisposition, Client
 
-from dags.oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
+from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
 from observatory_platform.files import convert, add_partition_date, save_jsonl_gz
 from observatory_platform.google.gcs import gcs_upload_files, gcs_blob_uri, gcs_blob_name_from_path, gcs_download_blob

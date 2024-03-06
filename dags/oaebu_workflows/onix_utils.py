@@ -30,7 +30,7 @@ from copy import deepcopy
 
 from onixcheck import validate as validate_onix
 
-from dags.oaebu_workflows.config import schema_folder
+from oaebu_workflows.config import schema_folder
 from observatory_platform.config import observatory_home
 from observatory_platform.http_download import download_file
 from observatory_platform.proc_utils import wait_for_process

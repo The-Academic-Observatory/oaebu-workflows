@@ -35,11 +35,11 @@ from airflow.models import DagRun
 from airflow.utils.session import provide_session
 from sqlalchemy.orm.scoping import scoped_session
 
-from dags.oaebu_workflows.airflow_pools import CrossrefEventsPool
-from dags.oaebu_workflows.config import schema_folder as default_schema_folder
-from dags.oaebu_workflows.config import sql_folder, oaebu_user_agent_header
-from dags.oaebu_workflows.oaebu_partners import OaebuPartner, DataPartner, partner_from_str
-from dags.oaebu_workflows.onix_workflow.onix_work_aggregation import BookWorkAggregator, BookWorkFamilyAggregator
+from oaebu_workflows.airflow_pools import CrossrefEventsPool
+from oaebu_workflows.config import schema_folder as default_schema_folder
+from oaebu_workflows.config import sql_folder, oaebu_user_agent_header
+from oaebu_workflows.oaebu_partners import OaebuPartner, DataPartner, partner_from_str
+from oaebu_workflows.onix_workflow.onix_work_aggregation import BookWorkAggregator, BookWorkFamilyAggregator
 from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
 from observatory_platform.files import save_jsonl_gz
 from observatory_platform.airflow.tasks import check_dependencies

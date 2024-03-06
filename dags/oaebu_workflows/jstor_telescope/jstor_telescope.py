@@ -38,8 +38,8 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import Resource, build
 from tenacity import retry, stop_after_attempt, wait_exponential, wait_fixed
 
-from dags.oaebu_workflows.config import oaebu_user_agent_header
-from dags.oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
+from oaebu_workflows.config import oaebu_user_agent_header
+from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
 from observatory_platform.files import save_jsonl_gz
 from observatory_platform.url_utils import retry_get_url

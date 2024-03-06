@@ -24,8 +24,8 @@ from airflow.decorators import dag, task
 from airflow.exceptions import AirflowException, AirflowSkipException
 from google.cloud.bigquery import SourceFormat, Client
 
-from dags.oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
-from dags.oaebu_workflows.onix_utils import collapse_subjects, onix_parser_download, onix_parser_execute
+from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
+from oaebu_workflows.onix_utils import collapse_subjects, onix_parser_download, onix_parser_execute
 from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
 from observatory_platform.files import load_jsonl, save_jsonl_gz
 from observatory_platform.google.gcs import gcs_blob_uri, gcs_upload_files, gcs_blob_name_from_path, gcs_download_blob
