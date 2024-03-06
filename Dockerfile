@@ -14,13 +14,8 @@ FROM quay.io/astronomer/astro-runtime:9.10.0
 # Install custom dependencies for DAGs that are not available via apt by default
 USER root
 
-# To connect to GKE with KubernetesPodOperator install google-cloud-cli and google-cloud-cli-gke-gcloud-auth-plugin
-RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.asc] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
-RUN curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | tee /usr/share/keyrings/cloud.google.asc
-RUN apt-get update && apt-get install -y google-cloud-cli google-cloud-cli-gke-gcloud-auth-plugin
-
 # Install git
-RUN apt-get install git -y
+RUN apt-get update && apt-get install git -y
 
 USER astro
 
