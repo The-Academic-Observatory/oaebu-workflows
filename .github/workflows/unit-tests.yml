@@ -1,6 +1,6 @@
 name: Unit Tests
 
-on: [push, merge_group]
+on: [push]
 
 jobs:
   build:
@@ -13,12 +13,12 @@ jobs:
 
     steps:
       - name: Checkout ${{ matrix.python-version }}
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           lfs: true
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -27,10 +27,9 @@ jobs:
           python -m pip install --upgrade pip
 
           cd ..
-          git clone https://github.com/The-Academic-Observatory/observatory-platform.git
+          git clone -b feature/astro-refactor https://github.com/The-Academic-Observatory/observatory-platform.git
           cd observatory-platform
-          pip install -e observatory-api --constraint https://raw.githubusercontent.com/apache/airflow/constraints-2.7.3/constraints-no-providers-${{ matrix.python-version }}.txt
-          pip install -e observatory-platform --constraint https://raw.githubusercontent.com/apache/airflow/constraints-2.7.3/constraints-no-providers-${{ matrix.python-version }}.txt
+          pip install -e .[tests] --constraint https://raw.githubusercontent.com/apache/airflow/constraints-2.7.3/constraints-no-providers-${{ matrix.python-version }}.txt
           cd ..
 
           cd oaebu-workflows
