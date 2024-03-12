@@ -31,7 +31,7 @@ import pendulum
 import requests
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.hooks.base import BaseHook
-from airflow.decorators import dag, task
+from airflow.decorators import dag, task, task_group
 from bs4 import BeautifulSoup, SoupStrainer
 from google.cloud.bigquery import TimePartitioningType, SourceFormat, WriteDisposition, Client
 from google.oauth2.credentials import Credentials
@@ -277,13 +277,14 @@ def create_dag(
 
             return [r.to_dict() for r in releases]
 
-        @task
-        def transform(releases: List[dict], **context) -> None:
-            """Task to transform the Jstor releases for a given month."""
+        @task_group(group_id="process_release")
+        def process_release(data):
+            @task
+            def transform(release: dict, **context) -> None:
+                """Task to transform the Jstor releases for a given month."""
 
-            releases = [JstorRelease.from_dict(r) for r in releases]
-            api = make_jstor_api(entity_type, entity_id)
-            for release in releases:
+                release = JstorRelease(release)
+                api = make_jstor_api(entity_type, entity_id)
                 # Download files from GCS
                 success = gcs_download_blob(
                     bucket_name=cloud_workspace.download_bucket,
@@ -314,13 +315,12 @@ def create_dag(
                 )
                 set_task_state(success, context["ti"].task_id, release=release)
 
-        @task
-        def bq_load(releases: List[dict], **context) -> None:
-            """Loads the sales and traffic data into BigQuery"""
+            @task
+            def bq_load(release: dict, **context) -> None:
+                """Loads the sales and traffic data into BigQuery"""
 
-            releases = [JstorRelease.from_dict(r) for r in releases]
-            client = Client(project=cloud_workspace.project_id)
-            for release in releases:
+                release = JstorRelease(release)
+                client = Client(project=cloud_workspace.project_id)
                 for partner, table_description, file_path in [
                     (country_partner, bq_country_table_description, release.transform_country_path),
                     (
@@ -352,15 +352,14 @@ def create_dag(
                     )
                     set_task_state(state, context["ti"].task_id, release=release)
 
-        @task
-        def add_new_dataset_releases(releases: List[dict], **context) -> None:
-            """Adds release information to API."""
+            @task
+            def add_new_dataset_releases(release: dict, **context) -> None:
+                """Adds release information to API."""
 
-            releases = [JstorRelease.from_dict(r) for r in releases]
-            client = Client(project=cloud_workspace.project_id)
-            api = DatasetAPI(project_id=cloud_workspace.project_id, client=client)
-            api.seed_db()
-            for release in releases:
+                release = JstorRelease(release)
+                client = Client(project=cloud_workspace.project_id)
+                api = DatasetAPI(project_id=cloud_workspace.project_id, client=client)
+                api.seed_db()
                 dataset_release = DatasetRelease(
                     dag_id=dag_id,
                     dataset_id=api_dataset_id,
@@ -373,14 +372,13 @@ def create_dag(
                 )
                 api.add_dataset_release(dataset_release)
 
-        @task
-        def cleanup_workflow(releases: List[dict], **context) -> None:
-            """Delete all files, folders and XComs associated with this release.
-            Assign a label to the gmail messages that have been processed."""
+            @task
+            def cleanup_workflow(release: dict, **context) -> None:
+                """Delete all files, folders and XComs associated with this release.
+                Assign a label to the gmail messages that have been processed."""
 
-            releases = [JstorRelease.from_dict(r) for r in releases]
-            api = make_jstor_api(entity_type, entity_id)
-            for release in releases:
+                release = JstorRelease(release)
+                api = make_jstor_api(entity_type, entity_id)
                 cleanup(
                     dag_id=dag_id,
                     execution_date=context["execution_date"],
@@ -389,24 +387,15 @@ def create_dag(
                 success = api.add_labels(release.reports)
                 set_task_state(success, context["ti"].task_id, release=release)
 
+            transform(data) >> bq_load(data) >> add_new_dataset_releases(data) >> cleanup_workflow(data)
+
         # Define DAG tasks
         task_check_dependencies = check_dependencies(airflow_conns=[gmail_api_conn_id], start_date=start_date)
         xcom_reports = list_reports()
         xcom_releases = download(xcom_reports)
-        task_transform = transform(xcom_releases)
-        task_bq_load = bq_load(xcom_releases)
-        task_add_release = add_new_dataset_releases(xcom_releases)
-        task_cleanup_workflow = cleanup_workflow(xcom_releases)
+        process_release_task_group = process_release.expand(data=xcom_releases)
 
-        (
-            task_check_dependencies
-            >> xcom_reports
-            >> xcom_releases
-            >> task_transform
-            >> task_bq_load
-            >> task_add_release
-            >> task_cleanup_workflow
-        )
+        (task_check_dependencies >> xcom_reports >> xcom_releases >> process_release_task_group)
 
     return jstor()
 

@@ -97,7 +97,7 @@ def create_dag(
     elevate_related_products: bool = False,
     metadata_partner: Union[str, OaebuPartner] = "thoth",
     bq_dataset_description: str = "Thoth ONIX Feed",
-    bq_table_description: Optional[str] = None,
+    bq_table_description: str = "Thoth ONIX Feed",
     api_dataset_id: str = "onix",
     catchup: bool = False,
     start_date: DateTime = pendulum.datetime(2022, 12, 1),
@@ -117,9 +117,6 @@ def create_dag(
     :param start_date: The start date of the DAG
     :param schedule: The schedule interval of the DAG
     """
-
-    if bq_table_description is None:
-        bq_table_description = "Thoth ONIX Feed"
 
     metadata_partner = partner_from_str(metadata_partner, metadata_partner=True)
 

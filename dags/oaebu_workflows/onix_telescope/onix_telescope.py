@@ -20,7 +20,7 @@ import re
 from typing import List, Union
 
 import pendulum
-from airflow.decorators import dag, task
+from airflow.decorators import dag, task, task_group
 from airflow.exceptions import AirflowException, AirflowSkipException
 from google.cloud.bigquery import SourceFormat, Client
 
@@ -138,7 +138,7 @@ def create_dag(
     )
     def onix_telescope():
         @task()
-        def make_release(**context) -> List[dict]:
+        def fetch_releases(**context) -> List[dict]:
             """Lists all ONIX releases and publishes their file names as an XCom.
 
             :param context: the context passed from the BranchPythonOperator.
@@ -176,21 +176,22 @@ def create_dag(
                 )
             return [r.to_dict() for r in releases]
 
-        @task()
-        def move_files_to_in_progress(releases: List[dict], **context) -> None:
-            """Move ONIX files to SFTP in-progress folder.
-            :param releases: a list of Onix release instances"""
+        @task_group(group_id="process_release")
+        def process_release(data: dict):
+            @task()
+            def move_files_to_in_progress(release: dict, **context) -> None:
+                """Move ONIX files to SFTP in-progress folder.
+                :param releases: a list of Onix release instances"""
 
-            releases = [OnixRelease.from_dict(r) for r in releases]
-            sftp_folders.move_files_to_in_progress([release.onix_file_name for release in releases])
+                release = OnixRelease(release)
+                sftp_folders.move_filesrto_in_progress(release.onix_file_name)
 
-        @task()
-        def download(releases: List[dict], **context):
-            """Task to download the ONIX releases."""
+            @task()
+            def download(release: dict, **context):
+                """Task to download the ONIX releases."""
 
-            releases = [OnixRelease.from_dict(r) for r in releases]
-            with make_sftp_connection(sftp_service_conn_id) as sftp:
-                for release in releases:
+                release = OnixRelease(release)
+                with make_sftp_connection(sftp_service_conn_id) as sftp:
                     in_progress_file = os.path.join(sftp_folders.in_progress, release.onix_file_name)
                     sftp.get(in_progress_file, localpath=release.download_path)
                     success = gcs_upload_files(
@@ -198,17 +199,16 @@ def create_dag(
                     )
                     set_task_state(success, context["ti"].task_id, release=release)
 
-        @task()
-        def transform(releases: List[dict], **context) -> None:
-            """Task to transform the ONIX releases."""
+            @task()
+            def transform(release: dict, **context) -> None:
+                """Task to transform the ONIX releases."""
 
-            releases = [OnixRelease.from_dict(r) for r in releases]
+                release = OnixRelease(release)
 
-            # Download the parser
-            success, parser_path = onix_parser_download()
-            set_task_state(success, context["ti"].task_id)
+                # Download the parser
+                success, parser_path = onix_parser_download()
+                set_task_state(success, context["ti"].task_id)
 
-            for release in releases:
                 # Download files from GCS
                 success = gcs_download_blob(
                     bucket_name=cloud_workspace.download_bucket,
@@ -228,20 +228,19 @@ def create_dag(
                 )
                 set_task_state(success, context["ti"].task_id, release=release)
 
-        @task()
-        def bq_load(releases: List[dict], **context) -> None:
-            """Task to load each transformed release to BigQuery."""
+            @task()
+            def bq_load(release: dict, **context) -> None:
+                """Task to load each transformed release to BigQuery."""
 
-            releases = [OnixRelease.from_dict(r) for r in releases]
-            bq_create_dataset(
-                project_id=cloud_workspace.project_id,
-                dataset_id=metadata_partner.bq_dataset_id,
-                location=cloud_workspace.data_location,
-                description=bq_dataset_description,
-            )
-            client = Client(project=cloud_workspace.project_id)
-            # Load each transformed release
-            for release in releases:
+                release = OnixRelease(release)
+                bq_create_dataset(
+                    project_id=cloud_workspace.project_id,
+                    dataset_id=metadata_partner.bq_dataset_id,
+                    location=cloud_workspace.data_location,
+                    description=bq_dataset_description,
+                )
+                client = Client(project=cloud_workspace.project_id)
+                # Load each transformed release
                 table_id = bq_sharded_table_id(
                     cloud_workspace.project_id,
                     metadata_partner.bq_dataset_id,
@@ -259,22 +258,21 @@ def create_dag(
                 )
                 set_task_state(state, context["ti"].task_id, release=release)
 
-        @task()
-        def move_files_to_finished(releases: List[dict], **context) -> None:
-            """Move ONIX files to SFTP finished folder."""
+            @task()
+            def move_files_to_finished(release: dict, **context) -> None:
+                """Move ONIX files to SFTP finished folder."""
 
-            releases = [OnixRelease.from_dict(r) for r in releases]
-            sftp_folders.move_files_to_finished([release.onix_file_name for release in releases])
+                release = OnixRelease(release)
+                sftp_folders.move_files_to_finished(release.onix_file_name)
 
-        @task()
-        def add_new_dataset_releases(releases: List[dict], **context) -> None:
-            """Adds release information to API."""
+            @task()
+            def add_new_dataset_releases(release: dict, **context) -> None:
+                """Adds release information to API."""
 
-            releases = [OnixRelease.from_dict(r) for r in releases]
-            client = Client(project=cloud_workspace.project_id)
-            api = DatasetAPI(project_id=cloud_workspace.project_id, client=client)
-            api.seed_db()
-            for release in releases:
+                release = OnixRelease(release)
+                client = Client(project=cloud_workspace.project_id)
+                api = DatasetAPI(project_id=cloud_workspace.project_id, client=client)
+                api.seed_db()
                 dataset_release = DatasetRelease(
                     dag_id=dag_id,
                     dataset_id=api_dataset_id,
@@ -287,36 +285,29 @@ def create_dag(
                 )
                 api.add_dataset_release(dataset_release)
 
-        @task()
-        def cleanup_workflow(releases: List[dict], **context) -> None:
-            """Delete all files, folders and XComs associated with this release."""
+            @task()
+            def cleanup_workflow(release: dict, **context) -> None:
+                """Delete all files, folders and XComs associated with this release."""
 
-            releases = [OnixRelease.from_dict(r) for r in releases]
-            for release in releases:
+                release = OnixRelease(release)
                 cleanup(
                     dag_id=dag_id, execution_date=context["execution_date"], workflow_folder=release.workflow_folder
                 )
 
-        task_check_dependencies = check_dependencies(airflow_conns=[sftp_service_conn_id])
-        xcom_release = make_release()
-        task_move_files_to_in_progress = move_files_to_in_progress(xcom_release)
-        task_download = download(xcom_release)
-        task_transform = transform(xcom_release)
-        task_bq_load = bq_load(xcom_release)
-        task_move_files_to_finished = move_files_to_finished(xcom_release)
-        task_add_new_dataset_releases = add_new_dataset_releases(xcom_release)
-        task_cleanup_workflow = cleanup_workflow(xcom_release)
+            (
+                move_files_to_in_progress(data)
+                >> download(data)
+                >> transform(data)
+                >> bq_load(data)
+                >> move_files_to_finished(data)
+                >> add_new_dataset_releases(data)
+                >> cleanup_workflow(data)
+            )
 
-        (
-            task_check_dependencies
-            >> xcom_release
-            >> task_move_files_to_in_progress
-            >> task_download
-            >> task_transform
-            >> task_bq_load
-            >> task_move_files_to_finished
-            >> task_add_new_dataset_releases
-            >> task_cleanup_workflow
-        )
+        task_check_dependencies = check_dependencies(airflow_conns=[sftp_service_conn_id])
+        xcom_releases = fetch_releases()
+        process_release_task_group = process_release.expand(data=xcom_releases)
+
+        task_check_dependencies >> xcom_releases >> process_release_task_group
 
     return onix_telescope()

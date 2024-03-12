@@ -22,7 +22,7 @@ from typing import List, Tuple, Union
 
 import pendulum
 from airflow.exceptions import AirflowException, AirflowSkipException
-from airflow.decorators import dag, task
+from airflow.decorators import dag, task, task_group
 from google.cloud.bigquery import TimePartitioningType, SourceFormat, WriteDisposition, Client
 
 from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
@@ -156,7 +156,7 @@ def create_dag(
     )
     def google_books():
         @task
-        def make_release(**context) -> List[dict]:
+        def fetch_releases(**context) -> List[dict]:
             """Lists all Google Books releases available on the SFTP server
 
             :returns: List of release dictionaries
@@ -197,20 +197,22 @@ def create_dag(
                 )
             return [r.to_dict() for r in releases]
 
-        @task
-        def move_files_to_in_progress(releases: List[dict], **context) -> None:
-            """Move Google Books files to SFTP in-progress folder."""
+        @task_group(group_id="process_release")
+        def process_release(data: dict, **context):
+            """Process the Google Books release."""
 
-            releases = [GoogleBooksRelease.from_dict(r) for r in releases]
-            for release in releases:
+            @task
+            def move_files_to_in_progress(release: List[dict], **context) -> None:
+                """Move Google Books files to SFTP in-progress folder."""
+
+                release = GoogleBooksRelease.from_dict(release)
                 sftp_folders.move_files_to_in_progress(release.sftp_files)
 
-        @task
-        def download(releases: List[dict], **context) -> None:
-            """Downloads the Google Books releases and uploads them to GCS"""
+            @task
+            def download(release: List[dict], **context) -> None:
+                """Downloads the Google Books release and uploads them to GCS"""
 
-            releases = [GoogleBooksRelease.from_dict(r) for r in releases]
-            for release in releases:
+                release = GoogleBooksRelease.from_dict(release)
                 with make_sftp_connection(sftp_service_conn_id) as sftp:
                     for file in release.sftp_files:
                         if "Traffic" in file:
@@ -231,12 +233,11 @@ def create_dag(
                         f"Files could not be uploaded to cloud storage bucket: {cloud_workspace.download_bucket}"
                     )
 
-        @task
-        def transform(releases: List[dict], **context) -> None:
-            """Transforms the Google Books releases and uploads them to GCS"""
+            @task
+            def transform(release: List[dict], **context) -> None:
+                """Transforms the Google Books release and uploads them to GCS"""
 
-            releases = [GoogleBooksRelease.from_dict(r) for r in releases]
-            for release in releases:
+                release = GoogleBooksRelease.from_dict(release)
                 # Download files from GCS
                 success = gcs_download_blob(
                     bucket_name=cloud_workspace.download_bucket,
@@ -260,8 +261,7 @@ def create_dag(
                     traffic_path=release.transform_traffic_path,
                     release_date=release.partition_date,
                 )
-            """Uploads the transformed files to GCS for each release"""
-            for release in releases:
+                """Uploads the transformed files to GCS for each release"""
                 success = gcs_upload_files(
                     bucket_name=cloud_workspace.transform_bucket,
                     file_paths=[release.transform_sales_path, release.transform_traffic_path],
@@ -271,21 +271,19 @@ def create_dag(
                         f"Files could not be uploaded to cloud storage bucket: {cloud_workspace.transform_bucket}"
                     )
 
-        @task
-        def move_files_to_finished(releases: List[dict], **context) -> None:
-            """Move Google Books files to SFTP finished folder."""
+            @task
+            def move_files_to_finished(release: List[dict], **context) -> None:
+                """Move Google Books files to SFTP finished folder."""
 
-            releases = [GoogleBooksRelease.from_dict(r) for r in releases]
-            for release in releases:
+                release = GoogleBooksRelease.from_dict(release)
                 sftp_folders.move_files_to_finished(release.sftp_files)
 
-        @task
-        def bq_load(releases: List[dict], **context) -> None:
-            """Loads the sales and traffic data into BigQuery"""
+            @task
+            def bq_load(release: List[dict], **context) -> None:
+                """Loads the sales and traffic data into BigQuery"""
 
-            releases = [GoogleBooksRelease.from_dict(r) for r in releases]
-            client = Client(project=cloud_workspace.project_id)
-            for release in releases:
+                release = GoogleBooksRelease.from_dict(release)
+                client = Client(project=cloud_workspace.project_id)
                 for partner, table_description, file_path in [
                     [sales_partner, bq_sales_table_description, release.transform_sales_path],
                     [traffic_partner, bq_traffic_table_description, release.transform_traffic_path],
@@ -313,15 +311,14 @@ def create_dag(
                     )
                     set_task_state(success, context["ti"].task_id, release=release)
 
-        @task
-        def add_new_dataset_releases(releases: List[dict], **context) -> None:
-            """Adds release information to API."""
+            @task
+            def add_new_dataset_release(release: List[dict], **context) -> None:
+                """Adds release information to API."""
 
-            releases = [GoogleBooksRelease.from_dict(r) for r in releases]
-            client = Client(project=cloud_workspace.project_id)
-            api = DatasetAPI(project_id=cloud_workspace.project_id, client=client)
-            api.seed_db()
-            for release in releases:
+                release = GoogleBooksRelease.from_dict(release)
+                client = Client(project=cloud_workspace.project_id)
+                api = DatasetAPI(project_id=cloud_workspace.project_id, client=client)
+                api.seed_db()
                 dataset_release = DatasetRelease(
                     dag_id=dag_id,
                     dataset_id=api_dataset_id,
@@ -334,38 +331,31 @@ def create_dag(
                 )
                 api.add_dataset_release(dataset_release)
 
-        @task
-        def cleanup_workflow(releases: List[dict], **context) -> None:
-            """Delete all files, folders and XComs associated with this release."""
+            @task
+            def cleanup_workflow(release: List[dict], **context) -> None:
+                """Delete all files, folders and XComs associated with this release."""
 
-            releases = [GoogleBooksRelease.from_dict(r) for r in releases]
-            for release in releases:
+                release = GoogleBooksRelease.from_dict(release)
                 cleanup(
                     dag_id=dag_id, execution_date=context["execution_date"], workflow_folder=release.workflow_folder
                 )
 
+            (
+                move_files_to_in_progress(data)
+                >> download(data)
+                >> transform(data)
+                >> move_files_to_finished(data)
+                >> bq_load(data)
+                >> add_new_dataset_release(data)
+                >> cleanup_workflow(data)
+            )
+
         # Define dag tasks
         task_check_dependencies = check_dependencies(airflow_conns=[sftp_service_conn_id])
-        xcom_release = make_release()
-        task_move_in_progress = move_files_to_in_progress(xcom_release)
-        task_download = download(xcom_release)
-        task_transform = transform(xcom_release)
-        task_move_finished = move_files_to_finished(xcom_release)
-        task_bq_load = bq_load(xcom_release)
-        task_add_release = add_new_dataset_releases(xcom_release)
-        task_cleanup_workflow = cleanup_workflow(xcom_release)
+        xcom_releases = fetch_releases()
+        process_release_task_group = process_release.expand(data=xcom_releases)
 
-        (
-            task_check_dependencies
-            >> xcom_release
-            >> task_move_in_progress
-            >> task_download
-            >> task_transform
-            >> task_move_finished
-            >> task_bq_load
-            >> task_add_release
-            >> task_cleanup_workflow
-        )
+        task_check_dependencies >> xcom_releases >> process_release_task_group
 
     return google_books()
 

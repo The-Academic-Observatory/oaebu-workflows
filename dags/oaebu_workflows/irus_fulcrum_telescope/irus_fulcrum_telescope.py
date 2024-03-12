@@ -115,7 +115,7 @@ def create_dag(
     publishers: List[str],
     data_partner: Union[str, OaebuPartner] = "irus_fulcrum",
     bq_dataset_description: str = "IRUS dataset",
-    bq_table_description: str = None,
+    bq_table_description: str = "Fulcrum metrics as recorded by the IRUS platform",
     api_dataset_id: str = "fulcrum",
     irus_oapen_api_conn_id: str = "irus_api",
     catchup: bool = True,
@@ -135,8 +135,6 @@ def create_dag(
     :param schedule: The schedule interval of the DAG
     :param start_date: The start date of the DAG
     """
-    if bq_table_description is None:
-        bq_table_description = "Fulcrum metrics as recorded by the IRUS platform"
 
     data_partner = partner_from_str(data_partner)
 

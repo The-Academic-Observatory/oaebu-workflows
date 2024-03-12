@@ -23,7 +23,7 @@ from typing import List, Optional, Tuple, Union
 
 import pendulum
 import requests
-from airflow.decorators import dag, task
+from airflow.decorators import dag, task, task_group
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.hooks.base import BaseHook
 from google.auth import environment_vars
@@ -132,7 +132,7 @@ def create_dag(
     publisher_uuid_v5: str,
     data_partner: Union[str, OaebuPartner] = "irus_oapen",
     bq_dataset_description: str = "IRUS dataset",
-    bq_table_description: str = None,
+    bq_table_description: str = "OAPEN metrics as recorded by the IRUS platform",
     gdpr_oapen_project_id: str = "oapen-usage-data-gdpr-proof",
     gdpr_oapen_bucket_id: str = "oapen-usage-data-gdpr-proof_cloud-function",
     api_dataset_id: str = "oapen",
@@ -166,9 +166,6 @@ def create_dag(
     :param max_active_runs: The maximum number of concurrent DAG instances
     """
 
-    if bq_table_description is None:
-        bq_table_description = "OAPEN metrics as recorded by the IRUS platform"
-
     data_partner = partner_from_str(data_partner)
 
     @dag(
@@ -182,7 +179,7 @@ def create_dag(
     )
     def irus_oapen():
         @task()
-        def make_release(**context) -> List[IrusOapenRelease]:
+        def fetch_releases(**context) -> List[IrusOapenRelease]:
             """Create a list of IrusOapenRelease instances for a given month.
             Say the dag is scheduled to run on 2022-04-07
             Interval_start will be 2022-03-01
@@ -211,12 +208,13 @@ def create_dag(
             ]
             return [r.to_dict() for r in releases]
 
-        @task()
-        def create_cloud_function_(releases: List[dict], **context):
-            """Task to create the cloud function for each release."""
+        @task_group(group_id="process_release")
+        def process_release(data, **context):
+            @task()
+            def create_cloud_function_(release: dict, **context):
+                """Task to create the cloud function for each release."""
 
-            releases = [IrusOapenRelease.from_dict(r) for r in releases]
-            for release in releases:
+                release = IrusOapenRelease.from_dict(release)
                 # set up cloud function variables
                 location = f"projects/{gdpr_oapen_project_id}/locations/{IRUS_FUNCTION_REGION}"
                 full_name = f"{location}/functions/{IRUS_FUNCTION_NAME}"
@@ -255,12 +253,11 @@ def create_dag(
                 else:
                     logging.info(f"Using existing cloud function, source code has not changed.")
 
-        @task()
-        def call_cloud_function_(releases: List[dict], **context):
-            """Task to call the cloud function for each release."""
+            @task()
+            def call_cloud_function_(release: dict, **context):
+                """Task to call the cloud function for each release."""
 
-            releases = [IrusOapenRelease.from_dict(r) for r in releases]
-            for release in releases:
+                release = IrusOapenRelease.from_dict(release)
                 # set up cloud function variables
                 location = f"projects/{gdpr_oapen_project_id}/locations/{IRUS_FUNCTION_REGION}"
                 full_name = f"{location}/functions/{IRUS_FUNCTION_NAME}"
@@ -295,15 +292,14 @@ def create_dag(
                     blob_name=release.download_blob_name,
                 )
 
-        @task()
-        def transfer(releases: List[dict], **context):
-            """Task to transfer the file for each release.
+            @task()
+            def transfer(release: dict, **context):
+                """Task to transfer the file for each release.
 
-            :param releases: the list of IrusOapenRelease instances.
-            """
+                :param releases: the list of IrusOapenRelease instances.
+                """
 
-            releases = [IrusOapenRelease.from_dict(r) for r in releases]
-            for release in releases:
+                release = IrusOapenRelease.from_dict(release)
                 success = gcs_copy_blob(
                     blob_name=release.download_blob_name,
                     src_bucket=gdpr_oapen_bucket_id,
@@ -311,19 +307,19 @@ def create_dag(
                 )
                 set_task_state(success, context["ti"].task_id, release=release)
 
-        @task()
-        def transform(releases: List[dict], **context):
-            """Task to download the access stats to a local file for each release."""
+            @task()
+            def transform(release: dict, **context):
+                """Task to download the access stats to a local file for each release."""
 
-            releases = [IrusOapenRelease.from_dict(r) for r in releases]
-            for release in releases:
+                release = IrusOapenRelease.from_dict(release)
                 # Download files from GCS
                 success = gcs_download_blob(
                     bucket_name=cloud_workspace.download_bucket,
                     blob_name=release.download_blob_name,
                     file_path=release.download_path,
                 )
-                set_task_state(success, context["ti"].task_id, release=release)
+                if not success:
+                    raise FileNotFoundError(f"Could not find file: {release.download_blob_name}")
 
                 # Read gzipped data and create list of dicts
                 with gzip.open(release.download_path, "r") as f:
@@ -343,19 +339,18 @@ def create_dag(
                 )
                 set_task_state(success, context["ti"].task_id, release=release)
 
-        @task()
-        def bq_load(releases: List[dict], **context) -> None:
-            """Loads the sales and traffic data into BigQuery"""
+            @task()
+            def bq_load(release: dict, **context) -> None:
+                """Loads the sales and traffic data into BigQuery"""
 
-            releases = [IrusOapenRelease.from_dict(r) for r in releases]
-            bq_create_dataset(
-                project_id=cloud_workspace.project_id,
-                dataset_id=data_partner.bq_dataset_id,
-                location=cloud_workspace.data_location,
-                description=bq_dataset_description,
-            )
-            client = Client(project=cloud_workspace.project_id)
-            for release in releases:
+                release = IrusOapenRelease.from_dict(release)
+                bq_create_dataset(
+                    project_id=cloud_workspace.project_id,
+                    dataset_id=data_partner.bq_dataset_id,
+                    location=cloud_workspace.data_location,
+                    description=bq_dataset_description,
+                )
+                client = Client(project=cloud_workspace.project_id)
                 uri = gcs_blob_uri(cloud_workspace.transform_bucket, gcs_blob_name_from_path(release.transform_path))
                 table_id = bq_table_id(
                     cloud_workspace.project_id, data_partner.bq_dataset_id, data_partner.bq_table_name
@@ -375,15 +370,14 @@ def create_dag(
                 )
                 set_task_state(state, context["ti"].task_id, release=release)
 
-        @task()
-        def add_new_dataset_releases(releases: List[dict], **context) -> None:
-            """Adds release information to API."""
+            @task()
+            def add_new_dataset_releases(release: dict, **context) -> None:
+                """Adds release information to API."""
 
-            releases = [IrusOapenRelease.from_dict(r) for r in releases]
-            client = Client(project=cloud_workspace.project_id)
-            api = DatasetAPI(project_id=cloud_workspace.project_id, client=client)
-            api.seed_db()
-            for release in releases:
+                release = IrusOapenRelease.from_dict(release)
+                client = Client(project=cloud_workspace.project_id)
+                api = DatasetAPI(project_id=cloud_workspace.project_id, client=client)
+                api.seed_db()
                 dataset_release = DatasetRelease(
                     dag_id=dag_id,
                     dataset_id=api_dataset_id,
@@ -396,42 +390,35 @@ def create_dag(
                 )
                 api.add_dataset_release(dataset_release)
 
-        @task()
-        def cleanup_workflow(releases: List[dict], **context) -> None:
-            """Delete all files, folders and XComs associated with this release."""
+            @task()
+            def cleanup_workflow(release: dict, **context) -> None:
+                """Delete all files, folders and XComs associated with this release."""
 
-            releases = [IrusOapenRelease.from_dict(r) for r in releases]
-            for release in releases:
+                release = IrusOapenRelease.from_dict(release)
                 cleanup(
                     dag_id=dag_id,
                     execution_date=context["execution_date"],
                     workflow_folder=release.workflow_folder,
                 )
 
+            (
+                create_cloud_function_(data)
+                >> call_cloud_function_(data, task_concurrency=1)
+                >> transfer(data)
+                >> transform(data)
+                >> bq_load(data)
+                >> add_new_dataset_releases(data)
+                >> cleanup_workflow(data)
+            )
+
         # Define DAG tasks
         task_check_dependencies = check_dependencies(
             airflow_conns=[geoip_license_conn_id, irus_oapen_api_conn_id, irus_oapen_login_conn_id]
         )
-        xcom_release = make_release()
-        task_create_cloud_function = create_cloud_function_(xcom_release, task_concurrency=1)
-        task_call_cloud_function = call_cloud_function_(xcom_release)
-        task_transfer = transfer(xcom_release)
-        task_transform = transform(xcom_release)
-        task_bq_load = bq_load(xcom_release)
-        task_add_release = add_new_dataset_releases(xcom_release)
-        task_cleanup_workflow = cleanup_workflow(xcom_release)
+        xcom_release = fetch_releases()
+        process_release_task_group = process_release.expand(data=xcom_release)
 
-        (
-            task_check_dependencies
-            >> xcom_release
-            >> task_create_cloud_function
-            >> task_call_cloud_function
-            >> task_transfer
-            >> task_transform
-            >> task_bq_load
-            >> task_add_release
-            >> task_cleanup_workflow
-        )
+        (task_check_dependencies >> xcom_release >> process_release_task_group)
 
     return irus_oapen()
 
