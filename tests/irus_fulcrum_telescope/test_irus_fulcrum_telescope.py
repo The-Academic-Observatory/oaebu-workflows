@@ -21,6 +21,7 @@ import pendulum
 import vcr
 from airflow.utils.state import State
 from airflow.models.connection import Connection
+from google.cloud.bigquery import Client
 
 from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.oaebu_partners import partner_from_str
@@ -196,7 +197,8 @@ class TestIrusFulcrumTelescope(SandboxTestCase):
                 )
 
                 # Set up the API
-                api = DatasetAPI(project_id=self.project_id)
+                client = Client(project=env.cloud_workspace.project_id)
+                api = DatasetAPI(project_id=self.project_id, client=client)
                 dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 0)
 

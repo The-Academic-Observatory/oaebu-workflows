@@ -29,6 +29,7 @@ from airflow.utils.state import State
 from click.testing import CliRunner
 from googleapiclient.discovery import build
 from googleapiclient.http import RequestMockBuilder
+from google.cloud.bigquery import Client
 
 from oaebu_workflows.config import test_fixtures_folder, module_file_path
 from oaebu_workflows.oaebu_partners import partner_from_str
@@ -269,7 +270,8 @@ class TestIrusOapenTelescope(SandboxTestCase):
                 env._delete_bucket(gdpr_bucket_id)
 
                 # Add_dataset_release_task
-                api = DatasetAPI(project_id=self.project_id)
+                client = Client(project=env.cloud_workspace.project_id)
+                api = DatasetAPI(project_id=self.project_id, client=client)
                 dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 0)
 

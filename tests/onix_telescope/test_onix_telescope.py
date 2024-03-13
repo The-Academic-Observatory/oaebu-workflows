@@ -21,6 +21,7 @@ from unittest.mock import patch
 import pendulum
 from airflow.models import Connection
 from airflow.utils.state import State
+from google.cloud.bigquery import Client
 
 from oaebu_workflows.onix_telescope.onix_telescope import OnixRelease, create_dag
 from oaebu_workflows.oaebu_partners import partner_from_str
@@ -211,7 +212,8 @@ class TestOnixTelescope(SandboxTestCase):
                 self.assertTrue(os.path.isfile(finished_path))
 
                 # Set up the API
-                api = DatasetAPI(project_id=self.project_id)
+                client = Client(project=env.cloud_workspace.project_id)
+                api = DatasetAPI(project_id=self.project_id, client=client)
                 dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 0)
 

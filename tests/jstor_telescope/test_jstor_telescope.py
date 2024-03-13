@@ -27,6 +27,7 @@ from airflow.utils.state import State
 from click.testing import CliRunner
 from googleapiclient.discovery import build
 from googleapiclient.http import HttpMockSequence
+from google.cloud.bigquery import Client
 
 from oaebu_workflows.config import test_fixtures_folder, module_file_path
 from oaebu_workflows.oaebu_partners import partner_from_str
@@ -337,7 +338,8 @@ class TestJstorTelescopePublisher(SandboxTestCase):
                 self.assert_table_integrity(institution_table_id, self.institution_report["table_rows"])
 
                 # Set up the API
-                api = DatasetAPI(project_id=self.project_id)
+                client=Client(project=env.cloud_workspace.project_id)
+                api = DatasetAPI(project_id=self.project_id, client=client)
                 dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 0)
 
@@ -592,7 +594,8 @@ class TestJstorTelescopeCollection(SandboxTestCase):
                 self.assert_table_content(institution_table_id, expected, primary_key="ISBN")
 
                 # Set up the API
-                api = DatasetAPI(project_id=self.project_id)
+                client=Client(project=env.cloud_workspace.project_id)
+                api = DatasetAPI(project_id=self.project_id, client=client)
                 dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 0)
 
