@@ -25,7 +25,6 @@ import vcr
 from airflow.exceptions import AirflowException
 from airflow.utils.state import State
 from tenacity import stop_after_attempt
-from google.cloud.bigquery import Client
 
 from oaebu_workflows.config import test_fixtures_folder, module_file_path
 from oaebu_workflows.oaebu_partners import partner_from_str
@@ -87,7 +86,7 @@ class TestOapenMetadataTelescope(SandboxTestCase):
                 Workflow(
                     dag_id="oapen_metadata",
                     name="OAPEN Metadata Telescope",
-                    class_name="dags.oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope.create_dag",
+                    class_name="oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope.create_dag",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(metadata_uri=""),
                 )
@@ -189,14 +188,14 @@ class TestOapenMetadataTelescope(SandboxTestCase):
                 self.assert_table_content(table_id, load_and_parse_json(self.test_table), primary_key="ISBN13")
 
                 # Set up the API
-                client = Client(project=env.cloud_workspace.project_id)
-                api = DatasetAPI(project_id=self.project_id, client=client)
+                api = DatasetAPI(project_id=self.project_id, dataset_id=api_dataset_id)
+                api.seed_db()
                 dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 0)
 
                 now = pendulum.now("Europe/London")  # Use Europe/London to ensure +00UTC timezone
                 with patch(
-                    "dags.oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope.pendulum.now"
+                    "oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope.pendulum.now"
                 ) as mock_now:
                     mock_now.return_value = now
                     ti = env.run_task("add_new_dataset_releases")

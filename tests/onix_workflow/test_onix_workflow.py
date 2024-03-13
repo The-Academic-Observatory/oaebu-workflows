@@ -203,7 +203,7 @@ class TestOnixWorkflow(SandboxTestCase):
                 Workflow(
                     dag_id="onix_workflow_test_dag_load",
                     name="Onix Workflow Test Dag Load",
-                    class_name="dags.oaebu_workflows.onix_workflow.onix_workflow.create_dag",
+                    class_name="oaebu_workflows.onix_workflow.onix_workflow.create_dag",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(
                         sensor_dag_ids=[
@@ -1216,7 +1216,8 @@ class TestOnixWorkflow(SandboxTestCase):
                 ################################
 
                 # Set up the API
-                api = DatasetAPI(project_id=self.gcp_project_id)
+                api = DatasetAPI(project_id=self.gcp_project_id, dataset_id=api_dataset_id)
+                api.seed_db()
                 dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 0)
 

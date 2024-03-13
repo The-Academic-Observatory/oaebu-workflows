@@ -296,7 +296,7 @@ def create_dag(
 
             release = UclDiscoveryRelease.from_dict(release)
             client = Client(project=cloud_workspace.project_id)
-            api = DatasetAPI(project_id=cloud_workspace.project_id, client=client)
+            api = DatasetAPI(project_id=cloud_workspace.project_id, dataset_id=api_dataset_id, client=client)
             api.seed_db()
             dataset_release = DatasetRelease(
                 dag_id=dag_id,

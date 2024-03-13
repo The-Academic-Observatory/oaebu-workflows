@@ -27,7 +27,6 @@ from airflow.utils.state import State
 from click.testing import CliRunner
 from googleapiclient.discovery import build
 from googleapiclient.http import HttpMockSequence
-from google.cloud.bigquery import Client
 
 from oaebu_workflows.config import test_fixtures_folder, module_file_path
 from oaebu_workflows.oaebu_partners import partner_from_str
@@ -99,7 +98,7 @@ class TestTelescopeSetup(SandboxTestCase):
                     Workflow(
                         dag_id="jstor_test_telescope",
                         name="My JSTOR Workflow",
-                        class_name="dags.oaebu_workflows.jstor_telescope.jstor_telescope.create_dag",
+                        class_name="oaebu_workflows.jstor_telescope.jstor_telescope.create_dag",
                         cloud_workspace=self.fake_cloud_workspace,
                         kwargs=dict(entity_id=self.entity_id, entity_type=entity_type),
                     )
@@ -235,7 +234,7 @@ class TestJstorTelescopePublisher(SandboxTestCase):
 
                 # Test download_reports task
                 with httpretty.enabled(), patch(
-                    "dags.oaebu_workflows.jstor_telescope.jstor_telescope.gcs_upload_files"
+                    "oaebu_workflows.jstor_telescope.jstor_telescope.gcs_upload_files"
                 ) as mock_upload:
                     mock_upload.return_value = True
                     for report in [self.country_report, self.institution_report]:
@@ -338,8 +337,8 @@ class TestJstorTelescopePublisher(SandboxTestCase):
                 self.assert_table_integrity(institution_table_id, self.institution_report["table_rows"])
 
                 # Set up the API
-                client=Client(project=env.cloud_workspace.project_id)
-                api = DatasetAPI(project_id=self.project_id, client=client)
+                api = DatasetAPI(project_id=self.project_id, dataset_id=api_dataset_id)
+                api.seed_db()
                 dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 0)
 
@@ -594,8 +593,8 @@ class TestJstorTelescopeCollection(SandboxTestCase):
                 self.assert_table_content(institution_table_id, expected, primary_key="ISBN")
 
                 # Set up the API
-                client=Client(project=env.cloud_workspace.project_id)
-                api = DatasetAPI(project_id=self.project_id, client=client)
+                api = DatasetAPI(project_id=self.project_id, dataset_id=api_dataset_id)
+                api.seed_db()
                 dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 0)
 

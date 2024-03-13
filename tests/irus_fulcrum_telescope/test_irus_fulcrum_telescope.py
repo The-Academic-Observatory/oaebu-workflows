@@ -21,7 +21,6 @@ import pendulum
 import vcr
 from airflow.utils.state import State
 from airflow.models.connection import Connection
-from google.cloud.bigquery import Client
 
 from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.oaebu_partners import partner_from_str
@@ -87,7 +86,7 @@ class TestIrusFulcrumTelescope(SandboxTestCase):
                 Workflow(
                     dag_id="fulcrum_test",
                     name="Fulcrum Telescope",
-                    class_name="dags.oaebu_workflows.irus_fulcrum_telescope.irus_fulcrum_telescope.create_dag",
+                    class_name="oaebu_workflows.irus_fulcrum_telescope.irus_fulcrum_telescope.create_dag",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(publishers=[FAKE_PUBLISHERS]),
                 )
@@ -197,16 +196,14 @@ class TestIrusFulcrumTelescope(SandboxTestCase):
                 )
 
                 # Set up the API
-                client = Client(project=env.cloud_workspace.project_id)
-                api = DatasetAPI(project_id=self.project_id, client=client)
+                api = DatasetAPI(project_id=self.project_id, dataset_id=api_dataset_id)
+                api.seed_db()
                 dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 0)
 
                 # Add_dataset_release_task
                 now = pendulum.now("Europe/London")  # Use Europe/London to ensure +00UTC timezone
-                with patch(
-                    "dags.oaebu_workflows.irus_fulcrum_telescope.irus_fulcrum_telescope.pendulum.now"
-                ) as mock_now:
+                with patch("oaebu_workflows.irus_fulcrum_telescope.irus_fulcrum_telescope.pendulum.now") as mock_now:
                     mock_now.return_value = now
                     ti = env.run_task("add_new_dataset_releases")
                 self.assertEqual(ti.state, State.SUCCESS)

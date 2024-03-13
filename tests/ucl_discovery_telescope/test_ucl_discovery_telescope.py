@@ -77,7 +77,7 @@ class TestUclDiscoveryTelescope(SandboxTestCase):
                 Workflow(
                     dag_id="ucl_discovery",
                     name="UCL Discovery Telescope",
-                    class_name="dags.oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.create_dag",
+                    class_name="oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.create_dag",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(sheet_id="foo"),
                 )
@@ -155,7 +155,7 @@ class TestUclDiscoveryTelescope(SandboxTestCase):
             cassette = vcr.VCR(record_mode="none")
             sa_patch = patch("oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.service_account")
             conn_patch = patch(
-                "dags.oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.BaseHook.get_connection"
+                "oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.BaseHook.get_connection"
             )
             build_patch = patch("oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.discovery.build")
             with sa_patch, conn_patch, build_patch as mock_build, cassette.use_cassette(
@@ -215,8 +215,8 @@ class TestUclDiscoveryTelescope(SandboxTestCase):
             ###################
 
             # Set up the API
-            client = Client(project=env.cloud_workspace.project_id)
-            api = DatasetAPI(project_id=self.project_id, client=client)
+            api = DatasetAPI(project_id=env.cloud_workspace.project_id, dataset_id=api_dataset_id)
+            api.seed_db()
             dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
             self.assertEqual(len(dataset_releases), 0)
 

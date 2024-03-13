@@ -96,7 +96,7 @@ class TestOnixTelescope(SandboxTestCase):
                 Workflow(
                     dag_id="onix",
                     name="ONIX Telescope",
-                    class_name="dags.oaebu_workflows.onix_telescope.onix_telescope.create_dag",
+                    class_name="oaebu_workflows.onix_telescope.onix_telescope.create_dag",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(date_regex=self.date_regex),
                 )
@@ -212,8 +212,8 @@ class TestOnixTelescope(SandboxTestCase):
                 self.assertTrue(os.path.isfile(finished_path))
 
                 # Set up the API
-                client = Client(project=env.cloud_workspace.project_id)
-                api = DatasetAPI(project_id=self.project_id, client=client)
+                api = DatasetAPI(project_id=self.project_id, dataset_id=api_dataset_id)
+                api.seed_db()
                 dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 0)
 
