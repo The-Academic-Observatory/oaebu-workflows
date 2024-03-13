@@ -21,7 +21,7 @@ import json
 import unittest
 from unittest.mock import patch
 
-from dags.oaebu_workflows.onix_utils import (
+from oaebu_workflows.onix_utils import (
     OnixTransformer,
     collapse_subjects,
     create_personname_fields,
@@ -35,7 +35,7 @@ from dags.oaebu_workflows.onix_utils import (
     remove_invalid_products,
     deduplicate_related_products,
 )
-from dags.oaebu_workflows.config import test_fixtures_folder, schema_folder
+from oaebu_workflows.config import test_fixtures_folder, schema_folder
 from observatory_platform.files import load_jsonl
 from observatory_platform.sandbox.test_utils import SandboxTestCase, compare_lists_of_dicts
 
@@ -159,7 +159,7 @@ class TestOnixFunctions(SandboxTestCase):
         """Tests the onix_parser_download and onix_parser_execute functions"""
         with TemporaryDirectory() as tempdir:
             ### Test parser download - fails ###
-            with patch("dags.oaebu_workflows.onix_utils.download_file") as mock_download:
+            with patch("oaebu_workflows.onix_utils.download_file") as mock_download:
                 mock_download.return_value = (False, "")
                 success, parser_path = onix_parser_download(download_dir=tempdir)
                 self.assertEqual(success, False)
@@ -183,9 +183,9 @@ class TestOnixFunctions(SandboxTestCase):
             ### Test parser_execute: nonzero returncode ###
             onix_fixtures = test_fixtures_folder(workflow_module="onix_telescope")
             shutil.copy(os.path.join(onix_fixtures, "20210330_CURTINPRESS_ONIX.xml"), input_dir)
-            with patch("dags.oaebu_workflows.onix_utils.wait_for_process") as mock_wfp:
+            with patch("oaebu_workflows.onix_utils.wait_for_process") as mock_wfp:
                 mock_wfp.return_value = ("stdout", "stderr")
-                with patch("dags.oaebu_workflows.onix_utils.subprocess.Popen") as mock_popen:
+                with patch("oaebu_workflows.onix_utils.subprocess.Popen") as mock_popen:
                     mock_popen.returncode = 1
                     success = onix_parser_execute(parser_path=parser_path, input_dir=input_dir, output_dir=output_dir)
             self.assertEqual(success, False)

@@ -28,9 +28,9 @@ from click.testing import CliRunner
 from googleapiclient.discovery import build
 from googleapiclient.http import HttpMockSequence
 
-from dags.oaebu_workflows.config import test_fixtures_folder, module_file_path
-from dags.oaebu_workflows.oaebu_partners import partner_from_str
-from dags.oaebu_workflows.jstor_telescope.jstor_telescope import (
+from oaebu_workflows.config import test_fixtures_folder, module_file_path
+from oaebu_workflows.oaebu_partners import partner_from_str
+from oaebu_workflows.jstor_telescope.jstor_telescope import (
     JSTOR_PROCESSED_LABEL_NAME,
     JstorRelease,
     JstorPublishersAPI,
@@ -168,8 +168,8 @@ class TestJstorTelescopePublisher(SandboxTestCase):
             },
         }
 
-    @patch("dags.oaebu_workflows.jstor_telescope.jstor_telescope.build")
-    @patch("dags.oaebu_workflows.jstor_telescope.jstor_telescope.Credentials")
+    @patch("oaebu_workflows.jstor_telescope.jstor_telescope.build")
+    @patch("oaebu_workflows.jstor_telescope.jstor_telescope.Credentials")
     def test_telescope_publisher(self, mock_account_credentials, mock_build):
         """Test the Jstor telescope end to end."""
 
@@ -343,7 +343,7 @@ class TestJstorTelescopePublisher(SandboxTestCase):
 
                 # Add_dataset_release_task
                 now = pendulum.now("Europe/London")  # Use Europe/London to ensure +00UTC timezone
-                with patch("dags.oaebu_workflows.jstor_telescope.jstor_telescope.pendulum.now") as mock_now:
+                with patch("oaebu_workflows.jstor_telescope.jstor_telescope.pendulum.now") as mock_now:
                     mock_now.return_value = now
                     ti = env.run_task("process_release.add_new_dataset_releases", map_index=0)
                 self.assertEqual(ti.state, State.SUCCESS)
@@ -448,8 +448,8 @@ class TestJstorTelescopeCollection(SandboxTestCase):
             "table_rows": 6,
         }
 
-    @patch("dags.oaebu_workflows.jstor_telescope.jstor_telescope.build")
-    @patch("dags.oaebu_workflows.jstor_telescope.jstor_telescope.Credentials")
+    @patch("oaebu_workflows.jstor_telescope.jstor_telescope.build")
+    @patch("oaebu_workflows.jstor_telescope.jstor_telescope.Credentials")
     def test_telescope_collection(self, mock_account_credentials, mock_build):
         """Test the Jstor telescope end to end."""
 
@@ -598,7 +598,7 @@ class TestJstorTelescopeCollection(SandboxTestCase):
 
                 # Add_dataset_release_task
                 now = pendulum.now("Europe/London")  # Use Europe/London to ensure +00UTC timezone
-                with patch("dags.oaebu_workflows.jstor_telescope.jstor_telescope.pendulum.now") as mock_now:
+                with patch("oaebu_workflows.jstor_telescope.jstor_telescope.pendulum.now") as mock_now:
                     mock_now.return_value = now
                     ti = env.run_task("process_release.add_new_dataset_releases", map_index=0)
                 self.assertEqual(ti.state, State.SUCCESS)
@@ -659,8 +659,8 @@ class TestJstorTelescopeCollection(SandboxTestCase):
                 api.get_release_date(reports[1]["file"])
 
 
-@patch("dags.oaebu_workflows.jstor_telescope.jstor_telescope.build")
-@patch("dags.oaebu_workflows.jstor_telescope.jstor_telescope.Credentials")
+@patch("oaebu_workflows.jstor_telescope.jstor_telescope.build")
+@patch("oaebu_workflows.jstor_telescope.jstor_telescope.Credentials")
 def test_get_label_id(self, mock_account_credentials, mock_build):
     """Test getting label id both when label already exists and does not exist yet."""
     mock_account_credentials.from_json_keyfile_dict.return_value = ""

@@ -22,9 +22,9 @@ import pendulum
 from airflow.models import Connection
 from airflow.utils.state import State
 
-from dags.oaebu_workflows.onix_telescope.onix_telescope import OnixRelease, create_dag
-from dags.oaebu_workflows.oaebu_partners import partner_from_str
-from dags.oaebu_workflows.config import test_fixtures_folder, module_file_path
+from oaebu_workflows.onix_telescope.onix_telescope import OnixRelease, create_dag
+from oaebu_workflows.oaebu_partners import partner_from_str
+from oaebu_workflows.config import test_fixtures_folder, module_file_path
 from observatory_platform.dataset_api import DatasetAPI
 from observatory_platform.google.bigquery import bq_sharded_table_id
 from observatory_platform.google.gcs import gcs_blob_name_from_path
@@ -67,23 +67,23 @@ class TestOnixTelescope(SandboxTestCase):
         )
         self.assert_dag_structure(
             {
-                "check_dependencies": ["make_release"],
-                "make_release": [
-                    "move_files_to_in_progress",
-                    "download",
-                    "transform",
-                    "bq_load",
-                    "move_files_to_finished",
-                    "add_new_dataset_releases",
-                    "cleanup_workflow",
+                "check_dependencies": ["fetch_releases"],
+                "fetch_releases": [
+                    "process_release.move_files_to_in_progress",
+                    "process_release.download",
+                    "process_release.transform",
+                    "process_release.bq_load",
+                    "process_release.move_files_to_finished",
+                    "process_release.add_new_dataset_releases",
+                    "process_release.cleanup_workflow",
                 ],
-                "move_files_to_in_progress": ["download"],
-                "download": ["transform"],
-                "transform": ["bq_load"],
-                "bq_load": ["move_files_to_finished"],
-                "move_files_to_finished": ["add_new_dataset_releases"],
-                "add_new_dataset_releases": ["cleanup_workflow"],
-                "cleanup_workflow": [],
+                "process_release.move_files_to_in_progress": ["process_release.download"],
+                "process_release.download": ["process_release.transform"],
+                "process_release.transform": ["process_release.bq_load"],
+                "process_release.bq_load": ["process_release.move_files_to_finished"],
+                "process_release.move_files_to_finished": ["process_release.add_new_dataset_releases"],
+                "process_release.add_new_dataset_releases": ["process_release.cleanup_workflow"],
+                "process_release.cleanup_workflow": [],
             },
             dag,
         )
@@ -116,7 +116,7 @@ class TestOnixTelescope(SandboxTestCase):
 
     def test_telescope(self):
         """Test the ONIX telescope end to end."""
-        # Setup Observatory environment
+        # Setup Observatory environmento
         env = SandboxEnvironment(self.project_id, self.data_location)
         sftp_server = SftpServer(host="localhost", port=self.sftp_port)
 
@@ -154,9 +154,9 @@ class TestOnixTelescope(SandboxTestCase):
                 shutil.copy(self.onix_xml_path, onix_file_dst)
 
                 # Get release info from SFTP server and check that the correct release info is returned via Xcom
-                ti = env.run_task("make_release")
+                ti = env.run_task("fetch_releases")
                 self.assertEqual(ti.state, State.SUCCESS)
-                release_dicts = ti.xcom_pull(task_ids="make_release", include_prior_dates=False)
+                release_dicts = ti.xcom_pull(task_ids="fetch_releases", include_prior_dates=False)
                 expected_release_dicts = [
                     {
                         "dag_id": "onix_telescope_test",
@@ -169,14 +169,14 @@ class TestOnixTelescope(SandboxTestCase):
                 release = OnixRelease.from_dict(release_dicts[0])
 
                 # Test move file to in progress
-                ti = env.run_task("move_files_to_in_progress")
+                ti = env.run_task("process_release.move_files_to_in_progress", map_index=0)
                 self.assertEqual(ti.state, State.SUCCESS)
                 in_progress_path = os.path.join(local_sftp_folders.in_progress, release.onix_file_name)
                 self.assertFalse(os.path.isfile(onix_file_dst))
                 self.assertTrue(os.path.isfile(in_progress_path))
 
                 # Test download
-                ti = env.run_task("download")
+                ti = env.run_task("process_release.download", map_index=0)
                 self.assertEqual(ti.state, State.SUCCESS)
                 self.assert_file_integrity(release.download_path, "28f85c488ab01b0cff769d9da6b4be24", "md5")
                 self.assert_blob_integrity(
@@ -184,7 +184,7 @@ class TestOnixTelescope(SandboxTestCase):
                 )
 
                 # Test transform
-                ti = env.run_task("transform")
+                ti = env.run_task("process_release.transform", map_index=0)
                 self.assertEqual(ti.state, State.SUCCESS)
                 self.assert_file_integrity(release.transform_path, "2164a300", "gzip_crc")
                 self.assert_blob_integrity(
@@ -192,7 +192,7 @@ class TestOnixTelescope(SandboxTestCase):
                 )
 
                 # Test load into BigQuery
-                ti = env.run_task("bq_load")
+                ti = env.run_task("process_release.bq_load", map_index=0)
                 self.assertEqual(ti.state, State.SUCCESS)
                 table_id = bq_sharded_table_id(
                     env.cloud_workspace.project_id,
@@ -204,7 +204,7 @@ class TestOnixTelescope(SandboxTestCase):
                 self.assert_table_content(table_id, load_and_parse_json(self.onix_json_path), primary_key="ISBN13")
 
                 # Test move files to finished
-                ti = env.run_task("move_files_to_finished")
+                ti = env.run_task("process_release.move_files_to_finished", map_index=0)
                 self.assertEqual(ti.state, State.SUCCESS)
                 finished_path = os.path.join(local_sftp_folders.finished, onix_file_name)
                 self.assertFalse(os.path.isfile(local_sftp_folders.in_progress))
@@ -217,9 +217,9 @@ class TestOnixTelescope(SandboxTestCase):
 
                 # Set up the API
                 now = pendulum.now("Europe/London")  # Use Europe/London to ensure +00UTC timezone
-                with patch("dags.oaebu_workflows.onix_telescope.onix_telescope.pendulum.now") as mock_now:
+                with patch("oaebu_workflows.onix_telescope.onix_telescope.pendulum.now") as mock_now:
                     mock_now.return_value = now
-                    ti = env.run_task("add_new_dataset_releases")
+                    ti = env.run_task("process_release.add_new_dataset_releases", map_index=0)
                 self.assertEqual(ti.state, State.SUCCESS)
                 dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 1)
@@ -237,12 +237,12 @@ class TestOnixTelescope(SandboxTestCase):
                     "changefile_end_date": None,
                     "sequence_start": None,
                     "sequence_end": None,
-                    "extra": "null",
+                    "extra": None,
                 }
                 self.assertEqual(expected_release, dataset_releases[0].to_dict())
 
                 # Test cleanup
                 workflow_folder_path = release.workflow_folder
-                ti = env.run_task("cleanup_workflow")
+                ti = env.run_task("process_release.cleanup_workflow", map_index=0)
                 self.assertEqual(ti.state, State.SUCCESS)
                 self.assert_cleanup(workflow_folder_path)

@@ -387,7 +387,7 @@ def partner_from_str(partner: Union[str, OaebuPartner], metadata_partner: bool =
     :return: The OaebuPartner
     """
 
-    if isinstance(partner, OaebuPartner):
+    if not isinstance(partner, str):
         return partner
 
     partners_dict = OAEBU_METADATA_PARTNERS if metadata_partner else OAEBU_DATA_PARTNERS

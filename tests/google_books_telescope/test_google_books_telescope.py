@@ -24,9 +24,9 @@ from airflow.models.connection import Connection
 from airflow.utils.state import State
 from click.testing import CliRunner
 
-from dags.oaebu_workflows.config import test_fixtures_folder, module_file_path
-from dags.oaebu_workflows.oaebu_partners import partner_from_str
-from dags.oaebu_workflows.google_books_telescope.google_books_telescope import (
+from oaebu_workflows.config import test_fixtures_folder, module_file_path
+from oaebu_workflows.oaebu_partners import partner_from_str
+from oaebu_workflows.google_books_telescope.google_books_telescope import (
     GoogleBooksRelease,
     create_dag,
     gb_transform,

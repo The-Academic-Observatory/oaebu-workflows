@@ -18,7 +18,7 @@
 import unittest
 from unittest.mock import patch
 
-from dags.oaebu_workflows.oaebu_partners import (
+from oaebu_workflows.oaebu_partners import (
     OaebuPartner,
     DataPartner,
     partner_from_str,
@@ -59,8 +59,8 @@ MOCK_METADATA_PARTNERS = {
 
 
 class TestPartnerFromStr(unittest.TestCase):
-    @patch.dict("dags.oaebu_workflows.oaebu_partners.OAEBU_METADATA_PARTNERS", MOCK_METADATA_PARTNERS)
-    @patch.dict("dags.oaebu_workflows.oaebu_partners.OAEBU_DATA_PARTNERS", MOCK_DATA_PARTNERS)
+    @patch.dict("oaebu_workflows.oaebu_partners.OAEBU_METADATA_PARTNERS", MOCK_METADATA_PARTNERS)
+    @patch.dict("oaebu_workflows.oaebu_partners.OAEBU_DATA_PARTNERS", MOCK_DATA_PARTNERS)
     def test_valid_partner_name_string(self):
         # Call the function with a valid partner name string
         result = partner_from_str("data_partner")
@@ -72,8 +72,8 @@ class TestPartnerFromStr(unittest.TestCase):
         result = partner_from_str(OAEBU_METADATA_PARTNERS["md_partner"], metadata_partner=True)
         self.assertEqual(result, OAEBU_METADATA_PARTNERS["md_partner"])
 
-    @patch.dict("dags.oaebu_workflows.oaebu_partners.OAEBU_METADATA_PARTNERS", MOCK_METADATA_PARTNERS)
-    @patch.dict("dags.oaebu_workflows.oaebu_partners.OAEBU_DATA_PARTNERS", MOCK_DATA_PARTNERS)
+    @patch.dict("oaebu_workflows.oaebu_partners.OAEBU_METADATA_PARTNERS", MOCK_METADATA_PARTNERS)
+    @patch.dict("oaebu_workflows.oaebu_partners.OAEBU_DATA_PARTNERS", MOCK_DATA_PARTNERS)
     def test_invalid_partner_name_string(self):
         # Call the function with an invalid partner name string
         with self.assertRaisesRegex(KeyError, "Partner not found: invalid_partner"):

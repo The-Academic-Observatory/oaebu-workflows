@@ -26,9 +26,9 @@ from airflow.exceptions import AirflowException
 from airflow.utils.state import State
 from tenacity import stop_after_attempt
 
-from dags.oaebu_workflows.config import test_fixtures_folder, module_file_path
-from dags.oaebu_workflows.oaebu_partners import partner_from_str
-from dags.oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope import (
+from oaebu_workflows.config import test_fixtures_folder, module_file_path
+from oaebu_workflows.oaebu_partners import partner_from_str
+from oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope import (
     OapenMetadataRelease,
     download_metadata,
     create_dag,
@@ -215,7 +215,7 @@ class TestOapenMetadataTelescope(SandboxTestCase):
                     "changefile_end_date": None,
                     "sequence_start": None,
                     "sequence_end": None,
-                    "extra": "null",
+                    "extra": None,
                 }
                 self.assertEqual(expected_release, dataset_releases[0].to_dict())
 
