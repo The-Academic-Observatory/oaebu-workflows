@@ -39,7 +39,7 @@ jobs:
         run: |
           ls 
           echo "-------------"
-          echo "PYTHONPATH=$HOME/oaebu-workflows/oaebu_workflows/dags" >> "$GITHUB_ENV"
+          echo "PYTHONPATH=$HOME/work/oaebu-workflows/oaebu-workflows/dags" >> "$GITHUB_ENV"
           echo "-------------"
           pwd
           echo "-------------"
