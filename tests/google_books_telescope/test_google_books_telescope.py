@@ -60,23 +60,23 @@ class TestGoogleBooksTelescope(SandboxTestCase):
         dag = create_dag(dag_id="test_dag", cloud_workspace=self.fake_cloud_workspace, sftp_root="/")
         self.assert_dag_structure(
             {
-                "check_dependencies": ["make_release"],
-                "make_release": [
-                    "move_files_to_in_progress",
-                    "download",
-                    "transform",
-                    "move_files_to_finished",
-                    "bq_load",
-                    "add_new_dataset_releases",
-                    "cleanup_workflow",
+                "check_dependencies": ["fetch_releases"],
+                "fetch_releases": [
+                    "process_release.move_files_to_in_progress",
+                    "process_release.download",
+                    "process_release.transform",
+                    "process_release.move_files_to_finished",
+                    "process_release.bq_load",
+                    "process_release.add_new_dataset_release",
+                    "process_release.cleanup_workflow",
                 ],
-                "move_files_to_in_progress": ["download"],
-                "download": ["transform"],
-                "transform": ["move_files_to_finished"],
-                "move_files_to_finished": ["bq_load"],
-                "bq_load": ["add_new_dataset_releases"],
-                "add_new_dataset_releases": ["cleanup_workflow"],
-                "cleanup_workflow": [],
+                "process_release.move_files_to_in_progress": ["process_release.download"],
+                "process_release.download": ["process_release.transform"],
+                "process_release.transform": ["process_release.move_files_to_finished"],
+                "process_release.move_files_to_finished": ["process_release.bq_load"],
+                "process_release.bq_load": ["process_release.add_new_dataset_release"],
+                "process_release.add_new_dataset_release": ["process_release.cleanup_workflow"],
+                "process_release.cleanup_workflow": [],
             },
             dag,
         )
@@ -163,9 +163,9 @@ class TestGoogleBooksTelescope(SandboxTestCase):
                         shutil.copy(file_path, upload_file)
 
                     # Test that make release is successful
-                    ti = env.run_task("make_release")
+                    ti = env.run_task("fetch_releases")
                     self.assertEqual(ti.state, State.SUCCESS)
-                    release_dicts = ti.xcom_pull(task_ids="make_release", include_prior_dates=False)
+                    release_dicts = ti.xcom_pull(task_ids="fetch_releases", include_prior_dates=False)
                     expected_release_dicts = [
                         {
                             "dag_id": "google_books_test",
@@ -181,7 +181,7 @@ class TestGoogleBooksTelescope(SandboxTestCase):
                     release = GoogleBooksRelease.from_dict(release_dicts[0])
 
                     # Test move file to in progress
-                    ti = env.run_task("move_files_to_in_progress")
+                    ti = env.run_task("process_release.move_files_to_in_progress", map_index=0)
                     self.assertEqual(ti.state, State.SUCCESS)
                     for file in release.sftp_files:
                         file_name = os.path.basename(file)
@@ -191,13 +191,13 @@ class TestGoogleBooksTelescope(SandboxTestCase):
                         self.assertTrue(os.path.isfile(in_progress_file))
 
                     # Run main telescope tasks
-                    ti = env.run_task("download")
+                    ti = env.run_task("process_release.download", map_index=0)
                     self.assertEqual(ti.state, State.SUCCESS)
-                    ti = env.run_task("transform")
+                    ti = env.run_task("process_release.transform", map_index=0)
                     self.assertEqual(ti.state, State.SUCCESS)
-                    ti = env.run_task("move_files_to_finished")
+                    ti = env.run_task("process_release.move_files_to_finished", map_index=0)
                     self.assertEqual(ti.state, State.SUCCESS)
-                    ti = env.run_task("bq_load")
+                    ti = env.run_task("process_release.bq_load", map_index=0)
                     self.assertEqual(ti.state, State.SUCCESS)
 
                     # Make assertions for the above tasks
@@ -273,7 +273,7 @@ class TestGoogleBooksTelescope(SandboxTestCase):
                         "dags.oaebu_workflows.google_books_telescope.google_books_telescope.pendulum.now"
                     ) as mock_now:
                         mock_now.return_value = now
-                        ti = env.run_task("add_new_dataset_releases")
+                        ti = env.run_task("process_release.add_new_dataset_release", map_index=0)
                     self.assertEqual(ti.state, State.SUCCESS)
                     dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                     self.assertEqual(len(dataset_releases), 1)
@@ -291,13 +291,13 @@ class TestGoogleBooksTelescope(SandboxTestCase):
                         "changefile_end_date": None,
                         "sequence_start": None,
                         "sequence_end": None,
-                        "extra": "null",
+                        "extra": None,
                     }
                     self.assertEqual(expected_release, dataset_releases[0].to_dict())
 
                     # Test cleanup
                     workflow_folder_path = release.workflow_folder
-                    ti = env.run_task("cleanup_workflow")
+                    ti = env.run_task("process_release.cleanup_workflow", map_index=0)
                     self.assertEqual(ti.state, State.SUCCESS)
                     self.assert_cleanup(workflow_folder_path)
 

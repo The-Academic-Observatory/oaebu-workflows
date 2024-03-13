@@ -25,9 +25,9 @@ from airflow.utils.state import State
 from googleapiclient.discovery import build
 from googleapiclient.http import HttpMockSequence
 
-from dags.oaebu_workflows.google_analytics3_telescope.google_analytics3_telescope import GoogleAnalytics3Telescope
-from dags.oaebu_workflows.oaebu_partners import partner_from_str
-from dags.oaebu_workflows.config import test_fixtures_folder
+from oaebu_workflows.google_analytics3_telescope.google_analytics3_telescope import GoogleAnalytics3Telescope
+from oaebu_workflows.oaebu_partners import partner_from_str
+from oaebu_workflows.config import test_fixtures_folder
 from observatory.platform.api import get_dataset_releases
 from observatory.platform.observatory_config import Workflow
 from observatory.platform.bigquery import bq_table_id

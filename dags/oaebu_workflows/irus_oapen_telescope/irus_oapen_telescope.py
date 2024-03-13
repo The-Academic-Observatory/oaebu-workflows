@@ -208,51 +208,51 @@ def create_dag(
             ]
             return [r.to_dict() for r in releases]
 
-        @task_group(group_id="process_release")
-        def process_release(data, **context):
-            @task()
-            def create_cloud_function_(release: dict, **context):
-                """Task to create the cloud function for each release."""
+        @task()
+        def create_cloud_function_(releases: List[dict], **context):
+            """Task to create the cloud function for each release."""
 
-                release = IrusOapenRelease.from_dict(release)
-                # set up cloud function variables
-                location = f"projects/{gdpr_oapen_project_id}/locations/{IRUS_FUNCTION_REGION}"
-                full_name = f"{location}/functions/{IRUS_FUNCTION_NAME}"
+            release = IrusOapenRelease.from_dict(releases[0])
+            # set up cloud function variables
+            location = f"projects/{gdpr_oapen_project_id}/locations/{IRUS_FUNCTION_REGION}"
+            full_name = f"{location}/functions/{IRUS_FUNCTION_NAME}"
 
-                # zip source code and upload to bucket
-                success, upload = upload_source_code_to_bucket(
-                    source_url=IRUS_FUNCTION_SOURCE_URL,
-                    project_id=gdpr_oapen_project_id,
-                    bucket_name=gdpr_oapen_bucket_id,
+            # zip source code and upload to bucket
+            success, upload = upload_source_code_to_bucket(
+                source_url=IRUS_FUNCTION_SOURCE_URL,
+                project_id=gdpr_oapen_project_id,
+                bucket_name=gdpr_oapen_bucket_id,
+                blob_name=IRUS_FUNCTION_BLOB_NAME,
+                cloud_function_path=release.cloud_function_path,
+            )
+            set_task_state(success, context["ti"].task_id, release=release)
+
+            # initialise cloud functions api
+            creds = ServiceAccountCredentials.from_json_keyfile_name(os.environ.get(environment_vars.CREDENTIALS))
+            service = build(
+                "cloudfunctions", "v2beta", credentials=creds, cache_discovery=False, static_discovery=False
+            )
+
+            # update or create cloud function
+            exists = cloud_function_exists(service, full_name)
+            if not exists or upload is True:
+                update = True if exists else False
+                success, msg = create_cloud_function(
+                    service=service,
+                    location=location,
+                    full_name=full_name,
+                    source_bucket=gdpr_oapen_bucket_id,
                     blob_name=IRUS_FUNCTION_BLOB_NAME,
-                    cloud_function_path=release.cloud_function_path,
+                    max_active_runs=max_cloud_function_instances,
+                    update=update,
                 )
                 set_task_state(success, context["ti"].task_id, release=release)
+                logging.info(f"Creating or patching cloud function successful, response: {msg}")
+            else:
+                logging.info(f"Using existing cloud function, source code has not changed.")
 
-                # initialise cloud functions api
-                creds = ServiceAccountCredentials.from_json_keyfile_name(os.environ.get(environment_vars.CREDENTIALS))
-                service = build(
-                    "cloudfunctions", "v2beta", credentials=creds, cache_discovery=False, static_discovery=False
-                )
-
-                # update or create cloud function
-                exists = cloud_function_exists(service, full_name)
-                if not exists or upload is True:
-                    update = True if exists else False
-                    success, msg = create_cloud_function(
-                        service=service,
-                        location=location,
-                        full_name=full_name,
-                        source_bucket=gdpr_oapen_bucket_id,
-                        blob_name=IRUS_FUNCTION_BLOB_NAME,
-                        max_active_runs=max_cloud_function_instances,
-                        update=update,
-                    )
-                    set_task_state(success, context["ti"].task_id, release=release)
-                    logging.info(f"Creating or patching cloud function successful, response: {msg}")
-                else:
-                    logging.info(f"Using existing cloud function, source code has not changed.")
-
+        @task_group(group_id="process_release")
+        def process_release(data, **context):
             @task()
             def call_cloud_function_(release: dict, **context):
                 """Task to call the cloud function for each release."""
@@ -402,8 +402,7 @@ def create_dag(
                 )
 
             (
-                create_cloud_function_(data)
-                >> call_cloud_function_(data, task_concurrency=1)
+                call_cloud_function_(data)
                 >> transfer(data)
                 >> transform(data)
                 >> bq_load(data)
@@ -416,9 +415,10 @@ def create_dag(
             airflow_conns=[geoip_license_conn_id, irus_oapen_api_conn_id, irus_oapen_login_conn_id]
         )
         xcom_release = fetch_releases()
+        cloud_function_task = create_cloud_function_(xcom_release, task_concurrency=1)
         process_release_task_group = process_release.expand(data=xcom_release)
 
-        (task_check_dependencies >> xcom_release >> process_release_task_group)
+        (task_check_dependencies >> xcom_release >> cloud_function_task >> process_release_task_group)
 
     return irus_oapen()
 

@@ -202,14 +202,14 @@ def create_dag(
             """Process the Google Books release."""
 
             @task
-            def move_files_to_in_progress(release: List[dict], **context) -> None:
+            def move_files_to_in_progress(release: dict, **context) -> None:
                 """Move Google Books files to SFTP in-progress folder."""
 
                 release = GoogleBooksRelease.from_dict(release)
                 sftp_folders.move_files_to_in_progress(release.sftp_files)
 
             @task
-            def download(release: List[dict], **context) -> None:
+            def download(release: dict, **context) -> None:
                 """Downloads the Google Books release and uploads them to GCS"""
 
                 release = GoogleBooksRelease.from_dict(release)
@@ -234,7 +234,7 @@ def create_dag(
                     )
 
             @task
-            def transform(release: List[dict], **context) -> None:
+            def transform(release: dict, **context) -> None:
                 """Transforms the Google Books release and uploads them to GCS"""
 
                 release = GoogleBooksRelease.from_dict(release)
@@ -272,14 +272,14 @@ def create_dag(
                     )
 
             @task
-            def move_files_to_finished(release: List[dict], **context) -> None:
+            def move_files_to_finished(release: dict, **context) -> None:
                 """Move Google Books files to SFTP finished folder."""
 
                 release = GoogleBooksRelease.from_dict(release)
                 sftp_folders.move_files_to_finished(release.sftp_files)
 
             @task
-            def bq_load(release: List[dict], **context) -> None:
+            def bq_load(release: dict, **context) -> None:
                 """Loads the sales and traffic data into BigQuery"""
 
                 release = GoogleBooksRelease.from_dict(release)
@@ -312,7 +312,7 @@ def create_dag(
                     set_task_state(success, context["ti"].task_id, release=release)
 
             @task
-            def add_new_dataset_release(release: List[dict], **context) -> None:
+            def add_new_dataset_release(release: dict, **context) -> None:
                 """Adds release information to API."""
 
                 release = GoogleBooksRelease.from_dict(release)
@@ -332,7 +332,7 @@ def create_dag(
                 api.add_dataset_release(dataset_release)
 
             @task
-            def cleanup_workflow(release: List[dict], **context) -> None:
+            def cleanup_workflow(release: dict, **context) -> None:
                 """Delete all files, folders and XComs associated with this release."""
 
                 release = GoogleBooksRelease.from_dict(release)

@@ -283,7 +283,7 @@ def create_dag(
             def transform(release: dict, **context) -> None:
                 """Task to transform the Jstor releases for a given month."""
 
-                release = JstorRelease(release)
+                release = JstorRelease.from_dict(release)
                 api = make_jstor_api(entity_type, entity_id)
                 # Download files from GCS
                 success = gcs_download_blob(
@@ -319,7 +319,7 @@ def create_dag(
             def bq_load(release: dict, **context) -> None:
                 """Loads the sales and traffic data into BigQuery"""
 
-                release = JstorRelease(release)
+                release = JstorRelease.from_dict(release)
                 client = Client(project=cloud_workspace.project_id)
                 for partner, table_description, file_path in [
                     (country_partner, bq_country_table_description, release.transform_country_path),
@@ -356,7 +356,7 @@ def create_dag(
             def add_new_dataset_releases(release: dict, **context) -> None:
                 """Adds release information to API."""
 
-                release = JstorRelease(release)
+                release = JstorRelease.from_dict(release)
                 client = Client(project=cloud_workspace.project_id)
                 api = DatasetAPI(project_id=cloud_workspace.project_id, client=client)
                 api.seed_db()
@@ -377,7 +377,7 @@ def create_dag(
                 """Delete all files, folders and XComs associated with this release.
                 Assign a label to the gmail messages that have been processed."""
 
-                release = JstorRelease(release)
+                release = JstorRelease.from_dict(release)
                 api = make_jstor_api(entity_type, entity_id)
                 cleanup(
                     dag_id=dag_id,

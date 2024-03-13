@@ -79,23 +79,23 @@ class TestIrusOapenTelescope(SandboxTestCase):
         )
         self.assert_dag_structure(
             {
-                "check_dependencies": ["make_release"],
-                "make_release": [
+                "check_dependencies": ["fetch_releases"],
+                "fetch_releases": [
+                    "process_release.transfer",
+                    "process_release.transform",
+                    "process_release.call_cloud_function_",
                     "create_cloud_function_",
-                    "call_cloud_function_",
-                    "transfer",
-                    "transform",
-                    "bq_load",
-                    "add_new_dataset_releases",
-                    "cleanup_workflow",
+                    "process_release.bq_load",
+                    "process_release.add_new_dataset_releases",
+                    "process_release.cleanup_workflow",
                 ],
-                "create_cloud_function_": ["call_cloud_function_"],
-                "call_cloud_function_": ["transfer"],
-                "transfer": ["transform"],
-                "transform": ["bq_load"],
-                "bq_load": ["add_new_dataset_releases"],
-                "add_new_dataset_releases": ["cleanup_workflow"],
-                "cleanup_workflow": [],
+                "create_cloud_function_": ["process_release.call_cloud_function_"],
+                "process_release.call_cloud_function_": ["process_release.transfer"],
+                "process_release.transfer": ["process_release.transform"],
+                "process_release.transform": ["process_release.bq_load"],
+                "process_release.bq_load": ["process_release.add_new_dataset_releases"],
+                "process_release.add_new_dataset_releases": ["process_release.cleanup_workflow"],
+                "process_release.cleanup_workflow": [],
             },
             dag,
         )
@@ -200,9 +200,9 @@ class TestIrusOapenTelescope(SandboxTestCase):
                 self.assertEqual(ti.state, State.SUCCESS)
 
                 # Make the release
-                ti = env.run_task("make_release")
+                ti = env.run_task("fetch_releases")
                 self.assertEqual(ti.state, State.SUCCESS)
-                release_dicts = ti.xcom_pull(task_ids="make_release", include_prior_dates=False)
+                release_dicts = ti.xcom_pull(task_ids="fetch_releases", include_prior_dates=False)
                 expected_release_dicts = [
                     {
                         "dag_id": "irus_oapen_test",
@@ -233,7 +233,7 @@ class TestIrusOapenTelescope(SandboxTestCase):
                     )
                     url = "https://oapen-access-stats-kkinbzaigla-ew.a.run.app"
                     httpretty.register_uri(httpretty.POST, url, body="")
-                    ti = env.run_task("call_cloud_function_")
+                    ti = env.run_task("process_release.call_cloud_function_", map_index=0)
                     self.assertEqual(ti.state, State.SUCCESS)
 
                 # Test transfer task
@@ -242,12 +242,12 @@ class TestIrusOapenTelescope(SandboxTestCase):
                     blob_name=release.download_blob_name,
                     file_path=self.download_path,
                 )
-                ti = env.run_task("transfer")
+                ti = env.run_task("process_release.transfer", map_index=0)
                 self.assertEqual(ti.state, State.SUCCESS)
                 self.assert_blob_integrity(env.download_bucket, release.download_blob_name, self.download_path)
 
                 # Test transform task
-                ti = env.run_task("transform")
+                ti = env.run_task("process_release.transform", map_index=0)
                 self.assertEqual(ti.state, State.SUCCESS)
                 self.assertTrue(os.path.exists(release.transform_path))
                 self.assert_file_integrity(release.transform_path, "0b111b2f", "gzip_crc")
@@ -256,7 +256,7 @@ class TestIrusOapenTelescope(SandboxTestCase):
                 )
 
                 # Test that data loads into BigQuery
-                ti = env.run_task("bq_load")
+                ti = env.run_task("process_release.bq_load", map_index=0)
                 self.assertEqual(ti.state, State.SUCCESS)
                 table_id = bq_table_id(
                     project_id=env.cloud_workspace.project_id,
@@ -277,7 +277,7 @@ class TestIrusOapenTelescope(SandboxTestCase):
                 now = pendulum.now("Europe/London")  # Use Europe/London to ensure +00UTC timezone
                 with patch("dags.oaebu_workflows.irus_oapen_telescope.irus_oapen_telescope.pendulum.now") as mock_now:
                     mock_now.return_value = now
-                    ti = env.run_task("add_new_dataset_releases")
+                    ti = env.run_task("process_release.add_new_dataset_releases", map_index=0)
                 self.assertEqual(ti.state, State.SUCCESS)
                 dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 1)
@@ -295,13 +295,13 @@ class TestIrusOapenTelescope(SandboxTestCase):
                     "changefile_end_date": None,
                     "sequence_start": None,
                     "sequence_end": None,
-                    "extra": "null",
+                    "extra": None,
                 }
                 self.assertEqual(expected_release, dataset_releases[0].to_dict())
 
                 # Test that all telescope data deleted
                 workflow_folder_path = release.workflow_folder
-                ti = env.run_task("cleanup_workflow")
+                ti = env.run_task("process_release.cleanup_workflow", map_index=0)
                 self.assertEqual(ti.state, State.SUCCESS)
                 self.assert_cleanup(workflow_folder_path)
 
@@ -377,7 +377,7 @@ class TestIrusOapenTelescope(SandboxTestCase):
             )
             with env.create_dag_run(dag, pendulum.datetime(year=2023, month=1, day=1)):
 
-                ti = env.run_task("make_release")
+                ti = env.run_task("fetch_releases")
 
                 # Test when source code upload was unsuccessful
                 mock_upload.return_value = False, False

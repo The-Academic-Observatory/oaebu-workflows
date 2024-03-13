@@ -76,11 +76,16 @@ class TestTelescopeSetup(SandboxTestCase):
                     {
                         "check_dependencies": ["list_reports"],
                         "list_reports": ["download"],
-                        "download": ["transform", "bq_load", "add_new_dataset_releases", "cleanup_workflow"],
-                        "transform": ["bq_load"],
-                        "bq_load": ["add_new_dataset_releases"],
-                        "add_new_dataset_releases": ["cleanup_workflow"],
-                        "cleanup_workflow": [],
+                        "download": [
+                            "process_release.transform",
+                            "process_release.bq_load",
+                            "process_release.add_new_dataset_releases",
+                            "process_release.cleanup_workflow",
+                        ],
+                        "process_release.transform": ["process_release.bq_load"],
+                        "process_release.bq_load": ["process_release.add_new_dataset_releases"],
+                        "process_release.add_new_dataset_releases": ["process_release.cleanup_workflow"],
+                        "process_release.cleanup_workflow": [],
                     },
                     dag,
                 )
@@ -291,7 +296,7 @@ class TestJstorTelescopePublisher(SandboxTestCase):
                 )
 
                 # Test that file transformed
-                ti = env.run_task("transform")
+                ti = env.run_task("process_release.transform", map_index=0)
                 self.assertEqual(ti.state, State.SUCCESS)
                 self.assertTrue(os.path.exists(release.transform_country_path))
                 self.assertTrue(os.path.exists(release.transform_institution_path))
@@ -316,7 +321,7 @@ class TestJstorTelescopePublisher(SandboxTestCase):
                 )
 
                 # Test that data is loaded into BigQuery
-                ti = env.run_task("bq_load")
+                ti = env.run_task("process_release.bq_load", map_index=0)
                 self.assertEqual(ti.state, State.SUCCESS)
                 country_table_id = bq_table_id(
                     env.cloud_workspace.project_id,
@@ -340,7 +345,7 @@ class TestJstorTelescopePublisher(SandboxTestCase):
                 now = pendulum.now("Europe/London")  # Use Europe/London to ensure +00UTC timezone
                 with patch("dags.oaebu_workflows.jstor_telescope.jstor_telescope.pendulum.now") as mock_now:
                     mock_now.return_value = now
-                    ti = env.run_task("add_new_dataset_releases")
+                    ti = env.run_task("process_release.add_new_dataset_releases", map_index=0)
                 self.assertEqual(ti.state, State.SUCCESS)
                 dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 1)
@@ -358,13 +363,13 @@ class TestJstorTelescopePublisher(SandboxTestCase):
                     "changefile_end_date": None,
                     "sequence_start": None,
                     "sequence_end": None,
-                    "extra": "null",
+                    "extra": None,
                 }
                 self.assertEqual(expected_release, dataset_releases[0].to_dict())
 
                 # Test that all telescope data deleted
                 workflow_folder_path = release.workflow_folder
-                ti = env.run_task("cleanup_workflow")
+                ti = env.run_task("process_release.cleanup_workflow", map_index=0)
                 self.assertEqual(ti.state, State.SUCCESS)
                 self.assert_cleanup(workflow_folder_path)
 
@@ -543,7 +548,7 @@ class TestJstorTelescopeCollection(SandboxTestCase):
                 )
 
                 # Test that file transformed
-                ti = env.run_task("transform")
+                ti = env.run_task("process_release.transform", map_index=0)
                 self.assertEqual(ti.state, State.SUCCESS)
                 self.assertTrue(os.path.exists(release.transform_country_path))
                 self.assertTrue(os.path.exists(release.transform_institution_path))
@@ -567,7 +572,7 @@ class TestJstorTelescopeCollection(SandboxTestCase):
                 )
 
                 # Test that data loaded into BigQuery
-                ti = env.run_task("bq_load")
+                ti = env.run_task("process_release.bq_load", map_index=0)
                 self.assertEqual(ti.state, State.SUCCESS)
                 country_table_id = bq_table_id(
                     env.cloud_workspace.project_id,
@@ -595,7 +600,7 @@ class TestJstorTelescopeCollection(SandboxTestCase):
                 now = pendulum.now("Europe/London")  # Use Europe/London to ensure +00UTC timezone
                 with patch("dags.oaebu_workflows.jstor_telescope.jstor_telescope.pendulum.now") as mock_now:
                     mock_now.return_value = now
-                    ti = env.run_task("add_new_dataset_releases")
+                    ti = env.run_task("process_release.add_new_dataset_releases", map_index=0)
                 self.assertEqual(ti.state, State.SUCCESS)
                 dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 1)
@@ -613,13 +618,13 @@ class TestJstorTelescopeCollection(SandboxTestCase):
                     "changefile_end_date": None,
                     "sequence_start": None,
                     "sequence_end": None,
-                    "extra": "null",
+                    "extra": None,
                 }
                 self.assertEqual(expected_release, dataset_releases[0].to_dict())
 
                 # Test that all telescope data deleted
                 workflow_folder_path = release.workflow_folder
-                ti = env.run_task("cleanup_workflow")
+                ti = env.run_task("process_release.cleanup_workflow", map_index=0)
                 self.assertEqual(ti.state, State.SUCCESS)
                 self.assert_cleanup(workflow_folder_path)
 
