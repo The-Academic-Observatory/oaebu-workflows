@@ -285,7 +285,7 @@ class TestGoogleBooksTelescope(SandboxTestCase):
                         "created": now.to_iso8601_string(),
                         "modified": now.to_iso8601_string(),
                         "data_interval_start": "2021-03-31T00:00:00+00:00",
-                        "data_interval_end": "2021-04-04T00:00:00+00:00",
+                        "data_interval_end": "2021-04-04T12:00:00+00:00",
                         "snapshot_date": None,
                         "partition_date": "2020-02-29T00:00:00+00:00",
                         "changefile_start_date": None,
