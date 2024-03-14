@@ -121,7 +121,7 @@ def create_dag(
     api_dataset_id: str = "google_books",
     sftp_service_conn_id: str = "sftp_service",
     catchup: bool = False,
-    schedule: str = "@weekly",
+    schedule: str = "0 12 * * Sun",  # Midday every sunday
     start_date: pendulum.DateTime = pendulum.datetime(2018, 1, 1),
 ):
     """Construct a GoogleBooks DAG.

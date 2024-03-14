@@ -108,7 +108,7 @@ def create_dag(
     api_dataset_id: str = "onix",
     sftp_service_conn_id: str = "sftp_service",
     catchup: bool = False,
-    schedule: str = "@weekly",
+    schedule: str = "0 12 * * Sun",  # Midday every sunday
     start_date: pendulum.DateTime = pendulum.datetime(2021, 3, 28),
 ):
     """Construct an OINX DAG.

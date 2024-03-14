@@ -101,7 +101,7 @@ def create_dag(
     api_dataset_id: str = "onix",
     catchup: bool = False,
     start_date: DateTime = pendulum.datetime(2022, 12, 1),
-    schedule: str = "@weekly",
+    schedule: str = "0 12 * * Sun",  # Midday every sunday
 ):
     """Construct an Thoth DAG.
     :param dag_id: The ID of the DAG

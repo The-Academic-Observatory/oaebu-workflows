@@ -28,7 +28,6 @@ from google.cloud.bigquery import SourceFormat, Client
 from ratelimit import limits, sleep_and_retry
 from tenacity import wait_exponential_jitter
 from jinja2 import Environment, FileSystemLoader
-from airflow.sensors.external_task import ExternalTaskSensor
 from airflow.decorators import dag, task, task_group
 from airflow.models.baseoperator import chain
 from airflow.models import DagRun
@@ -41,6 +40,7 @@ from oaebu_workflows.config import sql_folder, oaebu_user_agent_header
 from oaebu_workflows.oaebu_partners import OaebuPartner, DataPartner, partner_from_str
 from oaebu_workflows.onix_workflow.onix_work_aggregation import BookWorkAggregator, BookWorkFamilyAggregator
 from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
+from observatory_platform.airflow.sensors import DagCompleteSensor
 from observatory_platform.files import save_jsonl_gz
 from observatory_platform.airflow.tasks import check_dependencies
 from observatory_platform.url_utils import retry_get_url
@@ -239,7 +239,7 @@ def create_dag(
     sensor_dag_ids: List[str] = None,
     catchup: Optional[bool] = False,
     start_date: Optional[pendulum.DateTime] = pendulum.datetime(2022, 8, 1),
-    schedule: Optional[str] = "0 0 * * 1",  # Mondays at midnight
+    schedule: Optional[str] = "0 0 * * Mon",  # Mondays at midnight
 ):
     """
     Initialises the workflow object.
@@ -314,7 +314,7 @@ def create_dag(
 
             tasks = []
             for ext_dag_id in sensor_dag_ids:
-                sensor = ExternalTaskSensor(
+                sensor = DagCompleteSensor(
                     task_id=f"{ext_dag_id}_sensor",
                     external_dag_id=ext_dag_id,
                     mode="reschedule",
