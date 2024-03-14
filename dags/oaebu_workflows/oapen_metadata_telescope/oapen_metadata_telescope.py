@@ -168,7 +168,7 @@ def create_dag(
             :param context: the context passed from the PythonOperator.
             :param release: an OapenMetadataRelease instance.
             """
-            raise Exception("RAISING AN ERROR")  # TODO: Revert
+
             release = OapenMetadataRelease.from_dict(release)
             logging.info(f"Downloading metadata XML from url: {metadata_uri}")
             download_metadata(metadata_uri, release.download_path)
