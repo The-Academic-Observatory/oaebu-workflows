@@ -32,6 +32,7 @@ from observatory_platform.google.bigquery import bq_load_table, bq_create_datase
 from observatory_platform.airflow.tasks import check_dependencies
 from observatory_platform.airflow.workflow import CloudWorkspace, cleanup
 from observatory_platform.airflow.release import PartitionRelease, set_task_state
+from observatory_platform.airflow.airflow import on_failure_callback
 from observatory_platform.url_utils import retry_get_url
 
 IRUS_FULCRUM_ENDPOINT_TEMPLATE = (
@@ -121,6 +122,9 @@ def create_dag(
     catchup: bool = True,
     schedule: str = "0 0 4 * *",  # Run on the 4th of every month
     start_date: pendulum.DateTime = pendulum.datetime(2022, 4, 1),  # Earliest available data
+    max_active_runs: int = 1,
+    retries: int = 3,
+    retry_delay: Union[int, float] = 5,
 ):
     """The Fulcrum Telescope
     :param dag_id: The ID of the DAG
@@ -134,6 +138,9 @@ def create_dag(
     :param catchup: Whether to catchup the DAG or not
     :param schedule: The schedule interval of the DAG
     :param start_date: The start date of the DAG
+    :param max_active_runs: The maximum number of active DAG runs
+    :param retries: The number of times to retry failed tasks
+    :param retry_delay: The delay between retries in minutes
     """
 
     data_partner = partner_from_str(data_partner)
@@ -144,7 +151,9 @@ def create_dag(
         start_date=start_date,
         catchup=catchup,
         tags=["oaebu"],
-        default_args={"retries": 3, "retry_delay": pendulum.duration(minutes=5)},
+        max_active_runs=max_active_runs,
+        on_failure_callback=on_failure_callback,
+        default_args={"retries": retries, "retry_delay": pendulum.duration(minutes=retry_delay)},
     )
     def irus_fulcrum():
         @task

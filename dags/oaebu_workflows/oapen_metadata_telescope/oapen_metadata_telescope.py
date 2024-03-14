@@ -44,6 +44,7 @@ from observatory_platform.google.gcs import gcs_upload_files, gcs_blob_uri, gcs_
 from observatory_platform.google.bigquery import bq_load_table, bq_sharded_table_id, bq_create_dataset
 from observatory_platform.airflow.release import SnapshotRelease, set_task_state, make_snapshot_date
 from observatory_platform.airflow.workflow import CloudWorkspace, cleanup
+from observatory_platform.airflow.airflow import on_failure_callback
 
 
 # Download job will wait 120 seconds between first 2 attempts, then 30 minutes for the following 3
@@ -112,6 +113,9 @@ def create_dag(
     catchup: bool = False,
     start_date: pendulum.DateTime = pendulum.datetime(2018, 5, 14),
     schedule: str = "0 12 * * Sun",  # Midday every sunday
+    max_active_runs: int = 1,
+    retries: int = 3,
+    retry_delay: Union[int, float] = 5,
 ):
     """Construct a OapenMetadata DAG.
     :param dag_id: The ID of the DAG
@@ -125,6 +129,9 @@ def create_dag(
     :param catchup: Whether to catchup the DAG or not
     :param start_date: The start date of the DAG
     :param schedule: The schedule interval of the DAG
+    :param max_active_runs: The maximum number of active DAG runs
+    :param retries: The number of times to retry failed tasks
+    :param retry_delay: The delay between retries in minutes
     """
 
     metadata_partner = partner_from_str(metadata_partner, metadata_partner=True)
@@ -138,7 +145,9 @@ def create_dag(
         start_date=start_date,
         catchup=catchup,
         tags=["oaebu"],
-        default_args={"retries": 3, "retry_delay": pendulum.duration(minutes=5)},
+        max_active_runs=max_active_runs,
+        on_failure_callback=on_failure_callback,
+        default_args={"retries": retries, "retry_delay": pendulum.duration(minutes=retry_delay)},
     )
     def oapen_metadata():
         @task()
@@ -159,7 +168,7 @@ def create_dag(
             :param context: the context passed from the PythonOperator.
             :param release: an OapenMetadataRelease instance.
             """
-
+            raise Exception("RAISING AN ERROR")  # TODO: Revert
             release = OapenMetadataRelease.from_dict(release)
             logging.info(f"Downloading metadata XML from url: {metadata_uri}")
             download_metadata(metadata_uri, release.download_path)

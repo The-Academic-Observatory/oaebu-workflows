@@ -49,6 +49,8 @@ from observatory_platform.airflow.tasks import check_dependencies
 from observatory_platform.files import add_partition_date, convert
 from observatory_platform.airflow.release import PartitionRelease, set_task_state
 from observatory_platform.airflow.workflow import CloudWorkspace, cleanup
+from observatory_platform.airflow.airflow import on_failure_callback
+
 
 JSTOR_PROCESSED_LABEL_NAME = "processed_report"
 
@@ -165,6 +167,9 @@ def create_dag(
     catchup: bool = False,
     schedule: str = "0 0 4 * *",  # 4th day of every month
     start_date: pendulum.DateTime = pendulum.datetime(2016, 10, 1),
+    max_active_runs: int = 1,
+    retries: int = 3,
+    retry_delay: Union[int, float] = 5,
 ):
     """Construct a Jstor DAG.
     :param dag_id: The ID of the DAG
@@ -182,6 +187,9 @@ def create_dag(
     :param max_active_runs: The maximum number of DAG runs that can be run concurrently
     :param schedule: The schedule interval of the DAG
     :param start_date: The start date of the DAG
+    :param max_active_runs: The maximum number of active DAG runs
+    :param retries: The number of times to retry failed tasks
+    :param retry_delay: The delay between retries in minutes
     """
 
     country_partner = partner_from_str(country_partner)
@@ -193,7 +201,9 @@ def create_dag(
         start_date=start_date,
         catchup=catchup,
         tags=["oaebu"],
-        default_args={"retries": 3, "retry_delay": pendulum.duration(minutes=5)},
+        max_active_runs=max_active_runs,
+        on_failure_callback=on_failure_callback,
+        default_args={"retries": retries, "retry_delay": pendulum.duration(minutes=retry_delay)},
     )
     def jstor():
         @task

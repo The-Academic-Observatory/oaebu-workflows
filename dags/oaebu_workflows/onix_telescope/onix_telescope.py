@@ -34,6 +34,7 @@ from observatory_platform.airflow.tasks import check_dependencies
 from observatory_platform.sftp import SftpFolders, make_sftp_connection
 from observatory_platform.airflow.release import SnapshotRelease, set_task_state
 from observatory_platform.airflow.workflow import CloudWorkspace, cleanup
+from observatory_platform.airflow.airflow import on_failure_callback
 
 
 class OnixRelease(SnapshotRelease):
@@ -110,6 +111,9 @@ def create_dag(
     catchup: bool = False,
     schedule: str = "0 12 * * Sun",  # Midday every sunday
     start_date: pendulum.DateTime = pendulum.datetime(2021, 3, 28),
+    max_active_runs: int = 1,
+    retries: int = 3,
+    retry_delay: Union[int, float] = 5,
 ):
     """Construct an OINX DAG.
     :param dag_id: The ID of the DAG
@@ -134,6 +138,7 @@ def create_dag(
         schedule=schedule,
         catchup=catchup,
         tags=["oaebu"],
+        on_failure_callback=on_failure_callback,
         default_args={"retries": 3, "retry_delay": pendulum.duration(minutes=5)},
     )
     def onix_telescope():

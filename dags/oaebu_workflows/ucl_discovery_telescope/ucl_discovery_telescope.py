@@ -37,6 +37,7 @@ from observatory_platform.airflow.tasks import check_dependencies
 from observatory_platform.files import add_partition_date
 from observatory_platform.airflow.release import PartitionRelease, set_task_state
 from observatory_platform.airflow.workflow import CloudWorkspace, cleanup
+from observatory_platform.airflow.airflow import on_failure_callback
 
 
 class UclDiscoveryRelease(PartitionRelease):
@@ -122,6 +123,8 @@ def create_dag(
     start_date: pendulum.DateTime = pendulum.datetime(2015, 6, 1),
     catchup: bool = True,
     max_active_runs: int = 10,
+    retries: int = 3,
+    retry_delay: Union[int, float] = 5,
 ):
     """Construct a UclDiscovery DAG.
 
@@ -138,6 +141,8 @@ def create_dag(
     :param start_date: The start date of the DAG
     :param catchup: Whether to catchup the DAG or not
     :param max_active_runs: The maximum number of concurrent DAG runs
+    :param retries: The number of times to retry failed tasks
+    :param retry_delay: The delay between retries in minutes
     """
     data_partner = partner_from_str(data_partner)
 
@@ -148,7 +153,8 @@ def create_dag(
         catchup=catchup,
         max_active_runs=max_active_runs,
         tags=["oaebu"],
-        default_args={"retries": 3, "retry_delay": pendulum.duration(minutes=5)},
+        on_failure_callback=on_failure_callback,
+        default_args={"retries": retries, "retry_delay": pendulum.duration(minutes=retry_delay)},
     )
     def ucl_discovery():
         @task()

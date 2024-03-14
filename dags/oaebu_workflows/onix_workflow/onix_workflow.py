@@ -48,6 +48,7 @@ from observatory_platform.google.gcs import gcs_upload_files, gcs_blob_uri, gcs_
 from observatory_platform.jinja2_utils import render_template
 from observatory_platform.airflow.release import SnapshotRelease, make_snapshot_date, set_task_state
 from observatory_platform.airflow.workflow import CloudWorkspace, cleanup
+from observatory_platform.airflow.airflow import on_failure_callback
 from observatory_platform.google.bigquery import (
     bq_load_table,
     bq_table_id,
@@ -240,6 +241,10 @@ def create_dag(
     catchup: Optional[bool] = False,
     start_date: Optional[pendulum.DateTime] = pendulum.datetime(2022, 8, 1),
     schedule: Optional[str] = "0 0 * * Mon",  # Mondays at midnight
+    max_active_runs: int = 1,
+    retries: int = 3,
+    retry_delay: Union[int, float] = 5,
+
 ):
     """
     Initialises the workflow object.
@@ -303,6 +308,7 @@ def create_dag(
         start_date=start_date,
         catchup=catchup,
         tags=["oaebu"],
+        on_failure_callback=on_failure_callback,
         default_args={"retries": 3, "retry_delay": pendulum.duration(minutes=5)},
     )
     def onix_workflow():

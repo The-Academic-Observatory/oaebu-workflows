@@ -33,6 +33,7 @@ from observatory_platform.url_utils import retry_get_url
 from observatory_platform.google.gcs import gcs_upload_files, gcs_blob_name_from_path, gcs_blob_uri, gcs_download_blob
 from observatory_platform.airflow.release import SnapshotRelease, set_task_state, make_snapshot_date
 from observatory_platform.airflow.workflow import CloudWorkspace, cleanup
+from observatory_platform.airflow.airflow import on_failure_callback
 
 
 THOTH_URL = "{host_name}/specifications/{format_specification}/publisher/{publisher_id}"
@@ -102,6 +103,9 @@ def create_dag(
     catchup: bool = False,
     start_date: DateTime = pendulum.datetime(2022, 12, 1),
     schedule: str = "0 12 * * Sun",  # Midday every sunday
+    max_active_runs: int = 1,
+    retries: int = 3,
+    retry_delay: Union[int, float] = 5,
 ):
     """Construct an Thoth DAG.
     :param dag_id: The ID of the DAG
@@ -116,6 +120,9 @@ def create_dag(
     :param catchup: Whether to catchup the DAG or not
     :param start_date: The start date of the DAG
     :param schedule: The schedule interval of the DAG
+    :param max_active_runs: The maximum number of active DAG runs
+    :param retries: The number of times to retry failed tasks
+    :param retry_delay: The delay between retries in minutes
     """
 
     metadata_partner = partner_from_str(metadata_partner, metadata_partner=True)
@@ -126,7 +133,9 @@ def create_dag(
         schedule=schedule,
         catchup=catchup,
         tags=["oaebu"],
-        default_args={"retries": 3, "retry_delay": pendulum.duration(minutes=5)},
+        max_active_runs=max_active_runs,
+        on_failure_callback=on_failure_callback,
+        default_args={"retries": retries, "retry_delay": pendulum.duration(minutes=retry_delay)},
     )
     def thoth_telescope():
         @task()
