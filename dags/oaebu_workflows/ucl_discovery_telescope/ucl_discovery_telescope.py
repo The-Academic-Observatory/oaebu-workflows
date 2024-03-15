@@ -151,14 +151,15 @@ def create_dag(
         start_date=start_date,
         schedule=schedule,
         catchup=catchup,
-        max_active_runs=max_active_runs,
         tags=["oaebu"],
-        on_failure_callback=on_failure_callback,
-        default_args={"retries": retries, "retry_delay": pendulum.duration(minutes=retry_delay)},
+        max_active_runs=max_active_runs,
+        default_args=dict(
+            retries=retries, retry_delay=pendulum.duration(minutes=retry_delay), on_failure_callback=on_failure_callback
+        ),
     )
     def ucl_discovery():
         @task()
-        def make_release(**context) -> List[dict]:
+        def make_release(**context) -> dict:
             """Creates a new ucl discovery release instance
 
             :param context: the context passed from the PythonOperator.

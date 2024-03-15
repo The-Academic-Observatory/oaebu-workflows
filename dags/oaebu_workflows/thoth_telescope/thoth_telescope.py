@@ -51,7 +51,7 @@ class ThothRelease(SnapshotRelease):
         """Construct a ThothRelease.
         :param dag_id: The ID of the DAG
         :param run_id: The Airflow run ID
-        :param release_date: The date of the snapshot_date/release
+        :param snapshot_date: The date of the snapshot_date/release
         """
         super().__init__(dag_id=dag_id, run_id=run_id, snapshot_date=snapshot_date)
         self.download_file_name = f"thoth_{snapshot_date.format('YYYY_MM_DD')}.xml"
@@ -134,12 +134,13 @@ def create_dag(
         catchup=catchup,
         tags=["oaebu"],
         max_active_runs=max_active_runs,
-        on_failure_callback=on_failure_callback,
-        default_args={"retries": retries, "retry_delay": pendulum.duration(minutes=retry_delay)},
+        default_args=dict(
+            retries=retries, retry_delay=pendulum.duration(minutes=retry_delay), on_failure_callback=on_failure_callback
+        ),
     )
     def thoth_telescope():
         @task()
-        def make_release(**content) -> ThothRelease:
+        def make_release(**content) -> dict:
             """Creates a new Thoth release instance
 
             :param content: the context passed from the PythonOperator.

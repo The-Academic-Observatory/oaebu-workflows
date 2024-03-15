@@ -286,6 +286,9 @@ def create_dag(
     :param catchup: Whether to catch up missed DAG runs.
     :param start_date: Start date of the DAG.
     :param schedule: Scheduled interval for running the DAG.
+    :param max_active_runs: The maximum number of active DAG runs.
+    :param retries: The number of times to retry failed tasks.
+    :param retry_delay: The delay between retries in minutes.
     """
 
     if not sensor_dag_ids:
@@ -308,8 +311,10 @@ def create_dag(
         start_date=start_date,
         catchup=catchup,
         tags=["oaebu"],
-        on_failure_callback=on_failure_callback,
-        default_args={"retries": 3, "retry_delay": pendulum.duration(minutes=5)},
+        max_active_runs=max_active_runs,
+        default_args=dict(
+            retries=retries, retry_delay=pendulum.duration(minutes=retry_delay), on_failure_callback=on_failure_callback
+        ),
     )
     def onix_workflow():
         """Construct the DAG"""

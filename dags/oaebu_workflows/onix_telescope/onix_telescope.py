@@ -128,6 +128,9 @@ def create_dag(
     :param catchup: Whether to catchup the DAG or not
     :param schedule: The schedule interval of the DAG
     :param start_date: The start date of the DAG
+    :param max_active_runs: The maximum number of active DAG runs.
+    :param retries: The number of times to retry failed tasks.
+    :param retry_delay: The delay between retries in minutes.
     """
     metadata_partner = partner_from_str(metadata_partner, metadata_partner=True)
     sftp_folders = SftpFolders(dag_id, sftp_conn_id=sftp_service_conn_id, sftp_root=sftp_root)
@@ -138,8 +141,10 @@ def create_dag(
         schedule=schedule,
         catchup=catchup,
         tags=["oaebu"],
-        on_failure_callback=on_failure_callback,
-        default_args={"retries": 3, "retry_delay": pendulum.duration(minutes=5)},
+        max_active_runs=max_active_runs,
+        default_args=dict(
+            retries=retries, retry_delay=pendulum.duration(minutes=retry_delay), on_failure_callback=on_failure_callback
+        ),
     )
     def onix_telescope():
         @task()

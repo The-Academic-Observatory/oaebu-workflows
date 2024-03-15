@@ -181,12 +181,13 @@ def create_dag(
         catchup=catchup,
         tags=["oaebu"],
         max_active_runs=max_active_runs,
-        on_failure_callback=on_failure_callback,
-        default_args={"retries": retries, "retry_delay": pendulum.duration(minutes=retry_delay)},
+        default_args=dict(
+            retries=retries, retry_delay=pendulum.duration(minutes=retry_delay), on_failure_callback=on_failure_callback
+        ),
     )
     def irus_oapen():
         @task()
-        def fetch_releases(**context) -> List[IrusOapenRelease]:
+        def fetch_releases(**context) -> List[dict]:
             """Create a list of IrusOapenRelease instances for a given month.
             Say the dag is scheduled to run on 2022-04-07
             Interval_start will be 2022-03-01

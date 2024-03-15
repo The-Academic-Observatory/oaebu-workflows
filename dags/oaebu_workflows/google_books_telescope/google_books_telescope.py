@@ -160,8 +160,9 @@ def create_dag(
         catchup=catchup,
         tags=["oaebu"],
         max_active_runs=max_active_runs,
-        on_failure_callback=on_failure_callback,
-        default_args={"retries": retries, "retry_delay": pendulum.duration(minutes=retry_delay)},
+        default_args=dict(
+            retries=retries, retry_delay=pendulum.duration(minutes=retry_delay), on_failure_callback=on_failure_callback
+        ),
     )
     def google_books():
         @task
