@@ -29,11 +29,11 @@ jobs:
           cd ..
           git clone -b feature/astro-refactor https://github.com/The-Academic-Observatory/observatory-platform.git
           cd observatory-platform
-          pip install -e .[tests] --constraint https://raw.githubusercontent.com/apache/airflow/constraints-2.7.3/constraints-no-providers-${{ matrix.python-version }}.txt
+          pip install -e .[tests] --constraint https://raw.githubusercontent.com/apache/airflow/constraints-2.8.3/constraints-no-providers-${{ matrix.python-version }}.txt
           cd ..
 
           cd oaebu-workflows
-          pip install -r requirements.txt --constraint https://raw.githubusercontent.com/apache/airflow/constraints-2.7.3/constraints-no-providers-${{ matrix.python-version }}.txt
+          pip install -r requirements.txt --constraint https://raw.githubusercontent.com/apache/airflow/constraints-2.8.3/constraints-no-providers-${{ matrix.python-version }}.txt
 
       - name: Add dag folder to PYTHONPATH
         run: |
