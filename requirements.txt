@@ -1,5 +1,5 @@
 # Astro Runtime includes the following pre-installed providers packages: https://docs.astronomer.io/astro/runtime-image-architecture#provider-packages
-astronomer-starship
+astronomer-starship>=2,<3
 beautifulsoup4>=4.9.3,<5
 onixcheck>=0.9.7,<1
 ratelimit>=2.2.1,<3
