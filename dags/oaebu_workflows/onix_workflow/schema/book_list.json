@@ -49,8 +49,8 @@
   },
   {
     "mode": "NULLABLE",
-    "name": "publiser_name",
-    "type": "INTEGER",
+    "name": "publisher_name",
+    "type": "STRING",
     "description": "The name of the publisher"
   },
   {

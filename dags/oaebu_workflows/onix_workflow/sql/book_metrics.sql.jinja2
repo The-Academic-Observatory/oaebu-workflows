@@ -30,7 +30,6 @@ SELECT
         {% include dp.files.book_metrics_sql %},
     {% endfor %}    
     STRUCT((SELECT SUM(count) FROM UNNEST(month.crossref_events)) as count) as crossref_events
-    (SELECT publisher.publisher_name as publisher_name FROM onix WHERE publisher.publishing_role = "Publisher") as publisher_name 
 FROM `{{ book_product_table_id }}`, UNNEST(months) AS month
 WHERE 
 {% for dp in data_partners | selectattr("export_book_metrics", "equalto", True) %}
