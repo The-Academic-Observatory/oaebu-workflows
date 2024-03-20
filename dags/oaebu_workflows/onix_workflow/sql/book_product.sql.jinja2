@@ -64,14 +64,16 @@ onix_ebook_titles_raw as (
                 SUBSTRING(CAST(dates.Date as STRING), 0, 4)
             FROM UNNEST(onix.PublishingDates) as dates
             WHERE dates.PublishingDateRole = "Publication date")[SAFE_OFFSET(0)] as published_year,
+
             # This subquery creates the published_date when the date.Date field is 8 characters long (YYYYMMDD)
             ARRAY(SELECT 
                 SAFE.PARSE_DATE("%Y%m%d", SUBSTRING(SAFE_CAST(dates.Date AS STRING), 0, 8))
             FROM UNNEST(onix.PublishingDates) AS dates
             WHERE dates.PublishingDateRole = "Publication date" AND 
                 CHAR_LENGTH(SAFE_CAST(dates.Date AS STRING)) = 8 )[SAFE_OFFSET(0)] AS published_date,
-            # The following four sub-queries all pull data from the onix.subjects array, but neatly organised the values into the 4 current classification systems
-            ARRAY(
+            
+	    # The following four sub-queries all pull data from the onix.subjects array, but neatly organised the values into the 4 current classification systems
+	    ARRAY(
                 SELECT
                     subject.SubjectCode
                 FROM UNNEST(onix.Subjects) as subject
@@ -90,13 +92,25 @@ onix_ebook_titles_raw as (
                 custom_split(heading,';') 
             FROM UNNEST(onix.Subjects) as subject, UNNEST(subject.SubjectHeadingText) as heading
             WHERE subject.SubjectSchemeIdentifier = "Keywords") as keywords,
+
             (SELECT
                 ARRAY(
                     SELECT as STRUCT
                         PersonName, PersonNameInverted, ORCID
                     FROM UNNEST(onix.Contributors) as contributor
                 )
-            ) as authors
+            ) as authors,
+
+	    # Pull the publisher information (https://onix-codelists.io/codelist/45)
+            (SELECT
+                ARRAY(
+                    SELECT as STRUCT
+                        PublisherName AS publisher_name,
+                        PublishingRole AS publishing_role
+                    FROM UNNEST(onix.Publishers)
+                )
+            ) AS publisher
+
         ) as onix
     FROM `{{ onix_table_id }}` as onix
 ),

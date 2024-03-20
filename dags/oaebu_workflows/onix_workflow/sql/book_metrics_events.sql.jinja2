@@ -1,4 +1,4 @@
-{# Copyright 2020 Curtin University
+{# Copyright 2020-2024 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Author: Richard Hosking #}
+# Author: Richard Hosking, Keegan Smith #}
 {#
 The purpose of this script it to export the book event metrics section from the book_product table
-Primarily, the goal is to create a flat structure which is suitable for graphing in Kibana
 #}
 
 SELECT
@@ -24,6 +23,7 @@ SELECT
     MAX(work_family_id) as work_family_id,
     MAX(onix.title) as title,
     CAST(MAX(onix.published_year) as INT64) as published_year,
+    (SELECT publisher_name from `{{ book_product_table_id }}`, UNNEST(onix.publisher) as publisher where publishing_role = "Publisher" LIMIT 1) as publisher_name,
     month.month,
     events.source as event_source,
     STRUCT(

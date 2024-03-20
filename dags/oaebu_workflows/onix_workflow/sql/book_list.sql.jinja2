@@ -1,4 +1,4 @@
-{# Copyright 2020 Curtin University
+{# Copyright 2020-2024 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Author: Richard Hosking #}
+# Author: Richard Hosking, Keegan Smith #}
 {#
 The purpose of this script it to export the unique book list from the book_product table
-Primarily, the goal is to create a flat structure which is suitable for graphing in Kibana
 #}
 
 SELECT
@@ -27,6 +26,7 @@ SELECT
     onix.EditionNumber,
     CAST(onix.published_year as INT64) as published_year,
     onix.published_date AS published_date,
+    (SELECT p.publisher_name as publisher_name FROM UNNEST(onix.publisher) as p WHERE p.publishing_role = "Publisher" LIMIT 1) as publisher_name,
     onix.title,
     onix.bic_subjects,
     onix.bisac_subjects,

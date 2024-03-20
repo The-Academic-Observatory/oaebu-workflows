@@ -31,6 +31,12 @@
   },
   {
     "mode": "NULLABLE",
+    "name": "publiser_name",
+    "type": "INTEGER",
+    "description": "The name of the publisher"
+  },
+  {
+    "mode": "NULLABLE",
     "name": "month",
     "type": "DATE",
     "description": "The month for which the metrics apply to"
