@@ -57,6 +57,12 @@
   },
   {
     "mode": "NULLABLE",
+    "name": "publiser_name",
+    "type": "INTEGER",
+    "description": "The name of the publisher"
+  },
+  {
+    "mode": "NULLABLE",
     "name": "month",
     "type": "DATE",
     "description": "The month in which the metrics took place"
@@ -76,3 +82,4 @@
     "description": "Metrics from Crossref Events"
   }
 ]
+

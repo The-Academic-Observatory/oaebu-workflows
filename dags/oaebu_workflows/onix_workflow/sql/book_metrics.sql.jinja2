@@ -15,7 +15,6 @@
 # Author: Richard Hosking, Keegan Smith #}
 {#
 The purpose of this script it to export the book metrics section from the book_product table
-Primarily, the goal is to create a flat structure which is suitable for graphing in Kibana
 #}
 
 SELECT
@@ -25,11 +24,13 @@ SELECT
     onix.title as title,
     onix.authors,
     CAST(onix.published_year as INT64) as published_year,
+    (SELECT p.publisher_name as publisher_name FROM UNNEST(onix.publisher) as p WHERE p.publishing_role = "Publisher" LIMIT 1) as publisher_name, -- pull the publisher name from the onix.publisher field
     month.month,
     {% for dp in data_partners | selectattr("export_book_metrics", "equalto", True) %}
         {% include dp.files.book_metrics_sql %},
     {% endfor %}    
     STRUCT((SELECT SUM(count) FROM UNNEST(month.crossref_events)) as count) as crossref_events
+    (SELECT publisher.publisher_name as publisher_name FROM onix WHERE publisher.publishing_role = "Publisher") as publisher_name 
 FROM `{{ book_product_table_id }}`, UNNEST(months) AS month
 WHERE 
 {% for dp in data_partners | selectattr("export_book_metrics", "equalto", True) %}
