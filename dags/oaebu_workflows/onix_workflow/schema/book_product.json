@@ -103,7 +103,7 @@
           },
           {
             "mode": "NULLABLE",
-            "name": "publisher_role",
+            "name": "publishing_role",
             "type": "STRING",
             "description": "The role of the publishing entity"
           }
