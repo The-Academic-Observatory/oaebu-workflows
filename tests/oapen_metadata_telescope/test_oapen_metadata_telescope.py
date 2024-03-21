@@ -167,7 +167,7 @@ class TestOapenMetadataTelescope(SandboxTestCase):
                 self.assertTrue(os.path.exists(invalid_products_path))
 
                 # Check file content is as expected
-                self.assert_file_integrity(invalid_products_path, "1ce5155e79ff4e405564038d4520ae3c", "md5")
+                self.assert_file_integrity(invalid_products_path, "957861f97324c199408140fc7e9a2430", "md5")
 
                 # Test that transformed files uploaded to BQ
                 self.assert_blob_integrity(
