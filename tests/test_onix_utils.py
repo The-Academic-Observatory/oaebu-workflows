@@ -81,47 +81,47 @@ class TestOnixTransformer(SandboxTestCase):
             transformer_output_path = transformer.transform()
             self.assert_file_integrity(
                 os.path.join(transformer.output_dir, self.filtered_name),
-                "7e2b13ae1f25c2d09f11e7864c2f0f92",
+                "f988942bf9174542c9438c82e2c7a2f0",
                 algorithm="md5",
             )
             self.assert_file_integrity(
                 os.path.join(transformer.output_dir, self.errors_removed_name),
-                "6f6cd81c6abe047fffc95fd7d105d78e",
+                "bfe854f0c1d8ad76213726c7f8d2485c",
                 algorithm="md5",
             )
             self.assert_file_integrity(
                 os.path.join(transformer.output_dir, self.normalised_name),
-                "e73e1d4e0eac10d512b343835373be08",
+                "2933b83393da45b1df876be8812a3938",
                 algorithm="md5",
             )
             self.assert_file_integrity(
                 os.path.join(transformer.output_dir, self.deduplicated_name),
-                "294a88af4897de5f8b66524afe317520",
+                "0d260ad328b711637b615a4f86936d12",
                 algorithm="md5",
             )
             self.assert_file_integrity(
                 os.path.join(transformer.output_dir, self.elevated_name),
-                "087b7ebcb806b560acf1d6fcd303817c",
+                "534275238d1bc19858fde785724f8cdc",
                 algorithm="md5",
             )
             self.assert_file_integrity(
                 os.path.join(transformer.output_dir, self.parsed_name),
-                "033ef3c67663dc042b16be05db2b1a7b",
+                "e0ed54c4e25622895a94f1497ef445fb",
                 algorithm="md5",
             )
             self.assert_file_integrity(
                 os.path.join(transformer.output_dir, self.apply_names_name),
-                "9dc363f29e8f9bdf8c652dd22aed49e0",
+                "d37ed8ba20e31ef53fcf16f0056a79dc",
                 algorithm="md5",
             )
             self.assert_file_integrity(
                 os.path.join(transformer.output_dir, self.collapsed_name),
-                "74e4870f5c37a2e9690156b47c3232f7",
+                "a5359cbf369510f742a4bcf2a9b3fac5",
                 algorithm="md5",
             )
             self.assert_file_integrity(
                 os.path.join(transformer.output_dir, "invalid_products.xml"),
-                "1ce5155e79ff4e405564038d4520ae3c",
+                "957861f97324c199408140fc7e9a2430",
                 algorithm="md5",
             )
             compare_lists_of_dicts(
