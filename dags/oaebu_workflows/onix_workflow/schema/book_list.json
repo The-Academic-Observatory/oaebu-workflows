@@ -49,6 +49,12 @@
   },
   {
     "mode": "NULLABLE",
+    "name": "publisher_name",
+    "type": "STRING",
+    "description": "The name of the publisher"
+  },
+  {
+    "mode": "NULLABLE",
     "name": "title",
     "type": "STRING",
     "description": "The Books Title"
@@ -104,3 +110,4 @@
     "description": "A list of Book Authors"
   }
 ]
+

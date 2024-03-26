@@ -31,6 +31,12 @@
   },
   {
     "mode": "NULLABLE",
+    "name": "publisher_name",
+    "type": "STRING",
+    "description": "The name of the publisher"
+  },
+  {
+    "mode": "NULLABLE",
     "name": "month",
     "type": "DATE",
     "description": "The month for which the metrics apply to"
@@ -86,3 +92,4 @@
     "description": "Metrics from OAPEN. Recorded with the IRUS-UK platform"
   }
 ]
+
