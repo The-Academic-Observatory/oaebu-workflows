@@ -15,6 +15,7 @@ docs/schemas
 .env
 __pycache__
 /oaebu-workflows/build
+pyrightconfig.json
 
 # Astronomer
 airflow_settings.yaml

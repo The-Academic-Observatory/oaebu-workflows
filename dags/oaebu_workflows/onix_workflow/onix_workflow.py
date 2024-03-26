@@ -234,7 +234,7 @@ def create_dag(
     schema_folder: str = default_schema_folder(workflow_module="onix_workflow"),
     mailto: str = "agent@observatory.academy",
     crossref_start_date: pendulum.DateTime = pendulum.datetime(2018, 5, 14),
-    api_dataset_id: str = "onix_workflow",
+    api_dataset_id: str = "dataset_api",
     max_threads: int = 2 * os.cpu_count() - 1,
     # Ariflow parameters
     sensor_dag_ids: List[str] = None,
@@ -244,7 +244,6 @@ def create_dag(
     max_active_runs: int = 1,
     retries: int = 3,
     retry_delay: Union[int, float] = 5,
-
 ):
     """
     Initialises the workflow object.
@@ -279,7 +278,7 @@ def create_dag(
     :param schema_folder: the SQL schema path.
     :param mailto: email address used to identify the user when sending requests to an API.
     :param crossref_start_date: The starting date of crossref's API calls
-    :param api_dataset_id: The ID to store the dataset release in the API
+    :param api_dataset_id: The name of the Bigquery dataset to store the API release(s)
     :param max_threads: The maximum number of threads to use for parallel tasks.
 
     :param sensor_dag_ids: Dag IDs for dependent tasks

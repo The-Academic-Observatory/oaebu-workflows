@@ -106,7 +106,7 @@ def create_dag(
     metadata_partner: Union[str, OaebuPartner] = "onix",
     bq_dataset_description: str = "ONIX data provided by Org",
     bq_table_description: str = None,
-    api_dataset_id: str = "onix",
+    api_dataset_id: str = "dataset_api",
     sftp_service_conn_id: str = "sftp_service",
     catchup: bool = False,
     schedule: str = "0 12 * * Sun",  # Midday every sunday
@@ -123,7 +123,7 @@ def create_dag(
     :param date_regex: Regular expression for extracting a date string from an ONIX file name
     :param bq_dataset_description: Description for the BigQuery dataset
     :param bq_table_description: Description for the biguery table
-    :param api_dataset_id: The ID to store the dataset release in the API
+    :param api_dataset_id: The name of the Bigquery dataset to store the API release(s)
     :param sftp_service_conn_id: Airflow connection ID for the SFTP service
     :param catchup: Whether to catchup the DAG or not
     :param schedule: The schedule interval of the DAG
