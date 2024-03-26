@@ -117,7 +117,7 @@ def create_dag(
     data_partner: Union[str, OaebuPartner] = "irus_fulcrum",
     bq_dataset_description: str = "IRUS dataset",
     bq_table_description: str = "Fulcrum metrics as recorded by the IRUS platform",
-    api_dataset_id: str = "fulcrum",
+    api_dataset_id: str = "dataset_api",
     irus_oapen_api_conn_id: str = "irus_api",
     catchup: bool = True,
     schedule: str = "0 0 4 * *",  # Run on the 4th of every month
@@ -133,7 +133,7 @@ def create_dag(
     :param data_partner: The name of the data partner
     :param bq_dataset_description: Description for the BigQuery dataset
     :param bq_table_description: Description for the biguery table
-    :param api_dataset_id: The ID to store the dataset release in the API
+    :param api_dataset_id: The name of the Bigquery dataset to store the API release(s)
     :param irus_oapen_api_conn_id: Airflow connection ID OAPEN IRUS UK (counter 5)
     :param catchup: Whether to catchup the DAG or not
     :param schedule: The schedule interval of the DAG
@@ -155,6 +155,7 @@ def create_dag(
         default_args=dict(
             retries=retries, retry_delay=pendulum.duration(minutes=retry_delay), on_failure_callback=on_failure_callback
         ),
+        max_active_runs=max_active_runs,
     )
     def irus_fulcrum():
         @task
@@ -363,6 +364,8 @@ def transform_fulcrum_data(
     if publishers:
         totals_data = [i for i in totals_data if i["Publisher"] in publishers]
         country_data = [i for i in country_data if i["Publisher"] in publishers]
+    else:
+        logging.info("Proceeding with ALL publishers enabled")
 
     # Total and Country-granulated results should all have the same item entries and be ordered the same, but we should check anyway
     c_ids = [i["IRUS_Item_ID"] for i in country_data]
