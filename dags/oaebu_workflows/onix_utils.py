@@ -175,28 +175,27 @@ class OnixTransformer:
         return os.path.join(dir_, file_name)
 
     def _save_metadata(self, metadata: Union[List[dict], Mapping[str, Any]], file_path: str):
-        save_path = os.path.join(self._work_dir, file_path)
         format = re.search(r"\.(.*)$", file_path).group(1)
         if format == "xml":
             if not isinstance(metadata, Mapping):
                 raise TypeError(f"Metadata must be of type Mapping, instead got type {type(metadata)}")
-            with open(save_path, "w") as f:
+            with open(file_path, "w") as f:
                 xmltodict.unparse(metadata, output=f, pretty=True)
         elif format == "json":
-            with open(save_path, "w") as f:
+            with open(file_path, "w") as f:
                 json.dump(metadata, f)
         elif format == "jsonl":
-            with open(save_path, "w") as f:
+            with open(file_path, "w") as f:
                 for m in metadata:
                     json.dump(m, f)
                     f.write("\n")
         elif format == "jsonl.gz":
             if not type(metadata) == list:
                 raise TypeError(f"Metadata must be of type list, instead got type {type(metadata)}")
-            save_jsonl_gz(save_path, metadata)
+            save_jsonl_gz(file_path, metadata)
         else:
             raise ValueError(f"Unsupported format: {format}")
-        self._current_md_path = save_path
+        self._current_md_path = file_path
 
     def _load_metadata(self, file_path: str):
         format = re.search(r"\.(.*)$", file_path).group(1)
