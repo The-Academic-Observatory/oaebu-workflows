@@ -202,6 +202,9 @@ class OnixTransformer:
         if format == "xml":
             with open(file_path, "rb") as f:
                 metadata = xmltodict.parse(f)
+            # The metadata may load in as a dictionary rather than a list.
+            if not isinstance(metadata["ONIXMessage"]["Product"], list):
+                metadata["ONIXMessage"]["Product"] = [metadata["ONIXMessage"]["Product"]]
         elif format == "json":
             with open(file_path, "r") as f:
                 metadata = json.load(f)
@@ -667,7 +670,10 @@ def remove_invalid_products(input_xml: str, output_xml: str, invalid_products_fi
     # Parse the xml to dictionary
     with open(input_xml, "rb") as f:
         metadata = xmltodict.parse(f)
+    # The products may load as a dict and not a list
 
+    if not isinstance(metadata["ONIXMessage"]["Product"], list):
+        metadata["ONIXMessage"]["Product"] = [metadata["ONIXMessage"]["Product"]]
     # Remove products matching the record references
     metadata["ONIXMessage"]["Product"] = [
         p for p in metadata["ONIXMessage"]["Product"] if p["RecordReference"] not in invalid_references
