@@ -25,6 +25,12 @@
   },
   {
     "mode": "NULLABLE",
+    "name": "publisher_name",
+    "type": "STRING",
+    "description": "The name of the publisher"
+  },
+  {
+    "mode": "NULLABLE",
     "name": "institution",
     "type": "STRING",
     "description": "Institution Name"

@@ -203,7 +203,7 @@ class TestThothTelescope(SandboxTestCase):
                 dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 0)
 
-                now = pendulum.now("Europe/London")  # Use Europe/London to ensure +00UTC timezone
+                now = pendulum.now("UTC")  # Use UTC to ensure +00UTC timezone
                 with patch("oaebu_workflows.thoth_telescope.thoth_telescope.pendulum.now") as mock_now:
                     mock_now.return_value = now
                     ti = env.run_task("add_new_dataset_releases")
@@ -214,8 +214,9 @@ class TestThothTelescope(SandboxTestCase):
                     "dag_id": dag_id,
                     "dataset_id": api_dataset_id,
                     "dag_run_id": release.run_id,
-                    "created": now.to_iso8601_string(),
-                    "modified": now.to_iso8601_string(),
+                    # Replace Z shorthand because BQ converts it to +00:00
+                    "created": now.to_iso8601_string().replace("Z", "+00:00"),
+                    "modified": now.to_iso8601_string().replace("Z", "+00:00"),
                     "data_interval_start": "2022-12-01T00:00:00+00:00",
                     "data_interval_end": "2022-12-04T12:00:00+00:00",
                     "snapshot_date": "2022-12-04T00:00:00+00:00",
@@ -224,7 +225,7 @@ class TestThothTelescope(SandboxTestCase):
                     "changefile_end_date": None,
                     "sequence_start": None,
                     "sequence_end": None,
-                    "extra": None,
+                    "extra": {},
                 }
                 self.assertEqual(expected_release, dataset_releases[0].to_dict())
 

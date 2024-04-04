@@ -202,7 +202,7 @@ class TestIrusFulcrumTelescope(SandboxTestCase):
                 self.assertEqual(len(dataset_releases), 0)
 
                 # Add_dataset_release_task
-                now = pendulum.now("Europe/London")  # Use Europe/London to ensure +00UTC timezone
+                now = pendulum.now("UTC")  # Use UTC to ensure +00UTC timezone
                 with patch("oaebu_workflows.irus_fulcrum_telescope.irus_fulcrum_telescope.pendulum.now") as mock_now:
                     mock_now.return_value = now
                     ti = env.run_task("add_new_dataset_releases")
@@ -213,8 +213,9 @@ class TestIrusFulcrumTelescope(SandboxTestCase):
                     "dag_id": dag_id,
                     "dataset_id": api_dataset_id,
                     "dag_run_id": release.run_id,
-                    "created": now.to_iso8601_string(),
-                    "modified": now.to_iso8601_string(),
+                    # Replace Z shorthand because BQ converts it to +00:00
+                    "created": now.to_iso8601_string().replace("Z", "+00:00"),
+                    "modified": now.to_iso8601_string().replace("Z", "+00:00"),
                     "data_interval_start": "2022-04-01T00:00:00+00:00",
                     "data_interval_end": "2022-05-01T00:00:00+00:00",
                     "snapshot_date": None,
@@ -223,7 +224,7 @@ class TestIrusFulcrumTelescope(SandboxTestCase):
                     "changefile_end_date": None,
                     "sequence_start": None,
                     "sequence_end": None,
-                    "extra": None,
+                    "extra": {},
                 }
                 self.assertEqual(expected_release, dataset_releases[0].to_dict())
 

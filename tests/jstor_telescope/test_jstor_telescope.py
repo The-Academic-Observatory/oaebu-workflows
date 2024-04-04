@@ -343,7 +343,7 @@ class TestJstorTelescopePublisher(SandboxTestCase):
                 self.assertEqual(len(dataset_releases), 0)
 
                 # Add_dataset_release_task
-                now = pendulum.now("Europe/London")  # Use Europe/London to ensure +00UTC timezone
+                now = pendulum.now("UTC")  # Use UTC to ensure +00UTC timezone
                 with patch("oaebu_workflows.jstor_telescope.jstor_telescope.pendulum.now") as mock_now:
                     mock_now.return_value = now
                     ti = env.run_task("process_release.add_new_dataset_releases", map_index=0)
@@ -354,8 +354,9 @@ class TestJstorTelescopePublisher(SandboxTestCase):
                     "dag_id": dag_id,
                     "dataset_id": api_dataset_id,
                     "dag_run_id": release.run_id,
-                    "created": now.to_iso8601_string(),
-                    "modified": now.to_iso8601_string(),
+                    # Replace Z shorthand because BQ converts it to +00:00
+                    "created": now.to_iso8601_string().replace("Z", "+00:00"),
+                    "modified": now.to_iso8601_string().replace("Z", "+00:00"),
                     "data_interval_start": "2022-07-01T00:00:00+00:00",
                     "data_interval_end": "2022-08-01T00:00:00+00:00",
                     "snapshot_date": None,
@@ -364,7 +365,7 @@ class TestJstorTelescopePublisher(SandboxTestCase):
                     "changefile_end_date": None,
                     "sequence_start": None,
                     "sequence_end": None,
-                    "extra": None,
+                    "extra": {},
                 }
                 self.assertEqual(expected_release, dataset_releases[0].to_dict())
 
@@ -599,7 +600,7 @@ class TestJstorTelescopeCollection(SandboxTestCase):
                 self.assertEqual(len(dataset_releases), 0)
 
                 # Add_dataset_release_task
-                now = pendulum.now("Europe/London")  # Use Europe/London to ensure +00UTC timezone
+                now = pendulum.now("UTC")  # Use UTC to ensure +00UTC timezone
                 with patch("oaebu_workflows.jstor_telescope.jstor_telescope.pendulum.now") as mock_now:
                     mock_now.return_value = now
                     ti = env.run_task("process_release.add_new_dataset_releases", map_index=0)
@@ -610,8 +611,9 @@ class TestJstorTelescopeCollection(SandboxTestCase):
                     "dag_id": dag_id,
                     "dataset_id": api_dataset_id,
                     "dag_run_id": release.run_id,
-                    "created": now.to_iso8601_string(),
-                    "modified": now.to_iso8601_string(),
+                    # Replace Z shorthand because BQ converts it to +00:00
+                    "created": now.to_iso8601_string().replace("Z", "+00:00"),
+                    "modified": now.to_iso8601_string().replace("Z", "+00:00"),
                     "data_interval_start": "2023-09-01T00:00:00+00:00",
                     "data_interval_end": "2023-10-01T00:00:00+00:00",
                     "snapshot_date": None,
@@ -620,7 +622,7 @@ class TestJstorTelescopeCollection(SandboxTestCase):
                     "changefile_end_date": None,
                     "sequence_start": None,
                     "sequence_end": None,
-                    "extra": None,
+                    "extra": {},
                 }
                 self.assertEqual(expected_release, dataset_releases[0].to_dict())
 

@@ -14,7 +14,7 @@
 
 # Author: Richard Hosking. Keegan Smith #}
 
-WITH months AS (select * FROM {{ book_product_table_id }}, UNNEST(months) AS month),
+WITH months AS (select * FROM `{{ book_product_table_id }}`, UNNEST(months) AS month),
 
 countries as (
     SELECT
@@ -32,6 +32,7 @@ month_country as (
         work_family_id,
         onix.title,
         CAST(onix.published_year as INT64) as published_year,
+        (SELECT p.publisher_name as publisher_name FROM UNNEST(onix.publisher) as p WHERE p.publishing_role = "Publisher" LIMIT 1) as publisher_name, -- pull the publisher name from the onix.publisher field
         month,
         alpha2,
         iso_name as country_name,
@@ -56,6 +57,7 @@ SELECT
     month_country.work_family_id as work_family_id,
     month_country.title,
     month_country.published_year,
+    month_country.publisher_name,
     month_country.month,
     month_country.alpha2 as country_code,
     month_country.country_name,

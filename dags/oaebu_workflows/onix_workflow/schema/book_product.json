@@ -92,6 +92,26 @@
         "name": "authors",
         "type": "RECORD",
         "description": "Book Authors"
+      },
+      {
+        "fields": [
+          {
+            "mode": "NULLABLE",
+            "name": "publisher_name",
+            "type": "STRING",
+            "description": "The name of an entity associated with the publication process. See publisher_role for type of entity the name refers to"
+          },
+          {
+            "mode": "NULLABLE",
+            "name": "publishing_role",
+            "type": "STRING",
+            "description": "The role of the publishing entity"
+          }
+        ],
+        "mode": "REPEATED",
+        "name": "publisher",
+        "type": "RECORD",
+        "description": "Publisher fields"
       }
     ],
     "mode": "NULLABLE",
@@ -250,3 +270,4 @@
     "description": "Linked Metrics from all sources, organised by month of occurance"
   }
 ]
+

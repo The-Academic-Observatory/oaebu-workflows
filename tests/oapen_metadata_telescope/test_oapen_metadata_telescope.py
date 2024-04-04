@@ -167,7 +167,7 @@ class TestOapenMetadataTelescope(SandboxTestCase):
                 self.assertTrue(os.path.exists(invalid_products_path))
 
                 # Check file content is as expected
-                self.assert_file_integrity(invalid_products_path, "1ce5155e79ff4e405564038d4520ae3c", "md5")
+                self.assert_file_integrity(invalid_products_path, "957861f97324c199408140fc7e9a2430", "md5")
 
                 # Test that transformed files uploaded to BQ
                 self.assert_blob_integrity(
@@ -193,7 +193,7 @@ class TestOapenMetadataTelescope(SandboxTestCase):
                 dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
                 self.assertEqual(len(dataset_releases), 0)
 
-                now = pendulum.now("Europe/London")  # Use Europe/London to ensure +00UTC timezone
+                now = pendulum.now("UTC")  # Use UTC to ensure +00UTC timezone
                 with patch(
                     "oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope.pendulum.now"
                 ) as mock_now:
@@ -206,8 +206,9 @@ class TestOapenMetadataTelescope(SandboxTestCase):
                     "dag_id": dag_id,
                     "dataset_id": api_dataset_id,
                     "dag_run_id": release.run_id,
-                    "created": now.to_iso8601_string(),
-                    "modified": now.to_iso8601_string(),
+                    # Replace Z shorthand because BQ converts it to +00:00
+                    "created": now.to_iso8601_string().replace("Z", "+00:00"),
+                    "modified": now.to_iso8601_string().replace("Z", "+00:00"),
                     "data_interval_start": "2021-02-01T00:00:00+00:00",
                     "data_interval_end": "2021-02-07T12:00:00+00:00",
                     "snapshot_date": "2021-02-07T00:00:00+00:00",
@@ -216,7 +217,7 @@ class TestOapenMetadataTelescope(SandboxTestCase):
                     "changefile_end_date": None,
                     "sequence_start": None,
                     "sequence_end": None,
-                    "extra": None,
+                    "extra": {},
                 }
                 self.assertEqual(expected_release, dataset_releases[0].to_dict())
 
