@@ -22,14 +22,14 @@
           "ProductIDTypeName": null,
           "IDValue": null
         },
-        "PublishingDate": {
-          "PublishingDateRole": null,
-          "PublishingDate": null
-        },
         "PublishingDetail": {
           "Publisher": {
             "PublisherName": null,
             "PublishingRole": null
+          },
+          "PublishingDate": {
+            "PublishingDateRole": null,
+            "Date": { "@dateformat": null, "#text": null }
           }
         },
         "DescriptiveDetail": {

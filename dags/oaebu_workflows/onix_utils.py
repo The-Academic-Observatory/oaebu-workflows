@@ -119,7 +119,7 @@ class OnixTransformer:
         if hasattr(self, "_work_dir") and self._work_dir:
             shutil.rmtree(self._work_dir, ignore_errors=True)
 
-    def transform(self):
+    def transform(self) -> str:
         """
         Transform the oapen metadata XML file based on the supplied options.
 
