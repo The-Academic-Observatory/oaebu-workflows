@@ -365,7 +365,7 @@ class TestJstorTelescopePublisher(SandboxTestCase):
                     "changefile_end_date": None,
                     "sequence_start": None,
                     "sequence_end": None,
-                    "extra": "{}",
+                    "extra": {},
                 }
                 self.assertEqual(expected_release, dataset_releases[0].to_dict())
 
@@ -622,7 +622,7 @@ class TestJstorTelescopeCollection(SandboxTestCase):
                     "changefile_end_date": None,
                     "sequence_start": None,
                     "sequence_end": None,
-                    "extra": "{}",
+                    "extra": {},
                 }
                 self.assertEqual(expected_release, dataset_releases[0].to_dict())
 
