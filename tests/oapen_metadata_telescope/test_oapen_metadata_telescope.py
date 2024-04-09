@@ -16,8 +16,9 @@
 
 import os
 import unittest
+import json
 from unittest.mock import MagicMock, patch
-from tempfile import NamedTemporaryFile
+from tempfile import TemporaryDirectory, NamedTemporaryFile
 from xml.parsers.expat import ExpatError
 
 import pendulum
@@ -27,6 +28,7 @@ from airflow.utils.state import State
 from tenacity import stop_after_attempt
 
 from oaebu_workflows.config import test_fixtures_folder, module_file_path
+from oaebu_workflows.onix_utils import OnixTransformer
 from oaebu_workflows.oaebu_partners import partner_from_str
 from oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope import (
     OapenMetadataRelease,
@@ -37,7 +39,7 @@ from observatory_platform.dataset_api import DatasetAPI
 from observatory_platform.google.gcs import gcs_blob_name_from_path
 from observatory_platform.google.bigquery import bq_sharded_table_id
 from observatory_platform.airflow.workflow import Workflow
-from observatory_platform.sandbox.test_utils import SandboxTestCase, load_and_parse_json
+from observatory_platform.sandbox.test_utils import SandboxTestCase, load_and_parse_json, compare_lists_of_dicts
 from observatory_platform.sandbox.sandbox_environment import SandboxEnvironment
 
 
@@ -167,7 +169,7 @@ class TestOapenMetadataTelescope(SandboxTestCase):
                 self.assertTrue(os.path.exists(invalid_products_path))
 
                 # Check file content is as expected
-                self.assert_file_integrity(invalid_products_path, "957861f97324c199408140fc7e9a2430", "md5")
+                self.assert_file_integrity(invalid_products_path, "73fef1a3fb4c644f0f5203d2132e76a4", "md5")
 
                 # Test that transformed files uploaded to BQ
                 self.assert_blob_integrity(
@@ -292,3 +294,28 @@ class TestDownloadMetadata(unittest.TestCase):
                 self.assertRaisesRegex(
                     ConnectionError, "Expected status code 200", download_metadata, self.uri, download_file.name
                 )
+
+
+class TestFilterApplication(unittest.TestCase):
+    """Test that the oapen metadata filter is applied correctly"""
+
+    def test_e2e_application(self):
+        """Given an input, test that the expected output is produced"""
+        fixtures_folder = test_fixtures_folder(workflow_module="oapen_metadata_telescope")
+        input_file = os.path.join(fixtures_folder, "test_filter_input.xml")
+        with open(os.path.join(fixtures_folder, "test_filter_output.json"), "r") as f:
+            expected_output = json.load(f)
+
+        with TemporaryDirectory() as tempdir:
+            transformer = OnixTransformer(
+                input_path=input_file,
+                output_dir=tempdir,
+                filter_products=True,
+                save_format="json",
+            )
+
+            actual_output = transformer.transform()
+            with open(actual_output, "r") as f:
+                actual_output = json.load(f)
+
+        self.assertEqual(compare_lists_of_dicts(expected_output, actual_output, primary_key="ISBN13"), True)

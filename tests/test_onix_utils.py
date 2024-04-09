@@ -14,6 +14,7 @@
 
 # Author: Keegan Smith
 
+from observatory_platform.files import get_file_hash
 import os
 import shutil
 from tempfile import TemporaryDirectory, NamedTemporaryFile
@@ -53,6 +54,7 @@ class TestOnixTransformer(SandboxTestCase):
     parsed_name = "full.jsonl"
     apply_names_name = "name_applied.jsonl"
     collapsed_name = "collapsed.jsonl"
+    invalid_products_name = "invalid_products.xml"
 
     test_input_metadata = os.path.join(FIXTURES_FOLDER, "input_metadata.xml")
     test_output_parse_only = os.path.join(FIXTURES_FOLDER, "output_parse_only.jsonl")
@@ -81,47 +83,47 @@ class TestOnixTransformer(SandboxTestCase):
             transformer_output_path = transformer.transform()
             self.assert_file_integrity(
                 os.path.join(transformer.output_dir, self.filtered_name),
-                "f988942bf9174542c9438c82e2c7a2f0",
+                "28e2335496561f1340ae01a6770ad272",
                 algorithm="md5",
             )
             self.assert_file_integrity(
                 os.path.join(transformer.output_dir, self.errors_removed_name),
-                "bfe854f0c1d8ad76213726c7f8d2485c",
+                "29b11ef0a36ee0aee9c8b71dd2e93ea0",
                 algorithm="md5",
             )
             self.assert_file_integrity(
                 os.path.join(transformer.output_dir, self.normalised_name),
-                "2933b83393da45b1df876be8812a3938",
+                "56cee2b6087203382bc98b14d3d6e631",
                 algorithm="md5",
             )
             self.assert_file_integrity(
                 os.path.join(transformer.output_dir, self.deduplicated_name),
-                "0d260ad328b711637b615a4f86936d12",
+                "3483c402a80e96719c0c039d8b7f9573",
                 algorithm="md5",
             )
             self.assert_file_integrity(
                 os.path.join(transformer.output_dir, self.elevated_name),
-                "534275238d1bc19858fde785724f8cdc",
+                "6513debcc031ee6f46d17222b69907f7",
                 algorithm="md5",
             )
             self.assert_file_integrity(
                 os.path.join(transformer.output_dir, self.parsed_name),
-                "e0ed54c4e25622895a94f1497ef445fb",
+                "31b01c48667c4f810eaa6de4cf3bcdbe",
                 algorithm="md5",
             )
             self.assert_file_integrity(
                 os.path.join(transformer.output_dir, self.apply_names_name),
-                "d37ed8ba20e31ef53fcf16f0056a79dc",
+                "b31d4800f29178f6075100d357216466",
                 algorithm="md5",
             )
             self.assert_file_integrity(
                 os.path.join(transformer.output_dir, self.collapsed_name),
-                "a5359cbf369510f742a4bcf2a9b3fac5",
+                "e695482f63e349966ff925836324b4e6",
                 algorithm="md5",
             )
             self.assert_file_integrity(
-                os.path.join(transformer.output_dir, "invalid_products.xml"),
-                "957861f97324c199408140fc7e9a2430",
+                os.path.join(transformer.output_dir, self.invalid_products_name),
+                "73fef1a3fb4c644f0f5203d2132e76a4",
                 algorithm="md5",
             )
             compare_lists_of_dicts(
