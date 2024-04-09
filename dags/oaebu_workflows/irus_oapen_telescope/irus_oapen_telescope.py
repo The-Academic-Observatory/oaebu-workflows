@@ -27,12 +27,14 @@ from airflow.decorators import dag, task, task_group
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.hooks.base import BaseHook
 import google
+from google.auth import environment_vars, transport, compute_engine
+from google.oauth2 import service_account
+from google.oauth2.credentials import Credentials
+from google.auth import environment_vars
 from google.auth.transport.requests import AuthorizedSession
 from google.cloud.bigquery import TimePartitioningType, SourceFormat, WriteDisposition, Client
 from googleapiclient.discovery import Resource, build
 from googleapiclient.errors import HttpError
-
-# from google.oauth2 import service_account
 
 from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
@@ -237,9 +239,6 @@ def create_dag(
             set_task_state(success, context["ti"].task_id, release=release)
 
             # initialise cloud functions api
-            # service_account_conn = BaseHook.get_connection(service_account_conn_id)
-            # creds = service_account.Credentials.from_service_account_info(service_account_conn.extra_dejson)
-            # credentials=creds,
             service = build("cloudfunctions", "v2beta", cache_discovery=False, static_discovery=False)
 
             # update or create cloud function
@@ -281,8 +280,6 @@ def create_dag(
                 password = BaseHook.get_connection(airflow_conn).password
 
                 # initialise cloud functions api
-                # service_account_conn = BaseHook.get_connection(service_account_conn_id)
-                # creds = service_account.Credentials.from_service_account_info(service_account_conn.extra_dejson)
                 service = build("cloudfunctions", "v2beta", cache_discovery=False, static_discovery=False)
 
                 # Get cloud function uri
@@ -585,9 +582,10 @@ def call_cloud_function(
     :param bucket_name: Name of the bucket to store oapen access stats data
     :param blob_name: Blob name to store oapen access stats data
     """
-    # service_account_conn = BaseHook.get_connection(sa_conn_id)
-    # creds = service_account.Credentials.from_service_account_info(service_account_conn.extra_dejson)
-    creds, _ = google.auth.default()
+    request = transport.requests.Request()
+    creds = compute_engine.IDTokenCredentials(
+        request=request, target_audience=function_uri, use_metadata_identity_endpoint=True
+    )
     authed_session = AuthorizedSession(creds)
     data = {
         "release_date": release_date,
