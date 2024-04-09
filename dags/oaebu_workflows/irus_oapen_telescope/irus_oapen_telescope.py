@@ -26,12 +26,7 @@ import requests
 from airflow.decorators import dag, task, task_group
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.hooks.base import BaseHook
-import google
-from google.auth import environment_vars, transport, compute_engine
-from google.oauth2 import service_account
-from google.oauth2.credentials import Credentials
-from google.auth import environment_vars
-from google.auth.transport.requests import AuthorizedSession
+from google.auth import transport, compute_engine
 from google.cloud.bigquery import TimePartitioningType, SourceFormat, WriteDisposition, Client
 from googleapiclient.discovery import Resource, build
 from googleapiclient.errors import HttpError
@@ -143,7 +138,6 @@ def create_dag(
     geoip_license_conn_id: str = "geoip_license_key",
     irus_oapen_api_conn_id: str = "irus_api",
     irus_oapen_login_conn_id: str = "irus_login",
-    service_account_conn_id: str = "oaebu_service_account",
     catchup: bool = True,
     start_date: pendulum.DateTime = pendulum.datetime(2015, 6, 1),
     schedule: str = "0 0 4 * *",  # Run on the 4th of every month
@@ -586,7 +580,7 @@ def call_cloud_function(
     creds = compute_engine.IDTokenCredentials(
         request=request, target_audience=function_uri, use_metadata_identity_endpoint=True
     )
-    authed_session = AuthorizedSession(creds)
+    authed_session = transport.requests.AuthorizedSession(creds)
     data = {
         "release_date": release_date,
         "username": username,

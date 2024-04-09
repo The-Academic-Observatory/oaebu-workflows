@@ -118,8 +118,8 @@ class TestIrusOapenTelescope(SandboxTestCase):
             dag_file = os.path.join(module_file_path("dags"), "load_dags.py")
             self.assert_dag_load_from_config("irus_oapen_test", dag_file)
 
-    @patch("oaebu_workflows.irus_oapen_telescope.irus_oapen_telescope.AuthorizedSession.post")
-    def test_telescope(self, mock_authorized_session):
+    @patch("oaebu_workflows.irus_oapen_telescope.irus_oapen_telescope.transport.requests.AuthorizedSession.post")
+    def test_telescope(self, mock_auth_session):
         """Test the IRUS OAPEN telescope end to end."""
 
         # Setup Observatory environment
@@ -183,16 +183,7 @@ class TestIrusOapenTelescope(SandboxTestCase):
                 irus_oapen_login_conn_id = "irus_login"
                 conn = Connection(conn_id=irus_oapen_login_conn_id, uri="mysql://user_id:license_key@")
                 env.add_connection(conn)
-                conn = Connection(
-                    conn_id="oaebu_service_account",
-                    uri="google-cloud-platform://?type=service_account&private_key_id=private_key_id"
-                    "&private_key=private_key"
-                    "&client_email=client_email"
-                    "&client_id=client_id"
-                    "&token_uri=token_uri",
-                )
 
-                env.add_connection(conn)
                 # Test that all dependencies are specified: no error should be thrown
                 ti = env.run_task("check_dependencies")
                 self.assertEqual(ti.state, State.SUCCESS)
@@ -221,9 +212,8 @@ class TestIrusOapenTelescope(SandboxTestCase):
                     static_discovery=False,
                     requestBuilder=request_builder,
                 )
-                sa_patch = patch("oaebu_workflows.irus_oapen_telescope.irus_oapen_telescope.service_account")
                 build_patch = patch("oaebu_workflows.irus_oapen_telescope.irus_oapen_telescope.build")
-                with sa_patch, build_patch:
+                with build_patch:
                     build_patch.return_value = build_return_value
                     ti = env.run_task("create_cloud_function_")
                 self.assertEqual(ti.state, State.SUCCESS)
@@ -236,17 +226,17 @@ class TestIrusOapenTelescope(SandboxTestCase):
                     # mock response of cloud function
                     url = "https://oapen-access-stats-kkinbzaigla-ew.a.run.app"
                     httpretty.register_uri(httpretty.POST, url, body="")
-
-                    sa_patch = patch("oaebu_workflows.irus_oapen_telescope.irus_oapen_telescope.service_account")
-                    build_patch = patch("oaebu_workflows.irus_oapen_telescope.irus_oapen_telescope.build")
-                    mock_authorized_session.return_value = MagicMock(
+                    # Mock the post response
+                    mock_auth_session.return_value = MagicMock(
                         spec=Response,
                         status_code=200,
                         json=lambda: {"entries": 100, "unprocessed_publishers": None},
                         reason="unit test",
                     )
+                    id_token_patch = patch("oaebu_workflows.irus_oapen_telescope.irus_oapen_telescope.compute_engine")
+                    build_patch = patch("oaebu_workflows.irus_oapen_telescope.irus_oapen_telescope.build")
                     build_patch.return_value = build_return_value
-                    with sa_patch, build_patch:
+                    with id_token_patch, build_patch:
                         ti = env.run_task("process_release.call_cloud_function_", map_index=0)
                     self.assertEqual(ti.state, State.SUCCESS)
 
@@ -595,10 +585,9 @@ class TestIrusOapenTelescope(SandboxTestCase):
                 self.assertEqual(request["success"], success)
                 self.assertDictEqual(request["msg"], msg)
 
-    @patch("oaebu_workflows.irus_oapen_telescope.irus_oapen_telescope.AuthorizedSession.post")
-    @patch("oaebu_workflows.irus_oapen_telescope.irus_oapen_telescope.BaseHook")
-    @patch("oaebu_workflows.irus_oapen_telescope.irus_oapen_telescope.service_account")
-    def test_call_cloud_function(self, mock_sa, mock_basehook, mock_authorized_session):
+    @patch("oaebu_workflows.irus_oapen_telescope.irus_oapen_telescope.transport.requests.AuthorizedSession.post")
+    @patch("oaebu_workflows.irus_oapen_telescope.irus_oapen_telescope.compute_engine")
+    def test_call_cloud_function(self, _, mock_authorized_session):
         """Test the function that calls the cloud function"""
 
         function_uri = "function_uri"
