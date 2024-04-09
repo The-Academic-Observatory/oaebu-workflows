@@ -26,12 +26,13 @@ import requests
 from airflow.decorators import dag, task, task_group
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.hooks.base import BaseHook
-from google.auth import environment_vars
+import google
 from google.auth.transport.requests import AuthorizedSession
 from google.cloud.bigquery import TimePartitioningType, SourceFormat, WriteDisposition, Client
-from google.oauth2 import service_account
 from googleapiclient.discovery import Resource, build
 from googleapiclient.errors import HttpError
+
+# from google.oauth2 import service_account
 
 from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
@@ -236,11 +237,10 @@ def create_dag(
             set_task_state(success, context["ti"].task_id, release=release)
 
             # initialise cloud functions api
-            service_account_conn = BaseHook.get_connection(service_account_conn_id)
-            creds = service_account.Credentials.from_service_account_info(service_account_conn.extra_dejson)
-            service = build(
-                "cloudfunctions", "v2beta", credentials=creds, cache_discovery=False, static_discovery=False
-            )
+            # service_account_conn = BaseHook.get_connection(service_account_conn_id)
+            # creds = service_account.Credentials.from_service_account_info(service_account_conn.extra_dejson)
+            # credentials=creds,
+            service = build("cloudfunctions", "v2beta", cache_discovery=False, static_discovery=False)
 
             # update or create cloud function
             exists = cloud_function_exists(service, full_name)
@@ -281,11 +281,9 @@ def create_dag(
                 password = BaseHook.get_connection(airflow_conn).password
 
                 # initialise cloud functions api
-                service_account_conn = BaseHook.get_connection(service_account_conn_id)
-                creds = service_account.Credentials.from_service_account_info(service_account_conn.extra_dejson)
-                service = build(
-                    "cloudfunctions", "v2beta", credentials=creds, cache_discovery=False, static_discovery=False
-                )
+                # service_account_conn = BaseHook.get_connection(service_account_conn_id)
+                # creds = service_account.Credentials.from_service_account_info(service_account_conn.extra_dejson)
+                service = build("cloudfunctions", "v2beta", cache_discovery=False, static_discovery=False)
 
                 # Get cloud function uri
                 function_uri = cloud_function_exists(service, full_name)
@@ -570,7 +568,6 @@ def call_cloud_function(
     publisher_uuid_v5: str,
     bucket_name: str,
     blob_name: str,
-    sa_conn_id: str = "oaebu_service_account",
 ) -> None:
     """Iteratively call cloud function, until it has finished processing all publishers.
     When a publisher name/uuid  is given, there is only 1 publisher, if it is empty the cloud function will process
@@ -587,10 +584,10 @@ def call_cloud_function(
     :param publisher_uuid_v5: UUID of the publisher (used for counter version 5)
     :param bucket_name: Name of the bucket to store oapen access stats data
     :param blob_name: Blob name to store oapen access stats data
-    :param sa_conn_id: The connection ID containing the service account credentials
     """
-    service_account_conn = BaseHook.get_connection(sa_conn_id)
-    creds = service_account.Credentials.from_service_account_info(service_account_conn.extra_dejson)
+    # service_account_conn = BaseHook.get_connection(sa_conn_id)
+    # creds = service_account.Credentials.from_service_account_info(service_account_conn.extra_dejson)
+    creds, _ = google.auth.default()
     authed_session = AuthorizedSession(creds)
     data = {
         "release_date": release_date,
