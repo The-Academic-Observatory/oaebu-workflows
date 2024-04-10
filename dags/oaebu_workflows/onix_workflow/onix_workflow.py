@@ -16,7 +16,6 @@
 # Author: Tuan Chien, Richard Hosking, Keegan Smith
 
 import os
-from datetime import timedelta, datetime
 from typing import List, Optional, Tuple, Union, Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import re
@@ -30,9 +29,6 @@ from tenacity import wait_exponential_jitter
 from jinja2 import Environment, FileSystemLoader
 from airflow.decorators import dag, task, task_group
 from airflow.models.baseoperator import chain
-from airflow.models import DagRun
-from airflow.utils.session import provide_session
-from sqlalchemy.orm.scoping import scoped_session
 
 from oaebu_workflows.airflow_pools import CrossrefEventsPool
 from oaebu_workflows.config import schema_folder as default_schema_folder
