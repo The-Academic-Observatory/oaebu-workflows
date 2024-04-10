@@ -324,15 +324,7 @@ def create_dag(
 
             tasks = []
             for ext_dag_id in sensor_dag_ids:
-                sensor = DagCompleteSensor(
-                    task_id=f"{ext_dag_id}_sensor",
-                    external_dag_id=ext_dag_id,
-                    mode="reschedule",
-                    poke_interval=int(1200),  # Check if dag run is ready every 20 minutes
-                    timeout=int(timedelta(days=1).total_seconds()),  # Sensor will fail after 1 day of waiting
-                    check_existence=True,
-                )
-
+                sensor = DagCompleteSensor(task_id=f"{ext_dag_id}_sensor", external_dag_id=ext_dag_id)
                 tasks.append(sensor)
             chain(tasks)
 
@@ -1367,30 +1359,3 @@ def insert_into_schema(schema_base: List[dict], insert_field: dict, schema_field
         schema_base.append(insert_field)
 
     return schema_base
-
-
-@provide_session
-def latest_execution_timedelta(
-    data_interval_start: datetime, ext_dag_id: str, session: scoped_session = None, **context
-) -> int:
-    """
-    Get the latest execution for a given external dag and returns its data_interval_start (logical date)
-
-    :param ext_dag_id: The dag_id to get the latest execution date for.
-    :return: The latest execution date in the window.
-    """
-    dagruns = (
-        session.query(DagRun)
-        .filter(
-            DagRun.dag_id == ext_dag_id,
-        )
-        .all()
-    )
-    dates = [d.data_interval_start for d in dagruns]  # data_interval start is what ExternalTaskSensor checks
-    dates.sort(reverse=True)
-
-    if not len(dates):  # If no execution is found return the logical date for the Workflow
-        logging.warn(f"No Executions found for dag id: {ext_dag_id}")
-        return data_interval_start
-
-    return dates[0]
