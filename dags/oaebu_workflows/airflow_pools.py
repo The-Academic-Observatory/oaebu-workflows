@@ -50,5 +50,5 @@ class CrossrefEventsPool(AirflowPool):
         :param pool_slots: The number of slots assigned to this pool
         """
         super().__init__(
-            pool_name="Crossref Events Pool", pool_slots=pool_slots, pool_description="Crossref Events API Pool"
+            pool_name="crossref_events_pool", pool_slots=pool_slots, pool_description="Crossref Events API Pool"
         )
