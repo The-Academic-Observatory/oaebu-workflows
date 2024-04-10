@@ -331,8 +331,6 @@ def create_dag(
                     poke_interval=int(1200),  # Check if dag run is ready every 20 minutes
                     timeout=int(timedelta(days=1).total_seconds()),  # Sensor will fail after 1 day of waiting
                     check_existence=True,
-                    # Custom date retrieval fn. Airflow expects a callable with the execution_date as an argument only.
-                    execution_date_fn=lambda dt: latest_execution_timedelta(dt, ext_dag_id),
                 )
 
                 tasks.append(sensor)
