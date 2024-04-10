@@ -26,13 +26,10 @@ import requests
 from airflow.decorators import dag, task, task_group
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.hooks.base import BaseHook
-from google.auth import environment_vars
-from google.auth.transport.requests import AuthorizedSession
+from google.auth import transport, compute_engine
 from google.cloud.bigquery import TimePartitioningType, SourceFormat, WriteDisposition, Client
-from google.oauth2.service_account import IDTokenCredentials
 from googleapiclient.discovery import Resource, build
 from googleapiclient.errors import HttpError
-from oauth2client.service_account import ServiceAccountCredentials
 
 from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
@@ -236,10 +233,7 @@ def create_dag(
             set_task_state(success, context["ti"].task_id, release=release)
 
             # initialise cloud functions api
-            creds = ServiceAccountCredentials.from_json_keyfile_name(os.environ.get(environment_vars.CREDENTIALS))
-            service = build(
-                "cloudfunctions", "v2beta", credentials=creds, cache_discovery=False, static_discovery=False
-            )
+            service = build("cloudfunctions", "v2beta", cache_discovery=False, static_discovery=False)
 
             # update or create cloud function
             exists = cloud_function_exists(service, full_name)
@@ -280,10 +274,7 @@ def create_dag(
                 password = BaseHook.get_connection(airflow_conn).password
 
                 # initialise cloud functions api
-                creds = ServiceAccountCredentials.from_json_keyfile_name(os.environ.get(environment_vars.CREDENTIALS))
-                service = build(
-                    "cloudfunctions", "v2beta", credentials=creds, cache_discovery=False, static_discovery=False
-                )
+                service = build("cloudfunctions", "v2beta", cache_discovery=False, static_discovery=False)
 
                 # Get cloud function uri
                 function_uri = cloud_function_exists(service, full_name)
@@ -585,10 +576,11 @@ def call_cloud_function(
     :param bucket_name: Name of the bucket to store oapen access stats data
     :param blob_name: Blob name to store oapen access stats data
     """
-    creds = IDTokenCredentials.from_service_account_file(
-        os.environ.get(environment_vars.CREDENTIALS), target_audience=function_uri
+    request = transport.requests.Request()
+    creds = compute_engine.IDTokenCredentials(
+        request=request, target_audience=function_uri, use_metadata_identity_endpoint=True
     )
-    authed_session = AuthorizedSession(creds)
+    authed_session = transport.requests.AuthorizedSession(creds)
     data = {
         "release_date": release_date,
         "username": username,

@@ -153,11 +153,8 @@ class TestUclDiscoveryTelescope(SandboxTestCase):
             # download
             cassette = vcr.VCR(record_mode="none")
             sa_patch = patch("oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.service_account")
-            conn_patch = patch(
-                "oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.BaseHook.get_connection"
-            )
             build_patch = patch("oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.discovery.build")
-            with sa_patch, conn_patch, build_patch as mock_build, cassette.use_cassette(
+            with sa_patch, build_patch as mock_build, cassette.use_cassette(
                 self.download_cassette, ignore_hosts=["oauth2.googleapis.com", "storage.googleapis.com"]
             ):
                 mock_service = mock_build.return_value.spreadsheets.return_value.values.return_value.get.return_value
@@ -166,7 +163,7 @@ class TestUclDiscoveryTelescope(SandboxTestCase):
             self.assertEqual(ti.state, State.SUCCESS)
 
             # transform
-            with sa_patch, conn_patch, build_patch as mock_build:
+            with sa_patch, build_patch as mock_build:
                 mock_service = mock_build.return_value.spreadsheets.return_value.values.return_value.get.return_value
                 mock_service.execute.return_value = {"values": sheet_return}
                 ti = env.run_task("transform")
