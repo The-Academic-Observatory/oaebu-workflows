@@ -80,7 +80,6 @@ class OaebuPartner:
     :param title_field_name: Name of the field containing the Title.
     :param sharded: whether the table is sharded or not.
     :param schema_path: The path of the partner's schema folder.
-    :param source_table: For views, the the source
     """
 
     type_id: str
