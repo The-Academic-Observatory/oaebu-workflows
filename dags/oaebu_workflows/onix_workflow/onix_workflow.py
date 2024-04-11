@@ -202,6 +202,7 @@ def create_dag(
     dag_id: str,
     cloud_workspace: CloudWorkspace,
     metadata_partner: Union[str, OaebuPartner],
+    source_onix_project: Optional[str] = None,
     # Bigquery parameters
     bq_master_crossref_project_id: str = "academic-observatory",
     bq_master_crossref_dataset_id: str = "crossref_metadata",
@@ -246,6 +247,8 @@ def create_dag(
 
     :param dag_id: DAG ID.
     :param cloud_workspace: The CloudWorkspace object for this DAG
+    :param metadata_partner: The Oaebu Metadata partner
+    :param source_onix_project: If using a view of an onix table, specify this as the project of the onix source table
 
     :param bq_master_crossref_project_id: GCP project ID of crossref master data
     :param bq_master_crossref_dataset_id: GCP dataset ID of crossref master data
@@ -333,8 +336,10 @@ def create_dag(
             """
 
             # Get ONIX release date
+            # We need the snapshot date - we can't get that from a view so we need the source table
+            onix_project_id = source_onix_project if source_onix_project else cloud_workspace.project_id
             onix_table_id = bq_table_id(
-                project_id=cloud_workspace.project_id,
+                project_id=onix_project_id,
                 dataset_id=metadata_partner.bq_dataset_id,
                 table_id=metadata_partner.bq_table_name,
             )
