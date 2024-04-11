@@ -194,7 +194,6 @@ class OnixWorkflowRelease(SnapshotRelease):
             "dag_id": self.dag_id,
             "run_id": self.run_id,
             "snapshot_date": self.snapshot_date.to_date_string(),
-            "onix_snapshot_date": self.onix_snapshot_date.to_date_string(),
             "crossref_master_snapshot_date": self.crossref_master_snapshot_date.to_date_string(),
             "onix_table_id": self.onix_table_id,
         }
@@ -336,15 +335,14 @@ def create_dag(
             :return: a dictionary representation of the OnixWorkflowRelease object.
             """
 
+            snapshot_date = make_snapshot_date(**context)
+            client = Client(project=cloud_workspace.project_id)
+
             # Get ONIX table ID
             if metadata_partner.sharded:
                 onix_source_table_id = bq_table_id(
-                    project_id=cloud_workspace.project_id,
-                    dataset_id=metadata_partner.bq_dataset_id,
-                    table_id=metadata_partner.bq_table_name,
+                    cloud_workspace.project_id, metadata_partner.bq_dataset_id, metadata_partner.bq_table_name
                 )
-                snapshot_date = make_snapshot_date(**context)
-                client = Client(project=cloud_workspace.project_id)
                 onix_snapshot_dates = bq_select_table_shard_dates(
                     table_id=onix_source_table_id, end_date=snapshot_date, client=client
                 )
@@ -354,23 +352,19 @@ def create_dag(
 
                 onix_snapshot_date = onix_snapshot_dates[0]  # Get most recent snapshot
                 onix_table_id = bq_sharded_table_id(
-                    project_id=cloud_workspace.project_id,
-                    dataset_id=metadata_partner.bq_dataset_id,
-                    table_id=metadata_partner.bq_table_name,
-                    date=onix_snapshot_date,
+                    cloud_workspace.project_id,
+                    metadata_partner.bq_dataset_id,
+                    metadata_partner.bq_table_name,
+                    onix_snapshot_date,
                 )
             else:
                 onix_table_id = bq_table_id(
-                    project_id=cloud_workspace.project_id,
-                    dataset_id=metadata_partner.bq_dataset_id,
-                    table_id=metadata_partner.bq_table_name,
+                    cloud_workspace.project_id, metadata_partner.bq_dataset_id, metadata_partner.bq_table_name
                 )
 
             # Get Crossref Metadata release date
             crossref_table_id = bq_table_id(
-                project_id=bq_master_crossref_project_id,
-                dataset_id=bq_master_crossref_dataset_id,
-                table_id=bq_master_crossref_metadata_table_name,
+                bq_master_crossref_project_id, bq_master_crossref_dataset_id, bq_master_crossref_metadata_table_name
             )
             crossref_metadata_snapshot_dates = bq_select_table_shard_dates(
                 table_id=crossref_table_id, end_date=snapshot_date, client=client

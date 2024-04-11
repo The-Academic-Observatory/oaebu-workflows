@@ -27,7 +27,7 @@ from airflow.utils.state import State
 
 from oaebu_workflows.config import schema_folder as default_schema_folder
 from oaebu_workflows.config import test_fixtures_folder
-from oaebu_workflows.oaebu_partners import OaebuPartner, OAEBU_DATA_PARTNERS, partner_from_str
+from oaebu_workflows.oaebu_partners import OaebuPartner, OAEBU_DATA_PARTNERS, OAEBU_METADATA_PARTNERS, partner_from_str
 from oaebu_workflows.onix_workflow.onix_workflow import (
     OnixWorkflowRelease,
     CROSSREF_EVENT_URL_TEMPLATE,
@@ -141,11 +141,18 @@ class TestOnixWorkflow(SandboxTestCase):
         self.events_cassette = os.path.join(self.fixtures_folder, "crossref_events_request.yaml")
 
     @patch("oaebu_workflows.onix_workflow.onix_workflow.bq_select_table_shard_dates")
-    def test_make_release(self, mock_sel_table_suffixes):
-        """Tests that the make_release function works as intended"""
+    def test_make_release_sharded(self, mock_sel_table_suffixes):
+        """Tests that the make_release function works as intended for a sharded metadata partner"""
 
         # Use a different onix snapshot date for testing purposes
         onix_snapshot_date = self.snapshot_date.add(days=1)
+        metadata_partner = OAEBU_METADATA_PARTNERS["onix"]  # Sharded metadata partner
+        expected_onix_table = bq_sharded_table_id(
+            self.fake_cloud_workspace.project_id,
+            metadata_partner.bq_dataset_id,
+            metadata_partner.bq_table_name,
+            onix_snapshot_date,
+        )
         crossref_snapshot_date = self.snapshot_date
         mock_sel_table_suffixes.side_effect = [[onix_snapshot_date], [crossref_snapshot_date]]
         env = SandboxEnvironment(self.gcp_project_id, self.data_location)
@@ -154,7 +161,7 @@ class TestOnixWorkflow(SandboxTestCase):
                 dag_id="test_make_release",
                 cloud_workspace=self.fake_cloud_workspace,
                 data_partners=[self.fake_onix_data_partner],
-                metadata_partner="onix",
+                metadata_partner=metadata_partner,
             )
             with env.create_dag_run(dag, self.snapshot_date.add(days=1)):
                 ti = env.run_task("make_release")
@@ -180,7 +187,7 @@ class TestOnixWorkflow(SandboxTestCase):
                 )
 
                 # Test that the onix and crossref snapshots are as expected
-                self.assertEqual(onix_snapshot_date, release.onix_snapshot_date)
+                self.assertEqual(expected_onix_table, release.onix_table_id)
                 self.assertEqual(crossref_snapshot_date, release.crossref_master_snapshot_date)
 
                 # Test for case - no ONIX releases found
@@ -192,6 +199,60 @@ class TestOnixWorkflow(SandboxTestCase):
                 # Test for case - no Crossref releases found
                 dag.clear(task_ids=["make_release"])
                 mock_sel_table_suffixes.side_effect = [[onix_snapshot_date], []]  # No crossref releases
+                with self.assertRaisesRegex(RuntimeError, "Crossref"):
+                    env.run_task("make_release")
+
+    @patch("oaebu_workflows.onix_workflow.onix_workflow.bq_select_table_shard_dates")
+    def test_make_release_unsharded(self, mock_sel_table_suffixes):
+        """Tests that the make_release function works as intended for an unsharded metadata partner"""
+
+        # Use a different onix snapshot date for testing purposes
+        metadata_partner = OAEBU_METADATA_PARTNERS["onix_view"]  # Unsharded metadata partner
+        expected_onix_table = bq_table_id(
+            self.fake_cloud_workspace.project_id,
+            metadata_partner.bq_dataset_id,
+            metadata_partner.bq_table_name,
+        )
+        crossref_snapshot_date = self.snapshot_date
+        mock_sel_table_suffixes.return_value = [crossref_snapshot_date]
+        env = SandboxEnvironment(self.gcp_project_id, self.data_location)
+        with env.create():
+            dag = create_dag(
+                dag_id="test_make_release",
+                cloud_workspace=self.fake_cloud_workspace,
+                data_partners=[self.fake_onix_data_partner],
+                metadata_partner=metadata_partner,
+            )
+            with env.create_dag_run(dag, self.snapshot_date.add(days=1)):
+                ti = env.run_task("make_release")
+                release_dict = ti.xcom_pull(task_ids="make_release", include_prior_dates=False)
+                release = OnixWorkflowRelease.from_dict(release_dict)
+                self.assertEqual(release.dag_id, dag.dag_id)
+
+                # Test release file names are as expected
+                self.assertEqual(release.workslookup_path, os.path.join(release.transform_folder, "worksid.jsonl.gz"))
+                self.assertEqual(
+                    release.workslookup_errors_path,
+                    os.path.join(release.transform_folder, "worksid_errors.jsonl.gz"),
+                )
+                self.assertEqual(
+                    release.worksfamilylookup_path, os.path.join(release.transform_folder, "workfamilyid.jsonl.gz")
+                )
+                self.assertEqual(
+                    release.crossref_metadata_path,
+                    os.path.join(release.transform_folder, "crossref_metadata.jsonl.gz"),
+                )
+                self.assertEqual(
+                    release.crossref_events_path, os.path.join(release.transform_folder, "crossref_events.jsonl.gz")
+                )
+
+                # Test that the onix table and crossref snapshots are as expected
+                self.assertEqual(expected_onix_table, release.onix_table_id)
+                self.assertEqual(crossref_snapshot_date, release.crossref_master_snapshot_date)
+
+                # Test for case - no Crossref releases found
+                dag.clear(task_ids=["make_release"])
+                mock_sel_table_suffixes.return_value = []  # No crossref releases
                 with self.assertRaisesRegex(RuntimeError, "Crossref"):
                     env.run_task("make_release")
 
@@ -965,11 +1026,17 @@ class TestOnixWorkflow(SandboxTestCase):
                     ti = env.run_task("make_release")
                 self.assertEqual(ti.state, State.SUCCESS)
                 release_dict = ti.xcom_pull(task_ids="make_release", include_prior_dates=False)
+                expected_onix_table_id = bq_sharded_table_id(
+                    env.cloud_workspace.project_id,
+                    metadata_partner.bq_dataset_id,
+                    metadata_partner.bq_table_name,
+                    partner_release_date,
+                )
                 expected_release_dict = {
                     "dag_id": "onix_workflow_test",
                     "run_id": "scheduled__2021-05-17T00:00:00+00:00",
                     "snapshot_date": "2021-05-24",
-                    "onix_snapshot_date": "2021-05-15",
+                    "onix_table_id": expected_onix_table_id,
                     "crossref_master_snapshot_date": "2021-05-15",
                 }
                 self.assertEqual(release_dict, expected_release_dict)
