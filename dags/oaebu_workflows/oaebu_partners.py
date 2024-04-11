@@ -73,13 +73,14 @@ class DataPartnerFiles:
 class OaebuPartner:
     """Class for storing information about data sources we are using to produce oaebu intermediate tables for.
 
-    :param type_id: The dataset type id. Should be the same as its dictionary key
+    :param type_id: The dataset type id. Should be the same as its dictionary key.
     :param bq_dataset_id: The BigQuery dataset ID Bigquery Dataset ID.
-    :param bq_table_name: The BigQuery table name Bigquery Table name
+    :param bq_table_name: The BigQuery table name.
     :param isbn_field_name: Name of the field containing the ISBN.
     :param title_field_name: Name of the field containing the Title.
     :param sharded: whether the table is sharded or not.
     :param schema_path: The path of the partner's schema folder.
+    :param source_table: For views, the the source
     """
 
     type_id: str
@@ -177,6 +178,15 @@ OAEBU_METADATA_PARTNERS = dict(
         isbn_field_name="ISBN13",
         title_field_name="TitleDetails.TitleElements.TitleText",
         sharded=True,
+        schema_path=os.path.join(schema_folder(workflow_module="onix_telescope"), "onix.json"),
+    ),
+    onix_view=OaebuPartner(
+        type_id="onix_view",
+        bq_dataset_id="onix",
+        bq_table_name="onix",
+        isbn_field_name="ISBN13",
+        title_field_name="TitleDetails.TitleElements.TitleText",
+        sharded=False,
         schema_path=os.path.join(schema_folder(workflow_module="onix_telescope"), "onix.json"),
     ),
 )

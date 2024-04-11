@@ -392,14 +392,19 @@ def create_dag(
             )
 
             # Fetch ONIX data
-            sharded_onix_table = bq_sharded_table_id(
-                cloud_workspace.project_id,
-                metadata_partner.bq_dataset_id,
-                metadata_partner.bq_table_name,
-                release.onix_snapshot_date,
-            )
+            if metadata_partner.sharded:
+                onix_table = bq_sharded_table_id(
+                    cloud_workspace.project_id,
+                    metadata_partner.bq_dataset_id,
+                    metadata_partner.bq_table_name,
+                    release.onix_snapshot_date,
+                )
+            else:
+                onix_table = bq_table_id(
+                    cloud_workspace.project_id, metadata_partner.bq_dataset_id, metadata_partner.bq_table_name
+                )
             client = Client(project=cloud_workspace.project_id)
-            products = get_onix_records(sharded_onix_table, client=client)
+            products = get_onix_records(onix_table, client=client)
 
             # Aggregate into works
             agg = BookWorkAggregator(products)
