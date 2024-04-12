@@ -74,22 +74,24 @@ class OnixWorkflowRelease(SnapshotRelease):
         dag_id: str,
         run_id: str,
         snapshot_date: pendulum.DateTime,
-        onix_snapshot_date: pendulum.DateTime,
         crossref_master_snapshot_date: pendulum.DateTime,
+        onix_table_id: str,
     ):
         """
         Construct the OnixWorkflow Release
         :param dag_id: DAG ID.
         :param release_date: The date of the partition/release
-        :param onix_snapshot_date: The ONIX snapshot/release date.
         :param crossref_master_snapshot_date: The release date/suffix of the crossref master table
+        :param onix_table_id: The table ID of the onix table to use for querying
         """
 
         super().__init__(dag_id=dag_id, run_id=run_id, snapshot_date=snapshot_date)
 
         # Dates
-        self.onix_snapshot_date = onix_snapshot_date
         self.crossref_master_snapshot_date = crossref_master_snapshot_date
+
+        # Onix table
+        self.onix_table_id = onix_table_id
 
         # Files
         self.workslookup_file_name = "worksid.jsonl.gz"
@@ -183,8 +185,8 @@ class OnixWorkflowRelease(SnapshotRelease):
             dag_id=dict_["dag_id"],
             run_id=dict_["run_id"],
             snapshot_date=pendulum.from_format(dict_["snapshot_date"], "YYYY-MM-DD"),
-            onix_snapshot_date=pendulum.from_format(dict_["onix_snapshot_date"], "YYYY-MM-DD"),
             crossref_master_snapshot_date=pendulum.from_format(dict_["crossref_master_snapshot_date"], "YYYY-MM-DD"),
+            onix_table_id=dict_["onix_table_id"],
         )
 
     def to_dict(self):
@@ -192,8 +194,8 @@ class OnixWorkflowRelease(SnapshotRelease):
             "dag_id": self.dag_id,
             "run_id": self.run_id,
             "snapshot_date": self.snapshot_date.to_date_string(),
-            "onix_snapshot_date": self.onix_snapshot_date.to_date_string(),
             "crossref_master_snapshot_date": self.crossref_master_snapshot_date.to_date_string(),
+            "onix_table_id": self.onix_table_id,
         }
 
 
@@ -246,6 +248,7 @@ def create_dag(
 
     :param dag_id: DAG ID.
     :param cloud_workspace: The CloudWorkspace object for this DAG
+    :param metadata_partner: The Oaebu Metadata partner
 
     :param bq_master_crossref_project_id: GCP project ID of crossref master data
     :param bq_master_crossref_dataset_id: GCP dataset ID of crossref master data
@@ -332,33 +335,44 @@ def create_dag(
             :return: a dictionary representation of the OnixWorkflowRelease object.
             """
 
-            # Get ONIX release date
-            onix_table_id = bq_table_id(
-                project_id=cloud_workspace.project_id,
-                dataset_id=metadata_partner.bq_dataset_id,
-                table_id=metadata_partner.bq_table_name,
-            )
             snapshot_date = make_snapshot_date(**context)
             client = Client(project=cloud_workspace.project_id)
-            onix_snapshot_dates = bq_select_table_shard_dates(
-                table_id=onix_table_id, end_date=snapshot_date, client=client
-            )
-            if not len(onix_snapshot_dates):
-                raise RuntimeError("OnixWorkflow.make_release: no ONIX releases found")
 
-            onix_snapshot_date = onix_snapshot_dates[0]  # Get most recent snapshot
+            # Get ONIX table ID
+            if metadata_partner.sharded:
+                onix_source_table_id = bq_table_id(
+                    cloud_workspace.project_id, metadata_partner.bq_dataset_id, metadata_partner.bq_table_name
+                )
+                onix_snapshot_dates = bq_select_table_shard_dates(
+                    table_id=onix_source_table_id, end_date=snapshot_date, client=client
+                )
+
+                if not len(onix_snapshot_dates):
+                    raise RuntimeError("OnixWorkflow.make_release: no ONIX releases found")
+
+                onix_snapshot_date = onix_snapshot_dates[0]  # Get most recent snapshot
+                onix_table_id = bq_sharded_table_id(
+                    cloud_workspace.project_id,
+                    metadata_partner.bq_dataset_id,
+                    metadata_partner.bq_table_name,
+                    onix_snapshot_date,
+                )
+            else:
+                onix_table_id = bq_table_id(
+                    cloud_workspace.project_id, metadata_partner.bq_dataset_id, metadata_partner.bq_table_name
+                )
 
             # Get Crossref Metadata release date
             crossref_table_id = bq_table_id(
-                project_id=bq_master_crossref_project_id,
-                dataset_id=bq_master_crossref_dataset_id,
-                table_id=bq_master_crossref_metadata_table_name,
+                bq_master_crossref_project_id, bq_master_crossref_dataset_id, bq_master_crossref_metadata_table_name
             )
             crossref_metadata_snapshot_dates = bq_select_table_shard_dates(
                 table_id=crossref_table_id, end_date=snapshot_date, client=client
             )
+
             if not len(crossref_metadata_snapshot_dates):
                 raise RuntimeError("OnixWorkflow.make_release: no Crossref Metadata releases found")
+
             crossref_master_snapshot_date = crossref_metadata_snapshot_dates[0]  # Get most recent snapshot
 
             # Make the release object
@@ -366,8 +380,8 @@ def create_dag(
                 dag_id=dag_id,
                 run_id=context["run_id"],
                 snapshot_date=snapshot_date,
-                onix_snapshot_date=onix_snapshot_date,
                 crossref_master_snapshot_date=crossref_master_snapshot_date,
+                onix_table_id=onix_table_id,
             ).to_dict()
 
         @task()
@@ -387,14 +401,8 @@ def create_dag(
             )
 
             # Fetch ONIX data
-            sharded_onix_table = bq_sharded_table_id(
-                cloud_workspace.project_id,
-                metadata_partner.bq_dataset_id,
-                metadata_partner.bq_table_name,
-                release.onix_snapshot_date,
-            )
             client = Client(project=cloud_workspace.project_id)
-            products = get_onix_records(sharded_onix_table, client=client)
+            products = get_onix_records(release.onix_table_id, client=client)
 
             # Aggregate into works
             agg = BookWorkAggregator(products)
@@ -454,12 +462,6 @@ def create_dag(
                 description="Data from Crossref sources",
             )
 
-            onix_table_id = bq_sharded_table_id(
-                cloud_workspace.project_id,
-                metadata_partner.bq_dataset_id,
-                metadata_partner.bq_table_name,
-                release.onix_snapshot_date,
-            )
             master_crossref_metadata_table_id = bq_sharded_table_id(
                 bq_master_crossref_project_id,
                 bq_master_crossref_dataset_id,
@@ -468,7 +470,7 @@ def create_dag(
             )
             sql = render_template(
                 os.path.join(sql_folder(workflow_module="onix_workflow"), "crossref_metadata_filter_isbn.sql.jinja2"),
-                onix_table_id=onix_table_id,
+                onix_table_id=release.onix_table_id,
                 crossref_metadata_table_id=master_crossref_metadata_table_id,
             )
             logging.info("Creating crossref metadata table from master table")
@@ -675,14 +677,6 @@ def create_dag(
                 for dp in data_partners
             }
 
-            # Metadata table name
-            onix_table_id = bq_sharded_table_id(
-                cloud_workspace.project_id,
-                metadata_partner.bq_dataset_id,
-                metadata_partner.bq_table_name,
-                release.onix_snapshot_date,
-            )
-
             # ONIX WF table names
             workid_table_id = bq_sharded_table_id(
                 cloud_workspace.project_id,
@@ -707,7 +701,7 @@ def create_dag(
                 data_partners=data_partners,
             )
             sql = env.render(
-                onix_table_id=onix_table_id,
+                onix_table_id=release.onix_table_id,
                 data_partners=data_partners,
                 book_table_id=book_table_id,
                 country_table_id=country_table_id,
