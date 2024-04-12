@@ -876,7 +876,10 @@ class JstorCollectionsAPI(JstorAPI):
                 row["Publisher"] = row.pop("publisher")
                 row["Book_ID"] = row.pop("item_doi")
                 row["Usage_Month"] = partition_date.strftime("%Y-%m")
-                row[entity] = row.pop("\ufeffentity_name")
+                try:
+                    row[entity] = row.pop("\ufeffentity_name")
+                except KeyError:
+                    row[entity] = row.pop("entity_name")
                 row["Book_Title"] = row.pop("book_title")
                 row["Authors"] = row.pop("authors")
                 row["ISBN"] = row.pop("eisbn")

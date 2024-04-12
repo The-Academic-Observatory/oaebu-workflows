@@ -445,7 +445,7 @@ class TestJstorTelescopeCollection(SandboxTestCase):
             "path": os.path.join(fixtures_folder, "collection_institution.json"),
             "table": os.path.join(fixtures_folder, "collection_institution_table.json"),
             "url": "https://www.jstor.org/admin/reports/download/129518301",
-            "download_hash": "1507899df3b3937d6fc20cbe007c882f",
+            "download_hash": "d52d458ca3a3f0a34f6df4d71688b006",
             "transform_hash": "6ff261d4",
             "table_rows": 6,
         }
