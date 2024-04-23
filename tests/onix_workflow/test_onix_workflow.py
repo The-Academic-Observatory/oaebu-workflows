@@ -180,7 +180,8 @@ class TestOnixWorkflow(SandboxTestCase):
                     os.path.join(release.transform_folder, "crossref_metadata.jsonl.gz"),
                 )
                 self.assertEqual(
-                    release.crossref_events_path, os.path.join(release.transform_folder, "crossref_events.jsonl.gz")
+                    release.transformed_crossref_events_path,
+                    os.path.join(release.transform_folder, "crossref_events.jsonl"),
                 )
 
                 # Test that the onix and crossref snapshots are as expected
@@ -240,7 +241,8 @@ class TestOnixWorkflow(SandboxTestCase):
                     os.path.join(release.transform_folder, "crossref_metadata.jsonl.gz"),
                 )
                 self.assertEqual(
-                    release.crossref_events_path, os.path.join(release.transform_folder, "crossref_events.jsonl.gz")
+                    release.transformed_crossref_events_path,
+                    os.path.join(release.transform_folder, "crossref_events.jsonl"),
                 )
 
                 # Test that the onix table and crossref snapshots are as expected
@@ -741,18 +743,12 @@ class TestOnixWorkflow(SandboxTestCase):
                 project_id=self.gcp_project_id,
             )
             table_id = bq_table_id(self.gcp_project_id, fake_doi_isbn_dataset_id, "doi_isbn_test")
-            actual_dois = dois_from_table(table_id, doi_column_name="DOI", distinct=True)
-            fake_doi_isbns = [entry["DOI"] for entry in fake_doi_isbn_table]
+            actual_dois = dois_from_table(table_id, doi_column_name="DOI")
+            fake_doi_isbns = {entry["DOI"] for entry in fake_doi_isbn_table}
 
             # Check there are no duplicates and the contents are the same
-            self.assertEqual(len(actual_dois), len(set(fake_doi_isbns)))
-            self.assertEqual(set(actual_dois), set(fake_doi_isbns))
-
-            # Do the same but allow duplicates
-            actual_dois = dois_from_table(table_id, doi_column_name="DOI", distinct=False)
-            fake_doi_isbns = [entry["DOI"] for entry in fake_doi_isbn_table]
             self.assertEqual(len(actual_dois), len(fake_doi_isbns))
-            self.assertEqual(sorted(actual_dois), sorted(fake_doi_isbns))
+            self.assertEqual(actual_dois, fake_doi_isbns)
 
             #############################################
             ### Test copy_latest_export_tables ###

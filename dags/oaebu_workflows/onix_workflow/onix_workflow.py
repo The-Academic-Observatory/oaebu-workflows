@@ -1087,18 +1087,17 @@ def get_doi_prefixes(dois: Iterable[str]) -> set[str]:
 
 
 def dois_from_table(
-    table_id: str, doi_column_name: str = "DOI", distinct: str = True, client: Client = None
+    table_id: str, doi_column_name: str = "DOI", client: Client = None
 ) -> set[str]:
     """
-    Queries a metadata table to retrieve the unique DOIs. Provided the DOIs are not in a nested structure.
+    Queries a metadata table to retrieve the distinct / unique DOIs. Provided the DOIs are not in a nested structure.
 
     :param table_id: The fully qualified ID of the metadata table on GCP
     :param doi_column_name: The name of the DOI column
-    :param distinct: Whether to retrieve only unique DOIs
     :return: All DOIs present in the metadata table
     """
 
-    select_field = f"DISTINCT({doi_column_name})" if distinct else doi_column_name
+    select_field = f"DISTINCT({doi_column_name})"
     sql = f"SELECT {select_field} FROM `{table_id}`"
     query_results = bq_run_query(sql, client=client)
     dois = {r["DOI"] for r in query_results}
