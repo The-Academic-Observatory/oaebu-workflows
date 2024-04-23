@@ -15,45 +15,44 @@
 # Author: Tuan Chien, Keegan Smith
 
 import os
-from datetime import timedelta
-from unittest.mock import patch
-import vcr
 import shutil
+from datetime import timedelta
 from typing import List
+from unittest.mock import patch
 
 import pendulum
+import vcr
 from airflow.models import DagBag
 from airflow.utils.state import State
+from click.testing import CliRunner
 
-from oaebu_workflows.config import schema_folder as default_schema_folder
-from oaebu_workflows.config import test_fixtures_folder
-from oaebu_workflows.oaebu_partners import OaebuPartner, OAEBU_DATA_PARTNERS, OAEBU_METADATA_PARTNERS, partner_from_str
+from oaebu_workflows.config import schema_folder as default_schema_folder, test_fixtures_folder
+from oaebu_workflows.oaebu_partners import OAEBU_DATA_PARTNERS, OAEBU_METADATA_PARTNERS, OaebuPartner, partner_from_str
 from oaebu_workflows.onix_workflow.onix_workflow import (
-    OnixWorkflowRelease,
-    create_dag,
-    download_crossref_events,
-    transform_crossref_events,
-    transform_event,
-    dois_from_table,
     copy_latest_export_tables,
+    create_dag,
+    dois_from_table,
+    download_crossref_events,
     get_onix_records,
     insert_into_schema,
+    OnixWorkflowRelease,
+    transform_crossref_events,
+    transform_event,
 )
+from observatory_platform.airflow.workflow import Workflow
+from observatory_platform.config import module_file_path
 from observatory_platform.dataset_api import DatasetAPI
-from observatory_platform.files import load_jsonl
+from observatory_platform.files import load_jsonl, save_jsonl
 from observatory_platform.google.bigquery import bq_find_schema, bq_run_query, bq_sharded_table_id, bq_table_id
 from observatory_platform.google.gcs import gcs_blob_name_from_path
-from observatory_platform.config import module_file_path
-
-from observatory_platform.airflow.workflow import Workflow
 from observatory_platform.sandbox.sandbox_environment import SandboxEnvironment
 from observatory_platform.sandbox.test_utils import (
-    SandboxTestCase,
-    Table,
     bq_load_tables,
     load_and_parse_json,
-    random_id,
     make_dummy_dag,
+    random_id,
+    SandboxTestCase,
+    Table,
 )
 
 
@@ -550,33 +549,25 @@ class TestOnixWorkflow(SandboxTestCase):
                 self.assert_table_content(table_id, load_jsonl(release.worksfamilylookup_path), primary_key="isbn13")
                 self.assert_table_content(table_id, worksfamilylookup_expected, primary_key="isbn13")
 
-    def test_crossref_API_calls(self):
-        """
-        Test the functions that query the crossref event and metadata APIs
-        """
-        # Test function calls with mocked HTTP responses
-        good_test_doi = "10.5555/12345678"
-        bad_test_doi = "10.1111111111111"
-        mailto = "agent@observatory.academy"
+    def test_crossref_events_api_calls(self):
+        """Test the functions that query the crossref event and metadata APIs"""
 
-        with vcr.use_cassette(
-            os.path.join(self.fixtures_folder, "crossref_download_function_test.yaml"), record_mode="none"
-        ):
+        with CliRunner().isolated_filesystem() as t:
+            input_path = os.path.join(t, "input.jsonl")
+            doi_prefixes = ["10.5555", "10.2222"]
             events_start = pendulum.date(2020, 1, 1)
-            events_end = pendulum.date(2022, 1, 1)
-            event_url = CROSSREF_EVENT_URL_TEMPLATE.format(
-                doi=good_test_doi,
-                mailto=mailto,
-                start_date=events_start.strftime("%Y-%m-%d"),
-                end_date=events_end.strftime("%Y-%m-%d"),
-            )
-            events = download_crossref_event_url(event_url)
-            self.assertListEqual(events, [{"passed": True}], f"Event return incorrect. Got {events}")
+            events_end = pendulum.date(2021, 1, 1)
+            mailto = "agent@observatory.academy"
 
-        good_events = download_crossref_events([good_test_doi], events_start, events_end, mailto, max_threads=1)
-        bad_events = download_crossref_events([bad_test_doi], events_start, events_end, mailto, max_threads=1)
-        self.assertEqual(len(good_events), 4)
-        self.assertIsNot(bad_events, f"Events should have returned nothing, instead returned {bad_events}")
+            with vcr.use_cassette(
+                os.path.join(self.fixtures_folder, "crossref_events_api_calls.yaml"),
+                record_mode=vcr.record_mode.RecordMode.ONCE,
+            ):
+                download_crossref_events(input_path, doi_prefixes, events_start, events_end, mailto)
+
+            actual_events = load_jsonl(input_path)
+            expected_num_events = 242 + 3620
+            self.assertEqual(expected_num_events, len(actual_events))
 
     @patch("oaebu_workflows.onix_workflow.onix_workflow.bq_run_query")
     def test_get_onix_records(self, mock_bq_query):
@@ -615,9 +606,36 @@ class TestOnixWorkflow(SandboxTestCase):
                 },
                 "timestamp": "2021-07-21T14:00:58Z",
                 "relation_type_id": "references",
-            }
+            },
+            {
+                "license": "https://creativecommons.org/publicdomain/zero/1.0/",
+                "obj_id": "https://doi.org/10.5555/12345679",
+                "source_token": "36c35e23-8757-4a9d-aacf-345e9b7eb50e",
+                "occurred_at": "2021-07-21T13:27:50Z",
+                "subj_id": "https://en.wikipedia.org/api/rest_v1/page/html/Josiah_S._Carberry/1034726541",
+                "id": "c76bbfd9-5122-4859-82c8-505b1eb845fd",
+                "evidence_record": "https://evidence.eventdata.crossref.org/evidence/20210721-wikipedia-83789066-1794-4c4f-bb2c-ed47ccd82264",
+                "terms": "https://doi.org/10.13003/CED-terms-of-use",
+                "action": "add",
+                "subj": {
+                    "pid": "https://en.wikipedia.org/wiki/Josiah_S._Carberry",
+                    "url": "https://en.wikipedia.org/w/index.php?title=Josiah_S._Carberry&oldid=1034726541",
+                    "title": "Josiah S. Carberry",
+                    "work_type_id": "entry-encyclopedia",
+                    "api-url": "https://en.wikipedia.org/api/rest_v1/page/html/Josiah_S._Carberry/1034726541",
+                },
+                "source_id": "wikipedia",
+                "obj": {
+                    "pid": "https://doi.org/10.5555/12345678",
+                    "url": "http://psychoceramics.labs.crossref.org/10.5555-12345678.html",
+                    "method": "landing-page-meta-tag",
+                    "verification": "checked-url-exact",
+                },
+                "timestamp": "2021-07-21T14:00:58Z",
+                "relation_type_id": "references",
+            },
         ]
-        expected_transformed_events = [
+        expected = [
             {
                 "license": "https://creativecommons.org/publicdomain/zero/1.0/",
                 "obj_id": "https://doi.org/10.5555/12345678",
@@ -646,13 +664,27 @@ class TestOnixWorkflow(SandboxTestCase):
                 "relation_type_id": "references",
             }
         ]
+
         # Standalone transform
-        actual_transformed_events = transform_event(input_events[0])
-        self.assertEqual(expected_transformed_events[0], actual_transformed_events)
+        actual = transform_event(input_events[0])
+        self.assertEqual(expected[0], actual)
+
         # List transform
-        actual_transformed_events = transform_crossref_events(input_events)
-        self.assertEqual(len(actual_transformed_events), 1)
-        self.assertEqual(expected_transformed_events, actual_transformed_events)
+        with CliRunner().isolated_filesystem() as t:
+            # Save input
+            input_path = os.path.join(t, "input.jsonl")
+            save_jsonl(input_path, input_events)
+
+            # Transform
+            # Also tests filtering of events
+            dois = {"10.5555/12345678"}
+            output_path = os.path.join(t, "output.jsonl")
+            transform_crossref_events(input_path, dois, output_path)
+
+            # Load actual and test
+            actual = load_jsonl(output_path)
+            self.assertEqual(len(actual), 1)
+            self.assertEqual(expected, actual)
 
     def test_insert_into_schema(self):
         """Tests the instert_into_schema function"""
@@ -890,7 +922,7 @@ class TestOnixWorkflow(SandboxTestCase):
 
         return partners, metadata_partner
 
-    def run_workflow_e2e(self, dry_run: bool = False):
+    def test_workflow(self):
         """End to end test of the ONIX workflow"""
 
         def vcr_ignore_condition(request):
@@ -925,7 +957,7 @@ class TestOnixWorkflow(SandboxTestCase):
             # Setup data partners, remove Google Analytics (the last partner) from these tests
             partner_release_date = pendulum.datetime(2021, 5, 15)
             data_partners, metadata_partner = self.setup_input_data(
-                data_partners=self.data_partner_list if not dry_run else [],
+                data_partners=self.data_partner_list,
                 settings_dataset_id=oaebu_settings_dataset_id,
                 fixtures_dataset_id=oaebu_fixtures_dataset_id,
                 crossref_master_dataset_id=master_crossref_dataset_id,
@@ -936,19 +968,15 @@ class TestOnixWorkflow(SandboxTestCase):
             )
 
             # Expected sensor dag_ids
-            sensor_dag_ids = (
-                [
-                    "jstor",
-                    "google_books",
-                    "google_analytics3",
-                    "irus_oapen",
-                    "irus_fulcrum",
-                    "ucl_discovery",
-                    "onix",
-                ]
-                if not dry_run
-                else []
-            )
+            sensor_dag_ids = [
+                "jstor",
+                "google_books",
+                "google_analytics3",
+                "irus_oapen",
+                "irus_fulcrum",
+                "ucl_discovery",
+                "onix",
+            ]
 
             start_date = pendulum.datetime(year=2021, month=5, day=9)
             dag_id = "onix_workflow_test"
@@ -1091,8 +1119,9 @@ class TestOnixWorkflow(SandboxTestCase):
                 )
 
                 # Load crossref event table into bigquery
+                # Even though this is using VCR, this file is manually created, which is not ideal
                 with vcr.use_cassette(
-                    self.events_cassette, record_mode=vcr.record_mode.RecordMode.ONCE, before_record_request=vcr_ignore_condition
+                    self.events_cassette, record_mode="none", before_record_request=vcr_ignore_condition
                 ):
                     ti = env.run_task("create_crossref_events_table")
                 self.assertEqual(ti.state, State.SUCCESS)
@@ -1131,7 +1160,7 @@ class TestOnixWorkflow(SandboxTestCase):
                 table_id = bq_sharded_table_id(
                     self.gcp_project_id, oaebu_output_dataset_id, bq_book_product_table_name, release.snapshot_date
                 )
-                expected_book_product_table = "book_product.json" if not dry_run else "book_product_dry.json"
+                expected_book_product_table = "book_product.json"
                 self.assert_table_content(
                     table_id,
                     load_and_parse_json(
@@ -1145,50 +1174,30 @@ class TestOnixWorkflow(SandboxTestCase):
                 ### Export OAEBU Tables ##
                 ##########################
 
-                if not dry_run:
-                    export_tasks = [
-                        "export_tables.export_book_list",
-                        "export_tables.export_book_institution_list",
-                        "export_tables.export_book_metrics",
-                        "export_tables.export_book_metrics_country",
-                        "export_tables.export_book_metrics_institution",
-                        "export_tables.export_book_metrics_author",
-                        "export_tables.export_book_metrics_city",
-                        "export_tables.export_book_metrics_events",
-                        "export_tables.export_book_metrics_subjects",
-                    ]
-                    export_tables = [
-                        ("book_list", 4),
-                        ("book_institution_list", 1),
-                        ("book_metrics", 5),
-                        ("book_metrics_country", 23),
-                        ("book_metrics_institution", 1),
-                        ("book_metrics_author", 3),
-                        ("book_metrics_city", 26),
-                        ("book_metrics_events", 3),
-                        ("book_metrics_subject_bic", 0),
-                        ("book_metrics_subject_bisac", 0),
-                        ("book_metrics_subject_thema", 0),
-                    ]
-                else:
-                    export_tasks = [
-                        "export_tables.export_book_list",
-                        "export_tables.export_book_metrics",
-                        "export_tables.export_book_metrics_country",
-                        "export_tables.export_book_metrics_author",
-                        "export_tables.export_book_metrics_events",
-                        "export_tables.export_book_metrics_subjects",
-                    ]
-                    export_tables = [
-                        ("book_list", 4),
-                        ("book_metrics", 3),
-                        ("book_metrics_country", 750),  # No filter is applied in a dry run
-                        ("book_metrics_author", 2),
-                        ("book_metrics_events", 3),
-                        ("book_metrics_subject_bic", 0),
-                        ("book_metrics_subject_bisac", 0),
-                        ("book_metrics_subject_thema", 0),
-                    ]
+                export_tasks = [
+                    "export_tables.export_book_list",
+                    "export_tables.export_book_institution_list",
+                    "export_tables.export_book_metrics",
+                    "export_tables.export_book_metrics_country",
+                    "export_tables.export_book_metrics_institution",
+                    "export_tables.export_book_metrics_author",
+                    "export_tables.export_book_metrics_city",
+                    "export_tables.export_book_metrics_events",
+                    "export_tables.export_book_metrics_subjects",
+                ]
+                export_tables = [
+                    ("book_list", 4),
+                    ("book_institution_list", 1),
+                    ("book_metrics", 5),
+                    ("book_metrics_country", 23),
+                    ("book_metrics_institution", 1),
+                    ("book_metrics_author", 3),
+                    ("book_metrics_city", 26),
+                    ("book_metrics_events", 3),
+                    ("book_metrics_subject_bic", 0),
+                    ("book_metrics_subject_bisac", 0),
+                    ("book_metrics_subject_thema", 0),
+                ]
 
                 # Create the export tables
                 export_prefix = self.gcp_project_id.replace("-", "_")
@@ -1207,7 +1216,7 @@ class TestOnixWorkflow(SandboxTestCase):
                 table_id = bq_sharded_table_id(
                     self.gcp_project_id, oaebu_export_dataset_id, f"{export_prefix}_book_list", release.snapshot_date
                 )
-                expected_book_list_table = "book_list.json" if not dry_run else "book_list_dry.json"
+                expected_book_list_table = "book_list.json"
                 fixture_table = load_and_parse_json(
                     os.path.join(self.fixtures_folder, "e2e_outputs", expected_book_list_table),
                     date_fields=["published_date"],
@@ -1318,11 +1327,3 @@ class TestOnixWorkflow(SandboxTestCase):
                 ti = env.run_task("cleanup_workflow")
                 self.assertEqual(ti.state, State.SUCCESS)
                 self.assert_cleanup(release_workflow_folder)
-
-    def test_workflow_e2e(self):
-        """Test that ONIX Workflow works as expected"""
-        self.run_workflow_e2e(dry_run=False)
-
-    def test_e2e_dry(self):
-        """Test that ONIX Workflow works as expected"""
-        self.run_workflow_e2e(dry_run=True)
