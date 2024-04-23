@@ -15,54 +15,55 @@
 #
 # Author: Tuan Chien, Richard Hosking, Keegan Smith
 
-import os
-from typing import List, Optional, Tuple, Union, Iterable
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import re
-import logging
 import json
+import logging
+import os
+import re
+from typing import Iterable, List, Optional, Tuple, Union
 
+import jsonlines
 import pendulum
-from google.cloud.bigquery import SourceFormat, Client
-from ratelimit import limits, sleep_and_retry
-from tenacity import wait_exponential_jitter
-from jinja2 import Environment, FileSystemLoader
 from airflow.decorators import dag, task, task_group
 from airflow.models.baseoperator import chain
+from google.cloud.bigquery import Client, SourceFormat
+from jinja2 import Environment, FileSystemLoader
+from ratelimit import limits, sleep_and_retry
+from requests import Request, Session
+from tenacity import wait_exponential_jitter
 
 from oaebu_workflows.airflow_pools import CrossrefEventsPool
-from oaebu_workflows.config import schema_folder as default_schema_folder
-from oaebu_workflows.config import sql_folder, oaebu_user_agent_header
-from oaebu_workflows.oaebu_partners import OaebuPartner, DataPartner, partner_from_str
+from oaebu_workflows.config import oaebu_user_agent_header, schema_folder as default_schema_folder, sql_folder
+from oaebu_workflows.oaebu_partners import DataPartner, OaebuPartner, partner_from_str
 from oaebu_workflows.onix_workflow.onix_work_aggregation import BookWorkAggregator, BookWorkFamilyAggregator
-from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
-from observatory_platform.airflow.sensors import DagCompleteSensor
-from observatory_platform.files import save_jsonl_gz
-from observatory_platform.airflow.tasks import check_dependencies
-from observatory_platform.url_utils import retry_get_url
-from observatory_platform.google.gcs import gcs_upload_files, gcs_blob_uri, gcs_blob_name_from_path
-from observatory_platform.jinja2_utils import render_template
-from observatory_platform.airflow.release import SnapshotRelease, make_snapshot_date, set_task_state
-from observatory_platform.airflow.workflow import CloudWorkspace, cleanup
 from observatory_platform.airflow.airflow import on_failure_callback
+from observatory_platform.airflow.release import make_snapshot_date, set_task_state, SnapshotRelease
+from observatory_platform.airflow.sensors import DagCompleteSensor
+from observatory_platform.airflow.tasks import check_dependencies
+from observatory_platform.airflow.workflow import cleanup, CloudWorkspace
+from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
+from observatory_platform.files import save_jsonl_gz, yield_jsonl
 from observatory_platform.google.bigquery import (
-    bq_load_table,
-    bq_table_id,
-    bq_sharded_table_id,
+    bq_copy_table,
     bq_create_dataset,
     bq_create_table_from_query,
+    bq_find_schema,
+    bq_load_table,
     bq_run_query,
     bq_select_table_shard_dates,
-    bq_copy_table,
-    bq_find_schema,
+    bq_sharded_table_id,
+    bq_table_id,
 )
+from observatory_platform.google.gcs import gcs_blob_name_from_path, gcs_blob_uri, gcs_upload_files
+from observatory_platform.jinja2_utils import render_template
+from observatory_platform.url_utils import retry_get_url
 
-
-CROSSREF_EVENT_URL_TEMPLATE = (
-    "https://api.eventdata.crossref.org/v1/events?mailto={mailto}"
-    "&from-collected-date={start_date}&until-collected-date={end_date}&rows=1000"
-    "&obj-id={doi}"
-)
+# Crossref Events rate limit settings
+# These settings mean that, for instance, if there are n Crossref Events tasks queued, then at most
+# 15 tasks will run at once (due to the pool slots) and each task will only ever call Crossref Events
+# at a rate of once per second.
+MAX_POOL_SLOTS = 15  # Matches 15 requests
+CALLS_PER_PERIOD = 1  # 1 call per second
+PERIOD = 1  # 1 second
 
 
 class OnixWorkflowRelease(SnapshotRelease):
@@ -98,7 +99,7 @@ class OnixWorkflowRelease(SnapshotRelease):
         self.workslookup_errors_file_name = "worksid_errors.jsonl.gz"
         self.worksfamilylookup_file_name = "workfamilyid.jsonl.gz"
         self.crossref_metadata_file_name = "crossref_metadata.jsonl.gz"
-        self.crossref_events_file_name = "crossref_events.jsonl.gz"
+        self.crossref_events_file_name = "crossref_events.jsonl"
 
         # Generated Schemas
         self.book_product_schema_file_name = "book_product_schema.json"
@@ -127,7 +128,11 @@ class OnixWorkflowRelease(SnapshotRelease):
         return os.path.join(self.transform_folder, self.crossref_metadata_file_name)
 
     @property
-    def crossref_events_path(self):
+    def download_crossref_events_path(self):
+        return os.path.join(self.download_folder, self.crossref_events_file_name)
+
+    @property
+    def transformed_crossref_events_path(self):
         return os.path.join(self.transform_folder, self.crossref_events_file_name)
 
     @property
@@ -177,7 +182,7 @@ class OnixWorkflowRelease(SnapshotRelease):
 
     @property
     def crossref_events_blob_name(self):
-        return gcs_blob_name_from_path(self.crossref_events_path)
+        return gcs_blob_name_from_path(self.transformed_crossref_events_path)
 
     @staticmethod
     def from_dict(dict_: dict):
@@ -233,7 +238,6 @@ def create_dag(
     mailto: str = "agent@observatory.academy",
     crossref_start_date: pendulum.DateTime = pendulum.datetime(2018, 5, 14),
     api_dataset_id: str = "dataset_api",
-    max_threads: int = 2 * os.cpu_count() - 1,
     # Ariflow parameters
     sensor_dag_ids: List[str] = None,
     catchup: Optional[bool] = False,
@@ -278,7 +282,6 @@ def create_dag(
     :param mailto: email address used to identify the user when sending requests to an API.
     :param crossref_start_date: The starting date of crossref's API calls
     :param api_dataset_id: The name of the Bigquery dataset to store the API release(s)
-    :param max_threads: The maximum number of threads to use for parallel tasks.
 
     :param sensor_dag_ids: Dag IDs for dependent tasks
     :param catchup: Whether to catch up missed DAG runs.
@@ -300,7 +303,7 @@ def create_dag(
 
     # Create pool for crossref API calls (if they don't exist)
     # Pools are necessary to throttle the maxiumum number of requests we can make per second and avoid 429 errors
-    crossref_events_pool = CrossrefEventsPool(pool_slots=15)
+    crossref_events_pool = CrossrefEventsPool(pool_slots=MAX_POOL_SLOTS)
     crossref_events_pool.create_pool()
 
     @dag(
@@ -501,24 +504,27 @@ def create_dag(
                 release.snapshot_date,
             )
             client = Client(project=cloud_workspace.project_id)
-            dois = dois_from_table(metadata_table_id, doi_column_name="DOI", distinct=True, client=client)
+            dois = dois_from_table(metadata_table_id, doi_column_name="DOI", client=client)
+            doi_prefixes = get_doi_prefixes(dois)
 
             # Download and transform all events
             start_date = crossref_start_date
             end_date = release.snapshot_date
-            events = download_crossref_events(dois, start_date, end_date, mailto, max_threads=max_threads)
-            events = transform_crossref_events(events, max_threads=max_threads)
+            input_path = release.download_crossref_events_path
+            output_path = release.transformed_crossref_events_path
+            download_crossref_events(input_path, doi_prefixes, start_date, end_date, mailto)
+            transform_crossref_events(input_path, dois, output_path)
 
-            # Zip and upload to google cloud
-            save_jsonl_gz(release.crossref_events_path, events)
-            gcs_upload_files(bucket_name=cloud_workspace.transform_bucket, file_paths=[release.crossref_events_path])
+            # Upload to google cloud and load into BigQuery
+            gcs_upload_files(
+                bucket_name=cloud_workspace.transform_bucket, file_paths=[release.transformed_crossref_events_path]
+            )
             table_id = bq_sharded_table_id(
                 cloud_workspace.project_id,
                 bq_oaebu_crossref_dataset_id,
                 bq_crossref_events_table_name,
                 release.snapshot_date,
             )
-
             state = bq_load_table(
                 uri=gcs_blob_uri(cloud_workspace.transform_bucket, release.crossref_events_blob_name),
                 table_id=table_id,
@@ -1039,7 +1045,7 @@ def create_dag(
         task_create_crossref_events_table = create_crossref_events_table(
             xcom_release,
             pool=crossref_events_pool.pool_name,
-            pool_slots=min(max_threads, crossref_events_pool.pool_slots),
+            pool_slots=1,
         )
         task_create_book_table = create_book_table(xcom_release)
         task_group_create_intermediate_tables = create_tasks_intermediate_tables(xcom_release)
@@ -1068,32 +1074,47 @@ def create_dag(
     return onix_workflow()
 
 
-def dois_from_table(
-    table_id: str, doi_column_name: str = "DOI", distinct: str = True, client: Client = None
-) -> List[str]:
-    """
-    Queries a metadata table to retrieve the unique DOIs. Provided the DOIs are not in a nested structure.
+def get_doi_prefixes(dois: Iterable[str]) -> set[str]:
+    """Convert DOIs to a set of unique DOI prefixes.
 
-    :param metadata_table_id: The fully qualified ID of the metadata table on GCP
-    :param doi_field_name: The name of the DOI column
-    :param distinct: Whether to retrieve only unique DOIs
+    :param dois: the DOIs.
+    :return: a set of unique prefixes
+    """
+
+    prefixes = set()
+    for doi in dois:
+        parts = doi.split("/")
+        if len(parts) == 2:
+            prefixes.add(parts[0])
+        else:
+            logging.warning(f"DOI is not made of two parts: {doi}")
+
+    return prefixes
+
+
+def dois_from_table(table_id: str, doi_column_name: str = "DOI", client: Client = None) -> set[str]:
+    """
+    Queries a metadata table to retrieve the distinct / unique DOIs. Provided the DOIs are not in a nested structure.
+
+    :param table_id: The fully qualified ID of the metadata table on GCP
+    :param doi_column_name: The name of the DOI column
     :return: All DOIs present in the metadata table
     """
 
-    select_field = f"DISTINCT({doi_column_name})" if distinct else doi_column_name
+    select_field = f"DISTINCT({doi_column_name})"
     sql = f"SELECT {select_field} FROM `{table_id}`"
     query_results = bq_run_query(sql, client=client)
-    dois = [r["DOI"] for r in query_results]
+    dois = {r["DOI"] for r in query_results}
     return dois
 
 
 def download_crossref_events(
-    dois: List[str],
+    file_path: str,
+    doi_prefixes: Iterable[str],
     start_date: pendulum.DateTime,
     end_date: pendulum.DateTime,
     mailto: str,
-    max_threads: int = 1,
-) -> List[dict]:
+):
     """
     Spawns multiple threads to download event data (DOI and publisher only) for each doi supplied.
     The url template was made with reference to the crossref event api:
@@ -1102,72 +1123,83 @@ def download_crossref_events(
     per second. Each API request happens to take roughly 1 second. Having more threadsthan necessary slows down the
     download process as the retry script will wait a minimum of two seconds between each attempt.
 
-    :param dois: The list of DOIs to download the events for
-    :param start_date: The start date for events we're interested in
-    :param end_date: The end date for events we're interested in
-    :param mailto: The email to use as a reference for who is requesting the data
-    :param max_threads: The maximum threads to spawn for the downloads.
-    :return: All events for the input DOIs
+    :param file_path: the path where the events should be saved.
+    :param doi_prefixes: the prefixes of DOIs to download data for.
+    :param dois: the prefixes of DOIs to download data for.
+    :param start_date: The start date for events we're interested in.
+    :param end_date: The end date for events we're interested in.
+    :param mailto: The email to use as a reference for who is requesting the data.
+    :return: All events for the input DOIs.
     """
 
-    url_start_date = start_date.strftime("%Y-%m-%d")
-    url_end_date = end_date.strftime("%Y-%m-%d")
-    max_threads = min(max_threads, 15)
-
-    event_urls = [
-        CROSSREF_EVENT_URL_TEMPLATE.format(doi=doi, mailto=mailto, start_date=url_start_date, end_date=url_end_date)
-        for doi in dois
+    requests = [
+        Request(
+            method="GET",
+            url="https://api.eventdata.crossref.org/v1/events",
+            params={
+                "mailto": mailto,
+                "from-collected-date": start_date.strftime("%Y-%m-%d"),
+                "until-collected-date": end_date.strftime("%Y-%m-%d"),
+                "rows": 1000,
+                "obj-id.prefix": prefix,
+            },
+        )
+        for prefix in doi_prefixes
     ]
 
-    logging.info(f"Beginning crossref event data download from {len(event_urls)} URLs with {max_threads} workers")
-    logging.info(
-        f"Downloading DOI data using URL: {CROSSREF_EVENT_URL_TEMPLATE.format(doi='***', mailto=mailto, start_date=url_start_date, end_date=url_end_date)}"
-    )
-    all_events = []
-    with ThreadPoolExecutor(max_workers=max_threads) as executor:
-        futures = []
-        for i, url in enumerate(event_urls):
-            futures.append(executor.submit(download_crossref_event_url, url, i=i))
-        for future in as_completed(futures):
-            all_events.extend(future.result())
-
-    return all_events
+    logging.info(f"Beginning Crossref Event data download with {len(requests)} requests")
+    for request in requests:
+        paginate_crossref_events(request, file_path)
 
 
-def download_crossref_event_url(url: str, i: int = 0) -> List[dict]:
-    """
-    Downloads all crossref events from a url, iterating through pages if there is more than one
+def paginate_crossref_events(request: Request, file_path: str):
+    """Downloads all crossref events from a url, iterating through pages if there is more than one
 
-    :param url: The url send the request to
-    :param i: Worker number
+    :param request: the request.
+    :param file_path: Worker number
     :return: The events from this URL
     """
 
-    events = []
+    url = Session().prepare_request(request).url
+    logging.info(f"Fetching pages for {url} and saving to {file_path}")
+    next_cursor = None
+    total_counts = 0
     headers = oaebu_user_agent_header()
-    next_cursor, page_counts, total_events, page_events = download_crossref_page_events(url, headers)
-    events.extend(page_events)
-    total_counts = page_counts
-    while next_cursor:
-        tmp_url = url + f"&cursor={next_cursor}"
-        next_cursor, page_counts, _, page_events = download_crossref_page_events(tmp_url, headers)
+
+    while True:
+        # Update request parameters only if next_cursor is not None
+        if next_cursor is not None:
+            request.params["cursor"] = next_cursor
+
+        # Download page
+        next_cursor, page_counts, _, page_events = download_crossref_events_page(request, headers)
+
+        # Accumulate the results
         total_counts += page_counts
-        events.extend(page_events)
-    logging.info(f"{i + 1}: {url} successful")
-    logging.info(f"{i + 1}: Total no. events: {total_events}, downloaded " f"events: {total_counts}")
-    return events
+
+        # Append data to file
+        with open(file_path, mode="a") as f:
+            with jsonlines.Writer(f) as writer:
+                writer.write_all(page_events)
+
+        # Break the loop if no more cursor is provided
+        if not next_cursor:
+            break
+
+    logging.info(f"Successful: {url} ")
+    logging.info(f"Total no. events: {total_counts}")
 
 
-def download_crossref_page_events(url: str, headers: dict) -> Tuple[str, int, int, List[dict]]:
-    """
-    Download crossref events from a single page
+def download_crossref_events_page(request: Request, headers: dict) -> Tuple[str, int, int, List[dict]]:
+    """Download crossref events from a single page
 
-    :param url: The url to send the request to
+    :param request: the request.
     :param headers: Headers to send with the request
     :return: The cursor, event counter, total number of events and the events for the URL
     """
 
     crossref_events_limiter()
+    url = Session().prepare_request(request).url
     response = retry_get_url(url, num_retries=5, wait=wait_exponential_jitter(initial=0.5, max=60), headers=headers)
     response_json = response.json()
     total_events = response_json["message"]["total-results"]
@@ -1179,31 +1211,35 @@ def download_crossref_page_events(url: str, headers: dict) -> Tuple[str, int, in
 
 
 @sleep_and_retry
-@limits(calls=15, period=1)
+@limits(calls=CALLS_PER_PERIOD, period=PERIOD)
 def crossref_events_limiter():
-    """ "Task to throttle the calls to the crossref events API"""
+    """Task to throttle the calls to the crossref events API"""
     return
 
 
-def transform_crossref_events(events: List[dict], max_threads: int = 1) -> List[dict]:
-    """
-    Spawns workers to transforms crossref events
+def clean_doi(doi: str) -> str:
+    return re.sub(r"^https?://doi\.org/", "", doi).upper()
 
-    :param all_events: A list of the events to transform
-    :param max_threads: The maximum number of threads to utilise for the transforming process
-    :return: transformed events, the order of the events in the input list is not preserved
+
+def transform_crossref_events(input_path: str, dois_filter: set[str], output_path: str):
+    """Transforms crossref events.
+
+    :param input_path: A list of the events to transform
+    :param dois_filter: a set of DOIs to filter the input by.
+    :param output_path: The maximum number of threads to utilise for the transforming process
     """
 
-    logging.info(f"Beginning crossref event transform with {max_threads} workers")
-    transformed_events = []
-    with ThreadPoolExecutor(max_workers=max_threads) as executor:
-        futures = []
-        for event in events:
-            futures.append(executor.submit(transform_event, event))
-        for future in as_completed(futures):
-            transformed_events.append(future.result())
+    logging.info(f"Beginning crossref event transform")
+
+    with open(output_path, mode="w") as f:
+        with jsonlines.Writer(f) as writer:
+            for event in yield_jsonl(input_path):
+                doi = clean_doi(event["obj_id"])
+                if doi in dois_filter:
+                    row = transform_event(event)
+                    writer.write(row)
+
     logging.info("Crossref event transformation complete")
-    return transformed_events
 
 
 def transform_event(event: dict) -> dict:
