@@ -57,6 +57,14 @@ from observatory_platform.google.gcs import gcs_blob_name_from_path, gcs_blob_ur
 from observatory_platform.jinja2_utils import render_template
 from observatory_platform.url_utils import retry_get_url
 
+# Crossref Events rate limit settings
+# These settings mean that, for instance, if there are n Crossref Events tasks queued, then at most
+# 15 tasks will run at once (due to the pool slots) and each task will only ever call Crossref Events
+# at a rate of once per second.
+MAX_POOL_SLOTS = 15  # Matches 15 requests
+CALLS_PER_PERIOD = 1  # 1 call per second
+PERIOD = 1  # 1 second
+
 
 class OnixWorkflowRelease(SnapshotRelease):
     """Release information for OnixWorkflow"""
@@ -230,7 +238,6 @@ def create_dag(
     mailto: str = "agent@observatory.academy",
     crossref_start_date: pendulum.DateTime = pendulum.datetime(2018, 5, 14),
     api_dataset_id: str = "dataset_api",
-    max_threads: int = 2 * os.cpu_count() - 1,
     # Ariflow parameters
     sensor_dag_ids: List[str] = None,
     catchup: Optional[bool] = False,
@@ -275,7 +282,6 @@ def create_dag(
     :param mailto: email address used to identify the user when sending requests to an API.
     :param crossref_start_date: The starting date of crossref's API calls
     :param api_dataset_id: The name of the Bigquery dataset to store the API release(s)
-    :param max_threads: The maximum number of threads to use for parallel tasks.
 
     :param sensor_dag_ids: Dag IDs for dependent tasks
     :param catchup: Whether to catch up missed DAG runs.
@@ -297,7 +303,7 @@ def create_dag(
 
     # Create pool for crossref API calls (if they don't exist)
     # Pools are necessary to throttle the maxiumum number of requests we can make per second and avoid 429 errors
-    crossref_events_pool = CrossrefEventsPool(pool_slots=15)
+    crossref_events_pool = CrossrefEventsPool(pool_slots=MAX_POOL_SLOTS)
     crossref_events_pool.create_pool()
 
     @dag(
@@ -498,7 +504,7 @@ def create_dag(
                 release.snapshot_date,
             )
             client = Client(project=cloud_workspace.project_id)
-            dois = dois_from_table(metadata_table_id, doi_column_name="DOI", distinct=True, client=client)
+            dois = dois_from_table(metadata_table_id, doi_column_name="DOI", client=client)
             doi_prefixes = get_doi_prefixes(dois)
 
             # Download and transform all events
@@ -1039,7 +1045,7 @@ def create_dag(
         task_create_crossref_events_table = create_crossref_events_table(
             xcom_release,
             pool=crossref_events_pool.pool_name,
-            pool_slots=min(max_threads, crossref_events_pool.pool_slots),
+            pool_slots=1,
         )
         task_create_book_table = create_book_table(xcom_release)
         task_group_create_intermediate_tables = create_tasks_intermediate_tables(xcom_release)
@@ -1086,9 +1092,7 @@ def get_doi_prefixes(dois: Iterable[str]) -> set[str]:
     return prefixes
 
 
-def dois_from_table(
-    table_id: str, doi_column_name: str = "DOI", client: Client = None
-) -> set[str]:
+def dois_from_table(table_id: str, doi_column_name: str = "DOI", client: Client = None) -> set[str]:
     """
     Queries a metadata table to retrieve the distinct / unique DOIs. Provided the DOIs are not in a nested structure.
 
@@ -1207,7 +1211,7 @@ def download_crossref_events_page(request: Request, headers: dict) -> Tuple[str,
 
 
 @sleep_and_retry
-@limits(calls=15, period=1)
+@limits(calls=CALLS_PER_PERIOD, period=PERIOD)
 def crossref_events_limiter():
     """Task to throttle the calls to the crossref events API"""
     return
