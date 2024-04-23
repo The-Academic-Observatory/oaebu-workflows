@@ -1013,7 +1013,6 @@ class TestOnixWorkflow(SandboxTestCase):
                 sensor_dag_ids=sensor_dag_ids,
                 start_date=start_date,
                 crossref_start_date=pendulum.datetime(year=2018, month=5, day=14),
-                max_threads=1,  # Use 1 thread for tests
             )
 
             # Skip dag existence check in sensor.
