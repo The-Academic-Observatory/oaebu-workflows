@@ -30,13 +30,11 @@ from oaebu_workflows.config import test_fixtures_folder
 from oaebu_workflows.oaebu_partners import OaebuPartner, OAEBU_DATA_PARTNERS, OAEBU_METADATA_PARTNERS, partner_from_str
 from oaebu_workflows.onix_workflow.onix_workflow import (
     OnixWorkflowRelease,
-    CROSSREF_EVENT_URL_TEMPLATE,
     create_dag,
     download_crossref_events,
     transform_crossref_events,
     transform_event,
     dois_from_table,
-    download_crossref_event_url,
     copy_latest_export_tables,
     get_onix_records,
     insert_into_schema,
@@ -1094,7 +1092,7 @@ class TestOnixWorkflow(SandboxTestCase):
 
                 # Load crossref event table into bigquery
                 with vcr.use_cassette(
-                    self.events_cassette, record_mode="none", before_record_request=vcr_ignore_condition
+                    self.events_cassette, record_mode=vcr.record_mode.RecordMode.ONCE, before_record_request=vcr_ignore_condition
                 ):
                     ti = env.run_task("create_crossref_events_table")
                 self.assertEqual(ti.state, State.SUCCESS)
