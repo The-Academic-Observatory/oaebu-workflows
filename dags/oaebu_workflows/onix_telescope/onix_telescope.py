@@ -265,6 +265,7 @@ def create_dag(
                     source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
                     table_description=bq_table_description,
                     client=client,
+                    ignore_unknown_values=True
                 )
                 set_task_state(state, context["ti"].task_id, release=release)
 
