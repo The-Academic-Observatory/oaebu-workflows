@@ -22,19 +22,19 @@ from typing import List, Union
 import pendulum
 from airflow.decorators import dag, task, task_group
 from airflow.exceptions import AirflowException, AirflowSkipException
-from google.cloud.bigquery import SourceFormat, Client
+from google.cloud.bigquery import Client, SourceFormat
 
 from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from oaebu_workflows.onix_utils import collapse_subjects, onix_parser_download, onix_parser_execute
+from observatory_platform.airflow.airflow import on_failure_callback
+from observatory_platform.airflow.release import set_task_state, SnapshotRelease
+from observatory_platform.airflow.tasks import check_dependencies
+from observatory_platform.airflow.workflow import cleanup, CloudWorkspace
 from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
 from observatory_platform.files import load_jsonl, save_jsonl_gz
-from observatory_platform.google.gcs import gcs_blob_uri, gcs_upload_files, gcs_blob_name_from_path, gcs_download_blob
-from observatory_platform.google.bigquery import bq_load_table, bq_sharded_table_id, bq_create_dataset
-from observatory_platform.airflow.tasks import check_dependencies
-from observatory_platform.sftp import SftpFolders, make_sftp_connection
-from observatory_platform.airflow.release import SnapshotRelease, set_task_state
-from observatory_platform.airflow.workflow import CloudWorkspace, cleanup
-from observatory_platform.airflow.airflow import on_failure_callback
+from observatory_platform.google.bigquery import bq_create_dataset, bq_load_table, bq_sharded_table_id
+from observatory_platform.google.gcs import gcs_blob_name_from_path, gcs_blob_uri, gcs_download_blob, gcs_upload_files
+from observatory_platform.sftp import make_sftp_connection, SftpFolders
 
 
 class OnixRelease(SnapshotRelease):
@@ -265,6 +265,7 @@ def create_dag(
                     source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
                     table_description=bq_table_description,
                     client=client,
+                    ignore_unknown_values=True,
                 )
                 set_task_state(state, context["ti"].task_id, release=release)
 
