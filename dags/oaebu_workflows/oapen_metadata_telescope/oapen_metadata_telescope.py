@@ -179,9 +179,10 @@ def create_dag(
             )
             set_task_state(success, context["ti"].task_id, release=release)
 
-        @task()
+        @task(queue="queue-a10")
         def transform(release: dict, **context) -> None:
-            """Transform the oapen metadata XML file into a valid ONIX file"""
+            """Transform the oapen metadata XML file into a valid ONIX file. This task runs on a different queue
+            because it uses more memory than other tasks."""
 
             release = OapenMetadataRelease.from_dict(release)
             # Download files from GCS
