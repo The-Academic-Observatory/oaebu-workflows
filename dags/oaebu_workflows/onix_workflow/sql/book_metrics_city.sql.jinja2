@@ -17,27 +17,48 @@
 The purpose of this script it to export the book city metrics section from the book_product table
 #}
 
-SELECT
-    ISBN13 as product_id,
-    MAX(work_id) as work_id,
-    MAX(work_family_id) as work_family_id,
-    MAX(onix.title) as title,
-    (SELECT publisher_name from `{{ book_product_table_id }}`, UNNEST(onix.publisher) as publisher where publishing_role = "Publisher" LIMIT 1) as publisher_name,
-    CAST(MAX(onix.published_year) as INT64) as published_year,
-    month.month,
-    city.city,
-    CONCAT(CAST(MAX(city.latitude) as STRING), ", ", CAST(MAX(city.longitude) as STRING)) as coordinates,
-    {# Currently only used by IRUS OAPEN #}
-    STRUCT(
-        SUM(city.title_requests) as title_requests,
-        SUM(city.total_item_investigations) as total_item_investigations,
-        SUM(city.total_item_requests) as total_item_requests,
-        SUM(city.unique_item_investigations) as unique_item_investigations,
-        SUM(city.unique_item_requests) as unique_item_requests
-    ) as irus_oapen
-    
+WITH publisher_names as (
+	SELECT 
+		publisher_name as publisher_name,
+		ISBN13 as product_id
+	FROM 
+		`{{ book_product_table_id }}`, UNNEST(onix.publisher)
+	WHERE 
+		publishing_role = "Publisher"
+),
 
-FROM `{{ book_product_table_id }}`, UNNEST(months) as month, 
-        UNNEST(month.irus_oapen.locations) as city 
-WHERE city.city IS NOT NULL
-GROUP BY ISBN13, month, city
+body as (
+	SELECT
+		ISBN13 as product_id,
+		MAX(work_id) as work_id,
+		MAX(work_family_id) as work_family_id,
+		MAX(onix.title) as title,
+		CAST(MAX(onix.published_year) as INT64) as published_year,
+		month.month,
+		city.city,
+		CONCAT(CAST(MAX(city.latitude) as STRING), ", ", CAST(MAX(city.longitude) as STRING)) as coordinates,
+		{# Currently only used by IRUS OAPEN #}
+		STRUCT(
+			SUM(city.title_requests) as title_requests,
+			SUM(city.total_item_investigations) as total_item_investigations,
+			SUM(city.total_item_requests) as total_item_requests,
+			SUM(city.unique_item_investigations) as unique_item_investigations,
+			SUM(city.unique_item_requests) as unique_item_requests
+		) as irus_oapen
+	FROM 
+		`{{ book_product_table_id }}`, UNNEST(months) as month, UNNEST(month.irus_oapen.locations) as city 
+	WHERE 
+		city.city IS NOT NULL
+	GROUP BY 
+		ISBN13, month, city
+)
+
+SELECT
+	b.*,
+	p.publisher_name as publisher_name
+FROM
+	body as b 
+JOIN 
+	publisher_names as p
+ON 
+	b.product_id = p.product_id
