@@ -58,7 +58,7 @@ SELECT
 	p.publisher_name as publisher_name
 FROM
 	body as b 
-JOIN 
+LEFT JOIN 
 	publisher_names as p
 ON 
 	b.product_id = p.product_id
