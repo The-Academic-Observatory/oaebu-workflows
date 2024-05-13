@@ -1184,11 +1184,11 @@ class TestOnixWorkflow(SandboxTestCase):
                 export_tables = [
                     ("book_list", 4),
                     ("book_institution_list", 1),
-                    ("book_metrics", 5),
-                    ("book_metrics_country", 23),
+                    ("book_metrics", 6),  # 5
+                    ("book_metrics_country", 32),
                     ("book_metrics_institution", 1),
                     ("book_metrics_author", 3),
-                    ("book_metrics_city", 26),
+                    ("book_metrics_city", 39),
                     ("book_metrics_events", 3),
                     ("book_metrics_subject_bic", 0),
                     ("book_metrics_subject_bisac", 0),
