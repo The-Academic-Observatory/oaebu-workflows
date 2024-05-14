@@ -237,6 +237,7 @@ def create_dag(
     skip_downloading_crossref_events: bool = True,
     # Run parameters
     data_partners: List[Union[str, OaebuPartner]] = None,
+    bespoke_data_partners: List[Dict] = None,
     ga3_views_field="page_views",
     schema_folder: str = default_schema_folder(workflow_module="onix_workflow"),
     mailto: str = "agent@observatory.academy",
@@ -283,6 +284,7 @@ def create_dag(
     a previous version of the table.
 
     :param data_partners: OAEBU data sources.
+    :param bespoke_data_partners: Dictionary-defined OAEBU Data Partners
     :param ga3_views_field: The name of the GA3 views field - should be either 'page_views' or 'unique_views'
     :param schema_folder: the SQL schema path.
     :param mailto: email address used to identify the user when sending requests to an API.
