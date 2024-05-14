@@ -1,0 +1,1 @@
+STRUCT(month.scholarspace_views.total_downloads) AS scholarspace_views

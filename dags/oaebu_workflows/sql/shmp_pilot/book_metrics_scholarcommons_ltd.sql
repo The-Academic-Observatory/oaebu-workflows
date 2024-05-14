@@ -1,0 +1,1 @@
+STRUCT(month.scholarcommons_ltd.total_downloads) AS scholarcommons_ltd

@@ -1,0 +1,122 @@
+[
+  {
+    "description": "The id of the book.",
+    "mode": "NULLABLE",
+    "name": "ID",
+    "type": "STRING"
+  },
+  {
+    "description": "Publication year.",
+    "mode": "NULLABLE",
+    "name": "YEAR",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Publication month.",
+    "mode": "NULLABLE",
+    "name": "MONTH",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Resource type.",
+    "mode": "NULLABLE",
+    "name": "RESOURCE_TYPE",
+    "type": "STRING"
+  },
+  {
+    "description": "Resource id.",
+    "mode": "NULLABLE",
+    "name": "RESOURCE_ID",
+    "type": "STRING"
+  },
+  {
+    "description": "ISBN of the book on MUSE.",
+    "mode": "NULLABLE",
+    "name": "ISBN",
+    "type": "STRING"
+  },
+  {
+    "description": "Title of the book.",
+    "mode": "NULLABLE",
+    "name": "RESOURCE",
+    "type": "STRING"
+  },
+  {
+    "description": "URL of the book.",
+    "mode": "NULLABLE",
+    "name": "RESOURCE_URL",
+    "type": "STRING"
+  },
+  {
+    "description": "Date of launch.",
+    "mode": "NULLABLE",
+    "name": "RESOURCE_LAUNCH",
+    "type": "DATE"
+  },
+  {
+    "description": "Author of the book.",
+    "mode": "NULLABLE",
+    "name": "AUTHOR",
+    "type": "STRING"
+  },
+  {
+    "description": "Title of the chapter.",
+    "mode": "NULLABLE",
+    "name": "FULLTEXT_TITLE",
+    "type": "STRING"
+  },
+  {
+    "description": "URL of the chapter.",
+    "mode": "NULLABLE",
+    "name": "FULLTEXT_URL",
+    "type": "STRING"
+  },
+  {
+    "description": "Date of fulltext launch.",
+    "mode": "NULLABLE",
+    "name": "FULLTEXT_LAUNCH",
+    "type": "DATE"
+  },
+  {
+    "description": "Issue.",
+    "mode": "NULLABLE",
+    "name": "ISSUE",
+    "type": "STRING"
+  },
+  {
+    "description": "Format.",
+    "mode": "NULLABLE",
+    "name": "FORMAT",
+    "type": "STRING"
+  },
+  {
+    "description": "Access type.",
+    "mode": "NULLABLE",
+    "name": "ACCESS",
+    "type": "STRING"
+  },
+  {
+    "description": "Country Name.",
+    "mode": "NULLABLE",
+    "name": "COUNTRY",
+    "type": "STRING"
+  },
+  {
+    "description": "Institution name.",
+    "mode": "NULLABLE",
+    "name": "INSTITUTION",
+    "type": "STRING"
+  },
+  {
+    "description": "Number of requests.",
+    "mode": "NULLABLE",
+    "name": "REQUESTS",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "release_date",
+    "type": "DATE",
+    "description": "Last day of the release month. Table is partitioned on this column."
+  }
+]
