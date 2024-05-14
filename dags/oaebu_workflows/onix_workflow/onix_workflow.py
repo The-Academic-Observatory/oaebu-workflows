@@ -35,7 +35,7 @@ from tenacity import wait_exponential_jitter
 
 from oaebu_workflows.airflow_pools import CrossrefEventsPool
 from oaebu_workflows.config import oaebu_user_agent_header, schema_folder as default_schema_folder, sql_folder
-from oaebu_workflows.oaebu_partners import DataPartner, OaebuPartner, partner_from_str
+from oaebu_workflows.oaebu_partners import DataPartner, OaebuPartner, partner_from_str, create_bespoke_data_partners
 from oaebu_workflows.onix_workflow.onix_work_aggregation import BookWorkAggregator, BookWorkFamilyAggregator
 from observatory_platform.airflow.airflow import on_failure_callback
 from observatory_platform.airflow.release import make_snapshot_date, set_task_state, SnapshotRelease
@@ -308,6 +308,8 @@ def create_dag(
 
     metadata_partner = partner_from_str(metadata_partner, metadata_partner=True)
     data_partners = [partner_from_str(p) for p in data_partners]
+    if bespoke_data_partners:
+        data_partners.extend(create_bespoke_data_partners(bespoke_data_partners))
 
     # Create pool for crossref API calls (if they don't exist)
     # Pools are necessary to throttle the maxiumum number of requests we can make per second and avoid 429 errors
