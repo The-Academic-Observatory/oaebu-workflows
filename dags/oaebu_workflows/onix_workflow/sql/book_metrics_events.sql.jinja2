@@ -18,41 +18,41 @@ The purpose of this script it to export the book event metrics section from the 
 #}
 
 WITH publisher_names as (
-	SELECT
-		publisher_name as publisher_name,
-		ISBN13 as product_id
-	FROM
-		`{{ book_product_table_id }}`, UNNEST(onix.publisher)
-	WHERE
-		publishing_role = "Publisher"
+    SELECT
+        publisher_name as publisher_name,
+        ISBN13 as product_id
+    FROM
+        `{{ book_product_table_id }}`, UNNEST(onix.publisher)
+    WHERE
+        publishing_role = "Publisher"
 ),
 
 body as (
-	SELECT
-		ISBN13 as product_id,
-		MAX(work_id) as work_id,
-		MAX(work_family_id) as work_family_id,
-		MAX(onix.title) as title,
-		CAST(MAX(onix.published_year) as INT64) as published_year,
-		month.month,
-		events.source as event_source,
-		STRUCT(
-			SUM(events.count) as count
-		) as crossref_events,
-	FROM 
-		`{{ book_product_table_id }}`, UNNEST(months) as month, UNNEST(month.crossref_events) as events
-	WHERE 
-		events IS NOT NULL
-	GROUP BY
-		ISBN13, month, event_source
+    SELECT
+        ISBN13 as product_id,
+        MAX(work_id) as work_id,
+        MAX(work_family_id) as work_family_id,
+        MAX(onix.title) as title,
+        CAST(MAX(onix.published_year) as INT64) as published_year,
+        month.month,
+        events.source as event_source,
+        STRUCT(
+            SUM(events.count) as count
+        ) as crossref_events,
+    FROM 
+        `{{ book_product_table_id }}`, UNNEST(months) as month, UNNEST(month.crossref_events) as events
+    WHERE 
+        events IS NOT NULL
+    GROUP BY
+        ISBN13, month, event_source
 )
 
 SELECT
-	b.*,
-	p.publisher_name as publisher_name
+    b.*,
+    p.publisher_name as publisher_name
 FROM 
-	body AS b
+    body AS b
 LEFT JOIN
-	publisher_names AS p
+    publisher_names AS p
 ON
-	b.product_id = p.product_id
+    b.product_id = p.product_id
