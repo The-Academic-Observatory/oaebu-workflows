@@ -1,0 +1,20 @@
+[
+  {
+    "mode": "REQUIRED",
+    "name": "ISBN13",
+    "type": "STRING",
+    "description": "13 Digit ISBN of the book."
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "value",
+    "type": "INTEGER",
+    "description": "Measured value."
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "release_date",
+    "type": "DATE",
+    "description": "The end date of the release month"
+  }
+]
