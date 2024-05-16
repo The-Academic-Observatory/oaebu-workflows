@@ -43,7 +43,7 @@ MOCK_DATA_PARTNERS = {
         export_book_metrics=True,
         export_country=True,
         export_subject=True,
-        has_metdata=True,
+        has_metadata=True,
     )
 }
 MOCK_METADATA_PARTNERS = {
