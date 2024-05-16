@@ -1,0 +1,11 @@
+jstor_month_country as (
+    SELECT
+        ISBN13,
+        month,
+        Country_name as alpha2,
+        -- for jstor collections, country_name is the full name not the alpha2 code. This is accounted for in the join to month_country.country_jstor_name instead of month_country.alpha2
+        total_item_requests
+    FROM
+        months,
+        UNNEST(jstor_country_pilot)
+)

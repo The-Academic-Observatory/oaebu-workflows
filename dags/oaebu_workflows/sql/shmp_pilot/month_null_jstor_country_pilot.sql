@@ -1,0 +1,1 @@
+ARRAY_LENGTH(month.jstor_country_pilot) > 0

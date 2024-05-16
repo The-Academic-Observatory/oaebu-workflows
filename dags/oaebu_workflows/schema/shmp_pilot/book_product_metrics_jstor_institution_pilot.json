@@ -1,0 +1,20 @@
+{
+    "fields": [
+        {
+            "mode": "NULLABLE",
+            "name": "Institution",
+            "type": "STRING",
+            "description": "Institution name"
+        },
+        {
+            "mode": "NULLABLE",
+            "name": "Total_Item_Requests",
+            "type": "INTEGER",
+            "description": "Total number of request made from that specific institution"
+        }
+    ],
+    "mode": "REPEATED",
+    "name": "jstor_institution_pilot",
+    "type": "RECORD",
+    "description": "Metrics derived from JSTOR Institutions"
+}
