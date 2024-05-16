@@ -1,1 +1,1 @@
-STRUCT(month.scholarspace_downloads.total_downloads) AS scholarspace_downloads
+STRUCT(month.scholarspace_downloads_pilot.value) AS scholarspace_downloads_pilot

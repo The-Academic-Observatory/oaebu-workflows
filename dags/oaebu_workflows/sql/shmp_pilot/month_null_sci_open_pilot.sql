@@ -1,1 +1,1 @@
-month.sci_open IS NOT NULL
+month.sci_open_pilot IS NOT NULL

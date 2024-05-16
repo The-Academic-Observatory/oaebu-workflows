@@ -1,1 +1,1 @@
-STRUCT(month.altmetrics.total_downloads) AS altmetrics
+STRUCT(month.altmetrics_pilot.value) AS altmetrics_pilot

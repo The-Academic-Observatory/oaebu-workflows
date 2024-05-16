@@ -1,1 +1,1 @@
-STRUCT(month.sci_open.total_downloads) AS sci_open
+STRUCT(month.sci_open_pilot.value) AS sci_open_pilot

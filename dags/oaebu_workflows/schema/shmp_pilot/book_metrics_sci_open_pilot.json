@@ -8,7 +8,7 @@
     }
   ],
   "mode": "NULLABLE",
-  "name": "Sci_Open",
+  "name": "sci_open_pilot",
   "type": "RECORD",
   "description": "Metrics derived from Sci Open"
 }

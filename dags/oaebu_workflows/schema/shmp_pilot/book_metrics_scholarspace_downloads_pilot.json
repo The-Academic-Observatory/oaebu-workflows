@@ -8,7 +8,7 @@
     }
   ],
   "mode": "NULLABLE",
-  "name": "scholarspace_downloads",
+  "name": "scholarspace_downloads_pilot",
   "type": "RECORD",
   "description": "Metrics derived from Scholarspace Downloads"
 }

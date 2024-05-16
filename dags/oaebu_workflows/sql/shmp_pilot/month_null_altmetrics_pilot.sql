@@ -1,1 +1,1 @@
-month.altmetrics IS NOT NULL
+month.altmetrics_pilot IS NOT NULL

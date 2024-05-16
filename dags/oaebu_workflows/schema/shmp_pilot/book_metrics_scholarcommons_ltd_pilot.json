@@ -8,7 +8,7 @@
     }
   ],
   "mode": "NULLABLE",
-  "name": "scholarspace_commons_ltd",
+  "name": "scholarcommons_ltd_pilot",
   "type": "RECORD",
-  "description": "Metrics derived from Scholarspace Commons LTD"
+  "description": "Metrics derived from Scholarcommons LTD"
 }

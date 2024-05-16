@@ -1,1 +1,1 @@
-month.scholarspace_downloads IS NOT NULL
+month.scholarspace_downloads_pilot IS NOT NULL

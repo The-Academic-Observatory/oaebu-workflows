@@ -8,7 +8,7 @@
     }
   ],
   "mode": "NULLABLE",
-  "name": "amazon_ltd",
+  "name": "amazon_ltd_pilot",
   "type": "RECORD",
   "description": "Metrics derived from Amazon LTD"
 }

@@ -8,7 +8,7 @@
     }
   ],
   "mode": "NULLABLE",
-  "name": "internet_archive",
+  "name": "internet_archive_pilot",
   "type": "RECORD",
   "description": "Metrics derived from Internet Archive"
 }

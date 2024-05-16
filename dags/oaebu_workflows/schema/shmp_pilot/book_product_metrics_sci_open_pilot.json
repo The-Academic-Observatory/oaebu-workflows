@@ -10,5 +10,5 @@
   "mode": "NULLABLE",
   "name": "sci_open_pilot",
   "type": "RECORD",
-  "description": "Metrics derived from sci_open"
+  "description": "Metrics derived from Sci Open"
 }

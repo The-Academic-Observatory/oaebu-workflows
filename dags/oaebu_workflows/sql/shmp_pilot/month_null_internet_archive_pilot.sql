@@ -1,1 +1,1 @@
-month.internet_archive IS NOT NULL
+month.internet_archive_pilot IS NOT NULL

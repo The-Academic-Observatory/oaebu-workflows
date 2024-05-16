@@ -8,7 +8,7 @@
     }
   ],
   "mode": "NULLABLE",
-  "name": "scholarspace_views",
+  "name": "scholarspace_views_pilot",
   "type": "RECORD",
   "description": "Metrics derived from Scholarspace Views"
 }

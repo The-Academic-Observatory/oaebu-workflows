@@ -1,1 +1,1 @@
-STRUCT(month.amazon_ltd.total_downloads) AS amazon_ltd
+STRUCT(month.amazon_ltd_pilot.value) AS amazon_ltd_pilot

@@ -2,7 +2,7 @@ internet_archive_pilot_metrics as (
     SELECT
         ISBN13,
         release_date,
-        value,
+        STRUCT(SUM(value) as value) as metrics,
     FROM
         `{{ internet_archive_pilot_table_id }}`
     GROUP BY

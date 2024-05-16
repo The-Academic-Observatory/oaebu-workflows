@@ -1,1 +1,1 @@
-STRUCT(month.scholarcommons_ltd.total_downloads) AS scholarcommons_ltd
+STRUCT(month.scholarcommons_ltd_pilot.value) AS scholarcommons_ltd_pilot

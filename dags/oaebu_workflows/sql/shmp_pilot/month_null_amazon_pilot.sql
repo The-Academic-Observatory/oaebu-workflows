@@ -1,1 +1,1 @@
-month.amazon IS NOT NULL
+month.amazon_pilot IS NOT NULL

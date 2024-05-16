@@ -1,1 +1,1 @@
-STRUCT(month.internet_archive.total_downloads) AS internet_archive
+STRUCT(month.internet_archive_pilot.value) AS internet_archive_pilot
