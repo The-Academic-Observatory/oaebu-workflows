@@ -1,11 +1,11 @@
-scholarspace_views_metrics as (
+scholarspace_views_pilot_metrics as (
     SELECT
         ISBN13,
         release_date,
         value,
     FROM
-        `{{ scholarspace_views_table_id }}`
+        `{{ scholarspace_views_pilot_table_id }}`
     GROUP BY
         ISBN13,
         release_date
-),
+)

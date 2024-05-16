@@ -1,11 +1,11 @@
-altmetrics_metrics as (
+sci_open_pilot_metrics as (
     SELECT
         ISBN13,
         release_date,
         value,
     FROM
-        `{{ altmetrics_table_id }}`
+        `{{ sci_open_pilot_table_id }}`
     GROUP BY
         ISBN13,
         release_date
-),
+)

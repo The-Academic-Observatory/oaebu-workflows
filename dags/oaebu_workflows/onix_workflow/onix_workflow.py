@@ -19,7 +19,7 @@ import json
 import logging
 import os
 import re
-from typing import Iterable, List, Optional, Tuple, Union
+from typing import Iterable, List, Optional, Tuple, Union, Dict
 
 import jsonlines
 import pendulum

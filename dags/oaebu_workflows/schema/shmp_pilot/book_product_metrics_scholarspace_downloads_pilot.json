@@ -1,20 +1,14 @@
-[
-  {
-    "mode": "REQUIRED",
-    "name": "ISBN13",
-    "type": "STRING",
-    "description": "13 Digit ISBN of the book."
-  },
-  {
-    "mode": "REQUIRED",
-    "name": "value",
-    "type": "INTEGER",
-    "description": "Measured value."
-  },
-  {
-    "mode": "REQUIRED",
-    "name": "release_date",
-    "type": "DATE",
-    "description": "The end date of the release month"
-  }
-]
+{
+  "fields": [
+    {
+      "mode": "NULLABLE",
+      "name": "value",
+      "type": "INTEGER",
+      "description": "Metric value"
+    }
+  ],
+  "mode": "NULLABLE",
+  "name": "scholarspace_downloads_pilot",
+  "type": "RECORD",
+  "description": "Metrics derived from scholarspace_downloads"
+}
