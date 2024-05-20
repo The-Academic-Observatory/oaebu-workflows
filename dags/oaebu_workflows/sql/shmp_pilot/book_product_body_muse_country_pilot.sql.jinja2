@@ -1,0 +1,25 @@
+muse_country_pilot_metrics as (
+    SELECT
+        ISBN as ISBN13,
+        release_date,
+        group_items_muse_country_pilot(
+            ARRAY_AGG(STRUCT(COUNTRY, REQUESTS))
+	) as metrics
+    FROM
+        `{{ muse_country_pilot_table_id }}`
+    GROUP BY
+        ISBN13,
+        release_date
+),
+
+muse_country_pilot_metadata as (
+    SELECT
+        ISBN as ISBN13,
+        MAX(RESOURCE) as Book_Title,
+        MAX(AUTHOR) as Author,
+        MAX(Access) as Access_Type
+    FROM
+        `{{ muse_country_pilot_table_id }}`
+    GROUP BY
+        ISBN13
+)

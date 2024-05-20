@@ -8,7 +8,7 @@
     }
   ],
   "mode": "NULLABLE",
-  "name": "muse_pilot",
+  "name": "muse_metrics_pilot",
   "type": "RECORD",
   "description": "Metrics derived from muse"
 }

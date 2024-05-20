@@ -1,10 +1,10 @@
-muse_pilot_metrics as (
+muse_metrics_pilot_metrics as (
     SELECT
         ISBN13,
         release_date,
         STRUCT(SUM(value) as value) as metrics,
     FROM
-        `{{ muse_pilot_table_id }}`
+        `{{ muse_metrics_pilot_table_id }}`
     GROUP BY
         ISBN13,
         release_date

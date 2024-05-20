@@ -4,12 +4,11 @@
       "mode": "NULLABLE",
       "name": "Total_Item_Requests",
       "type": "INTEGER",
-      "description": "Total number of request made"
+      "description": "The total number of item requests"
     }
   ],
   "mode": "NULLABLE",
-  "name": "jstor_country_pilot",
+  "name": "muse_country_pilot",
   "type": "RECORD",
-  "description": "Metrics from JSTOR"
+  "description": "Metrics from Muse Country"
 }
-

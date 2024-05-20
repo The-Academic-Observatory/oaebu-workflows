@@ -1,0 +1,10 @@
+muse_month_country as (
+    SELECT
+        ISBN13,
+        month,
+        Country_name as alpha2,
+        total_item_requests
+    FROM
+        months,
+        UNNEST(muse_country_pilot)
+)

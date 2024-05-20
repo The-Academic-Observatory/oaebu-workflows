@@ -8,8 +8,8 @@
     }
   ],
   "mode": "NULLABLE",
-  "name": "jstor_country_pilot",
+  "name": "muse_country_pilot",
   "type": "RECORD",
-  "description": "Metrics from JSTOR"
+  "description": "Metrics from Muse Country"
 }
 

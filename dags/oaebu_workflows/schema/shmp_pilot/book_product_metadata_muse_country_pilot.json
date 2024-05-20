@@ -1,0 +1,39 @@
+{
+  "fields": [
+    {
+      "mode": "NULLABLE",
+      "name": "ISBN13",
+      "type": "STRING",
+      "description": "ISBN of the book (13 digits)"
+    },
+    {
+      "mode": "NULLABLE",
+      "name": "Book_Title",
+      "type": "STRING",
+      "description": "Title of the book"
+    },
+    {
+      "mode": "NULLABLE",
+      "name": "Book_ID",
+      "type": "STRING",
+      "description": "DOI of the book on JSTOR"
+    },
+    {
+      "mode": "NULLABLE",
+      "name": "Author",
+      "type": "STRING",
+      "description": "Author of the book"
+    },
+    {
+      "mode": "NULLABLE",
+      "name": "Access_Type",
+      "type": "STRING",
+      "description": "Type of access"
+    }
+  ],
+  "mode": "NULLABLE",
+  "name": "muse_country_pilot",
+  "type": "RECORD",
+  "description": "Metadata derived from Muse"
+}
+

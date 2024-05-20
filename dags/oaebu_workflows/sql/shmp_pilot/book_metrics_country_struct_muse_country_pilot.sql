@@ -1,0 +1,1 @@
+STRUCT(muse_country_pilot.Total_Item_Requests) as muse_country_pilot
