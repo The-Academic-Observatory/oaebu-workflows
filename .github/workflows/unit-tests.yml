@@ -27,7 +27,9 @@ jobs:
           python -m pip install --upgrade pip
 
           cd ..
-          git clone -b feature/astro-refactor https://github.com/The-Academic-Observatory/observatory-platform.git
+          # Clone protection required until fix - https://github.com/git-lfs/git-lfs/issues/5749
+          export GIT_CLONE_PROTECTION_ACTIVE=false 
+          git clone -b feature/astro-refactor https://github.com/The-Academic-Observatory/observatory-platform.git 
           cd observatory-platform
           pip install -e .[tests] --constraint https://raw.githubusercontent.com/apache/airflow/constraints-2.7.3/constraints-no-providers-${{ matrix.python-version }}.txt
           cd ..
