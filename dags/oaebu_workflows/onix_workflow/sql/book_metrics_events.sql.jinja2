@@ -27,18 +27,32 @@ WITH publisher_names as (
         publishing_role = "Publisher"
 ),
 
+authors as (
+    SELECT
+        ISBN13 as product_id,
+    STRUCT(
+        PersonName as person_name,
+        PersonNameInverted as person_name_inverted,
+        ORCID
+    ) as authors
+    FROM `{{ book_product_table_id }}`, UNNEST(onix.authors)
+),
+
 body as (
     SELECT
         ISBN13 as product_id,
         MAX(work_id) as work_id,
         MAX(work_family_id) as work_family_id,
         MAX(onix.title) as title,
-        onix.authors,
-        STRUCT(onix.bic_subjects as bic, onix.bisac_subject as bisac, onix.thema_subjects as thema) as subjects,
         CAST(MAX(onix.published_year) as INT64) as published_year,
-        onix.published_date,
+        MAX(onix.published_date) as published_date,
         month.month,
         events.source as event_source,
+        STRUCT(
+          ARRAY_CONCAT_AGG(onix.bic_subjects) as bic,
+          ARRAY_CONCAT_AGG(onix.bisac_subjects) as bisac,
+          ARRAY_CONCAT_AGG(onix.thema_subjects) as thema
+        ) as subjects,
         STRUCT(
             SUM(events.count) as count
         ) as crossref_events,
@@ -52,10 +66,9 @@ body as (
 
 SELECT
     b.*,
-    p.publisher_name as publisher_name
+    p.publisher_name as publisher_name,
+    a.authors as authors
 FROM 
     body AS b
-LEFT JOIN
-    publisher_names AS p
-ON
-    b.product_id = p.product_id
+LEFT JOIN publisher_names as p ON b.product_id = p.product_id
+LEFT JOIN authors as a ON a.product_id = p.product_id

@@ -31,6 +31,12 @@
   },
   {
     "mode": "NULLABLE",
+    "name": "published_date",
+    "type": "DATE",
+    "description": "The publisher Date of the book"
+  },
+  {
+    "mode": "NULLABLE",
     "name": "publisher_name",
     "type": "STRING",
     "description": "The name of the publisher"
@@ -40,6 +46,58 @@
     "name": "month",
     "type": "DATE",
     "description": "The month for which the metrics apply to"
+  },
+  {
+    "fields": [
+      {
+        "mode": "REPEATED",
+        "name": "bic",
+        "type": "STRING",
+        "description": "BIC subject codes"
+      },
+      {
+        "mode": "REPEATED",
+        "name": "bisac",
+        "type": "STRING",
+        "description": "BISAC subject codes"
+      },
+      {
+        "mode": "REPEATED",
+        "name": "thema",
+        "type": "STRING",
+        "description": "THEMA subject codes"
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "subjects",
+    "type": "RECORD",
+    "description": "Subject codes"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "person_name",
+        "type": "STRING",
+        "description": "Name of the author"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "person_name_inverted",
+        "type": "STRING",
+        "description": "Inverted name of the author"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "ORCID",
+        "type": "STRING",
+        "description": "Author ORCID identifier"
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "authors",
+    "type": "RECORD",
+    "description": "Author information"
   },
   {
     "mode": "NULLABLE",
@@ -66,4 +124,3 @@
     "description": "The Country Wikipedia Name"
   }
 ]
-
