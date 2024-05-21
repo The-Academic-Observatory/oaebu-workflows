@@ -25,7 +25,7 @@ SELECT
     (ARRAY_LENGTH(months) > 0) as usage_flag,
     onix.EditionNumber,
     CAST(onix.published_year as INT64) as published_year,
-    onix.published_date AS published_date,
+    onix.published_date,
     (SELECT p.publisher_name as publisher_name FROM UNNEST(onix.publisher) as p WHERE p.publishing_role = "Publisher" LIMIT 1) as publisher_name,
     onix.title,
     onix.bic_subjects,

@@ -21,14 +21,16 @@ SELECT
     ISBN13 as product_id,
     work_id,
     work_family_id,
-    onix.title as title,
+    onix.title,
     onix.authors,
+    STRUCT(onix.bic_subjects as bic, onix.bisac_subject as bisac, onix.thema_subjects as thema) as subjects,
     CAST(onix.published_year as INT64) as published_year,
+    onix.published_date,
     (SELECT p.publisher_name as publisher_name FROM UNNEST(onix.publisher) as p WHERE p.publishing_role = "Publisher" LIMIT 1) as publisher_name, -- pull the publisher name from the onix.publisher field
     month.month,
     {% for dp in data_partners | selectattr("export_book_metrics", "equalto", True) %}
         {% include dp.files.book_metrics_sql %},
-    {% endfor %}    
+    {% endfor %}
     STRUCT((SELECT SUM(count) FROM UNNEST(month.crossref_events)) as count) as crossref_events
 FROM `{{ book_product_table_id }}`, UNNEST(months) AS month
 WHERE 

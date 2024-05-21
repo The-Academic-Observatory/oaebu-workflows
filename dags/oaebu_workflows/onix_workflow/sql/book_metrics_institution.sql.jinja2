@@ -20,8 +20,11 @@ The purpose of this script it to export the book institutional metrics section f
 SELECT
     ISBN13 as product_id,
     onix.title as title,
+    onix.authors,
+    STRUCT(onix.bic_subjects as bic, onix.bisac_subject as bisac, onix.thema_subjects as thema) as subjects,
     (SELECT p.publisher_name as publisher_name FROM UNNEST(onix.publisher) as p WHERE p.publishing_role = "Publisher" LIMIT 1) as publisher_name, -- pull the publisher name from the onix.publisher field
     CAST(onix.published_year as INT64) as published_year,
+    onix.published_date,
     month.month,
     institution.institution,
     {# Currently only used by jstor #}

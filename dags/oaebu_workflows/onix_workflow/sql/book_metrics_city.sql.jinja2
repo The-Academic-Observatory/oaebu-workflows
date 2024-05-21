@@ -34,6 +34,7 @@ body as (
         MAX(work_family_id) as work_family_id,
         MAX(onix.title) as title,
         CAST(MAX(onix.published_year) as INT64) as published_year,
+        onix.published_date,
         month.month,
         city.city,
         CONCAT(CAST(MAX(city.latitude) as STRING), ", ", CAST(MAX(city.longitude) as STRING)) as coordinates,

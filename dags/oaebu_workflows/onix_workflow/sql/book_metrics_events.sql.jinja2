@@ -33,7 +33,10 @@ body as (
         MAX(work_id) as work_id,
         MAX(work_family_id) as work_family_id,
         MAX(onix.title) as title,
+        onix.authors,
+        STRUCT(onix.bic_subjects as bic, onix.bisac_subject as bisac, onix.thema_subjects as thema) as subjects,
         CAST(MAX(onix.published_year) as INT64) as published_year,
+        onix.published_date,
         month.month,
         events.source as event_source,
         STRUCT(
