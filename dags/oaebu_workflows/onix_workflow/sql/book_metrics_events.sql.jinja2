@@ -30,12 +30,14 @@ WITH publisher_names as (
 authors as (
     SELECT
         ISBN13 as product_id,
-    STRUCT(
-        PersonName as person_name,
-        PersonNameInverted as person_name_inverted,
-        ORCID
-    ) as authors
-    FROM `{{ book_product_table_id }}`, UNNEST(onix.authors)
+        ARRAY(
+            SELECT STRUCT(
+                a.PersonName as person_name,
+                a.PersonNameInverted as person_name_inverted,
+                a.ORCID as ORCID
+            )
+            FROM UNNEST(onix.authors) as a) as author
+    FROM `{{ book_product_table_id }}`
 ),
 
 body as (

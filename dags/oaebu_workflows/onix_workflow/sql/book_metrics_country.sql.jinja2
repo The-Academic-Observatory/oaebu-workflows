@@ -34,11 +34,13 @@ month_country as (
         (SELECT p.publisher_name as publisher_name FROM UNNEST(onix.publisher) as p WHERE p.publishing_role = "Publisher" LIMIT 1) as publisher_name, -- pull the publisher name from the onix.publisher field
         CAST(onix.published_year as INT64) as published_year,
         onix.published_date as published_date,
-        STRUCT(
-            PersonName as person_name,
-            PersonNameInverted as person_name_inverted,
-            ORCID as ORCID
-        ) as authors,
+        ARRAY(
+            SELECT STRUCT(
+                a.PersonName as person_name,
+                a.PersonNameInverted as person_name_inverted,
+                a.ORCID as ORCID
+            )
+            FROM UNNEST(onix.authors) as a) as author,
         STRUCT(
             onix.bic_subjects as bic,
             onix.bisac_subjects as bisac,
@@ -50,7 +52,7 @@ month_country as (
         iso_name as country_iso_name,
         wikipedia_name as country_wikipedia_name,
         jstor_name as country_jstor_name
-    FROM months, UNNEST(onix.authors)
+    FROM months
     CROSS JOIN countries
 )
 

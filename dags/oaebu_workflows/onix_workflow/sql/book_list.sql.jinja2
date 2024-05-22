@@ -29,14 +29,16 @@ SELECT
     (SELECT p.publisher_name as publisher_name FROM UNNEST(onix.publisher) as p WHERE p.publishing_role = "Publisher" LIMIT 1) as publisher_name,
     onix.title,
     onix.keywords,
-    STRUCT(
-        PersonName as person_name,
-        PersonNameInverted as person_name_inverted,
-        ORCID as ORCID
-    ) as authors,
+    ARRAY(
+        SELECT STRUCT(
+            a.PersonName as person_name,
+            a.PersonNameInverted as person_name_inverted,
+            a.ORCID as ORCID
+        )
+        FROM UNNEST(onix.authors) as a) as author,
     STRUCT(
         onix.bic_subjects as bic,
         onix.bisac_subjects as bisac,
         onix.thema_subjects as thema
     ) as subjects
-FROM `{{ book_product_table_id }}`, UNNEST(onix.authors)
+FROM `{{ book_product_table_id }}`

@@ -24,11 +24,13 @@ SELECT
     onix.title,
     CAST(onix.published_year as INT64) as published_year,
     onix.published_date as published_date,
-    STRUCT(
-        PersonName as person_name,
-        PersonNameInverted as person_name_inverted,
-        ORCID as ORCID
-    ) as authors,
+    ARRAY(
+        SELECT STRUCT(
+            a.PersonName as person_name,
+            a.PersonNameInverted as person_name_inverted,
+            a.ORCID as ORCID
+        )
+        FROM UNNEST(onix.authors) as a) as author,
     STRUCT(
         onix.bic_subjects as bic,
         onix.bisac_subjects as bisac,
@@ -40,7 +42,7 @@ SELECT
         {% include dp.files.book_metrics_sql %},
     {% endfor %}
     STRUCT((SELECT SUM(count) FROM UNNEST(month.crossref_events)) as count) as crossref_events
-FROM `{{ book_product_table_id }}`, UNNEST(months) AS month, UNNEST(onix.authors)
+FROM `{{ book_product_table_id }}`, UNNEST(months) AS month
 WHERE 
 {% for dp in data_partners | selectattr("export_book_metrics", "equalto", True) %}
     {% include dp.files.month_null_sql %} OR
