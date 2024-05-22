@@ -36,7 +36,7 @@ authors as (
                 a.PersonNameInverted as person_name_inverted,
                 a.ORCID as ORCID
             )
-            FROM UNNEST(onix.authors) as a) as author
+            FROM UNNEST(onix.authors) as a) as authors
     FROM `{{ book_product_table_id }}`
 ),
 

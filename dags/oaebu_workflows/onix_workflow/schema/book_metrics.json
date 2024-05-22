@@ -70,7 +70,7 @@
         "description": "Author ORCID identifier"
       }
     ],
-    "mode": "NULLABLE",
+    "mode": "REPEATED",
     "name": "authors",
     "type": "RECORD",
     "description": "Author information"

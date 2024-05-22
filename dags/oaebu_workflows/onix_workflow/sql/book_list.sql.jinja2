@@ -35,7 +35,7 @@ SELECT
             a.PersonNameInverted as person_name_inverted,
             a.ORCID as ORCID
         )
-        FROM UNNEST(onix.authors) as a) as author,
+        FROM UNNEST(onix.authors) as a) as authors,
     STRUCT(
         onix.bic_subjects as bic,
         onix.bisac_subjects as bisac,
