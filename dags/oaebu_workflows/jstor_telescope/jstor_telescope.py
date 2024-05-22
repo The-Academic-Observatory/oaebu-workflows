@@ -163,6 +163,7 @@ def create_dag(
     bq_country_table_description: Optional[str] = None,
     bq_institution_table_description: Optional[str] = None,
     api_dataset_id: str = "dataset_api",
+    api_identifier: str = "jstor",
     gmail_api_conn_id: str = "gmail_api",
     catchup: bool = False,
     schedule: str = "0 0 4 * *",  # 4th day of every month
@@ -373,7 +374,7 @@ def create_dag(
                 api.seed_db()
                 dataset_release = DatasetRelease(
                     dag_id=dag_id,
-                    dataset_id=api_dataset_id,
+                    dataset_id=api_identifier,
                     dag_run_id=release.run_id,
                     created=pendulum.now(),
                     modified=pendulum.now(),

@@ -100,6 +100,7 @@ def create_dag(
     bq_dataset_description: str = "Thoth ONIX Feed",
     bq_table_description: str = "Thoth ONIX Feed",
     api_dataset_id: str = "dataset_api",
+    api_identifier: str = "api_identifier",
     catchup: bool = False,
     start_date: DateTime = pendulum.datetime(2022, 12, 1),
     schedule: str = "0 12 * * Sun",  # Midday every sunday
@@ -238,7 +239,7 @@ def create_dag(
             api.seed_db()
             dataset_release = DatasetRelease(
                 dag_id=dag_id,
-                dataset_id=api_dataset_id,
+                dataset_id=api_identifier,
                 dag_run_id=release.run_id,
                 created=pendulum.now(),
                 modified=pendulum.now(),

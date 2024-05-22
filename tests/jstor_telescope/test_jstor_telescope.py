@@ -200,6 +200,7 @@ class TestJstorTelescopePublisher(SandboxTestCase):
             api_dataset_id = env.add_dataset()
             dag_id = "jstor_test_telescope"
             entity_type = "publisher"
+            api_identifier = "unique_identifier"
             dag = create_dag(
                 dag_id=dag_id,
                 cloud_workspace=env.cloud_workspace,
@@ -208,6 +209,7 @@ class TestJstorTelescopePublisher(SandboxTestCase):
                 country_partner=country_partner,
                 institution_partner=institution_partner,
                 api_dataset_id=api_dataset_id,
+                api_identifier=api_identifier,
             )
 
             # Begin DAG run
@@ -339,7 +341,7 @@ class TestJstorTelescopePublisher(SandboxTestCase):
                 # Set up the API
                 api = DatasetAPI(project_id=self.project_id, dataset_id=api_dataset_id)
                 api.seed_db()
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_identifier)
                 self.assertEqual(len(dataset_releases), 0)
 
                 # Add_dataset_release_task
@@ -348,11 +350,11 @@ class TestJstorTelescopePublisher(SandboxTestCase):
                     mock_now.return_value = now
                     ti = env.run_task("process_release.add_new_dataset_releases", map_index=0)
                 self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_identifier)
                 self.assertEqual(len(dataset_releases), 1)
                 expected_release = {
                     "dag_id": dag_id,
-                    "dataset_id": api_dataset_id,
+                    "dataset_id": api_identifier,
                     "dag_run_id": release.run_id,
                     # Replace Z shorthand because BQ converts it to +00:00
                     "created": now.to_iso8601_string().replace("Z", "+00:00"),
@@ -479,6 +481,7 @@ class TestJstorTelescopeCollection(SandboxTestCase):
             api_dataset_id = env.add_dataset()
             dag_id = "jstor_test_telescope"
             entity_type = "collection"
+            api_identifier = "unique_identifier"
             dag = create_dag(
                 dag_id=dag_id,
                 cloud_workspace=env.cloud_workspace,
@@ -487,6 +490,7 @@ class TestJstorTelescopeCollection(SandboxTestCase):
                 country_partner=country_partner,
                 institution_partner=institution_partner,
                 api_dataset_id=api_dataset_id,
+                api_identifier=api_identifier,
             )
 
             # Begin DAG run
@@ -596,7 +600,7 @@ class TestJstorTelescopeCollection(SandboxTestCase):
                 # Set up the API
                 api = DatasetAPI(project_id=self.project_id, dataset_id=api_dataset_id)
                 api.seed_db()
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_identifier)
                 self.assertEqual(len(dataset_releases), 0)
 
                 # Add_dataset_release_task
@@ -605,11 +609,11 @@ class TestJstorTelescopeCollection(SandboxTestCase):
                     mock_now.return_value = now
                     ti = env.run_task("process_release.add_new_dataset_releases", map_index=0)
                 self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_identifier)
                 self.assertEqual(len(dataset_releases), 1)
                 expected_release = {
                     "dag_id": dag_id,
-                    "dataset_id": api_dataset_id,
+                    "dataset_id": api_identifier,
                     "dag_run_id": release.run_id,
                     # Replace Z shorthand because BQ converts it to +00:00
                     "created": now.to_iso8601_string().replace("Z", "+00:00"),

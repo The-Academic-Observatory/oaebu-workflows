@@ -242,6 +242,7 @@ def create_dag(
     mailto: str = "agent@observatory.academy",
     crossref_start_date: pendulum.DateTime = pendulum.datetime(2018, 5, 14),
     api_dataset_id: str = "dataset_api",
+    api_identifier: str = "onix_workflow",
     # Ariflow parameters
     sensor_dag_ids: List[str] = None,
     catchup: Optional[bool] = False,
@@ -1031,7 +1032,7 @@ def create_dag(
             api.seed_db()
             dataset_release = DatasetRelease(
                 dag_id=dag_id,
-                dataset_id=api_dataset_id,
+                dataset_id=api_identifier,
                 dag_run_id=release.run_id,
                 created=pendulum.now(),
                 modified=pendulum.now(),

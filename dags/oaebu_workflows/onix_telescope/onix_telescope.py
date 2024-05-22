@@ -107,6 +107,7 @@ def create_dag(
     bq_dataset_description: str = "ONIX data provided by Org",
     bq_table_description: str = None,
     api_dataset_id: str = "dataset_api",
+    api_identifier: str = "onix",
     sftp_service_conn_id: str = "sftp_service",
     catchup: bool = False,
     schedule: str = "0 12 * * Sun",  # Midday every sunday
@@ -286,7 +287,7 @@ def create_dag(
                 api.seed_db()
                 dataset_release = DatasetRelease(
                     dag_id=dag_id,
-                    dataset_id=api_dataset_id,
+                    dataset_id=api_identifier,
                     dag_run_id=release.run_id,
                     created=pendulum.now(),
                     modified=pendulum.now(),

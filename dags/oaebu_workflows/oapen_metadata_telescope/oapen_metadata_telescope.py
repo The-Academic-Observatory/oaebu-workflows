@@ -110,6 +110,7 @@ def create_dag(
     bq_dataset_description: str = "OAPEN Metadata converted to ONIX",
     bq_table_description: str = None,
     api_dataset_id: str = "dataset_api",
+    api_identifier: str = "oapen_metadata",
     catchup: bool = False,
     start_date: pendulum.DateTime = pendulum.datetime(2018, 5, 14),
     schedule: str = "0 12 * * Sun",  # Midday every sunday
@@ -262,7 +263,7 @@ def create_dag(
             api.seed_db()
             dataset_release = DatasetRelease(
                 dag_id=dag_id,
-                dataset_id=api_dataset_id,
+                dataset_id=api_identifier,
                 dag_run_id=release.run_id,
                 created=pendulum.now(),
                 modified=pendulum.now(),

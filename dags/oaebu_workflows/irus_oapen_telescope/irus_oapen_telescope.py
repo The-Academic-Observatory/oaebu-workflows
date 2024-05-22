@@ -134,6 +134,7 @@ def create_dag(
     gdpr_oapen_project_id: str = "oapen-usage-data-gdpr-proof",
     gdpr_oapen_bucket_id: str = "oapen-usage-data-gdpr-proof_cloud-function",
     api_dataset_id: str = "dataset_api",
+    api_identifier: str = "irus_oapen",
     max_cloud_function_instances: int = 0,
     geoip_license_conn_id: str = "geoip_license_key",
     irus_oapen_api_conn_id: str = "irus_api",
@@ -379,7 +380,7 @@ def create_dag(
                 api.seed_db()
                 dataset_release = DatasetRelease(
                     dag_id=dag_id,
-                    dataset_id=api_dataset_id,
+                    dataset_id=api_identifier,
                     dag_run_id=release.run_id,
                     created=pendulum.now(),
                     modified=pendulum.now(),

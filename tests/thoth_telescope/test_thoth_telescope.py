@@ -128,6 +128,7 @@ class TestThothTelescope(SandboxTestCase):
             metadata_partner.bq_dataset_id = env.add_dataset()
             dag_id = "thoth_telescope_test"
             api_dataset_id = env.add_dataset()
+            api_identifier = "unique_identifier"
             dag = create_dag(
                 dag_id=dag_id,
                 cloud_workspace=env.cloud_workspace,
@@ -136,6 +137,7 @@ class TestThothTelescope(SandboxTestCase):
                 publisher_id=FAKE_PUBLISHER_ID,
                 metadata_partner=metadata_partner,
                 api_dataset_id=api_dataset_id,
+                api_identifier=api_identifier,
             )
 
             with env.create_dag_run(dag, execution_date):
@@ -200,7 +202,7 @@ class TestThothTelescope(SandboxTestCase):
                 # Set up the API
                 api = DatasetAPI(project_id=self.project_id, dataset_id=api_dataset_id)
                 api.seed_db()
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_identifier)
                 self.assertEqual(len(dataset_releases), 0)
 
                 now = pendulum.now("UTC")  # Use UTC to ensure +00UTC timezone
@@ -208,11 +210,11 @@ class TestThothTelescope(SandboxTestCase):
                     mock_now.return_value = now
                     ti = env.run_task("add_new_dataset_releases")
                 self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_identifier)
                 self.assertEqual(len(dataset_releases), 1)
                 expected_release = {
                     "dag_id": dag_id,
-                    "dataset_id": api_dataset_id,
+                    "dataset_id": api_identifier,
                     "dag_run_id": release.run_id,
                     # Replace Z shorthand because BQ converts it to +00:00
                     "created": now.to_iso8601_string().replace("Z", "+00:00"),

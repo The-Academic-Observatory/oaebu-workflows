@@ -117,6 +117,7 @@ def create_dag(
     bq_dataset_description: str = "UCL Discovery dataset",
     bq_table_description: str = "UCL Discovery table",
     api_dataset_id: str = "dataset_api",
+    api_identifier: str = "ucl",
     oaebu_service_account_conn_id: str = "oaebu_service_account",
     max_threads: int = os.cpu_count() * 2,
     schedule: str = "0 0 4 * *",  # run on the 4th of every month
@@ -307,7 +308,7 @@ def create_dag(
             api.seed_db()
             dataset_release = DatasetRelease(
                 dag_id=dag_id,
-                dataset_id=api_dataset_id,
+                dataset_id=api_identifier,
                 dag_run_id=release.run_id,
                 created=pendulum.now(),
                 modified=pendulum.now(),

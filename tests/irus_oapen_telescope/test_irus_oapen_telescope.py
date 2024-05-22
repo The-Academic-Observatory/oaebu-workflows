@@ -132,6 +132,7 @@ class TestIrusOapenTelescope(SandboxTestCase):
         dag_id = "irus_oapen_test"
         gdpr_bucket_id = env.add_bucket()
         api_dataset_id = env.add_dataset()
+        api_identifier = "unique_identifier"
         dag = create_dag(
             dag_id=dag_id,
             cloud_workspace=env.cloud_workspace,
@@ -141,6 +142,7 @@ class TestIrusOapenTelescope(SandboxTestCase):
             gdpr_oapen_project_id=env.project_id,
             gdpr_oapen_bucket_id=gdpr_bucket_id,
             api_dataset_id=api_dataset_id,
+            api_identifier=api_identifier,
         )
 
         # Mock the Google Cloud Functions API service
@@ -275,7 +277,7 @@ class TestIrusOapenTelescope(SandboxTestCase):
                 # Add_dataset_release_task
                 api = DatasetAPI(project_id=self.project_id, dataset_id=api_dataset_id)
                 api.seed_db()
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_identifier)
                 self.assertEqual(len(dataset_releases), 0)
 
                 # Add_dataset_release_task
@@ -284,11 +286,11 @@ class TestIrusOapenTelescope(SandboxTestCase):
                     mock_now.return_value = now
                     ti = env.run_task("process_release.add_new_dataset_releases", map_index=0)
                 self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_identifier)
                 self.assertEqual(len(dataset_releases), 1)
                 expected_release = {
                     "dag_id": dag_id,
-                    "dataset_id": api_dataset_id,
+                    "dataset_id": api_identifier,
                     "dag_run_id": release.run_id,
                     # Replace Z shorthand because BQ converts it to +00:00
                     "created": now.to_iso8601_string().replace("Z", "+00:00"),

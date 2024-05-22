@@ -984,6 +984,7 @@ class TestOnixWorkflow(SandboxTestCase):
             bq_worksid_error_table_name = "onix_workid_isbn_errors"
             bq_workfamilyid_table_name = "onix_workfamilyid_isbn"
             api_dataset_id = env.add_dataset()
+            api_identifier = "unique_identifier"
             dag = create_dag(
                 dag_id=dag_id,
                 cloud_workspace=env.cloud_workspace,
@@ -1009,6 +1010,7 @@ class TestOnixWorkflow(SandboxTestCase):
                 bq_oaebu_export_dataset=oaebu_export_dataset_id,
                 bq_oaebu_latest_export_dataset=oaebu_latest_export_dataset_id,
                 api_dataset_id=api_dataset_id,
+                api_identifier=api_identifier,
                 data_partners=data_partners,
                 sensor_dag_ids=sensor_dag_ids,
                 start_date=start_date,
@@ -1288,7 +1290,7 @@ class TestOnixWorkflow(SandboxTestCase):
                 # Set up the API
                 api = DatasetAPI(project_id=self.gcp_project_id, dataset_id=api_dataset_id)
                 api.seed_db()
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_identifier)
                 self.assertEqual(len(dataset_releases), 0)
 
                 # Add_dataset_release_task
@@ -1297,11 +1299,11 @@ class TestOnixWorkflow(SandboxTestCase):
                     mock_now.return_value = now
                     ti = env.run_task("add_new_dataset_releases")
                 self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_identifier)
                 self.assertEqual(len(dataset_releases), 1)
                 expected_release = {
                     "dag_id": dag_id,
-                    "dataset_id": api_dataset_id,
+                    "dataset_id": api_identifier,
                     "dag_run_id": release.run_id,
                     # Replace Z shorthand because BQ converts it to +00:00
                     "created": now.to_iso8601_string().replace("Z", "+00:00"),

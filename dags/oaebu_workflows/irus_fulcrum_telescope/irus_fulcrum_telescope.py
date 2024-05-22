@@ -118,6 +118,7 @@ def create_dag(
     bq_dataset_description: str = "IRUS dataset",
     bq_table_description: str = "Fulcrum metrics as recorded by the IRUS platform",
     api_dataset_id: str = "dataset_api",
+    api_identifier: str = "irus_fulcrum",
     irus_oapen_api_conn_id: str = "irus_api",
     catchup: bool = True,
     schedule: str = "0 0 4 * *",  # Run on the 4th of every month
@@ -283,7 +284,7 @@ def create_dag(
             api.seed_db()
             dataset_release = DatasetRelease(
                 dag_id=dag_id,
-                dataset_id=api_dataset_id,
+                dataset_id=api_identifier,
                 dag_run_id=release.run_id,
                 created=pendulum.now(),
                 modified=pendulum.now(),
