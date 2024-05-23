@@ -27,6 +27,19 @@ WITH publisher_names as (
         publishing_role = "Publisher"
 ),
 
+authors as (
+    SELECT
+        ISBN13 as product_id,
+        ARRAY(
+            SELECT STRUCT(
+                a.PersonName as person_name,
+                a.PersonNameInverted as person_name_inverted,
+                a.ORCID as ORCID
+            )
+            FROM UNNEST(onix.authors) as a) as authors
+    FROM `{{ book_product_table_id }}`
+),
+
 body as (
     SELECT
         ISBN13 as product_id,
@@ -34,9 +47,15 @@ body as (
         MAX(work_family_id) as work_family_id,
         MAX(onix.title) as title,
         CAST(MAX(onix.published_year) as INT64) as published_year,
+        MAX(onix.published_date) as published_date,
         month.month,
         city.city,
         CONCAT(CAST(MAX(city.latitude) as STRING), ", ", CAST(MAX(city.longitude) as STRING)) as coordinates,
+        STRUCT(
+          ARRAY_CONCAT_AGG(onix.bic_subjects) as bic,
+          ARRAY_CONCAT_AGG(onix.bisac_subjects) as bisac,
+          ARRAY_CONCAT_AGG(onix.thema_subjects) as thema
+        ) as subjects,
         {# Currently only used by IRUS OAPEN #}
         STRUCT(
             SUM(city.title_requests) as title_requests,
@@ -52,13 +71,11 @@ body as (
     GROUP BY 
         ISBN13, month, city
 )
-
 SELECT
     b.*,
-    p.publisher_name as publisher_name
+    p.publisher_name as publisher_name,
+    a.authors as authors,
 FROM
     body as b 
-LEFT JOIN 
-    publisher_names as p
-ON 
-    b.product_id = p.product_id
+LEFT JOIN publisher_names as p ON b.product_id = p.product_id
+LEFT JOIN authors as a ON a.product_id = p.product_id

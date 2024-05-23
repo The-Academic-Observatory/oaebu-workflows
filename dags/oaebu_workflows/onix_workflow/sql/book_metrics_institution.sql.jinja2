@@ -22,6 +22,19 @@ SELECT
     onix.title as title,
     (SELECT p.publisher_name as publisher_name FROM UNNEST(onix.publisher) as p WHERE p.publishing_role = "Publisher" LIMIT 1) as publisher_name, -- pull the publisher name from the onix.publisher field
     CAST(onix.published_year as INT64) as published_year,
+    onix.published_date as published_date,
+    ARRAY(
+        SELECT STRUCT(
+            a.PersonName as person_name,
+            a.PersonNameInverted as person_name_inverted,
+            a.ORCID as ORCID
+        )
+        FROM UNNEST(onix.authors) as a) as authors,
+    STRUCT(
+        onix.bic_subjects as bic,
+        onix.bisac_subjects as bisac,
+        onix.thema_subjects as thema
+    ) as subjects,
     month.month,
     institution.institution,
     {# Currently only used by jstor #}

@@ -61,24 +61,6 @@
   },
   {
     "mode": "REPEATED",
-    "name": "bic_subjects",
-    "type": "STRING",
-    "description": "A list of BIC subjects"
-  },
-  {
-    "mode": "REPEATED",
-    "name": "bisac_subjects",
-    "type": "STRING",
-    "description": "A list of BISAC subjects"
-  },
-  {
-    "mode": "REPEATED",
-    "name": "thema_subjects",
-    "type": "STRING",
-    "description": "A list of thema subjects"
-  },
-  {
-    "mode": "REPEATED",
     "name": "keywords",
     "type": "STRING",
     "description": "A list of keywords"
@@ -86,28 +68,53 @@
   {
     "fields": [
       {
-        "mode": "NULLABLE",
-        "name": "PersonName",
+        "mode": "REPEATED",
+        "name": "bic",
         "type": "STRING",
-        "description": "The author's full name in the format '[first name] [last name]'"
+        "description": "BIC subject codes"
+      },
+      {
+        "mode": "REPEATED",
+        "name": "bisac",
+        "type": "STRING",
+        "description": "BISAC subject codes"
+      },
+      {
+        "mode": "REPEATED",
+        "name": "thema",
+        "type": "STRING",
+        "description": "THEMA subject codes"
+      }
+    ],
+    "mode": "NULLABLE",
+    "name": "subjects",
+    "type": "RECORD",
+    "description": "Subject codes"
+  },
+  {
+    "fields": [
+      {
+        "mode": "NULLABLE",
+        "name": "person_name",
+        "type": "STRING",
+        "description": "Name of the author"
       },
       {
         "mode": "NULLABLE",
-        "name": "PersonNameInverted",
+        "name": "person_name_inverted",
         "type": "STRING",
-        "description": "The author's full name in the format '[last name], [first name]'"
+        "description": "Inverted name of the author"
       },
       {
         "mode": "NULLABLE",
         "name": "ORCID",
         "type": "STRING",
-        "description": "The Authors ORCID ID"
+        "description": "Author ORCID identifier"
       }
     ],
     "mode": "REPEATED",
     "name": "authors",
     "type": "RECORD",
-    "description": "A list of Book Authors"
+    "description": "Author information"
   }
 ]
-

@@ -25,12 +25,20 @@ SELECT
     (ARRAY_LENGTH(months) > 0) as usage_flag,
     onix.EditionNumber,
     CAST(onix.published_year as INT64) as published_year,
-    onix.published_date AS published_date,
+    onix.published_date as published_date,
     (SELECT p.publisher_name as publisher_name FROM UNNEST(onix.publisher) as p WHERE p.publishing_role = "Publisher" LIMIT 1) as publisher_name,
     onix.title,
-    onix.bic_subjects,
-    onix.bisac_subjects,
-    onix.thema_subjects,
     onix.keywords,
-    onix.authors
+    ARRAY(
+        SELECT STRUCT(
+            a.PersonName as person_name,
+            a.PersonNameInverted as person_name_inverted,
+            a.ORCID as ORCID
+        )
+        FROM UNNEST(onix.authors) as a) as authors,
+    STRUCT(
+        onix.bic_subjects as bic,
+        onix.bisac_subjects as bisac,
+        onix.thema_subjects as thema
+    ) as subjects
 FROM `{{ book_product_table_id }}`

@@ -31,8 +31,21 @@ month_country as (
         work_id,
         work_family_id,
         onix.title,
-        CAST(onix.published_year as INT64) as published_year,
         (SELECT p.publisher_name as publisher_name FROM UNNEST(onix.publisher) as p WHERE p.publishing_role = "Publisher" LIMIT 1) as publisher_name, -- pull the publisher name from the onix.publisher field
+        CAST(onix.published_year as INT64) as published_year,
+        onix.published_date as published_date,
+        ARRAY(
+            SELECT STRUCT(
+                a.PersonName as person_name,
+                a.PersonNameInverted as person_name_inverted,
+                a.ORCID as ORCID
+            )
+            FROM UNNEST(onix.authors) as a) as authors,
+        STRUCT(
+            onix.bic_subjects as bic,
+            onix.bisac_subjects as bisac,
+            onix.thema_subjects as thema
+        ) as subjects,
         month,
         alpha2,
         iso_name as country_name,
@@ -53,10 +66,13 @@ SELECT
         {% include dp.files.book_metrics_country_struct_sql %},
     {% endfor %}
     month_country.ISBN13 as product_id,
-    month_country.work_id as work_id,
-    month_country.work_family_id as work_family_id,
+    month_country.work_id,
+    month_country.work_family_id,
     month_country.title,
+    month_country.authors as authors, 
+    month_country.subjects as subjects,
     month_country.published_year,
+    month_country.published_date,
     month_country.publisher_name,
     month_country.month,
     month_country.alpha2 as country_code,
