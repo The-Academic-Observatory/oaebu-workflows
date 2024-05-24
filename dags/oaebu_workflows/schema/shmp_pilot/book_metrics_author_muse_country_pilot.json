@@ -1,0 +1,14 @@
+{
+  "fields": [
+    {
+      "mode": "NULLABLE",
+      "name": "Total_Item_Requests",
+      "type": "INTEGER",
+      "description": "The total number of item requests"
+    }
+  ],
+  "mode": "NULLABLE",
+  "name": "muse_country_pilot",
+  "type": "RECORD",
+  "description": "Metrics from Muse Country"
+}

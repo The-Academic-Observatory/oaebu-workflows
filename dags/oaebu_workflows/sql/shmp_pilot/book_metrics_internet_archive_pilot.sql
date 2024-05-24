@@ -1,0 +1,1 @@
+STRUCT(month.internet_archive_pilot.value) AS internet_archive_pilot

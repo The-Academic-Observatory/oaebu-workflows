@@ -19,7 +19,7 @@ import json
 import logging
 import os
 import re
-from typing import Iterable, List, Optional, Tuple, Union
+from typing import Iterable, List, Optional, Tuple, Union, Dict
 
 import jsonlines
 import pendulum
@@ -35,7 +35,7 @@ from tenacity import wait_exponential_jitter
 
 from oaebu_workflows.airflow_pools import CrossrefEventsPool
 from oaebu_workflows.config import oaebu_user_agent_header, schema_folder as default_schema_folder, sql_folder
-from oaebu_workflows.oaebu_partners import DataPartner, OaebuPartner, partner_from_str
+from oaebu_workflows.oaebu_partners import DataPartner, OaebuPartner, partner_from_str, create_bespoke_data_partners
 from oaebu_workflows.onix_workflow.onix_work_aggregation import BookWorkAggregator, BookWorkFamilyAggregator
 from observatory_platform.airflow.airflow import on_failure_callback
 from observatory_platform.airflow.release import make_snapshot_date, set_task_state, SnapshotRelease
@@ -233,10 +233,10 @@ def create_dag(
     bq_worksid_table_name: str = "onix_workid_isbn",
     bq_worksid_error_table_name: str = "onix_workid_isbn_errors",
     bq_workfamilyid_table_name: str = "onix_workfamilyid_isbn",
-    oaebu_intermediate_match_suffix: str = "_matched",
     skip_downloading_crossref_events: bool = True,
     # Run parameters
     data_partners: List[Union[str, OaebuPartner]] = None,
+    bespoke_data_partners: List[Dict] = None,
     ga3_views_field="page_views",
     schema_folder: str = default_schema_folder(workflow_module="onix_workflow"),
     mailto: str = "agent@observatory.academy",
@@ -278,11 +278,11 @@ def create_dag(
     :param bq_worksid_table_name: table ID of the worksid table
     :param bq_worksid_error_table_name: table ID of the worksid error table
     :param bq_workfamilyid_table_name: table ID of the workfamilyid table
-    :param oaebu_intermediate_match_suffix: Suffix to append to intermediate tables
     :param skip_downloading_crossref_events: skip fetching new data for Crossref Events, when True, falls back to using
     a previous version of the table.
 
     :param data_partners: OAEBU data sources.
+    :param bespoke_data_partners: Dictionary-defined OAEBU Data Partners
     :param ga3_views_field: The name of the GA3 views field - should be either 'page_views' or 'unique_views'
     :param schema_folder: the SQL schema path.
     :param mailto: email address used to identify the user when sending requests to an API.
@@ -306,6 +306,8 @@ def create_dag(
 
     metadata_partner = partner_from_str(metadata_partner, metadata_partner=True)
     data_partners = [partner_from_str(p) for p in data_partners]
+    if bespoke_data_partners:
+        data_partners.extend(create_bespoke_data_partners(bespoke_data_partners))
 
     # Create pool for crossref API calls (if they don't exist)
     # Pools are necessary to throttle the maxiumum number of requests we can make per second and avoid 429 errors
@@ -590,39 +592,26 @@ def create_dag(
             set_task_state(status, context["ti"].task_id, release=release)
 
         @task_group(group_id="intermediate_tables")
-        def create_tasks_intermediate_tables(release: dict):
+        def _create_tasks_intermediate_tables(release: dict):
             tasks = []
             for data_partner in data_partners:
-                task = create_intermediate_table.override(task_id=f"intermediate_{data_partner.bq_table_name}")(
-                    release,
-                    orig_project_id=cloud_workspace.project_id,
-                    orig_dataset=data_partner.bq_dataset_id,
-                    orig_table=data_partner.bq_table_name,
-                    orig_isbn=data_partner.isbn_field_name,
-                    sharded=data_partner.sharded,
+                task = _create_intermediate_table.override(task_id=f"intermediate_{data_partner.type_id}")(
+                    release, data_partner=data_partner
                 )
                 tasks.append(task)
             chain(tasks)
 
         @task()
-        def create_intermediate_table(
+        def _create_intermediate_table(
             release: dict,
             *,
-            orig_project_id: str,
-            orig_dataset: str,
-            orig_table: str,
-            orig_isbn: str,
-            sharded: bool,
+            data_partner: DataPartner,
             **context,
         ) -> None:
-            """Create an intermediate oaebu table.  They are of the form datasource_matched<date>
+            """Create an intermediate oaebu table.  They are of the form type_id_matched<date>
 
             :param release: Onix workflow release information.
-            :param orig_project_id: Project ID for the partner data.
-            :param orig_dataset: Dataset ID for the partner data.
-            :param orig_table: Table ID for the partner data.
-            :param orig_isbn: Name of the ISBN field in the partner data table.
-            :param sharded: Whether the data partner table is sharded
+            :param data_partner: The data partner object for the data source.
             """
 
             release = OnixWorkflowRelease.from_dict(release)
@@ -632,44 +621,27 @@ def create_dag(
                 location=cloud_workspace.data_location,
                 description="Intermediate OAEBU Tables",
             )
-            orig_table_id = (
-                bq_sharded_table_id(orig_project_id, orig_dataset, orig_table, release.snapshot_date)
-                if sharded
-                else bq_table_id(orig_project_id, orig_dataset, orig_table)
-            )
-            output_table_name = f"{orig_table}{oaebu_intermediate_match_suffix}"
-            template_path = os.path.join(
-                sql_folder(workflow_module="onix_workflow"), "assign_workid_workfamilyid.sql.jinja2"
-            )
-            output_table_id = bq_sharded_table_id(
-                cloud_workspace.project_id,
-                bq_oaebu_intermediate_dataset,
-                output_table_name,
-                release.snapshot_date,
-            )
-            wid_table_id = bq_sharded_table_id(
+            bq_worksid_table_id = bq_sharded_table_id(
                 cloud_workspace.project_id,
                 bq_onix_workflow_dataset,
                 bq_worksid_table_name,
                 release.snapshot_date,
             )
-            wfam_table_id = bq_sharded_table_id(
+            bq_workfamily_table_id = bq_sharded_table_id(
                 cloud_workspace.project_id,
                 bq_onix_workflow_dataset,
                 bq_workfamilyid_table_name,
                 release.snapshot_date,
             )
 
-            # Make the table from SQL query
-            client = Client(project=cloud_workspace.project_id)
-            sql = render_template(
-                template_path,
-                orig_table_id=orig_table_id,
-                orig_isbn=orig_isbn,
-                wid_table_id=wid_table_id,
-                wfam_table_id=wfam_table_id,
+            status = create_intermediate_table(
+                data_partner=data_partner,
+                project_id=cloud_workspace.project_id,
+                bq_output_dataset=bq_oaebu_intermediate_dataset,
+                bq_worksid_table_id=bq_worksid_table_id,
+                bq_workfamily_table_id=bq_workfamily_table_id,
+                snapshot_date=release.snapshot_date,
             )
-            status = bq_create_table_from_query(sql=sql, table_id=output_table_id, client=client)
             set_task_state(status, context["ti"].task_id, release=release)
 
         @task()
@@ -686,11 +658,11 @@ def create_dag(
 
             # Data partner table names
             dp_tables = {
-                f"{dp.type_id}_table_id": bq_sharded_table_id(
-                    cloud_workspace.project_id,
-                    bq_oaebu_intermediate_dataset,
-                    f"{dp.type_id}_matched",
-                    release.snapshot_date,
+                f"{dp.type_id}_table_id": bq_intermediate_table_id(
+                    project_id=cloud_workspace.project_id,
+                    bq_intermediate_dataset=bq_oaebu_intermediate_dataset,
+                    dp_type_id=dp.type_id,
+                    snapshot_date=release.snapshot_date,
                 )
                 for dp in data_partners
             }
@@ -1056,7 +1028,7 @@ def create_dag(
         task_create_crossref_metadata_table = create_crossref_metadata_table(xcom_release)
         task_create_crossref_events_table = create_crossref_events_table(xcom_release)
         task_create_book_table = create_book_table(xcom_release)
-        task_group_create_intermediate_tables = create_tasks_intermediate_tables(xcom_release)
+        task_group_create_intermediate_tables = _create_tasks_intermediate_tables(xcom_release)
         task_create_book_product_table = create_book_product_table(xcom_release)
         task_group_create_export_tables = create_tasks_export_tables(xcom_release)
         task_update_latest_export_tables = update_latest_export_tables(xcom_release)
@@ -1080,6 +1052,65 @@ def create_dag(
         )
 
     return onix_workflow()
+
+
+def create_intermediate_table(
+    data_partner: DataPartner,
+    project_id: str,
+    bq_output_dataset: str,
+    bq_worksid_table_id: str,
+    bq_workfamily_table_id: str,
+    snapshot_date: str,
+) -> bool:
+    """Create an intermediate oaebu table from a data partner.
+
+    :param data_partner: The data partner object for the data source.
+    :param project_id: Project ID for the partner data.
+    :param bq_worksid_table_id: The ID of the worksid table
+    :param bq_workfamily_table_id: The ID of the workfamily table
+    :param snapshot_date: The snapshot date to use
+    :param bq_output_dataset: The name of the dataset to output the resulting table
+    :return: Whether the operation was successful
+    """
+
+    if data_partner.sharded:
+        orig_table_id = bq_sharded_table_id(
+            project_id, data_partner.bq_dataset_id, data_partner.bq_table_name, snapshot_date
+        )
+    else:
+        orig_table_id = bq_table_id(project_id, data_partner.bq_dataset_id, data_partner.bq_table_name)
+    output_table_id = bq_intermediate_table_id(
+        project_id=project_id,
+        bq_intermediate_dataset=bq_output_dataset,
+        dp_type_id=data_partner.type_id,
+        snapshot_date=snapshot_date,
+    )
+    template_path = os.path.join(sql_folder(workflow_module="onix_workflow"), "assign_workid_workfamilyid.sql.jinja2")
+
+    # Make the table from SQL query
+    client = Client(project=project_id)
+    sql = render_template(
+        template_path,
+        orig_table_id=orig_table_id,
+        orig_isbn=data_partner.isbn_field_name,
+        wid_table_id=bq_worksid_table_id,
+        wfam_table_id=bq_workfamily_table_id,
+    )
+    status = bq_create_table_from_query(sql=sql, table_id=output_table_id, client=client)
+    return status
+
+
+def bq_intermediate_table_id(project_id: str, bq_intermediate_dataset: str, dp_type_id: str, snapshot_date: str) -> str:
+    """
+    Generates a table ID for a given data partner type ID
+
+    :param project_id: The project ID
+    :param dp_type_id: The type ID of the data partner
+    :param snapshot_date: The stringified snapshot date
+    :param bq_intermediate_dataset: The 'intermediate' dateset name
+    :return: The data partner's intermediate table ID
+    """
+    return bq_sharded_table_id(project_id, bq_intermediate_dataset, f"{dp_type_id}_matched", snapshot_date)
 
 
 def get_doi_prefixes(dois: Iterable[str]) -> set[str]:

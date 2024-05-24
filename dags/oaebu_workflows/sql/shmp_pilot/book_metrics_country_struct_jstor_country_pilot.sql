@@ -1,0 +1,1 @@
+STRUCT(jstor_country_pilot.Total_Item_Requests) as jstor_country_pilot

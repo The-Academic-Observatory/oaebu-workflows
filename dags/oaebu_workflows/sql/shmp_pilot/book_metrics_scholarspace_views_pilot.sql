@@ -1,0 +1,1 @@
+STRUCT(month.scholarspace_views_pilot.value) AS scholarspace_views_pilot

@@ -22,6 +22,7 @@ from oaebu_workflows.oaebu_partners import (
     OaebuPartner,
     DataPartner,
     partner_from_str,
+    create_bespoke_data_partner,
     OAEBU_DATA_PARTNERS,
     OAEBU_METADATA_PARTNERS,
 )
@@ -42,7 +43,7 @@ MOCK_DATA_PARTNERS = {
         export_book_metrics=True,
         export_country=True,
         export_subject=True,
-        has_metdata=True,
+        has_metadata=True,
     )
 }
 MOCK_METADATA_PARTNERS = {
@@ -83,3 +84,63 @@ class TestPartnerFromStr(unittest.TestCase):
         # Call the function with a valid metadata partner but without the flag
         with self.assertRaisesRegex(KeyError, "Partner not found: md_partner"):
             partner_from_str("md_partner", metadata_partner=False)
+
+
+class TestBespokePartner(unittest.TestCase):
+    def test_valid_case(self):
+        """Test that no errors are raised when a valid input is supplied"""
+        input = {
+            "type_id": "type_id",
+            "bq_dataset_id": "bq_dataset_id",
+            "bq_table_name": "bq_table_name",
+            "isbn_field_name": "isbn_field_name",
+            "title_field_name": "title_field_name",
+            "sharded": True,
+            "schema_path": "schema_path",
+            "schema_directory": "schema_directory",
+            "sql_directory": "sql_directory",
+            "book_product_functions": "book_product_functions",
+            "export_author": False,
+            "export_book_metrics": False,
+            "export_country": False,
+            "export_subject": False,
+            "has_metadata": True,
+        }
+        expected_output = DataPartner(**input)
+        actual_output = create_bespoke_data_partner(input)
+        self.assertEqual(expected_output, actual_output)
+
+    def test_missing_required(self):
+        """Test that an error is raised when an input is missing a required parameter"""
+        input = {
+            "export_author": False,
+            "export_book_metrics": False,
+            "export_country": False,
+            "export_subject": False,
+            "has_metadata": True,
+        }
+        with self.assertRaisesRegex(NameError, "Missing required parameters"):
+            create_bespoke_data_partner(input)
+
+    def test_unrecognised_input(self):
+        """Test that an error is raised when an unrecognised parameter is supplied"""
+        input = {
+            "type_id": "type_id",
+            "bq_dataset_id": "bq_dataset_id",
+            "bq_table_name": "bq_table_name",
+            "isbn_field_name": "isbn_field_name",
+            "title_field_name": "title_field_name",
+            "sharded": True,
+            "schema_path": "schema_path",
+            "schema_directory": "schema_directory",
+            "sql_directory": "sql_directory",
+            "book_product_functions": "book_product_functions",
+            "export_author": False,
+            "export_book_metrics": False,
+            "export_country": False,
+            "export_subject": False,
+            "has_metadata": True,
+            "unrecognised_argument": "foo",
+        }
+        with self.assertRaisesRegex(NameError, "Unrecognised arguments supplied"):
+            create_bespoke_data_partner(input)

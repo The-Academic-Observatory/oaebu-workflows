@@ -1,0 +1,11 @@
+amazon_ltd_pilot_metrics as (
+    SELECT
+        ISBN13,
+        release_date,
+        STRUCT(SUM(value) as value) as metrics,
+    FROM
+        `{{ amazon_ltd_pilot_table_id }}`
+    GROUP BY
+        ISBN13,
+        release_date
+)

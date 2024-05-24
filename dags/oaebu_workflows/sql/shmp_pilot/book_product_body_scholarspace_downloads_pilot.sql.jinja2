@@ -1,0 +1,11 @@
+scholarspace_downloads_pilot_metrics as (
+    SELECT
+        ISBN13,
+        release_date,
+        STRUCT(SUM(value) as value) as metrics,
+    FROM
+        `{{ scholarspace_downloads_pilot_table_id }}`
+    GROUP BY
+        ISBN13,
+        release_date
+)

@@ -1,0 +1,15 @@
+{
+  "fields": [
+    {
+      "mode": "NULLABLE",
+      "name": "Total_Item_Requests",
+      "type": "INTEGER",
+      "description": "Total number of item requests"
+    }
+  ],
+  "mode": "NULLABLE",
+  "name": "jstor_country_pilot",
+  "type": "RECORD",
+  "description": "Metrics from JSTOR"
+}
+

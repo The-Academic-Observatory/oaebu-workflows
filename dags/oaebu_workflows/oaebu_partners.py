@@ -1,4 +1,3 @@
-# Copyright 2020-2024 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +15,8 @@
 # Author: Tuan Chien, Keegan Smith
 
 import os
-from typing import Union
+import inspect
+from typing import Union, List, Dict
 from dataclasses import dataclass
 
 from oaebu_workflows.config import schema_folder, sql_folder
@@ -113,11 +113,11 @@ class DataPartner(OaebuPartner):
         schema_directory: str,
         sql_directory: str,
         book_product_functions: str,
-        export_author: bool,
-        export_book_metrics: bool,
-        export_country: bool,
-        export_subject: bool,
-        has_metdata: bool = True,
+        export_author: bool = False,
+        export_book_metrics: bool = False,
+        export_country: bool = False,
+        export_subject: bool = False,
+        has_metadata: bool = True,
     ):
         """
         Initialises the class. Also uses the DataPartnerFiles class to set up the file names.
@@ -129,7 +129,7 @@ class DataPartner(OaebuPartner):
         :param export_book_metrics: Indicates if the partner will use the book metrics export table.
         :param export_country: Indicates if the partner will use the country export table.
         :param export_subject: Indicates if the partner will use the subject export tables (bic, bisac, thema).
-        :param has_metdata: Whether the partner has book metadata records
+        :param has_metadata: Whether the partner has book metadata records
         """
         super().__init__(
             type_id=type_id,
@@ -147,7 +147,7 @@ class DataPartner(OaebuPartner):
         self.export_book_metrics = export_book_metrics
         self.export_country = export_country
         self.export_subject = export_subject
-        self.has_metadata = has_metdata
+        self.has_metadata = has_metadata
         self.files = DataPartnerFiles(partner_name=self.type_id)
 
 
@@ -206,7 +206,7 @@ OAEBU_DATA_PARTNERS = dict(
         export_book_metrics=True,
         export_country=True,
         export_subject=True,
-        has_metdata=False,
+        has_metadata=False,
     ),
     google_books_sales=DataPartner(
         type_id="google_books_sales",
@@ -407,3 +407,44 @@ def partner_from_str(partner: Union[str, OaebuPartner], metadata_partner: bool =
         raise KeyError(f"Partner not found: {partner}").with_traceback(e.__traceback__)
 
     return partner
+
+
+def create_bespoke_data_partners(partners: List[Dict]) -> List[DataPartner]:
+    return [create_bespoke_data_partner(p) for p in partners]
+
+
+def create_bespoke_data_partner(partner_dict: dict) -> DataPartner:
+    """Converts a dictionary description of a partner to a DataPartner object
+
+    :param partner: The dictionary description of the partner. Should have all required fields as per the DataPartner
+        object description
+    """
+
+    # Get the required parameters of the DataPartner class
+    # https://docs.python.org/3/library/inspect.html#inspect.Parameter.kind
+    required_params = []
+    dp_params = inspect.signature(DataPartner.__init__).parameters
+    for k, v in dp_params.items():
+        if k == "self":  # Ignore the "self" parameter
+            continue
+        if v.default is v.empty:
+            required_params.append(k)
+
+    present_params = list(partner_dict.keys())
+    missing_params = []
+    for p in required_params:
+        if p not in present_params:
+            missing_params.append(p)
+    if missing_params:
+        raise NameError(f"Missing required parameters for DataPartner class: {missing_params}")
+
+    undefined_params = []
+    all_params = list(k for k in dp_params.keys() if k != "self")
+    print(all_params)
+    for p in partner_dict.keys():
+        if p not in all_params:
+            undefined_params.append(p)
+    if undefined_params:
+        raise NameError(f"Unrecognised arguments supplied to DataPartner class: {undefined_params}")
+
+    return DataPartner(**partner_dict)

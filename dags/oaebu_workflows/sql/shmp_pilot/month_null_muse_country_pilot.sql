@@ -1,0 +1,1 @@
+ARRAY_LENGTH(month.muse_country_pilot) > 0
