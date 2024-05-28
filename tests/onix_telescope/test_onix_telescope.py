@@ -135,6 +135,7 @@ class TestOnixTelescope(SandboxTestCase):
                 sftp_root="/",
                 date_regex=self.date_regex,
                 metadata_partner=metadata_partner,
+                elevate_related_products=True,
                 sftp_service_conn_id=sftp_service_conn_id,
                 api_dataset_id=api_dataset_id,
             )
@@ -179,7 +180,7 @@ class TestOnixTelescope(SandboxTestCase):
                 # Test download
                 ti = env.run_task("process_release.download", map_index=0)
                 self.assertEqual(ti.state, State.SUCCESS)
-                self.assert_file_integrity(release.download_path, "28f85c488ab01b0cff769d9da6b4be24", "md5")
+                self.assert_file_integrity(release.download_path, "02e81f8c19442a64f0c947510f9e1c7b", "md5")
                 self.assert_blob_integrity(
                     env.download_bucket, gcs_blob_name_from_path(release.download_path), release.download_path
                 )
@@ -187,7 +188,7 @@ class TestOnixTelescope(SandboxTestCase):
                 # Test transform
                 ti = env.run_task("process_release.transform", map_index=0)
                 self.assertEqual(ti.state, State.SUCCESS)
-                self.assert_file_integrity(release.transform_path, "2164a300", "gzip_crc")
+                self.assert_file_integrity(release.transform_path, "ac9643dd", "gzip_crc")
                 self.assert_blob_integrity(
                     env.transform_bucket, gcs_blob_name_from_path(release.transform_path), release.transform_path
                 )
@@ -201,7 +202,7 @@ class TestOnixTelescope(SandboxTestCase):
                     metadata_partner.bq_table_name,
                     release.snapshot_date,
                 )
-                self.assert_table_integrity(table_id, expected_rows=1)
+                self.assert_table_integrity(table_id, expected_rows=2)
                 self.assert_table_content(table_id, load_and_parse_json(self.onix_json_path), primary_key="ISBN13")
 
                 # Test move files to finished

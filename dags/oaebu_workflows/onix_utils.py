@@ -131,6 +131,8 @@ class OnixTransformer:
         5) Construct the Contributor.PersonName and Contributor.InvertedPersonName fields where possible
         6) Parse through the java parser to return .jsonl format - This is always done
         7) Collapse subjects into semicolon-separated strings
+
+        :return: The path to the transformed metadata file
         """
         settings = []
         if self.filter_products:
