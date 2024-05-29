@@ -369,11 +369,24 @@ def create_dag(
 
                 release = JstorRelease.from_dict(release)
                 client = Client(project=cloud_workspace.project_id)
-                api = DatasetAPI(project_id=cloud_workspace.project_id, dataset_id=api_dataset_id, client=client)
+                api = DatasetAPI(bq_project_id=cloud_workspace.project_id, bq_dataset_id=api_dataset_id, client=client)
                 api.seed_db()
+                # JSTOR country
                 dataset_release = DatasetRelease(
                     dag_id=dag_id,
-                    dataset_id=api_dataset_id,
+                    entity_id="jstor_country",
+                    dag_run_id=release.run_id,
+                    created=pendulum.now(),
+                    modified=pendulum.now(),
+                    data_interval_start=release.data_interval_start,
+                    data_interval_end=release.data_interval_end,
+                    partition_date=release.partition_date,
+                )
+                api.add_dataset_release(dataset_release)
+                # JSTOR insitution
+                dataset_release = DatasetRelease(
+                    dag_id=dag_id,
+                    entity_id="jstor_institution",
                     dag_run_id=release.run_id,
                     created=pendulum.now(),
                     modified=pendulum.now(),

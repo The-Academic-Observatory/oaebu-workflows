@@ -327,11 +327,24 @@ def create_dag(
 
                 release = GoogleBooksRelease.from_dict(release)
                 client = Client(project=cloud_workspace.project_id)
-                api = DatasetAPI(project_id=cloud_workspace.project_id, dataset_id=api_dataset_id, client=client)
+                api = DatasetAPI(bq_project_id=cloud_workspace.project_id, bq_dataset_id=api_dataset_id, client=client)
                 api.seed_db()
+                # Google Books sales
                 dataset_release = DatasetRelease(
                     dag_id=dag_id,
-                    dataset_id=api_dataset_id,
+                    entity_id="google_books_sales",
+                    dag_run_id=release.run_id,
+                    created=pendulum.now(),
+                    modified=pendulum.now(),
+                    data_interval_start=context["data_interval_start"],
+                    data_interval_end=context["data_interval_end"],
+                    partition_date=release.partition_date,
+                )
+                # Google Books traffic
+                api.add_dataset_release(dataset_release)
+                dataset_release = DatasetRelease(
+                    dag_id=dag_id,
+                    entity_id="google_books_traffic",
                     dag_run_id=release.run_id,
                     created=pendulum.now(),
                     modified=pendulum.now(),

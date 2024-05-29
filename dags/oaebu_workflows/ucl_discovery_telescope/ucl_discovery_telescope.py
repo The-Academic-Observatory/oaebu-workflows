@@ -303,11 +303,11 @@ def create_dag(
 
             release = UclDiscoveryRelease.from_dict(release)
             client = Client(project=cloud_workspace.project_id)
-            api = DatasetAPI(project_id=cloud_workspace.project_id, dataset_id=api_dataset_id, client=client)
+            api = DatasetAPI(bq_project_id=cloud_workspace.project_id, bq_dataset_id=api_dataset_id, client=client)
             api.seed_db()
             dataset_release = DatasetRelease(
                 dag_id=dag_id,
-                dataset_id=api_dataset_id,
+                entity_id="ucl_discovery",
                 dag_run_id=release.run_id,
                 created=pendulum.now(),
                 modified=pendulum.now(),
