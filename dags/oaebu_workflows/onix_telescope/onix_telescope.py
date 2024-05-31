@@ -17,6 +17,7 @@
 import logging
 import os
 import re
+import shutil
 from typing import List, Union
 
 import pendulum
@@ -25,13 +26,12 @@ from airflow.exceptions import AirflowException, AirflowSkipException
 from google.cloud.bigquery import Client, SourceFormat
 
 from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
-from oaebu_workflows.onix_utils import collapse_subjects, onix_parser_download, onix_parser_execute
+from oaebu_workflows.onix_utils import OnixTransformer
 from observatory_platform.airflow.airflow import on_failure_callback
 from observatory_platform.airflow.release import set_task_state, SnapshotRelease
 from observatory_platform.airflow.tasks import check_dependencies
 from observatory_platform.airflow.workflow import cleanup, CloudWorkspace
 from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
-from observatory_platform.files import load_jsonl, save_jsonl_gz
 from observatory_platform.google.bigquery import bq_create_dataset, bq_load_table, bq_sharded_table_id
 from observatory_platform.google.gcs import gcs_blob_name_from_path, gcs_blob_uri, gcs_download_blob, gcs_upload_files
 from observatory_platform.sftp import make_sftp_connection, SftpFolders
@@ -104,6 +104,7 @@ def create_dag(
     date_regex: str,
     sftp_root: str = "/",
     metadata_partner: Union[str, OaebuPartner] = "onix",
+    elevate_related_products: bool = False,
     bq_dataset_description: str = "ONIX data provided by Org",
     bq_table_description: str = None,
     api_dataset_id: str = "dataset_api",
@@ -120,6 +121,7 @@ def create_dag(
     :param cloud_workspace: The CloudWorkspace object for this DAG
     :param sftp_root: The working root of the SFTP server, passed to the SftoFolders class
     :param metadata_partner: The metadata partner name
+    :param elevate_related_products: Whether to pull out the related products into their own product field
     :param date_regex: Regular expression for extracting a date string from an ONIX file name
     :param bq_dataset_description: Description for the BigQuery dataset
     :param bq_table_description: Description for the biguery table
@@ -215,10 +217,6 @@ def create_dag(
 
                 release = OnixRelease.from_dict(release)
 
-                # Download the parser
-                success, parser_path = onix_parser_download()
-                set_task_state(success, context["ti"].task_id)
-
                 # Download files from GCS
                 success = gcs_download_blob(
                     bucket_name=cloud_workspace.download_bucket,
@@ -228,11 +226,15 @@ def create_dag(
                 if not success:
                     raise FileNotFoundError(f"Error downloading file {release.download_blob_name}")
 
-                onix_parser_execute(
-                    parser_path=parser_path, input_dir=release.download_folder, output_dir=release.transform_folder
+                transformer = OnixTransformer(
+                    input_path=release.download_path,
+                    output_dir=release.transform_folder,
+                    elevate_related_products=elevate_related_products,
+                    collapse_subjects=True,
+                    save_format="jsonl.gz",
                 )
-                onix = collapse_subjects(load_jsonl(release.parsed_path))
-                save_jsonl_gz(release.transform_path, onix)
+                md_file = transformer.transform()
+                shutil.move(md_file, release.transform_path)
                 success = gcs_upload_files(
                     bucket_name=cloud_workspace.transform_bucket, file_paths=[release.transform_path]
                 )
