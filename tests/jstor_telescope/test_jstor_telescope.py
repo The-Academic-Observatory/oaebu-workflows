@@ -352,6 +352,24 @@ class TestJstorTelescopePublisher(SandboxTestCase):
                 self.assertEqual(ti.state, State.SUCCESS)
                 dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="jstor_country")
                 self.assertEqual(len(dataset_releases), 1)
+                expected_release = { "dag_id": dag_id,
+                        "entity_id": "jstor_country",
+                        "dag_run_id": release.run_id,
+                        # Replace Z shorthand because BQ converts it to +00:00
+                        "created": now.to_iso8601_string().replace("Z", "+00:00"),
+                        "modified": now.to_iso8601_string().replace("Z", "+00:00"),
+                        "data_interval_start": "2022-07-01T00:00:00+00:00",
+                        "data_interval_end": "2022-08-01T00:00:00+00:00",
+                        "snapshot_date": None,
+                        "partition_date": "2022-07-31T00:00:00+00:00",
+                        "changefile_start_date": None,
+                        "changefile_end_date": None,
+                        "sequence_start": None,
+                        "sequence_end": None,
+                        "extra": {},
+                    },
+                self.assertEqual(dataset_releases[0].to_dict(), expected_release)
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="jstor_country")
                 expected_release = {
                     "dag_id": dag_id,
                     "entity_id": "jstor_country",
@@ -629,6 +647,24 @@ class TestJstorTelescopeCollection(SandboxTestCase):
                 self.assertEqual(ti.state, State.SUCCESS)
                 dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="jstor_country")
                 self.assertEqual(len(dataset_releases), 1)
+                expected_release = { "dag_id": dag_id,
+                        "entity_id": "jstor_country",
+                        "dag_run_id": release.run_id,
+                        # Replace Z shorthand because BQ converts it to +00:00
+                        "created": now.to_iso8601_string().replace("Z", "+00:00"),
+                        "modified": now.to_iso8601_string().replace("Z", "+00:00"),
+                        "data_interval_start": "2022-07-01T00:00:00+00:00",
+                        "data_interval_end": "2022-08-01T00:00:00+00:00",
+                        "snapshot_date": None,
+                        "partition_date": "2022-07-31T00:00:00+00:00",
+                        "changefile_start_date": None,
+                        "changefile_end_date": None,
+                        "sequence_start": None,
+                        "sequence_end": None,
+                        "extra": {},
+                    },
+                self.assertEqual(dataset_releases[0].to_dict(), expected_release)
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="jstor_country")
                 expected_release = {
                     "dag_id": dag_id,
                     "entity_id": "jstor_country",
