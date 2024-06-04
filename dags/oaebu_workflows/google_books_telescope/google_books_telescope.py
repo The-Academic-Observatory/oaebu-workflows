@@ -119,7 +119,7 @@ def create_dag(
     bq_dataset_description: str = "Data from Google sources",
     bq_sales_table_description: str = None,
     bq_traffic_table_description: str = None,
-    api_dataset_id: str = "dataset_api",
+    api_bq_dataset_id: str = "dataset_api",
     sftp_service_conn_id: str = "sftp_service",
     catchup: bool = False,
     schedule: str = "0 12 * * Sun",  # Midday every sunday
@@ -137,7 +137,7 @@ def create_dag(
     :param bq_dataset_description: Description for the BigQuery dataset
     :param bq_sales_table_description: Description for the BigQuery Google Books Sales table
     :param bq_traffic_table_description: Description for the BigQuery Google Books Traffic table
-    :param api_dataset_id: The name of the Bigquery dataset to store the API release(s)
+    :param api_bq_dataset_id: The name of the Bigquery dataset to store the API release(s)
     :param sftp_service_conn_id: Airflow connection ID for the SFTP service
     :param catchup: Whether to catchup the DAG or not
     :param schedule: The schedule interval of the DAG
@@ -327,7 +327,9 @@ def create_dag(
 
                 release = GoogleBooksRelease.from_dict(release)
                 client = Client(project=cloud_workspace.project_id)
-                api = DatasetAPI(bq_project_id=cloud_workspace.project_id, bq_dataset_id=api_dataset_id, client=client)
+                api = DatasetAPI(
+                    bq_project_id=cloud_workspace.project_id, bq_dataset_id=api_bq_dataset_id, client=client
+                )
                 api.seed_db()
                 # Google Books sales
                 dataset_release = DatasetRelease(

@@ -135,7 +135,7 @@ class TestGoogleBooksTelescope(SandboxTestCase):
                 traffic_partner.bq_dataset_id = dataset_id
                 sftp_service_conn_id = "sftp_service"
                 dag_id = "google_books_test"
-                api_dataset_id = env.add_dataset()
+                api_bq_dataset_id = env.add_dataset()
                 dag = create_dag(
                     dag_id=dag_id,
                     cloud_workspace=env.cloud_workspace,
@@ -143,7 +143,7 @@ class TestGoogleBooksTelescope(SandboxTestCase):
                     sales_partner=sales_partner,
                     traffic_partner=traffic_partner,
                     sftp_service_conn_id=sftp_service_conn_id,
-                    api_dataset_id=api_dataset_id,
+                    api_bq_dataset_id=api_bq_dataset_id,
                 )
 
                 # Add SFTP connection
@@ -263,9 +263,11 @@ class TestGoogleBooksTelescope(SandboxTestCase):
                     self.assert_table_integrity(table_id, params["bq_rows"])
 
                     # Set up the API and check
-                    api = DatasetAPI(project_id=self.project_id, dataset_id=api_dataset_id)
+                    api = DatasetAPI(bq_project_id=self.project_id, bq_dataset_id=api_bq_dataset_id)
                     api.seed_db()
-                    dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
+                    dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="google_books_sales")
+                    self.assertEqual(len(dataset_releases), 0)
+                    dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="google_books_traffic")
                     self.assertEqual(len(dataset_releases), 0)
 
                     # Add_dataset_release_task
@@ -276,26 +278,43 @@ class TestGoogleBooksTelescope(SandboxTestCase):
                         mock_now.return_value = now
                         ti = env.run_task("process_release.add_new_dataset_release", map_index=0)
                     self.assertEqual(ti.state, State.SUCCESS)
-                    dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
+                    dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="google_books_sales")
                     self.assertEqual(len(dataset_releases), 1)
                     expected_release = {
-                        "dag_id": dag_id,
-                        "dataset_id": api_dataset_id,
-                        "dag_run_id": release.run_id,
-                        # Replace Z shorthand because BQ converts it to +00:00
-                        "created": now.to_iso8601_string().replace("Z", "+00:00"),
-                        "modified": now.to_iso8601_string().replace("Z", "+00:00"),
-                        "data_interval_start": "2021-03-31T00:00:00+00:00",
-                        "data_interval_end": "2021-04-04T12:00:00+00:00",
-                        "snapshot_date": None,
-                        "partition_date": "2020-02-29T00:00:00+00:00",
-                        "changefile_start_date": None,
-                        "changefile_end_date": None,
-                        "sequence_start": None,
-                        "sequence_end": None,
-                        "extra": {},
-                    }
-                    self.assertEqual(expected_release, dataset_releases[0].to_dict())
+                            "dag_id": dag_id,
+                            "entity_id": "google_books_sales",
+                            "dag_run_id": release.run_id,
+                            # Replace Z shorthand because BQ converts it to +00:00
+                            "created": now.to_iso8601_string().replace("Z", "+00:00"),
+                            "modified": now.to_iso8601_string().replace("Z", "+00:00"),
+                            "data_interval_start": "2021-03-31T00:00:00+00:00",
+                            "data_interval_end": "2021-04-04T12:00:00+00:00",
+                            "snapshot_date": None,
+                            "partition_date": "2020-02-29T00:00:00+00:00",
+                            "changefile_start_date": None,
+                            "changefile_end_date": None,
+                            "sequence_start": None,
+                            "sequence_end": None,
+                            "extra": {},
+                        }
+                    self.assertEqual(dataset_releases.to_dict(), expected_release)
+                    expected_release = { 
+                            "dag_id": dag_id,
+                            "entity_id": "google_books_traffic",
+                            "dag_run_id": release.run_id,
+                            "created": now.to_iso8601_string().replace("Z", "+00:00"),
+                            "modified": now.to_iso8601_string().replace("Z", "+00:00"),
+                            "data_interval_start": "2021-03-31T00:00:00+00:00",
+                            "data_interval_end": "2021-04-04T12:00:00+00:00",
+                            "snapshot_date": None,
+                            "partition_date": "2020-02-29T00:00:00+00:00",
+                            "changefile_start_date": None,
+                            "changefile_end_date": None,
+                            "sequence_start": None,
+                            "sequence_end": None,
+                            "extra": {},
+                        }
+                    self.assertEqual(dataset_releases.to_dict(), expected_release)
 
                     # Test cleanup
                     workflow_folder_path = release.workflow_folder

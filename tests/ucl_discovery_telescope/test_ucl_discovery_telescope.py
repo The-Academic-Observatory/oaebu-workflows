@@ -95,14 +95,14 @@ class TestUclDiscoveryTelescope(SandboxTestCase):
         data_partner = partner_from_str("ucl_discovery")
         data_partner.bq_dataset_id = env.add_dataset()
         dag_id = "ucl_discovery"
-        api_dataset_id = env.add_dataset()
+        api_bq_dataset_id = env.add_dataset()
         dag = create_dag(
             dag_id=dag_id,
             cloud_workspace=env.cloud_workspace,
             sheet_id="foo",
             data_partner=data_partner,
             max_threads=1,
-            api_dataset_id=api_dataset_id,
+            api_bq_dataset_id=api_bq_dataset_id,
         )
         execution_date = pendulum.datetime(year=2023, month=6, day=1)
 
@@ -211,9 +211,9 @@ class TestUclDiscoveryTelescope(SandboxTestCase):
             ###################
 
             # Set up the API
-            api = DatasetAPI(project_id=env.cloud_workspace.project_id, dataset_id=api_dataset_id)
+            api = DatasetAPI(bq_project_id=env.cloud_workspace.project_id, bq_dataset_id=api_bq_dataset_id)
             api.seed_db()
-            dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
+            dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="ucl_discovery")
             self.assertEqual(len(dataset_releases), 0)
 
             # Add_dataset_release_task
@@ -222,11 +222,11 @@ class TestUclDiscoveryTelescope(SandboxTestCase):
                 mock_now.return_value = now
                 ti = env.run_task("add_new_dataset_releases")
             self.assertEqual(ti.state, State.SUCCESS)
-            dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
+            dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="ucl_discovery")
             self.assertEqual(len(dataset_releases), 1)
             expected_release = {
                 "dag_id": dag_id,
-                "dataset_id": api_dataset_id,
+                "entity_id": "ucl_discovery",
                 "dag_run_id": release.run_id,
                 # Replace Z shorthand because BQ converts it to +00:00
                 "created": now.to_iso8601_string().replace("Z", "+00:00"),

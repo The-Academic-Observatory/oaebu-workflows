@@ -21,7 +21,6 @@ from unittest.mock import patch
 import pendulum
 from airflow.models import Connection
 from airflow.utils.state import State
-from google.cloud.bigquery import Client
 
 from oaebu_workflows.onix_telescope.onix_telescope import OnixRelease, create_dag
 from oaebu_workflows.oaebu_partners import partner_from_str
@@ -126,7 +125,7 @@ class TestOnixTelescope(SandboxTestCase):
             execution_date = pendulum.datetime(year=2021, month=3, day=31)
             metadata_partner = partner_from_str("onix", metadata_partner=True)
             metadata_partner.bq_dataset_id = env.add_dataset()
-            api_dataset_id = env.add_dataset()
+            api_bq_dataset_id = env.add_dataset()
             sftp_service_conn_id = "sftp_service"
             dag_id = "onix_telescope_test"
             dag = create_dag(
@@ -137,7 +136,7 @@ class TestOnixTelescope(SandboxTestCase):
                 metadata_partner=metadata_partner,
                 elevate_related_products=True,
                 sftp_service_conn_id=sftp_service_conn_id,
-                api_dataset_id=api_dataset_id,
+                api_bq_dataset_id=api_bq_dataset_id,
             )
 
             # Add SFTP connection
@@ -213,9 +212,9 @@ class TestOnixTelescope(SandboxTestCase):
                 self.assertTrue(os.path.isfile(finished_path))
 
                 # Set up the API
-                api = DatasetAPI(project_id=self.project_id, dataset_id=api_dataset_id)
+                api = DatasetAPI(bq_project_id=self.project_id, bq_dataset_id=api_bq_dataset_id)
                 api.seed_db()
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="onix")
                 self.assertEqual(len(dataset_releases), 0)
 
                 # Set up the API
@@ -224,11 +223,11 @@ class TestOnixTelescope(SandboxTestCase):
                     mock_now.return_value = now
                     ti = env.run_task("process_release.add_new_dataset_releases", map_index=0)
                 self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="onix")
                 self.assertEqual(len(dataset_releases), 1)
                 expected_release = {
                     "dag_id": dag_id,
-                    "dataset_id": api_dataset_id,
+                    "entity_id": "onix",
                     "dag_run_id": release.run_id,
                     # Replace Z shorthand because BQ converts it to +00:00
                     "created": now.to_iso8601_string().replace("Z", "+00:00"),

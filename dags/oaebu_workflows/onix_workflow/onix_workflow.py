@@ -241,7 +241,7 @@ def create_dag(
     schema_folder: str = default_schema_folder(workflow_module="onix_workflow"),
     mailto: str = "agent@observatory.academy",
     crossref_start_date: pendulum.DateTime = pendulum.datetime(2018, 5, 14),
-    api_dataset_id: str = "dataset_api",
+    api_bq_dataset_id: str = "dataset_api",
     # Ariflow parameters
     sensor_dag_ids: List[str] = None,
     catchup: Optional[bool] = False,
@@ -287,7 +287,7 @@ def create_dag(
     :param schema_folder: the SQL schema path.
     :param mailto: email address used to identify the user when sending requests to an API.
     :param crossref_start_date: The starting date of crossref's API calls
-    :param api_dataset_id: The name of the Bigquery dataset to store the API release(s)
+    :param api_bq_dataset_id: The name of the Bigquery dataset to store the API release(s)
 
     :param sensor_dag_ids: Dag IDs for dependent tasks
     :param catchup: Whether to catch up missed DAG runs.
@@ -999,7 +999,7 @@ def create_dag(
 
             release = OnixWorkflowRelease.from_dict(release)
             client = Client(project=cloud_workspace.project_id)
-            api = DatasetAPI(bq_project_id=cloud_workspace.project_id, bq_dataset_id=api_dataset_id, client=client)
+            api = DatasetAPI(bq_project_id=cloud_workspace.project_id, bq_dataset_id=api_bq_dataset_id, client=client)
             api.seed_db()
             dataset_release = DatasetRelease(
                 dag_id=dag_id,

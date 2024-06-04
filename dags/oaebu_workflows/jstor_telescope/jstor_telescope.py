@@ -162,7 +162,7 @@ def create_dag(
     bq_dataset_description: str = "Data from JSTOR sources",
     bq_country_table_description: Optional[str] = None,
     bq_institution_table_description: Optional[str] = None,
-    api_dataset_id: str = "dataset_api",
+    api_bq_dataset_id: str = "dataset_api",
     gmail_api_conn_id: str = "gmail_api",
     catchup: bool = False,
     schedule: str = "0 0 4 * *",  # 4th day of every month
@@ -181,7 +181,7 @@ def create_dag(
     :param bq_dataset_description: Description for the BigQuery dataset
     :param bq_country_table_description: Description for the BigQuery JSTOR country table
     :param bq_institution_table_description: Description for the BigQuery JSTOR institution table
-    :param api_dataset_id: The name of the Bigquery dataset to store the API release(s)
+    :param api_bq_dataset_id: The name of the Bigquery dataset to store the API release(s)
     :param gmail_api_conn_id: Airflow connection ID for the Gmail API
     :param catchup: Whether to catchup the DAG or not
     :param max_active_runs: The maximum number of DAG runs that can be run concurrently
@@ -369,7 +369,9 @@ def create_dag(
 
                 release = JstorRelease.from_dict(release)
                 client = Client(project=cloud_workspace.project_id)
-                api = DatasetAPI(bq_project_id=cloud_workspace.project_id, bq_dataset_id=api_dataset_id, client=client)
+                api = DatasetAPI(
+                    bq_project_id=cloud_workspace.project_id, bq_dataset_id=api_bq_dataset_id, client=client
+                )
                 api.seed_db()
                 # JSTOR country
                 dataset_release = DatasetRelease(

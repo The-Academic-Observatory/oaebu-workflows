@@ -109,7 +109,7 @@ def create_dag(
     elevate_related_products: bool = False,
     bq_dataset_description: str = "OAPEN Metadata converted to ONIX",
     bq_table_description: str = None,
-    api_dataset_id: str = "dataset_api",
+    api_bq_dataset_id: str = "dataset_api",
     catchup: bool = False,
     start_date: pendulum.DateTime = pendulum.datetime(2018, 5, 14),
     schedule: str = "0 12 * * Sun",  # Midday every sunday
@@ -125,7 +125,7 @@ def create_dag(
     :param elevate_related_products: Whether to pull out the related products to the product level.
     :param bq_dataset_description: Description for the BigQuery dataset
     :param bq_table_description: Description for the biguery table
-    :param api_dataset_id: The name of the Bigquery dataset to store the API release(s)
+    :param api_bq_dataset_id: The name of the Bigquery dataset to store the API release(s)
     :param catchup: Whether to catchup the DAG or not
     :param start_date: The start date of the DAG
     :param schedule: The schedule interval of the DAG
@@ -258,7 +258,7 @@ def create_dag(
 
             release = OapenMetadataRelease.from_dict(release)
             client = Client(project=cloud_workspace.project_id)
-            api = DatasetAPI(bq_project_id=cloud_workspace.project_id, bq_dataset_id=api_dataset_id, client=client)
+            api = DatasetAPI(bq_project_id=cloud_workspace.project_id, bq_dataset_id=api_bq_dataset_id, client=client)
             api.seed_db()
             dataset_release = DatasetRelease(
                 dag_id=dag_id,
