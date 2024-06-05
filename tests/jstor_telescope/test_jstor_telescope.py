@@ -38,13 +38,13 @@ from oaebu_workflows.jstor_telescope.jstor_telescope import (
     create_dag,
     make_jstor_api,
 )
-
 from observatory_platform.airflow.workflow import Workflow
-from observatory_platform.sandbox.test_utils import SandboxTestCase, load_and_parse_json
-from observatory_platform.sandbox.sandbox_environment import SandboxEnvironment
-from observatory_platform.google.gcs import gcs_blob_name_from_path, gcs_upload_files
-from observatory_platform.google.bigquery import bq_table_id
 from observatory_platform.dataset_api import DatasetAPI
+from observatory_platform.date_utils import datetime_normalise
+from observatory_platform.google.bigquery import bq_table_id
+from observatory_platform.google.gcs import gcs_blob_name_from_path, gcs_upload_files
+from observatory_platform.sandbox.sandbox_environment import SandboxEnvironment
+from observatory_platform.sandbox.test_utils import SandboxTestCase, load_and_parse_json
 
 
 def dummy_gmail_connection() -> Connection:
@@ -345,47 +345,48 @@ class TestJstorTelescopePublisher(SandboxTestCase):
                 self.assertEqual(len(dataset_releases), 0)
 
                 # Add_dataset_release_task
-                now = pendulum.now("UTC")  # Use UTC to ensure +00UTC timezone
+                now = pendulum.now()
                 with patch("oaebu_workflows.jstor_telescope.jstor_telescope.pendulum.now") as mock_now:
                     mock_now.return_value = now
                     ti = env.run_task("process_release.add_new_dataset_releases", map_index=0)
                 self.assertEqual(ti.state, State.SUCCESS)
                 dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="jstor_country")
                 self.assertEqual(len(dataset_releases), 1)
-                expected_release = { "dag_id": dag_id,
-                        "entity_id": "jstor_country",
-                        "dag_run_id": release.run_id,
-                        # Replace Z shorthand because BQ converts it to +00:00
-                        "created": now.to_iso8601_string().replace("Z", "+00:00"),
-                        "modified": now.to_iso8601_string().replace("Z", "+00:00"),
-                        "data_interval_start": "2022-07-01T00:00:00+00:00",
-                        "data_interval_end": "2022-08-01T00:00:00+00:00",
-                        "snapshot_date": None,
-                        "partition_date": "2022-07-31T00:00:00+00:00",
-                        "changefile_start_date": None,
-                        "changefile_end_date": None,
-                        "sequence_start": None,
-                        "sequence_end": None,
-                        "extra": {},
-                    },
-                self.assertEqual(dataset_releases[0].to_dict(), expected_release)
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="jstor_country")
                 expected_release = {
-                        "dag_id": dag_id,
-                        "entity_id": "jstor_insitution",
-                        "dag_run_id": release.run_id,
-                        "created": now.to_iso8601_string().replace("Z", "+00:00"),
-                        "modified": now.to_iso8601_string().replace("Z", "+00:00"),
-                        "data_interval_start": "2022-07-01T00:00:00+00:00",
-                        "data_interval_end": "2022-08-01T00:00:00+00:00",
-                        "snapshot_date": None,
-                        "partition_date": "2022-07-31T00:00:00+00:00",
-                        "changefile_start_date": None,
-                        "changefile_end_date": None,
-                        "sequence_start": None,
-                        "sequence_end": None,
-                        "extra": {},
-                    }
+                    "dag_id": dag_id,
+                    "entity_id": "jstor_country",
+                    "dag_run_id": release.run_id,
+                    "created": datetime_normalise(now),
+                    "modified": datetime_normalise(now),
+                    "data_interval_start": "2022-07-01T00:00:00+00:00",
+                    "data_interval_end": "2022-08-01T00:00:00+00:00",
+                    "snapshot_date": None,
+                    "partition_date": "2022-07-31T00:00:00+00:00",
+                    "changefile_start_date": None,
+                    "changefile_end_date": None,
+                    "sequence_start": None,
+                    "sequence_end": None,
+                    "extra": {},
+                }
+                self.assertEqual(dataset_releases[0].to_dict(), expected_release)
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="jstor_institution")
+                self.assertEqual(len(dataset_releases), 1)
+                expected_release = {
+                    "dag_id": dag_id,
+                    "entity_id": "jstor_institution",
+                    "dag_run_id": release.run_id,
+                    "created": datetime_normalise(now),
+                    "modified": datetime_normalise(now),
+                    "data_interval_start": "2022-07-01T00:00:00+00:00",
+                    "data_interval_end": "2022-08-01T00:00:00+00:00",
+                    "snapshot_date": None,
+                    "partition_date": "2022-07-31T00:00:00+00:00",
+                    "changefile_start_date": None,
+                    "changefile_end_date": None,
+                    "sequence_start": None,
+                    "sequence_end": None,
+                    "extra": {},
+                }
                 self.assertEqual(dataset_releases[0].to_dict(), expected_release)
 
                 # Test that all telescope data deleted
@@ -621,47 +622,48 @@ class TestJstorTelescopeCollection(SandboxTestCase):
                 self.assertEqual(len(dataset_releases), 0)
 
                 # Add_dataset_release_task
-                now = pendulum.now("UTC")  # Use UTC to ensure +00UTC timezone
+                now = pendulum.now()
                 with patch("oaebu_workflows.jstor_telescope.jstor_telescope.pendulum.now") as mock_now:
                     mock_now.return_value = now
                     ti = env.run_task("process_release.add_new_dataset_releases", map_index=0)
                 self.assertEqual(ti.state, State.SUCCESS)
                 dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="jstor_country")
                 self.assertEqual(len(dataset_releases), 1)
-                expected_release = { "dag_id": dag_id,
-                        "entity_id": "jstor_country",
-                        "dag_run_id": release.run_id,
-                        # Replace Z shorthand because BQ converts it to +00:00
-                        "created": now.to_iso8601_string().replace("Z", "+00:00"),
-                        "modified": now.to_iso8601_string().replace("Z", "+00:00"),
-                        "data_interval_start": "2022-07-01T00:00:00+00:00",
-                        "data_interval_end": "2022-08-01T00:00:00+00:00",
-                        "snapshot_date": None,
-                        "partition_date": "2022-07-31T00:00:00+00:00",
-                        "changefile_start_date": None,
-                        "changefile_end_date": None,
-                        "sequence_start": None,
-                        "sequence_end": None,
-                        "extra": {},
-                    },
-                self.assertEqual(dataset_releases[0].to_dict(), expected_release)
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="jstor_country")
                 expected_release = {
-                        "dag_id": dag_id,
-                        "entity_id": "jstor_insitution",
-                        "dag_run_id": release.run_id,
-                        "created": now.to_iso8601_string().replace("Z", "+00:00"),
-                        "modified": now.to_iso8601_string().replace("Z", "+00:00"),
-                        "data_interval_start": "2022-07-01T00:00:00+00:00",
-                        "data_interval_end": "2022-08-01T00:00:00+00:00",
-                        "snapshot_date": None,
-                        "partition_date": "2022-07-31T00:00:00+00:00",
-                        "changefile_start_date": None,
-                        "changefile_end_date": None,
-                        "sequence_start": None,
-                        "sequence_end": None,
-                        "extra": {},
-                    }
+                    "dag_id": dag_id,
+                    "entity_id": "jstor_country",
+                    "dag_run_id": release.run_id,
+                    "created": datetime_normalise(now),
+                    "modified": datetime_normalise(now),
+                    "data_interval_start": "2023-09-01T00:00:00+00:00",
+                    "data_interval_end": "2023-10-01T00:00:00+00:00",
+                    "snapshot_date": None,
+                    "partition_date": "2023-09-30T00:00:00+00:00",
+                    "changefile_start_date": None,
+                    "changefile_end_date": None,
+                    "sequence_start": None,
+                    "sequence_end": None,
+                    "extra": {},
+                }
+                self.assertEqual(dataset_releases[0].to_dict(), expected_release)
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="jstor_institution")
+                self.assertEqual(len(dataset_releases), 1)
+                expected_release = {
+                    "dag_id": dag_id,
+                    "entity_id": "jstor_institution",
+                    "dag_run_id": release.run_id,
+                    "created": datetime_normalise(now),
+                    "modified": datetime_normalise(now),
+                    "data_interval_start": "2023-09-01T00:00:00+00:00",
+                    "data_interval_end": "2023-10-01T00:00:00+00:00",
+                    "snapshot_date": None,
+                    "partition_date": "2023-09-30T00:00:00+00:00",
+                    "changefile_start_date": None,
+                    "changefile_end_date": None,
+                    "sequence_start": None,
+                    "sequence_end": None,
+                    "extra": {},
+                }
                 self.assertEqual(dataset_releases[0].to_dict(), expected_release)
 
                 # Test that all telescope data deleted

@@ -26,6 +26,7 @@ from oaebu_workflows.onix_telescope.onix_telescope import OnixRelease, create_da
 from oaebu_workflows.oaebu_partners import partner_from_str
 from oaebu_workflows.config import test_fixtures_folder, module_file_path
 from observatory_platform.dataset_api import DatasetAPI
+from observatory_platform.date_utils import datetime_normalise
 from observatory_platform.google.bigquery import bq_sharded_table_id
 from observatory_platform.google.gcs import gcs_blob_name_from_path
 from observatory_platform.sftp import SftpFolders
@@ -217,8 +218,8 @@ class TestOnixTelescope(SandboxTestCase):
                 dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="onix")
                 self.assertEqual(len(dataset_releases), 0)
 
-                # Set up the API
-                now = pendulum.now("UTC")  # Use UTC to ensure +00UTC timezone
+                # Add dataset release task
+                now = pendulum.now()  
                 with patch("oaebu_workflows.onix_telescope.onix_telescope.pendulum.now") as mock_now:
                     mock_now.return_value = now
                     ti = env.run_task("process_release.add_new_dataset_releases", map_index=0)
@@ -229,9 +230,8 @@ class TestOnixTelescope(SandboxTestCase):
                     "dag_id": dag_id,
                     "entity_id": "onix",
                     "dag_run_id": release.run_id,
-                    # Replace Z shorthand because BQ converts it to +00:00
-                    "created": now.to_iso8601_string().replace("Z", "+00:00"),
-                    "modified": now.to_iso8601_string().replace("Z", "+00:00"),
+                    "created": datetime_normalise(now),
+                    "modified": datetime_normalise(now),
                     "data_interval_start": "2021-03-31T00:00:00+00:00",
                     "data_interval_end": "2021-04-04T12:00:00+00:00",
                     "snapshot_date": "2021-03-30T00:00:00+00:00",

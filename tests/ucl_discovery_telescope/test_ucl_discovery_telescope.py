@@ -32,12 +32,13 @@ from oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope import (
     download_discovery_stats,
     transform_discovery_stats,
 )
+from observatory_platform.airflow.workflow import Workflow
 from observatory_platform.dataset_api import DatasetAPI
+from observatory_platform.date_utils import datetime_normalise
 from observatory_platform.google.bigquery import bq_table_id
 from observatory_platform.google.gcs import gcs_blob_name_from_path
-from observatory_platform.airflow.workflow import Workflow
-from observatory_platform.sandbox.test_utils import SandboxTestCase, load_and_parse_json
 from observatory_platform.sandbox.sandbox_environment import SandboxEnvironment
+from observatory_platform.sandbox.test_utils import SandboxTestCase, load_and_parse_json
 
 
 class TestUclDiscoveryTelescope(SandboxTestCase):
@@ -217,7 +218,7 @@ class TestUclDiscoveryTelescope(SandboxTestCase):
             self.assertEqual(len(dataset_releases), 0)
 
             # Add_dataset_release_task
-            now = pendulum.now("UTC")  # Use UTC to ensure +00UTC timezone
+            now = pendulum.now()
             with patch("oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.pendulum.now") as mock_now:
                 mock_now.return_value = now
                 ti = env.run_task("add_new_dataset_releases")
@@ -228,9 +229,8 @@ class TestUclDiscoveryTelescope(SandboxTestCase):
                 "dag_id": dag_id,
                 "entity_id": "ucl_discovery",
                 "dag_run_id": release.run_id,
-                # Replace Z shorthand because BQ converts it to +00:00
-                "created": now.to_iso8601_string().replace("Z", "+00:00"),
-                "modified": now.to_iso8601_string().replace("Z", "+00:00"),
+                "created": datetime_normalise(now),
+                "modified": datetime_normalise(now),
                 "data_interval_start": "2023-06-01T00:00:00+00:00",
                 "data_interval_end": "2023-06-04T00:00:00+00:00",
                 "snapshot_date": None,
