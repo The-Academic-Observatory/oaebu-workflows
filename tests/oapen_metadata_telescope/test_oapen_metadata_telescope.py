@@ -35,12 +35,13 @@ from oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope import (
     download_metadata,
     create_dag,
 )
-from observatory_platform.dataset_api import DatasetAPI
-from observatory_platform.google.gcs import gcs_blob_name_from_path
-from observatory_platform.google.bigquery import bq_sharded_table_id
 from observatory_platform.airflow.workflow import Workflow
-from observatory_platform.sandbox.test_utils import SandboxTestCase, load_and_parse_json, compare_lists_of_dicts
+from observatory_platform.dataset_api import DatasetAPI
+from observatory_platform.date_utils import datetime_normalise
+from observatory_platform.google.bigquery import bq_sharded_table_id
+from observatory_platform.google.gcs import gcs_blob_name_from_path
 from observatory_platform.sandbox.sandbox_environment import SandboxEnvironment
+from observatory_platform.sandbox.test_utils import SandboxTestCase, load_and_parse_json, compare_lists_of_dicts
 
 
 class TestOapenMetadataTelescope(SandboxTestCase):
@@ -103,7 +104,7 @@ class TestOapenMetadataTelescope(SandboxTestCase):
 
         env = SandboxEnvironment(self.project_id, self.data_location)
         dataset_id = env.add_dataset()
-        api_dataset_id = env.add_dataset()
+        api_bq_dataset_id = env.add_dataset()
 
         with env.create():
             metadata_partner = partner_from_str("oapen_metadata", metadata_partner=True)
@@ -115,7 +116,7 @@ class TestOapenMetadataTelescope(SandboxTestCase):
                 metadata_uri=self.metadata_uri,
                 metadata_partner=metadata_partner,
                 elevate_related_products=True,
-                api_dataset_id=api_dataset_id,
+                api_bq_dataset_id=api_bq_dataset_id,
             )
 
             # first run
@@ -190,27 +191,26 @@ class TestOapenMetadataTelescope(SandboxTestCase):
                 self.assert_table_content(table_id, load_and_parse_json(self.test_table), primary_key="ISBN13")
 
                 # Set up the API
-                api = DatasetAPI(project_id=self.project_id, dataset_id=api_dataset_id)
+                api = DatasetAPI(bq_project_id=self.project_id, bq_dataset_id=api_bq_dataset_id)
                 api.seed_db()
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="oapen_metadata")
                 self.assertEqual(len(dataset_releases), 0)
 
-                now = pendulum.now("UTC")  # Use UTC to ensure +00UTC timezone
+                now = pendulum.now()
                 with patch(
                     "oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope.pendulum.now"
                 ) as mock_now:
                     mock_now.return_value = now
                     ti = env.run_task("add_new_dataset_releases")
                     self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="oapen_metadata")
                 self.assertEqual(len(dataset_releases), 1)
                 expected_release = {
                     "dag_id": dag_id,
-                    "dataset_id": api_dataset_id,
+                    "entity_id": "oapen_metadata",
                     "dag_run_id": release.run_id,
-                    # Replace Z shorthand because BQ converts it to +00:00
-                    "created": now.to_iso8601_string().replace("Z", "+00:00"),
-                    "modified": now.to_iso8601_string().replace("Z", "+00:00"),
+                    "created": datetime_normalise(now),
+                    "modified": datetime_normalise(now),
                     "data_interval_start": "2021-02-01T00:00:00+00:00",
                     "data_interval_end": "2021-02-07T12:00:00+00:00",
                     "snapshot_date": "2021-02-07T00:00:00+00:00",

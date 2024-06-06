@@ -44,12 +44,13 @@ from oaebu_workflows.irus_oapen_telescope.irus_oapen_telescope import (
     upload_source_code_to_bucket,
     create_dag,
 )
-from observatory_platform.dataset_api import DatasetAPI
 from observatory_platform.airflow.workflow import CloudWorkspace, Workflow
-from observatory_platform.google.gcs import gcs_blob_name_from_path, gcs_upload_file
+from observatory_platform.dataset_api import DatasetAPI
+from observatory_platform.date_utils import datetime_normalise
 from observatory_platform.google.bigquery import bq_table_id
-from observatory_platform.sandbox.test_utils import SandboxTestCase, find_free_port, random_id
+from observatory_platform.google.gcs import gcs_blob_name_from_path, gcs_upload_file
 from observatory_platform.sandbox.sandbox_environment import SandboxEnvironment
+from observatory_platform.sandbox.test_utils import SandboxTestCase, find_free_port, random_id
 
 
 class TestIrusOapenTelescope(SandboxTestCase):
@@ -131,7 +132,7 @@ class TestIrusOapenTelescope(SandboxTestCase):
         data_partner.bq_dataset_id = env.add_dataset()
         dag_id = "irus_oapen_test"
         gdpr_bucket_id = env.add_bucket()
-        api_dataset_id = env.add_dataset()
+        api_bq_dataset_id = env.add_dataset()
         dag = create_dag(
             dag_id=dag_id,
             cloud_workspace=env.cloud_workspace,
@@ -140,7 +141,7 @@ class TestIrusOapenTelescope(SandboxTestCase):
             data_partner=data_partner,
             gdpr_oapen_project_id=env.project_id,
             gdpr_oapen_bucket_id=gdpr_bucket_id,
-            api_dataset_id=api_dataset_id,
+            api_bq_dataset_id=api_bq_dataset_id,
         )
 
         # Mock the Google Cloud Functions API service
@@ -273,26 +274,25 @@ class TestIrusOapenTelescope(SandboxTestCase):
                 env._delete_bucket(gdpr_bucket_id)
 
                 # Add_dataset_release_task
-                api = DatasetAPI(project_id=self.project_id, dataset_id=api_dataset_id)
+                api = DatasetAPI(bq_project_id=self.project_id, bq_dataset_id=api_bq_dataset_id)
                 api.seed_db()
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="irus_oapen")
                 self.assertEqual(len(dataset_releases), 0)
 
                 # Add_dataset_release_task
-                now = pendulum.now("UTC")  # Use UTC to ensure +00UTC timezone
+                now = pendulum.now()
                 with patch("oaebu_workflows.irus_oapen_telescope.irus_oapen_telescope.pendulum.now") as mock_now:
                     mock_now.return_value = now
                     ti = env.run_task("process_release.add_new_dataset_releases", map_index=0)
                 self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="irus_oapen")
                 self.assertEqual(len(dataset_releases), 1)
                 expected_release = {
                     "dag_id": dag_id,
-                    "dataset_id": api_dataset_id,
+                    "entity_id": "irus_oapen",
                     "dag_run_id": release.run_id,
-                    # Replace Z shorthand because BQ converts it to +00:00
-                    "created": now.to_iso8601_string().replace("Z", "+00:00"),
-                    "modified": now.to_iso8601_string().replace("Z", "+00:00"),
+                    "created": datetime_normalise(now),
+                    "modified": datetime_normalise(now),
                     "data_interval_start": "2021-02-01T00:00:00+00:00",
                     "data_interval_end": "2021-03-01T00:00:00+00:00",
                     "snapshot_date": None,

@@ -42,6 +42,7 @@ from oaebu_workflows.onix_workflow.onix_workflow import (
 from observatory_platform.airflow.workflow import Workflow
 from observatory_platform.config import module_file_path
 from observatory_platform.dataset_api import DatasetAPI
+from observatory_platform.date_utils import datetime_normalise
 from observatory_platform.files import load_jsonl, save_jsonl
 from observatory_platform.google.bigquery import bq_find_schema, bq_run_query, bq_sharded_table_id, bq_table_id
 from observatory_platform.google.gcs import gcs_blob_name_from_path
@@ -983,7 +984,7 @@ class TestOnixWorkflow(SandboxTestCase):
             bq_worksid_table_name = "onix_workid_isbn"
             bq_worksid_error_table_name = "onix_workid_isbn_errors"
             bq_workfamilyid_table_name = "onix_workfamilyid_isbn"
-            api_dataset_id = env.add_dataset()
+            api_bq_dataset_id = env.add_dataset()
             dag = create_dag(
                 dag_id=dag_id,
                 cloud_workspace=env.cloud_workspace,
@@ -1008,7 +1009,7 @@ class TestOnixWorkflow(SandboxTestCase):
                 bq_workfamilyid_table_name=bq_workfamilyid_table_name,
                 bq_oaebu_export_dataset=oaebu_export_dataset_id,
                 bq_oaebu_latest_export_dataset=oaebu_latest_export_dataset_id,
-                api_dataset_id=api_dataset_id,
+                api_bq_dataset_id=api_bq_dataset_id,
                 data_partners=data_partners,
                 sensor_dag_ids=sensor_dag_ids,
                 start_date=start_date,
@@ -1286,26 +1287,25 @@ class TestOnixWorkflow(SandboxTestCase):
                 ################################
 
                 # Set up the API
-                api = DatasetAPI(project_id=self.gcp_project_id, dataset_id=api_dataset_id)
+                api = DatasetAPI(bq_project_id=self.gcp_project_id, bq_dataset_id=api_bq_dataset_id)
                 api.seed_db()
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="onix_workflow")
                 self.assertEqual(len(dataset_releases), 0)
 
                 # Add_dataset_release_task
-                now = pendulum.now("UTC")  # Use UTC to ensure +00UTC timezone
+                now = pendulum.now()
                 with patch("oaebu_workflows.onix_workflow.onix_workflow.pendulum.now") as mock_now:
                     mock_now.return_value = now
                     ti = env.run_task("add_new_dataset_releases")
                 self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, dataset_id=api_dataset_id)
+                dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="onix_workflow")
                 self.assertEqual(len(dataset_releases), 1)
                 expected_release = {
                     "dag_id": dag_id,
-                    "dataset_id": api_dataset_id,
+                    "entity_id": "onix_workflow",
                     "dag_run_id": release.run_id,
-                    # Replace Z shorthand because BQ converts it to +00:00
-                    "created": now.to_iso8601_string().replace("Z", "+00:00"),
-                    "modified": now.to_iso8601_string().replace("Z", "+00:00"),
+                        "created": datetime_normalise(now),
+                        "modified": datetime_normalise(now),
                     "data_interval_start": "2021-05-17T00:00:00+00:00",
                     "data_interval_end": "2021-05-24T00:00:00+00:00",
                     "snapshot_date": "2021-05-24T00:00:00+00:00",

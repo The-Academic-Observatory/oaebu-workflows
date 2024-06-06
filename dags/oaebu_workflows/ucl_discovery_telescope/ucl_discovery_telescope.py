@@ -116,7 +116,7 @@ def create_dag(
     data_partner: Union[str, OaebuPartner] = "ucl_discovery",
     bq_dataset_description: str = "UCL Discovery dataset",
     bq_table_description: str = "UCL Discovery table",
-    api_dataset_id: str = "dataset_api",
+    api_bq_dataset_id: str = "dataset_api",
     oaebu_service_account_conn_id: str = "oaebu_service_account",
     max_threads: int = os.cpu_count() * 2,
     schedule: str = "0 0 4 * *",  # run on the 4th of every month
@@ -134,7 +134,7 @@ def create_dag(
     :param data_partner: The name of the data partner
     :param bq_dataset_description: Description for the BigQuery dataset
     :param bq_table_description: Description for the biguery table
-    :param api_dataset_id: The name of the Bigquery dataset to store the API release(s)
+    :param api_bq_dataset_id: The name of the Bigquery dataset to store the API release(s)
     :param oaebu_service_account_conn_id: Airflow connection ID for the oaebu service account
     :param max_threads: The maximum number threads to utilise for parallel processes
     :param schedule: The schedule interval of the DAG
@@ -303,11 +303,11 @@ def create_dag(
 
             release = UclDiscoveryRelease.from_dict(release)
             client = Client(project=cloud_workspace.project_id)
-            api = DatasetAPI(project_id=cloud_workspace.project_id, dataset_id=api_dataset_id, client=client)
+            api = DatasetAPI(bq_project_id=cloud_workspace.project_id, bq_dataset_id=api_bq_dataset_id, client=client)
             api.seed_db()
             dataset_release = DatasetRelease(
                 dag_id=dag_id,
-                dataset_id=api_dataset_id,
+                entity_id="ucl_discovery",
                 dag_run_id=release.run_id,
                 created=pendulum.now(),
                 modified=pendulum.now(),

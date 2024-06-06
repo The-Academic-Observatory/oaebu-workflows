@@ -133,7 +133,7 @@ def create_dag(
     bq_table_description: str = "OAPEN metrics as recorded by the IRUS platform",
     gdpr_oapen_project_id: str = "oapen-usage-data-gdpr-proof",
     gdpr_oapen_bucket_id: str = "oapen-usage-data-gdpr-proof_cloud-function",
-    api_dataset_id: str = "dataset_api",
+    api_bq_dataset_id: str = "dataset_api",
     max_cloud_function_instances: int = 0,
     geoip_license_conn_id: str = "geoip_license_key",
     irus_oapen_api_conn_id: str = "irus_api",
@@ -155,7 +155,7 @@ def create_dag(
     :param bq_table_description: Description for the biguery table
     :param gdpr_oapen_project_id: The gdpr-proof oapen project id.
     :param gdpr_oapen_bucket_id: The gdpr-proof oapen bucket
-    :param api_dataset_id: The name of the Bigquery dataset to store the API release(s)
+    :param api_bq_dataset_id: The name of the Bigquery dataset to store the API release(s)
     :param max_cloud_function_instances:
     :param geoip_license_conn_id: The Airflow connection ID for the GEOIP license
     :param irus_oapen_api_conn_id: The Airflow connection ID for IRUS API - for counter 5
@@ -375,11 +375,13 @@ def create_dag(
 
                 release = IrusOapenRelease.from_dict(release)
                 client = Client(project=cloud_workspace.project_id)
-                api = DatasetAPI(project_id=cloud_workspace.project_id, dataset_id=api_dataset_id, client=client)
+                api = DatasetAPI(
+                    bq_project_id=cloud_workspace.project_id, bq_dataset_id=api_bq_dataset_id, client=client
+                )
                 api.seed_db()
                 dataset_release = DatasetRelease(
                     dag_id=dag_id,
-                    dataset_id=api_dataset_id,
+                    entity_id="irus_oapen",
                     dag_run_id=release.run_id,
                     created=pendulum.now(),
                     modified=pendulum.now(),

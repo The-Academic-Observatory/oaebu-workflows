@@ -117,7 +117,7 @@ def create_dag(
     data_partner: Union[str, OaebuPartner] = "irus_fulcrum",
     bq_dataset_description: str = "IRUS dataset",
     bq_table_description: str = "Fulcrum metrics as recorded by the IRUS platform",
-    api_dataset_id: str = "dataset_api",
+    api_bq_dataset_id: str = "dataset_api",
     irus_oapen_api_conn_id: str = "irus_api",
     catchup: bool = True,
     schedule: str = "0 0 4 * *",  # Run on the 4th of every month
@@ -133,7 +133,7 @@ def create_dag(
     :param data_partner: The name of the data partner
     :param bq_dataset_description: Description for the BigQuery dataset
     :param bq_table_description: Description for the biguery table
-    :param api_dataset_id: The name of the Bigquery dataset to store the API release(s)
+    :param api_bq_dataset_id: The name of the Bigquery dataset to store the API release(s)
     :param irus_oapen_api_conn_id: Airflow connection ID OAPEN IRUS UK (counter 5)
     :param catchup: Whether to catchup the DAG or not
     :param schedule: The schedule interval of the DAG
@@ -279,11 +279,11 @@ def create_dag(
 
             release = IrusFulcrumRelease.from_dict(release)
             client = Client(project=cloud_workspace.project_id)
-            api = DatasetAPI(project_id=cloud_workspace.project_id, dataset_id=api_dataset_id, client=client)
+            api = DatasetAPI(bq_project_id=cloud_workspace.project_id, bq_dataset_id=api_bq_dataset_id, client=client)
             api.seed_db()
             dataset_release = DatasetRelease(
                 dag_id=dag_id,
-                dataset_id=api_dataset_id,
+                entity_id="irus_fulcrum",
                 dag_run_id=release.run_id,
                 created=pendulum.now(),
                 modified=pendulum.now(),
