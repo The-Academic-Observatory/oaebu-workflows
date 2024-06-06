@@ -15,7 +15,7 @@
 # Author: Keegan Smith
 
 
-import collections import defaultdict
+from collections import defaultdict
 import logging
 import os
 from typing import List, Union
@@ -109,7 +109,6 @@ def create_dag(
     bq_table_description: str = "UCL Sales Table",
     api_bq_dataset_id: str = "dataset_api",
     oaebu_service_account_conn_id: str = "oaebu_service_account",
-    max_threads: int = os.cpu_count() * 2,
     schedule: str = "0 0 4 * *",  # run on the 4th of every month TODO: confirm
     start_date: pendulum.DateTime = pendulum.datetime(2023, 8, 1),
     catchup: bool = True,
@@ -158,11 +157,7 @@ def create_dag(
             """Download the ucl sales data for a given release.
             :param releases: The UCL discovery release.
             """
-            scopes = [
-                "https://www.googleapis.com/auth/drive",
-                "https://www.googleapis.com/auth/drive.file",
-                "https://www.googleapis.com/auth/spreadsheets",
-            ]
+            scopes = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
             service_account_conn = BaseHook.get_connection(oaebu_service_account_conn_id)
             credentials = service_account.Credentials.from_service_account_info(
                 service_account_conn.extra_dejson, scopes=scopes
@@ -304,13 +299,19 @@ def make_release(dag_id: str, context: dict) -> UclSalesRelease:
     )
 
 
-def download(credentials: service_account.Credentials, sheet_id: str, sheet_month: str) -> List[dict]:
+def download(
+    credentials: service_account.Credentials,
+    sheet_id: str,
+    sheet_month: str,
+) -> List[dict]:
     """Downloads the UCL sales data for a given month (sheet_month) from the google sheet
+    Executes a preliminary clean by stripping and lowercasing the heading. Compares this to expected_headings
 
     :param credentials: The google application credentials for sheet access.
     :param sheet_id: The ID of the google sheet. Can be found in its URL.
     :param sheet_month: The month to download. In the form YYYYMM.
-    :return: The downloaded data as a list of dictionaries
+    :param expected_headings: A subset of the headings we expect to find.
+    :return: The downloaded data as a list of dictionaries (json-like format)
     """
 
     service = discovery.build("sheets", "v4", credentials=credentials)
@@ -319,12 +320,8 @@ def download(credentials: service_account.Credentials, sheet_id: str, sheet_mont
     if not sheet_contents:
         raise ValueError(f"No content found for sheet with ID '{sheet_id}' and month '{sheet_month}'")
 
-    # In case of inconsistencies, reformat the header
-    header = [c.strip().upper() for c in sheet_contents[0]]
-    if not all(heading in header for heading in ["ISBN", "QTY", "YEAR", "MONTH", "FREE/PAID/RETURN?"]):
-        raise ValueError(f"Invalid header found for sheet: {header}")
-
     items = []
+    header = [h.strip().lower() for h in sheet_contents[0]]  # strandardise headings
     for row in sheet_contents[1:]:
         items.append(dict(zip(header, row)))
     return items
@@ -343,22 +340,26 @@ def get_ucl_book_list(client: Client = None) -> List[dict]:
     return bq_run_query(sql, client=client)
 
 
-def transform(data: List[dict], book_list: List[dict]) -> List[dict]:
+def transform_raw(data: List[dict]) -> List[dict]:
     """Transforms the ucl sales data. Aggregates each sale and matches the product using the book list
 
     :param data: The UCL sales data
-    :param book_list: The UCL book list from its export table
     :return: The transformed data
     """
 
-    isbn_net_qty= defaultdict(lambda: 0)
-    for entry in data:
-        if entry["FREE/PAID/RETURN?"] == "Paid":
-            isbn_net_qty[entry["ISBN"]] += entry["QTY"]
-        elif entry["FREE/PAID/RETURN?"] == "Return":
-            isbn_net_qty[entry["ISBN"]] -= entry["QTY"]
-    # TOOD: figure out the rest
+    # Convert the keys/headings to standard format
+    converted_data = {}
+    for k, v in data:
+        converted_data[k.strip().lower()] = v
 
+    # Check that all required headings are present
+    expected_headings = ("isbn", "qty", "year", "month", "free/paid/return?", "country", "book", "pub date", "format")
+    if not all(h.strip().lower() in converted_data.keys() for h in expected_headings):
+        raise ValueError(f"Invalid header found for sheet: {converted_data.keys()}")
 
+    transformed = []
+    for row in converted_data:
+        new_row = {h: row[h] for h in expected_headings}
+        transformed.append(new_row)
 
-        
+    return transformed
