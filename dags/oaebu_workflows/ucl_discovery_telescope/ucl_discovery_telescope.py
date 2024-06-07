@@ -17,7 +17,7 @@
 
 import logging
 import os
-from typing import List, Union
+from typing import Union
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import pendulum
