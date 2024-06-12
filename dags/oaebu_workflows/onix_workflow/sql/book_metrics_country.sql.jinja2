@@ -21,7 +21,8 @@ countries as (
         alpha2,
         iso_name,
         wikipedia_name,
-        jstor_name
+        jstor_name,
+        muse_name
     FROM `{{ country_table_id }}`
 ),
 
@@ -51,7 +52,8 @@ month_country as (
         iso_name as country_name,
         iso_name as country_iso_name,
         wikipedia_name as country_wikipedia_name,
-        jstor_name as country_jstor_name
+        jstor_name as country_jstor_name,
+        muse_name as country_muse_name
     FROM months
     CROSS JOIN countries
 )

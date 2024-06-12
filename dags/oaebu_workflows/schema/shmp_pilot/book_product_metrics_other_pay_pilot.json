@@ -1,0 +1,14 @@
+{
+  "fields": [
+    {
+      "mode": "NULLABLE",
+      "name": "value",
+      "type": "INTEGER",
+      "description": "Metric value"
+    }
+  ],
+  "mode": "NULLABLE",
+  "name": "other_pay_pilot",
+  "type": "RECORD",
+  "description": "Metrics derived from other_pay"
+}
