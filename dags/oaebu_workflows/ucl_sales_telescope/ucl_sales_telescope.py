@@ -15,6 +15,7 @@
 # Author: Keegan Smith
 
 
+import csv
 import logging
 import os
 from typing import List, Union
@@ -32,7 +33,7 @@ from observatory_platform.airflow.release import PartitionRelease, set_task_stat
 from observatory_platform.airflow.tasks import check_dependencies
 from observatory_platform.airflow.workflow import CloudWorkspace, cleanup
 from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
-from observatory_platform.files import save_jsonl_gz, load_jsonl, add_partition_date
+from observatory_platform.files import save_jsonl_gz, load_jsonl, add_partition_date, load_csv
 from observatory_platform.google.bigquery import bq_load_table, bq_table_id, bq_create_dataset
 from observatory_platform.google.gcs import gcs_blob_uri, gcs_upload_files, gcs_blob_name_from_path, gcs_download_blob
 
@@ -57,12 +58,11 @@ class UclSalesRelease(PartitionRelease):
         super().__init__(dag_id=dag_id, run_id=run_id, partition_date=partition_date)
         self.data_interval_start = data_interval_start
         self.data_interval_end = data_interval_end
-        self.transform_file_name = "ucl_sales.jsonl.gz"
         self.sheet_month = self.partition_date.format("YYYYMM")
 
     @property
     def download_path(self):
-        return os.path.join(self.download_folder, "ucl_sales.jsonl.gz")
+        return os.path.join(self.download_folder, "ucl_sales.csv")
 
     @property
     def transform_path(self):
@@ -164,7 +164,9 @@ def create_dag(
             sheet_data = download(credentials=credentials, sheet_id=sheet_id, sheet_month=release.sheet_month)
 
             logging.info(f"Saving downloaded data to file: {release.download_path}")
-            save_jsonl_gz(release.download_path, sheet_data)
+            with open(release.download_path, "w", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerows(sheet_data)
 
             success = gcs_upload_files(bucket_name=cloud_workspace.download_bucket, file_paths=[release.download_path])
             set_task_state(success, context["ti"].task_id, release=release)
@@ -183,7 +185,7 @@ def create_dag(
             if not success:
                 raise FileNotFoundError(f"Error downloading file: {release.download_blob_name}")
 
-            data = load_jsonl(release.download_path)
+            data = load_csv(release.download_path)
             data = transform(data)
 
             save_jsonl_gz(release.transform_path, data)
@@ -191,6 +193,25 @@ def create_dag(
                 bucket_name=cloud_workspace.transform_bucket, file_paths=[release.transform_path]
             )
             set_task_state(success, context["ti"].task_id, release=release)
+
+        @task()
+        def _data_integrity_check(release: dict, **context) -> None:
+            """Checks that the transformed data is valid"""
+
+            release = UclSalesRelease.from_dict(release)
+            # Download files from GCS
+            success = gcs_download_blob(
+                bucket_name=cloud_workspace.download_bucket,
+                blob_name=release.transform_blob_name,
+                file_path=release.transform_path,
+            )
+            if not success:
+                raise FileNotFoundError(f"Error downloading file: {release.download_blob_name}")
+
+            data = load_jsonl(release.transform_path)
+            success = data_integrity_check(data)
+            if not success:
+                raise RuntimeError("Data integrity check failed. Check logs for information")
 
         @task()
         def _bq_load(release: dict, **context) -> None:
@@ -253,6 +274,7 @@ def create_dag(
         xcom_release = _make_release()
         task_download = _download(xcom_release)
         task_transform = _transform(xcom_release)
+        task_data_integrity_check = _data_integrity_check(xcom_release)
         task_bq_load = _bq_load(xcom_release)
         task_add_new_dataset_releases = _add_new_dataset_releases(xcom_release)
         task_cleanup_workflow = _cleanup_workflow(xcom_release)
@@ -262,12 +284,34 @@ def create_dag(
             >> xcom_release
             >> task_download
             >> task_transform
+            >> task_data_integrity_check
             >> task_bq_load
             >> task_add_new_dataset_releases
             >> task_cleanup_workflow
         )
 
     return ucl_sales()
+
+
+def standardise_header(header: List[str]) -> List[str]:
+    return [h.strip().lower() for h in header[0]]
+
+
+def drop_duplicate_headings(data: List[List]) -> List[List]:
+    """Finds duplicate headings and drops the column
+
+    :param data: The data. The header is the first item in the list
+    """
+
+    duplicates = []
+    header = data[0]
+    for h in header:
+        indexes = [i for i, v in enumerate(data[0]) if v == h]
+        duplicates.extend(indexes[1:])
+    for i in sorted(duplicates, reverse=True):
+        for row in data:
+            del row[i]
+    return data
 
 
 def make_release(dag_id: str, context: dict) -> UclSalesRelease:
@@ -317,24 +361,23 @@ def download(
     if not sheet_contents:
         raise ValueError(f"No content found for sheet with ID '{sheet_id}' and month '{sheet_month}'")
 
-    items = []
-    header = [h.strip().lower() for h in sheet_contents[0]]  # strandardise headings
-    for row in sheet_contents[1:]:
-        items.append(dict(zip(header, row)))
-    return items
+    return sheet_contents
 
 
-def transform(data: List[dict]) -> List[dict]:
-    """Transforms the ucl sales data. Aggregates each sale and matches the product using the book list
+def transform(data: List[List]) -> List[dict]:
+    """Transforms the ucl sales data.
 
     :param data: The UCL sales data
     :return: The transformed data
     """
 
-    # Convert the keys/headings to standard format
+    data[0] = standardise_header(data[0])  # The first row is the header
+    data = drop_duplicate_headings(data)
+
+    # Convert to list of dicts format
     converted_data = []
-    for row in data:
-        converted_data.append({k.strip().lower(): v for k, v in row.items()})
+    for row in data[1:]:
+        converted_data.append(dict(zip(data[0], row)))
 
     # Check that all required headings are present
     headings_mapping = {
@@ -355,8 +398,57 @@ def transform(data: List[dict]) -> List[dict]:
     for row in converted_data:
         new_row = {v: row[k] for k, v in headings_mapping.items()}
         # Make the release date partition based on each row's year/month
-        release_date = pendulum.datetime(year=int(row["year"]), month=int(row["month"]), day=1).end_of("month")
+        release_date = pendulum.datetime(year=int(row["Year"]), month=int(row["Month"]), day=1).end_of("month")
         add_partition_date([new_row], partition_date=release_date, partition_field="release_date")
         transformed.append(new_row)
 
     return transformed
+
+
+def data_integrity_check(data: List[dict], current_date: pendulum.DateTime) -> bool:
+    """Checks that the ucl sales data is valid
+
+    :param data: The data as a list of dictionaries.
+    :param current_date: The date to compare the data to. No date in the data should be after this.
+    :return: True/False depending on if the check passed/failed.
+    """
+
+    def _isbn_check(isbn):
+        if not isbn.startswith("978") or len(isbn) != 13:
+            return False
+        return True
+
+    is_valid = True
+
+    # Empty check
+    if len(data) < 1:
+        logging.warn("Empty dataset supplied!")
+        is_valid = False
+
+    # Date check
+    dates = [pendulum.parse(r["release_date"]) for r in data]
+    if not all([r <= current_date for r in dates]):
+        logging.warn("Found sale month in the future!")
+        is_valid = False
+
+    # Sale type check
+    sale_types = [r["Sale_Type"] for r in data]
+    if not all([st in ("Paid", "Return", "Free") for st in sale_types]):
+        logging.warn("Not all sale types one of 'Paid', 'Return', 'Free'")
+        is_valid = False
+
+    # ISBN check
+    isbns = [r["ISBN13"] for r in data]
+    print("HERE")
+    print(len(data[0]["ISBN13"]))
+    if not all([_isbn_check(i) for i in isbns]):
+        logging.warn("Invalid ISBN found in data")
+        is_valid = False
+
+    # Quantity check
+    qtys = [int(r["Quantity"]) for r in data]
+    if not all([q >= 0 for q in qtys]):
+        logging.warn("Negative Quantity found in data")
+        is_valid = False
+
+    return is_valid
