@@ -21,7 +21,6 @@ from unittest.mock import patch
 import pendulum
 from airflow.utils.state import State
 from airflow.models.connection import Connection
-import vcr
 
 from oaebu_workflows.config import test_fixtures_folder, module_file_path
 from oaebu_workflows.oaebu_partners import partner_from_str
@@ -62,14 +61,14 @@ class TestUclSalesTelescope(SandboxTestCase):
                 "_make_release": [
                     "_download",
                     "_transform",
-                    "_check_data_integrity",
+                    "_data_integrity_check",
                     "_bq_load",
                     "_add_new_dataset_releases",
                     "_cleanup_workflow",
                 ],
                 "_download": ["_transform"],
-                "_transform": ["_check_data_integrity"],
-                "_check_data_integrity": ["_bq_load"],
+                "_transform": ["_data_integrity_check"],
+                "_data_integrity_check": ["_bq_load"],
                 "_bq_load": ["_add_new_dataset_releases"],
                 "_add_new_dataset_releases": ["_cleanup_workflow"],
                 "_cleanup_workflow": [],
@@ -109,7 +108,6 @@ class TestUclSalesTelescope(SandboxTestCase):
             cloud_workspace=env.cloud_workspace,
             sheet_id="foo",
             data_partner=data_partner,
-            max_threads=1,
             api_bq_dataset_id=api_bq_dataset_id,
         )
         execution_date = pendulum.datetime(year=2024, month=2, day=4)
@@ -117,13 +115,12 @@ class TestUclSalesTelescope(SandboxTestCase):
         # Create the Observatory environment and run tests
         with env.create(), env.create_dag_run(dag, execution_date):
             # Mock return values of download function
-            interval_start = pendulum.instance(env.dag_run.data_interval_start)
             sheet_return = [
                 ["Year", "Month", "Free/Paid/Return?", "Country", "ISBN", "Book", "Pub Date", "Qty"],
-                ["2024", "2", "Paid", "UK", "1111111111111", "My Book1", "2023/01/01", "5"],
-                ["2024", "2", "Return", "UK", "2222222222222", "My Book2", "2023/01/01", "5"],
-                ["2024", "2", "Free", "UK", "3333333333333", "My Book3", "2023/01/01", "5"],
-                ["2024", "1", "Paid", "UK", "1111111111111", "My Book1", "2023/01/01", "5"],
+                ["2024", "2", "Paid", "UK", "9781111111111", "My Book1", "2023/01/01", "5"],
+                ["2024", "2", "Return", "UK", "9782222222222", "My Book2", "2023/01/01", "5"],
+                ["2024", "2", "Free", "UK", "9783333333333", "My Book3", "2023/01/01", "5"],
+                ["2024", "1", "Paid", "UK", "9784444444444", "My Book4", "2023/01/01", "5"],
             ]
             conn = Connection(
                 conn_id="oaebu_service_account",
@@ -149,9 +146,9 @@ class TestUclSalesTelescope(SandboxTestCase):
             release_dict = ti.xcom_pull(task_ids="_make_release", include_prior_dates=False)
             expected_release_dict = {
                 "dag_id": "ucl_sales",
-                "run_id": "scheduled__2024-06-04T00:00:00+00:00",
+                "run_id": "scheduled__2024-02-04T00:00:00+00:00",
                 "data_interval_start": "2024-02-01",
-                "data_interval_end": "2024-02-01",
+                "data_interval_end": "2024-03-01",
                 "partition_date": "2024-02-29",
             }
             self.assertEqual(release_dict, expected_release_dict)
@@ -170,7 +167,8 @@ class TestUclSalesTelescope(SandboxTestCase):
             ti = env.run_task("_transform")
             self.assertEqual(ti.state, State.SUCCESS)
 
-            ti = env.run_task("_check_data_integrity")
+            # check data integrity
+            ti = env.run_task("_data_integrity_check")
             self.assertEqual(ti.state, State.SUCCESS)
 
             # bq_load
@@ -202,9 +200,11 @@ class TestUclSalesTelescope(SandboxTestCase):
                 data_partner.bq_dataset_id,
                 data_partner.bq_table_name,
             )
-            self.assert_table_integrity(table_id, 2)
+            self.assert_table_integrity(table_id, 4)
             self.assert_table_content(
-                table_id, load_and_parse_json(self.test_table, date_fields="release_date"), "ISBN13"
+                table_id,
+                load_and_parse_json(self.test_table, date_fields={"release_date", "Publication_Date"}),
+                "ISBN13",
             )
 
             ###################
@@ -221,7 +221,7 @@ class TestUclSalesTelescope(SandboxTestCase):
             now = pendulum.now()
             with patch("oaebu_workflows.ucl_sales_telescope.ucl_sales_telescope.pendulum.now") as mock_now:
                 mock_now.return_value = now
-                ti = env.run_task("add_new_dataset_releases")
+                ti = env.run_task("_add_new_dataset_releases")
             self.assertEqual(ti.state, State.SUCCESS)
             dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="ucl_sales")
             self.assertEqual(len(dataset_releases), 1)
@@ -231,8 +231,8 @@ class TestUclSalesTelescope(SandboxTestCase):
                 "dag_run_id": release.run_id,
                 "created": datetime_normalise(now),
                 "modified": datetime_normalise(now),
-                "data_interval_start": "2024-02-01T00:00:00+00:00",
-                "data_interval_end": "2024-02-04T00:00:00+00:00",
+                "data_interval_start": "2024-02-04T00:00:00+00:00",
+                "data_interval_end": "2024-03-04T00:00:00+00:00",
                 "snapshot_date": None,
                 "partition_date": "2024-02-29T00:00:00+00:00",
                 "changefile_start_date": None,
@@ -245,7 +245,7 @@ class TestUclSalesTelescope(SandboxTestCase):
 
             # Test that all telescope data deleted
             workflow_folder_path = release.workflow_folder
-            ti = env.run_task("cleanup_workflow")
+            ti = env.run_task("_cleanup_workflow")
             self.assertEqual(ti.state, State.SUCCESS)
             self.assert_cleanup(workflow_folder_path)
 
@@ -314,8 +314,8 @@ class TestTransform(TestCase):
                 "Sale_Type": "Paid",
                 "Country": "UK",
                 "Title": "My Book Title",
-                "Publication_Date": "2020/01/01",
-                "release_date": "2024-05-30",
+                "Publication_Date": "2020-01-01",
+                "release_date": "2024-05-31",
             },
             {
                 "ISBN13": "2222222222222",
@@ -325,21 +325,45 @@ class TestTransform(TestCase):
                 "Sale_Type": "Return",
                 "Country": "UK",
                 "Title": "My Book Title",
-                "Publication_Date": "2020/01/01",
-                "release_date": "2024-06-31",
+                "Publication_Date": "2020-01-01",
+                "release_date": "2024-06-30",
             },
         ]
         actual_output = transform(input)
-        self.assertEqual(set(expected_output, set(actual_output)))
+        self.assertEqual(expected_output, actual_output)
 
-        def test_invalid_input(self):
-            """Test the transform fails when input is not valid"""
-            # missing isbn
-            input = [["qty", "year", "month", "free/paid/return?", "country", "book", "pub date", "foo"]]
-
-    def test_invalid_date(self):
+    def test_invalid_input(self):
+        """Test the transform fails when input is not valid"""
+        # missing isbn
+        input = [
+            ["qty", "year", "month", "free/paid/return?", "country", "book", "pub date", "foo"],
+            ["1", "2024", "5", "Paid", "UK", "My Book Title", "2020/01/01", "bar"],
+        ]
         with self.assertRaisesRegex(ValueError, "Invalid header found"):
             transform(input)
+
+    def test_invalid_publication_date(self):
+        """Test the transform fails when input is not valid"""
+        # invalid Publication_Date
+        input = [
+            ["isbn", "qty", "year", "month", "free/paid/return?", "country", "book", "pub date", "foo"],
+            ["2222222222222", "1", "2024", "6", "Return", "UK", "My Book Title", "invalid_date", "bar"],
+        ]
+        expected_output = [
+            {
+                "ISBN13": "2222222222222",
+                "Quantity": "1",
+                "Year": "2024",
+                "Month": "6",
+                "Sale_Type": "Return",
+                "Country": "UK",
+                "Title": "My Book Title",
+                "Publication_Date": None,
+                "release_date": "2024-06-30",
+            },
+        ]
+        actual_output = transform(input)
+        self.assertEqual(expected_output, actual_output)
 
 
 class TestDataIntegrityCheck(TestCase):
@@ -355,7 +379,7 @@ class TestDataIntegrityCheck(TestCase):
                 "Country": "UK",
                 "Title": "My Book Title",
                 "Publication_Date": "2020/01/01",
-                "release_date": "2024-05-30",
+                "release_date": "2024-05-31",
             }
         ]
         self.assertTrue(data_integrity_check(input, pendulum.datetime(2024, 6, 1)))
@@ -376,7 +400,7 @@ class TestDataIntegrityCheck(TestCase):
                 "Country": "UK",
                 "Title": "My Book Title",
                 "Publication_Date": "2020/01/01",
-                "release_date": "2024-05-30",
+                "release_date": "2024-05-31",
             }
         ]
         self.assertFalse(data_integrity_check(input, pendulum.datetime(2024, 5, 1)))
@@ -393,7 +417,7 @@ class TestDataIntegrityCheck(TestCase):
                 "Country": "UK",
                 "Title": "My Book Title",
                 "Publication_Date": "2020/01/01",
-                "release_date": "2024-05-30",
+                "release_date": "2024-05-31",
             }
         ]
         self.assertFalse(data_integrity_check(input, pendulum.datetime(2024, 6, 1)))
@@ -410,7 +434,7 @@ class TestDataIntegrityCheck(TestCase):
                 "Country": "UK",
                 "Title": "My Book Title",
                 "Publication_Date": "2020/01/01",
-                "release_date": "2024-05-30",
+                "release_date": "2024-05-31",
             }
         ]
         self.assertFalse(data_integrity_check(input, pendulum.datetime(2024, 6, 1)))
@@ -429,7 +453,7 @@ class TestDataIntegrityCheck(TestCase):
                 "Country": "UK",
                 "Title": "My Book Title",
                 "Publication_Date": "2020/01/01",
-                "release_date": "2024-05-30",
+                "release_date": "2024-05-31",
             }
         ]
         self.assertFalse(data_integrity_check(input, pendulum.datetime(2024, 6, 1)))

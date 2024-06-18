@@ -33,7 +33,7 @@ from observatory_platform.airflow.release import PartitionRelease, set_task_stat
 from observatory_platform.airflow.tasks import check_dependencies
 from observatory_platform.airflow.workflow import CloudWorkspace, cleanup
 from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
-from observatory_platform.files import save_jsonl_gz, load_jsonl, add_partition_date, load_csv
+from observatory_platform.files import save_jsonl_gz, load_jsonl, add_partition_date
 from observatory_platform.google.bigquery import bq_load_table, bq_table_id, bq_create_dataset
 from observatory_platform.google.gcs import gcs_blob_uri, gcs_upload_files, gcs_blob_name_from_path, gcs_download_blob
 
@@ -70,7 +70,7 @@ class UclSalesRelease(PartitionRelease):
 
     @property
     def download_blob_name(self):
-        return gcs_blob_name_from_path(self.downloady_path)
+        return gcs_blob_name_from_path(self.download_path)
 
     @property
     def transform_blob_name(self):
@@ -185,7 +185,10 @@ def create_dag(
             if not success:
                 raise FileNotFoundError(f"Error downloading file: {release.download_blob_name}")
 
-            data = load_csv(release.download_path)
+            with open(release.download_path) as f:
+                reader = csv.reader(f)
+                data = [r for r in reader]
+            # data = load_csv(release.download_path)
             data = transform(data)
 
             save_jsonl_gz(release.transform_path, data)
@@ -201,7 +204,7 @@ def create_dag(
             release = UclSalesRelease.from_dict(release)
             # Download files from GCS
             success = gcs_download_blob(
-                bucket_name=cloud_workspace.download_bucket,
+                bucket_name=cloud_workspace.transform_bucket,
                 blob_name=release.transform_blob_name,
                 file_path=release.transform_path,
             )
@@ -209,7 +212,7 @@ def create_dag(
                 raise FileNotFoundError(f"Error downloading file: {release.download_blob_name}")
 
             data = load_jsonl(release.transform_path)
-            success = data_integrity_check(data)
+            success = data_integrity_check(data, current_date=release.partition_date)
             if not success:
                 raise RuntimeError("Data integrity check failed. Check logs for information")
 
@@ -294,7 +297,7 @@ def create_dag(
 
 
 def standardise_header(header: List[str]) -> List[str]:
-    return [h.strip().lower() for h in header[0]]
+    return [h.strip().lower() for h in header]
 
 
 def drop_duplicate_headings(data: List[List]) -> List[List]:
@@ -398,8 +401,15 @@ def transform(data: List[List]) -> List[dict]:
     for row in converted_data:
         new_row = {v: row[k] for k, v in headings_mapping.items()}
         # Make the release date partition based on each row's year/month
-        release_date = pendulum.datetime(year=int(row["Year"]), month=int(row["Month"]), day=1).end_of("month")
+        release_date = pendulum.datetime(year=int(row["year"]), month=int(row["month"]), day=1).end_of("month")
         add_partition_date([new_row], partition_date=release_date, partition_field="release_date")
+
+        # Attempt publication date formatting but it's not essential
+        try:
+            new_row["Publication_Date"] = pendulum.parse(new_row["Publication_Date"]).format("YYYY-MM-DD")
+        except pendulum.parsing.exceptions.ParserError:
+            new_row["Publication_Date"] = None
+
         transformed.append(new_row)
 
     return transformed
@@ -439,8 +449,6 @@ def data_integrity_check(data: List[dict], current_date: pendulum.DateTime) -> b
 
     # ISBN check
     isbns = [r["ISBN13"] for r in data]
-    print("HERE")
-    print(len(data[0]["ISBN13"]))
     if not all([_isbn_check(i) for i in isbns]):
         logging.warn("Invalid ISBN found in data")
         is_valid = False
