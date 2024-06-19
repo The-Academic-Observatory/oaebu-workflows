@@ -107,9 +107,9 @@ def create_dag(
     api_bq_dataset_id: str = "dataset_api",
     oaebu_service_account_conn_id: str = "oaebu_service_account",
     schedule: str = "0 0 4 * *",  # run on the 4th of every month TODO: confirm
-    start_date: pendulum.DateTime = pendulum.datetime(2023, 7, 1),
+    start_date: pendulum.DateTime = pendulum.datetime(2023, 8, 1),
     catchup: bool = True,
-    max_active_runs: int = 10,
+    max_active_runs: int = 1,
     retries: int = 3,
     retry_delay: Union[int, float] = 5,
 ):
