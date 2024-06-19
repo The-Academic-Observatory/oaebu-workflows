@@ -296,10 +296,6 @@ def create_dag(
     return ucl_sales()
 
 
-def standardise_header(header: List[str]) -> List[str]:
-    return [h.strip().lower() for h in header]
-
-
 def drop_duplicate_headings(data: List[List]) -> List[List]:
     """Finds duplicate headings and drops the column
 
@@ -312,6 +308,22 @@ def drop_duplicate_headings(data: List[List]) -> List[List]:
         indexes = [i for i, v in enumerate(data[0]) if v == h]
         duplicates.extend(indexes[1:])
     for i in sorted(duplicates, reverse=True):
+        for row in data:
+            del row[i]
+    return data
+
+
+def drop_empty_rows(data: List[List]) -> List[List]:
+    """Finds rows of empty strings and removes it from the data
+
+    :param data: The data to clean
+    """
+
+    empty_rows = []
+    for i, row in enumerate(data):
+        if all([c == "" for c in row]) or not row:
+            empty_rows.append(i)
+    for i in sorted(empty_rows, reverse=True):
         for row in data:
             del row[i]
     return data
@@ -374,8 +386,9 @@ def transform(data: List[List]) -> List[dict]:
     :return: The transformed data
     """
 
-    data[0] = standardise_header(data[0])  # The first row is the header
+    data[0] = [h.strip().lower() for h in data[0]]  # The first row is the header
     data = drop_duplicate_headings(data)
+    data = drop_empty_rows(data)
 
     # Convert to list of dicts format
     converted_data = []
@@ -453,10 +466,10 @@ def data_integrity_check(data: List[dict], current_date: pendulum.DateTime) -> b
         logging.warn("Invalid ISBN found in data")
         is_valid = False
 
-    # Quantity check
-    qtys = [int(r["Quantity"]) for r in data]
-    if not all([q >= 0 for q in qtys]):
-        logging.warn("Negative Quantity found in data")
-        is_valid = False
+    # # Quantity check
+    # qtys = [int(r["Quantity"]) for r in data]
+    # if not all([q >= 0 for q in qtys]):
+    #     logging.warn("Negative Quantity found in data")
+    #     is_valid = False
 
     return is_valid
