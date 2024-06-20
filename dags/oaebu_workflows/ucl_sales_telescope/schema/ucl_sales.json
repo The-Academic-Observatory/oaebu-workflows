@@ -52,5 +52,11 @@
     "name": "release_date",
     "type": "DATE",
     "description": "Last day of the release month. Table is partitioned on this column."
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "sheet_month",
+    "type": "STRING",
+    "description": "The sheet date from which this record is attributed to"
   }
 ]

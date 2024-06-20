@@ -32,6 +32,7 @@ from oaebu_workflows.ucl_sales_telescope.ucl_sales_telescope import (
     data_integrity_check,
     drop_duplicate_headings,
     drop_empty_rows,
+    fill_empty_dates,
 )
 from observatory_platform.airflow.workflow import Workflow
 from observatory_platform.dataset_api import DatasetAPI
@@ -257,7 +258,7 @@ class TestDropDuplicateHeadings(TestCase):
 
     def test_duplicate_data(self):
         """Test that the function works on data with a duplicated heading"""
-        input = [["head1", "head2", "head1", "HEAD2", "head1"], ["data1", "data2", "data1", "data2", ""]]
+        input = [["head1", "head2", "head1", "HEAD2", "head1", "head2"], ["data1", "data2", "data1", "data2", "", ""]]
         expected_output = [["head1", "head2", "HEAD2"], ["data1", "data2", "data2"]]
         actual_output = drop_duplicate_headings(input)
         self.assertEqual(expected_output, actual_output)
@@ -284,6 +285,46 @@ class TestDropEmptyRows(TestCase):
         input = [["foo", "bar"], ["foo", "bar"]]
         output = drop_empty_rows(input)
         self.assertEqual(input, output)
+
+
+class TestFillEmptyDates(TestCase):
+    """Tests for the fill_empty_dates function"""
+
+    def test_empty_data(self):
+        """Tests that the function works on data with missing year/month values"""
+        input_data = [
+            {"foo": "bar", "year": "2024", "month": ""},
+            {"foo": "bar", "year": "", "month": "12"},
+            {"foo": "bar", "year": "", "month": ""},
+        ]
+        input_date = pendulum.datetime(2020, 1, 1)
+        expected_output = [
+            {"foo": "bar", "year": "2024", "month": "1"},
+            {"foo": "bar", "year": "2020", "month": "12"},
+            {"foo": "bar", "year": "2020", "month": "1"},
+        ]
+        actual_output = fill_empty_dates(input_data, input_date)
+        self.assertEqual(expected_output, actual_output)
+
+    def test_good_data(self):
+        """Tests that data with no missing dates is untouched"""
+        input_data = [
+            {"foo": "bar", "year": "2024", "month": "1"},
+            {"foo": "bar", "year": "1", "month": "12"},
+        ]
+        input_date = pendulum.datetime(2020, 1, 1)
+        output = fill_empty_dates(input_data, input_date)
+        self.assertEqual(input_data, output)
+
+    def test_missing_keys(self):
+        """Tests that data with missing year/month keys is handled and untouched"""
+        input_data = [
+            {"foo": "bar", "YEAR": "", "MONTH": ""},
+            {"foo": "bar", "foo2": "", "foo3": ""},
+        ]
+        input_date = pendulum.datetime(2020, 1, 1)
+        output = fill_empty_dates(input_data, input_date)
+        self.assertEqual(input_data, output)
 
 
 class TestDownloadSales(TestCase):
@@ -330,7 +371,7 @@ class TestTransform(TestCase):
         input = [
             ["IsBn", "QTY", "year", "month", "free/paid/return?", "country", "book", "pub date", "foo"],
             ["1111111111111", "1", "2024", "5", "Paid", "UK", "My Book Title", "2020/01/01", "bar"],
-            ["2222222222222", "1", "2024", "6", "Return", "UK", "My Book Title", "2020/01/01", "bar"],
+            ["2222222222222", "1", "2024", "6", "RETURN ", "UK", "My Book Title", "2020/01/01", "bar"],
         ]
         expected_output = [
             {
@@ -338,43 +379,45 @@ class TestTransform(TestCase):
                 "Quantity": "1",
                 "Year": "2024",
                 "Month": "5",
-                "Sale_Type": "Paid",
+                "Sale_Type": "paid",
                 "Country": "UK",
                 "Title": "My Book Title",
                 "Publication_Date": "2020-01-01",
                 "release_date": "2024-05-31",
+                "sheet_month": "202406",
             },
             {
                 "ISBN13": "2222222222222",
                 "Quantity": "1",
                 "Year": "2024",
                 "Month": "6",
-                "Sale_Type": "Return",
+                "Sale_Type": "return",
                 "Country": "UK",
                 "Title": "My Book Title",
                 "Publication_Date": "2020-01-01",
                 "release_date": "2024-06-30",
+                "sheet_month": "202406",
             },
         ]
-        actual_output = transform(input)
+        actual_output = transform(input, pendulum.datetime(2024, 6, 1))
         self.assertEqual(expected_output, actual_output)
 
-    def test_invalid_input(self):
-        """Test the transform fails when input is not valid"""
+    def test_invalid_header(self):
+        """Test the transform fails when header is not valid"""
         # missing isbn
         input = [
             ["qty", "year", "month", "free/paid/return?", "country", "book", "pub date", "foo"],
             ["1", "2024", "5", "Paid", "UK", "My Book Title", "2020/01/01", "bar"],
         ]
         with self.assertRaisesRegex(ValueError, "Invalid header found"):
-            transform(input)
+            transform(input, pendulum.datetime(2024, 6, 1))
 
     def test_invalid_publication_date(self):
         """Test the transform fails when input is not valid"""
         # invalid Publication_Date
         input = [
-            ["isbn", "qty", "year", "month", "free/paid/return?", "country", "book", "pub date", "foo"],
-            ["2222222222222", "1", "2024", "6", "Return", "UK", "My Book Title", "invalid_date", "bar"],
+            ["isbn", "qty", "year", "month", "free/paid/return?", "country", "book", "pub date"],
+            ["2222222222222", "1", "2024", "6", "Return", "UK", "My Book Title", "invalid_date"],
         ]
         expected_output = [
             {
@@ -382,14 +425,15 @@ class TestTransform(TestCase):
                 "Quantity": "1",
                 "Year": "2024",
                 "Month": "6",
-                "Sale_Type": "Return",
+                "Sale_Type": "return",
                 "Country": "UK",
                 "Title": "My Book Title",
                 "Publication_Date": None,
                 "release_date": "2024-06-30",
+                "sheet_month": "202406",
             },
         ]
-        actual_output = transform(input)
+        actual_output = transform(input, pendulum.datetime(2024, 6, 1))
         self.assertEqual(expected_output, actual_output)
 
 
@@ -402,11 +446,12 @@ class TestDataIntegrityCheck(TestCase):
                 "Quantity": "1",
                 "Year": "2024",
                 "Month": "5",
-                "Sale_Type": "Paid",
+                "Sale_Type": "paid",
                 "Country": "UK",
                 "Title": "My Book Title",
                 "Publication_Date": "2020/01/01",
                 "release_date": "2024-05-31",
+                "sheet_month": "202405",
             }
         ]
         self.assertTrue(data_integrity_check(input, pendulum.datetime(2024, 6, 1)))
@@ -423,14 +468,15 @@ class TestDataIntegrityCheck(TestCase):
                 "Quantity": "1",
                 "Year": "2024",
                 "Month": "5",
-                "Sale_Type": "Paid",
+                "Sale_Type": "paid",
                 "Country": "UK",
                 "Title": "My Book Title",
                 "Publication_Date": "2020/01/01",
                 "release_date": "2024-05-31",
+                "sheet_month": "202405",
             }
         ]
-        self.assertFalse(data_integrity_check(input, pendulum.datetime(2024, 5, 1)))
+        self.assertFalse(data_integrity_check(input, pendulum.datetime(2024, 5, 1)))  # Release date in future
 
     def test_invalid_sale_type(self):
         """Test that the check fails when an invalid sale type is input"""
@@ -440,11 +486,12 @@ class TestDataIntegrityCheck(TestCase):
                 "Quantity": "1",
                 "Year": "2024",
                 "Month": "5",
-                "Sale_Type": "Foo",
+                "Sale_Type": "Paid",  # Should be all lowercase
                 "Country": "UK",
                 "Title": "My Book Title",
                 "Publication_Date": "2020/01/01",
                 "release_date": "2024-05-31",
+                "sheet_month": "202405",
             }
         ]
         self.assertFalse(data_integrity_check(input, pendulum.datetime(2024, 6, 1)))
@@ -457,11 +504,12 @@ class TestDataIntegrityCheck(TestCase):
                 "Quantity": "1",
                 "Year": "2024",
                 "Month": "5",
-                "Sale_Type": "Paid",
+                "Sale_Type": "paid",
                 "Country": "UK",
                 "Title": "My Book Title",
                 "Publication_Date": "2020/01/01",
                 "release_date": "2024-05-31",
+                "sheet_month": "202405",
             }
         ]
         self.assertFalse(data_integrity_check(input, pendulum.datetime(2024, 6, 1)))
@@ -481,6 +529,7 @@ class TestDataIntegrityCheck(TestCase):
     #             "Title": "My Book Title",
     #             "Publication_Date": "2020/01/01",
     #             "release_date": "2024-05-31",
+    #             "sheet_month": "202405",
     #         }
     #     ]
     #     self.assertFalse(data_integrity_check(input, pendulum.datetime(2024, 6, 1)))

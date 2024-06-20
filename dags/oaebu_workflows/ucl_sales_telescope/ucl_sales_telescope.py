@@ -188,8 +188,7 @@ def create_dag(
             with open(release.download_path) as f:
                 reader = csv.reader(f)
                 data = [r for r in reader]
-            # data = load_csv(release.download_path)
-            data = transform(data)
+            data = transform(data, release.partition_date)
 
             save_jsonl_gz(release.transform_path, data)
             success = gcs_upload_files(
@@ -303,10 +302,10 @@ def drop_duplicate_headings(data: List[List]) -> List[List]:
     """
 
     duplicates = []
-    header = data[0]
-    for h in header:
+    for h in data[0]:
         indexes = [i for i, v in enumerate(data[0]) if v == h]
         duplicates.extend(indexes[1:])
+    duplicates = set(duplicates)
     for i in sorted(duplicates, reverse=True):
         for row in data:
             del row[i]
@@ -323,9 +322,27 @@ def drop_empty_rows(data: List[List]) -> List[List]:
     for i, row in enumerate(data):
         if all([c == "" for c in row]) or not row:
             empty_rows.append(i)
+    print(empty_rows)
     for i in sorted(empty_rows, reverse=True):
-        for row in data:
-            del row[i]
+        del data[i]
+    return data
+
+
+def fill_empty_dates(data: List[dict], fill_date: pendulum.DateTime) -> List[dict]:
+    """Finds empty year/month values and populates whem with the appropriate value from the fill date
+
+    :param data: The data to fill if empty
+    :param fill_date: The date object. Empty year/month values will be filled as a string using this.
+    """
+
+    for row in data:
+        try:
+            if not row["year"]:
+                row["year"] = str(fill_date.year)
+            if not row["month"]:
+                row["month"] = str(fill_date.month)
+        except KeyError:
+            logging.warn("No 'year' or 'month' key found in row")
     return data
 
 
@@ -379,7 +396,7 @@ def download(
     return sheet_contents
 
 
-def transform(data: List[List]) -> List[dict]:
+def transform(data: List[List], sheet_date: pendulum.DateTime) -> List[dict]:
     """Transforms the ucl sales data.
 
     :param data: The UCL sales data
@@ -408,22 +425,34 @@ def transform(data: List[List]) -> List[dict]:
     }
     for row in converted_data:
         if not all(h in row.keys() for h in headings_mapping.keys()):
-            raise ValueError(f"Invalid header found for row: {row.keys()}")
+            raise ValueError(f"Invalid header found: {row.keys()}")
+
+    # Map the headings to our desired values
+    for i, row in enumerate(converted_data):
+        converted_data[i] = {v: row[k] for k, v in headings_mapping.items()}
+
+    # Lower case the sale type
+    for row in converted_data:
+        row["Sale_Type"] = row["Sale_Type"].strip().lower()
+
+    # Fill empty year/month entries
+    fill_empty_dates(converted_data, sheet_date)
 
     transformed = []
     for row in converted_data:
-        new_row = {v: row[k] for k, v in headings_mapping.items()}
         # Make the release date partition based on each row's year/month
-        release_date = pendulum.datetime(year=int(row["year"]), month=int(row["month"]), day=1).end_of("month")
-        add_partition_date([new_row], partition_date=release_date, partition_field="release_date")
+        release_date = pendulum.datetime(year=int(row["Year"]), month=int(row["Month"]), day=1).end_of("month")
+        add_partition_date([row], partition_date=release_date, partition_field="release_date")
+
+        # Add the sheet month as a field for book-keeping
+        row["sheet_month"] = sheet_date.format("YYYYMM")
 
         # Attempt publication date formatting but it's not essential
         try:
-            new_row["Publication_Date"] = pendulum.parse(new_row["Publication_Date"]).format("YYYY-MM-DD")
+            row["Publication_Date"] = pendulum.parse(row["Publication_Date"]).format("YYYY-MM-DD")
         except pendulum.parsing.exceptions.ParserError:
-            new_row["Publication_Date"] = None
-
-        transformed.append(new_row)
+            row["Publication_Date"] = None
+        transformed.append(row)
 
     return transformed
 
@@ -456,8 +485,8 @@ def data_integrity_check(data: List[dict], current_date: pendulum.DateTime) -> b
 
     # Sale type check
     sale_types = [r["Sale_Type"] for r in data]
-    if not all([st in ("Paid", "Return", "Free") for st in sale_types]):
-        logging.warn("Not all sale types one of 'Paid', 'Return', 'Free'")
+    if not all([st in ("paid", "return", "free") for st in sale_types]):
+        logging.warn("Not all sale types one of 'paid', 'return', 'free'")
         is_valid = False
 
     # ISBN check
