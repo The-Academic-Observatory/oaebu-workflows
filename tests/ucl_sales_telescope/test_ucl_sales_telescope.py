@@ -293,15 +293,15 @@ class TestFillEmptyDates(TestCase):
     def test_empty_data(self):
         """Tests that the function works on data with missing year/month values"""
         input_data = [
-            {"foo": "bar", "year": "2024", "month": ""},
-            {"foo": "bar", "year": "", "month": "12"},
-            {"foo": "bar", "year": "", "month": ""},
+            {"foo": "bar", "Year": "2024", "Month": ""},
+            {"foo": "bar", "Year": "", "Month": "12"},
+            {"foo": "bar", "Year": "", "Month": ""},
         ]
         input_date = pendulum.datetime(2020, 1, 1)
         expected_output = [
-            {"foo": "bar", "year": "2024", "month": "1"},
-            {"foo": "bar", "year": "2020", "month": "12"},
-            {"foo": "bar", "year": "2020", "month": "1"},
+            {"foo": "bar", "Year": "2024", "Month": "1"},
+            {"foo": "bar", "Year": "2020", "Month": "12"},
+            {"foo": "bar", "Year": "2020", "Month": "1"},
         ]
         actual_output = fill_empty_dates(input_data, input_date)
         self.assertEqual(expected_output, actual_output)
@@ -309,8 +309,8 @@ class TestFillEmptyDates(TestCase):
     def test_good_data(self):
         """Tests that data with no missing dates is untouched"""
         input_data = [
-            {"foo": "bar", "year": "2024", "month": "1"},
-            {"foo": "bar", "year": "1", "month": "12"},
+            {"foo": "bar", "Year": "2024", "Month": "1"},
+            {"foo": "bar", "Year": "1", "Month": "12"},
         ]
         input_date = pendulum.datetime(2020, 1, 1)
         output = fill_empty_dates(input_data, input_date)
@@ -320,6 +320,7 @@ class TestFillEmptyDates(TestCase):
         """Tests that data with missing year/month keys is handled and untouched"""
         input_data = [
             {"foo": "bar", "YEAR": "", "MONTH": ""},
+            {"foo": "bar", "year": "", "month": ""},
             {"foo": "bar", "foo2": "", "foo3": ""},
         ]
         input_date = pendulum.datetime(2020, 1, 1)

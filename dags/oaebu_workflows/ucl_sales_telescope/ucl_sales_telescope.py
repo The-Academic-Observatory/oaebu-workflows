@@ -337,12 +337,12 @@ def fill_empty_dates(data: List[dict], fill_date: pendulum.DateTime) -> List[dic
 
     for row in data:
         try:
-            if not row["year"]:
-                row["year"] = str(fill_date.year)
-            if not row["month"]:
-                row["month"] = str(fill_date.month)
+            if not row["Year"]:
+                row["Year"] = str(fill_date.year)
+            if not row["Month"]:
+                row["Month"] = str(fill_date.month)
         except KeyError:
-            logging.warn("No 'year' or 'month' key found in row")
+            logging.warn("No 'Year' or 'Month' key found in row")
     return data
 
 
@@ -449,6 +449,7 @@ def transform(data: List[List], sheet_date: pendulum.DateTime) -> List[dict]:
 
         # Attempt publication date formatting but it's not essential
         try:
+            print(row)
             row["Publication_Date"] = pendulum.parse(row["Publication_Date"]).format("YYYY-MM-DD")
         except pendulum.parsing.exceptions.ParserError:
             row["Publication_Date"] = None
