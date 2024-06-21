@@ -376,13 +376,6 @@ def clean_row(row: dict, fill_date: pendulum.DateTime) -> dict:
         row["ISBN13"] = None
         nullified.append("ISBN13")
 
-    # Attempt publication date formatting but it's not essential
-    try:
-        row["Publication_Date"] = pendulum.parse(row["Publication_Date"]).format("YYYY-MM-DD")
-    except (pendulum.parsing.exceptions.ParserError, ValueError):  # Value error raised if empty string
-        row["Publication_Date"] = None
-        nullified.append("Publication_Date")
-
     # Clean the Sale Type so that it's a consistent format
     row["Sale_Type"] = row["Sale_Type"].strip().lower()
     if row["Sale_Type"] not in ("paid", "return", "free"):
@@ -418,7 +411,6 @@ def convert_headings(data: List[dict]) -> List[dict]:
         "free/paid/return?": "Sale_Type",
         "country": "Country",
         "book": "Title",
-        "pub date": "Publication_Date",
     }
     for row in data:
         if not all(h in row.keys() for h in headings_mapping.keys()):

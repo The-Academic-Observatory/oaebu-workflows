@@ -117,11 +117,11 @@ class TestUclSalesTelescope(SandboxTestCase):
         with env.create(), env.create_dag_run(dag, execution_date):
             # Mock return values of download function
             sheet_return = [
-                ["Year", "Month", "Free/Paid/Return?", "Country", "ISBN", "Book", "Pub Date", "Qty"],
-                ["2024", "2", "Paid", "UK", "9781111111111", "My Book1", "2023/01/01", "5"],
-                ["2024", "2", "Return", "UK", "9782222222222", "My Book2", "2023/01/01", "5"],
-                ["2024", "2", "Free", "UK", "9783333333333", "My Book3", "2023/01/01", "5"],
-                ["2024", "1", "Paid", "UK", "9784444444444", "My Book4", "2023/01/01", "5"],
+                ["Year", "Month", "Free/Paid/Return?", "Country", "ISBN", "Book", "Qty"],
+                ["2024", "2", "Paid", "UK", "9781111111111", "My Book1", "5"],
+                ["2024", "2", "Return", "UK", "9782222222222", "My Book2", "5"],
+                ["2024", "2", "Free", "UK", "9783333333333", "My Book3", "5"],
+                ["2024", "1", "Paid", "UK", "9784444444444", "My Book4", "5"],
             ]
             conn = Connection(
                 conn_id="oaebu_service_account",
@@ -200,7 +200,7 @@ class TestUclSalesTelescope(SandboxTestCase):
             self.assert_table_integrity(table_id, 4)
             self.assert_table_content(
                 table_id,
-                load_and_parse_json(self.test_table, date_fields={"release_date", "Publication_Date"}),
+                load_and_parse_json(self.test_table, date_fields={"release_date"}),
                 "ISBN13",
             )
 
@@ -294,7 +294,6 @@ class TestCleanRow(TestCase):
             "Sale_Type": "paid",
             "Country": "UK",
             "Title": "My Book Title",
-            "Publication_Date": "2020-01-01",
         }
         output = clean_row(input_data, pendulum.datetime(2020, 1, 1))
         self.assertEqual(input_data, output)
@@ -309,7 +308,6 @@ class TestCleanRow(TestCase):
             "Sale_Type": "paid",
             "Country": "UK",
             "Title": "My Book Title",
-            "Publication_Date": "2020-01-01",
         }
         input_date = pendulum.datetime(2020, 1, 1)
         expected_output = input_data.copy()
@@ -317,26 +315,6 @@ class TestCleanRow(TestCase):
         actual_output = clean_row(input_data, pendulum.datetime(2020, 1, 1))
         self.assertEqual(expected_output, actual_output)
         input_data["ISBN13"] = "1111111111111"  # Doesn't start with 978
-        actual_output = clean_row(input_data, pendulum.datetime(2020, 1, 1))
-        self.assertEqual(expected_output, actual_output)
-
-    def test_bad_publication_date(self):
-        """Tests that data with bad publication date is handled correctly"""
-        input_data = {
-            "ISBN13": "9781111111111",
-            "Quantity": "1",
-            "Year": "2024",
-            "Month": "5",
-            "Sale_Type": "paid",
-            "Country": "UK",
-            "Title": "My Book Title",
-            "Publication_Date": "",  # Should be caught by value error
-        }
-        expected_output = input_data.copy()
-        expected_output["Publication_Date"] = None
-        actual_output = clean_row(input_data, pendulum.datetime(2020, 1, 1))
-        self.assertEqual(expected_output, actual_output)
-        input_data["Publication_Date"] = "foobar"  # Should be caught by parser exception
         actual_output = clean_row(input_data, pendulum.datetime(2020, 1, 1))
         self.assertEqual(expected_output, actual_output)
 
@@ -350,7 +328,6 @@ class TestCleanRow(TestCase):
             "Sale_Type": "",  # Should be nullified
             "Country": "UK",
             "Title": "My Book Title",
-            "Publication_Date": "2020-01-01",
         }
         expected_output = input_data.copy()
         expected_output["Sale_Type"] = None
@@ -374,7 +351,6 @@ class TestCleanRow(TestCase):
             "Sale_Type": "paid",
             "Country": "UK",
             "Title": "My Book Title",
-            "Publication_Date": "2020-01-01",
         }
         expected_output = input_data.copy()
         expected_output["Year"] = "2020"  # Should be filled with the input date
@@ -397,7 +373,6 @@ class TestConvertHeadings(TestCase):
                 "free/paid/return?": "paid",
                 "country": "UK",
                 "book": "my book title",
-                "pub date": "2020-01-01",
             }
         ]
         expected_output = [
@@ -409,7 +384,6 @@ class TestConvertHeadings(TestCase):
                 "Sale_Type": "paid",
                 "Country": "UK",
                 "Title": "my book title",
-                "Publication_Date": "2020-01-01",
             }
         ]
         actual_output = convert_headings(input_data)
@@ -430,7 +404,6 @@ class TestConvertHeadings(TestCase):
                 "free/paid/return?": "paid",
                 "country": "UK",
                 "book": "my book title",
-                "pub date": "2020-01-01",
             },
             {"foo": "bar"},
         ]
@@ -480,9 +453,9 @@ class TestTransform(TestCase):
     def test_valid_input(self):
         """Test the transform function works when the input is valid"""
         input = [
-            ["IsBn", "QTY", "year", "month", "free/paid/return?", "country", "book", "pub date", "foo"],
-            ["9781111111111", "1", "2024", "5", "Paid", "UK", "My Book Title", "2020/01/01", "bar"],
-            ["9782222222222", "1", "2024", "6", "RETURN ", "UK", "My Book Title", "2020/01/01", "bar"],
+            ["IsBn", "QTY", "year", "month", "free/paid/return?", "country", "book", "foo"],
+            ["9781111111111", "1", "2024", "5", "Paid", "UK", "My Book Title", "bar"],
+            ["9782222222222", "1", "2024", "6", "RETURN ", "UK", "My Book Title", "bar"],
         ]
         expected_output = [
             {
@@ -493,7 +466,6 @@ class TestTransform(TestCase):
                 "Sale_Type": "paid",
                 "Country": "UK",
                 "Title": "My Book Title",
-                "Publication_Date": "2020-01-01",
                 "release_date": "2024-05-31",
                 "sheet_month": "202406",
             },
@@ -505,7 +477,6 @@ class TestTransform(TestCase):
                 "Sale_Type": "return",
                 "Country": "UK",
                 "Title": "My Book Title",
-                "Publication_Date": "2020-01-01",
                 "release_date": "2024-06-30",
                 "sheet_month": "202406",
             },

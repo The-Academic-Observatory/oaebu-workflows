@@ -30,12 +30,6 @@
     "type": "STRING"
   },
   {
-    "description": "Date of publication",
-    "mode": "NULLABLE",
-    "name": "Publication_Date",
-    "type": "DATE"
-  },
-  {
     "description": "Year of sale",
     "mode": "NULLABLE",
     "name": "Year",
