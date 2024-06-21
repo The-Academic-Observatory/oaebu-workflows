@@ -1,7 +1,7 @@
 [
   {
     "description": "ISBN13 of the book.",
-    "mode": "REQUIRED",
+    "mode": "NULLABLE",
     "name": "ISBN13",
     "type": "STRING"
   },
@@ -13,7 +13,7 @@
   },
   {
     "description": "Country of sale",
-    "mode": "REQUIRED",
+    "mode": "NULLABLE",
     "name": "Country",
     "type": "STRING"
   },
