@@ -301,7 +301,6 @@ def drop_empty_rows(data: List[List]) -> List[List]:
     for i, row in enumerate(data):
         if all([c == "" for c in row]) or not row:
             empty_rows.append(i)
-    print(empty_rows)
     for i in sorted(empty_rows, reverse=True):
         del data[i]
     return data
