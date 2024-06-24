@@ -14,7 +14,6 @@
 
 # Author: Keegan Smith
 
-from observatory_platform.files import get_file_hash
 import os
 import shutil
 from tempfile import TemporaryDirectory, NamedTemporaryFile
@@ -416,15 +415,17 @@ class TestNormaliseRelatedProducts(unittest.TestCase):
 
 
 class TestElevateRelatedProducts(unittest.TestCase):
-    # Should return the same input list if no related products have an ISBN
+    """Tests the elevate_related_products function"""
+
     def test_no_isbn_related_products(self):
+        """Should return the same input list if no related products have an ISBN"""
         expected_products = [
             {
                 "ProductIdentifier": {"ProductIDType": "15", "IDValue": "1234567890"},
                 "RelatedMaterial": {
                     "RelatedProduct": {
-                        "ProductRelationCode": "01",
-                        "ProductIdentifier": [{"ProductIDType": "03", "IDValue": "9876543210"}],
+                        "ProductRelationCode": "06",
+                        "ProductIdentifier": {"ProductIDType": "03", "IDValue": "9876543210"},
                     }
                 },
             }
@@ -433,8 +434,8 @@ class TestElevateRelatedProducts(unittest.TestCase):
         result = elevate_related_products(expected_products)
         self.assertEqual(result, expected_products)  # Should not change
 
-    # Should return the same input list if no related products are present
     def test_no_related_products(self):
+        """Should return the same input list if no related products are present"""
         onix_products = [
             {"ProductIdentifier": {"ProductIDType": "15", "IDValue": "1234567890"}, "RelatedMaterial": {}},
         ]
@@ -448,12 +449,10 @@ class TestElevateRelatedProducts(unittest.TestCase):
             {
                 "ProductIdentifier": {"ProductIDType": "03", "IDValue": "1234567890"},
                 "RelatedMaterial": {
-                    "RelatedProduct": [
-                        {
-                            "ProductRelationCode": "06",
-                            "ProductIdentifier": {"ProductIDType": "15", "IDValue": "0987654321"},
-                        }
-                    ]
+                    "RelatedProduct": {
+                        "ProductRelationCode": "06",
+                        "ProductIdentifier": {"ProductIDType": "15", "IDValue": "0987654321"},
+                    }
                 },
             }
         ]
@@ -462,17 +461,15 @@ class TestElevateRelatedProducts(unittest.TestCase):
         self.assertEqual(result, onix_products)  # Should not change
 
     def test_relation_code(self):
-        """Shuold not elevate related products if the relation code is no '06'"""
+        """Shuold not elevate related products if the relation code is not in the code map"""
         onix_products = [
             {
                 "ProductIdentifier": {"ProductIDType": "15", "IDValue": "1234567890"},
                 "RelatedMaterial": {
-                    "RelatedProduct": [
-                        {
-                            "ProductRelationCode": "03",
-                            "ProductIdentifier": {"ProductIDType": "15", "IDValue": "0987654321"},
-                        }
-                    ]
+                    "RelatedProduct": {
+                        "ProductRelationCode": "03",
+                        "ProductIdentifier": {"ProductIDType": "15", "IDValue": "0987654321"},
+                    }
                 },
             }
         ]
@@ -486,12 +483,10 @@ class TestElevateRelatedProducts(unittest.TestCase):
             {
                 "ProductIdentifier": {"ProductIDType": "15", "IDValue": "2"},
                 "RelatedMaterial": {
-                    "RelatedProduct": [
-                        {
-                            "ProductRelationCode": "06",
-                            "ProductIdentifier": {"ProductIDType": "15", "IDValue": "1"},
-                        }
-                    ]
+                    "RelatedProduct": {
+                        "ProductRelationCode": "06",
+                        "ProductIdentifier": {"ProductIDType": "15", "IDValue": "1"},
+                    }
                 },
             },
             {
@@ -509,79 +504,49 @@ class TestElevateRelatedProducts(unittest.TestCase):
             {
                 "ProductIdentifier": {"ProductIDType": "15", "IDValue": "1"},
                 "RelatedMaterial": {
-                    "RelatedProduct": [
-                        {
-                            "ProductRelationCode": "06",
-                            "ProductIdentifier": {"ProductIDType": "15", "IDValue": "1.1"},
-                        },
-                    ]
+                    "RelatedProduct": {
+                        "ProductRelationCode": "06",
+                        "ProductIdentifier": {"ProductIDType": "15", "IDValue": "1.1"},
+                    },
                 },
                 "RecordReference": "product1",
             },
             {
                 "ProductIdentifier": {"ProductIDType": "15", "IDValue": "2"},
                 "RelatedMaterial": {
-                    "RelatedProduct": [
-                        {
-                            "ProductRelationCode": "06",
-                            "ProductIdentifier": {"ProductIDType": "15", "IDValue": "2.1"},
-                        }
-                    ]
+                    "RelatedProduct": {
+                        "ProductRelationCode": "13",
+                        "ProductIdentifier": {"ProductIDType": "15", "IDValue": "2.1"},
+                    }
                 },
                 "RecordReference": "product2",
             },
         ]
-
-        expected_result = [
-            {
-                "ProductIdentifier": {"ProductIDType": "15", "IDValue": "1"},
-                "RelatedMaterial": {
-                    "RelatedProduct": [
-                        {
-                            "ProductRelationCode": "06",
-                            "ProductIdentifier": {"ProductIDType": "15", "IDValue": "1.1"},
-                        },
-                    ]
-                },
-                "RecordReference": "product1",
-            },
-            {
-                "ProductIdentifier": {"ProductIDType": "15", "IDValue": "2"},
-                "RelatedMaterial": {
-                    "RelatedProduct": [
-                        {
-                            "ProductRelationCode": "06",
-                            "ProductIdentifier": {"ProductIDType": "15", "IDValue": "2.1"},
-                        }
-                    ]
-                },
-                "RecordReference": "product2",
-            },
-            {
-                "ProductIdentifier": {"ProductIDType": "15", "IDValue": "1.1"},
-                "RelatedMaterial": {
-                    "RelatedProduct": [
-                        {
+        expected_result = onix_products.copy()
+        expected_result.extend(
+            [
+                {
+                    "ProductIdentifier": {"ProductIDType": "15", "IDValue": "1.1"},
+                    "RelatedMaterial": {
+                        "RelatedProduct": {
                             "ProductRelationCode": "06",
                             "ProductIdentifier": {"ProductIDType": "15", "IDValue": "1"},
                         },
-                    ]
+                    },
+                    "RecordReference": "product1_1.1",
                 },
-                "RecordReference": "product1_1.1",
-            },
-            {
-                "ProductIdentifier": {"ProductIDType": "15", "IDValue": "2.1"},
-                "RelatedMaterial": {
-                    "RelatedProduct": [
-                        {
-                            "ProductRelationCode": "06",
+                {
+                    "ProductIdentifier": {"ProductIDType": "15", "IDValue": "2.1"},
+                    "RelatedMaterial": {
+                        "RelatedProduct": {
+                            "ProductRelationCode": "27",
                             "ProductIdentifier": {"ProductIDType": "15", "IDValue": "2"},
                         }
-                    ]
+                    },
+                    "RecordReference": "product2_2.1",
                 },
-                "RecordReference": "product2_2.1",
-            },
-        ]
+            ]
+        )
         result = elevate_related_products(onix_products)
         self.assertEqual(result, expected_result)
 
