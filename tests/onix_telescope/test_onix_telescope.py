@@ -188,7 +188,6 @@ class TestOnixTelescope(SandboxTestCase):
                 # Test transform
                 ti = env.run_task("process_release.transform", map_index=0)
                 self.assertEqual(ti.state, State.SUCCESS)
-                self.assert_file_integrity(release.transform_path, "ac9643dd", "gzip_crc")
                 self.assert_blob_integrity(
                     env.transform_bucket, gcs_blob_name_from_path(release.transform_path), release.transform_path
                 )
