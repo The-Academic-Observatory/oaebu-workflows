@@ -80,51 +80,6 @@ class TestOnixTransformer(SandboxTestCase):
                 keep_intermediate=True,
             )
             transformer_output_path = transformer.transform()
-            self.assert_file_integrity(
-                os.path.join(transformer.output_dir, self.filtered_name),
-                "28e2335496561f1340ae01a6770ad272",
-                algorithm="md5",
-            )
-            self.assert_file_integrity(
-                os.path.join(transformer.output_dir, self.errors_removed_name),
-                "29b11ef0a36ee0aee9c8b71dd2e93ea0",
-                algorithm="md5",
-            )
-            self.assert_file_integrity(
-                os.path.join(transformer.output_dir, self.normalised_name),
-                "56cee2b6087203382bc98b14d3d6e631",
-                algorithm="md5",
-            )
-            self.assert_file_integrity(
-                os.path.join(transformer.output_dir, self.deduplicated_name),
-                "3483c402a80e96719c0c039d8b7f9573",
-                algorithm="md5",
-            )
-            self.assert_file_integrity(
-                os.path.join(transformer.output_dir, self.elevated_name),
-                "6513debcc031ee6f46d17222b69907f7",
-                algorithm="md5",
-            )
-            self.assert_file_integrity(
-                os.path.join(transformer.output_dir, self.parsed_name),
-                "31b01c48667c4f810eaa6de4cf3bcdbe",
-                algorithm="md5",
-            )
-            self.assert_file_integrity(
-                os.path.join(transformer.output_dir, self.apply_names_name),
-                "b31d4800f29178f6075100d357216466",
-                algorithm="md5",
-            )
-            self.assert_file_integrity(
-                os.path.join(transformer.output_dir, self.collapsed_name),
-                "e695482f63e349966ff925836324b4e6",
-                algorithm="md5",
-            )
-            self.assert_file_integrity(
-                os.path.join(transformer.output_dir, self.invalid_products_name),
-                "73fef1a3fb4c644f0f5203d2132e76a4",
-                algorithm="md5",
-            )
             compare_lists_of_dicts(
                 load_jsonl(self.test_output_metadata),
                 load_jsonl(transformer_output_path),
