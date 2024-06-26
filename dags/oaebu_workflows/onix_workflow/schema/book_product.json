@@ -33,6 +33,12 @@
       },
       {
         "mode": "NULLABLE",
+        "name": "subtitle",
+        "type": "STRING",
+        "description": "The Book's Subtitle"
+      },
+      {
+        "mode": "NULLABLE",
         "name": "published_year",
         "type": "STRING",
         "description": "The year the book was published"
@@ -270,4 +276,3 @@
     "description": "Linked Metrics from all sources, organised by month of occurance"
   }
 ]
-

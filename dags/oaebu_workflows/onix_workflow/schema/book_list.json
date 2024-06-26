@@ -57,7 +57,19 @@
     "mode": "NULLABLE",
     "name": "title",
     "type": "STRING",
-    "description": "The Books Title"
+    "description": "The Book's Title"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "subtitle",
+    "type": "STRING",
+    "description": "Subtitle of the Book"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "title_subtitle",
+    "type": "STRING",
+    "description": "The concatenated title and subtitle of the Book"
   },
   {
     "mode": "REPEATED",

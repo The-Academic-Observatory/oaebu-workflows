@@ -13,6 +13,18 @@
   },
   {
     "mode": "NULLABLE",
+    "name": "subtitle",
+    "type": "STRING",
+    "description": "Subtitle of the Book"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "title_subtitle",
+    "type": "STRING",
+    "description": "The concatenated title and subtitle of the Book"
+  },
+  {
+    "mode": "NULLABLE",
     "name": "published_year",
     "type": "INTEGER",
     "description": "The publisher year of the book"
