@@ -537,10 +537,11 @@ def elevate_related_products(onix_products: List[dict]) -> List[dict]:
         if not product_isbn:
             continue  # Only elevate if parent product has an ISBN
 
+        relation_code_map = {"06": "06", "13": "27"}
         for related_product in related_products:
             relation_code = related_product["ProductRelationCode"]
-            if relation_code != "06":
-                continue  # We expect only "Alternative Format" relations - https://onix-codelists.io/codelist/51
+            if relation_code not in relation_code_map.keys():
+                continue  # We expect only "Alternative Format"/Epub relations - https://onix-codelists.io/codelist/51
 
             # Find the ISBN for the related product
             rp_isbn = _get_product_isbn(related_product)
@@ -549,17 +550,15 @@ def elevate_related_products(onix_products: List[dict]) -> List[dict]:
             if rp_isbn in parent_isbns:
                 continue  # No need to elevate as this is a duplicate of one of the original ISBNs
 
-            # Copy & make modifications to product
+            # Copy & make modifications to the new product
             new_product = deepcopy(product)
             new_product["ProductIdentifier"] = {"ProductIDType": "15", "IDValue": rp_isbn}
             new_product["RecordReference"] += f"_{rp_isbn}"
-            # Find and replace the original related product with the parent's ISBN
-            for rp in _get_related_products(new_product):
-                relation_code = rp["ProductRelationCode"]
-                if relation_code != "06":
-                    continue
-                if _get_product_isbn(rp) == rp_isbn:
-                    rp["ProductIdentifier"] = {"ProductIDType": "15", "IDValue": product_isbn}
+            # Make the parent the new related product with the inverted relation code
+            new_product["RelatedMaterial"]["RelatedProduct"] = {
+                "ProductRelationCode": relation_code_map[relation_code],
+                "ProductIdentifier": {"IDValue": product_isbn, "ProductIDType": "15"},
+            }
 
             added_products.append(new_product)
             parent_isbns.append(rp_isbn)
