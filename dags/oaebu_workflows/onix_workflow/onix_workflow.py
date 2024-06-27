@@ -686,6 +686,9 @@ def create_dag(
             )
 
             # Render the SQL
+            bic_table_id = bq_table_id(bq_subject_project_id, bq_subject_dataset_id, "bic_lookup")
+            thema_table_id = bq_table_id(bq_subject_project_id, bq_subject_dataset_id, "thema_lookup")
+            bisac_table_id = bq_table_id(bq_subject_project_id, bq_subject_dataset_id, "bisac_lookup")
             env = create_data_partner_env(
                 main_template=os.path.join(sql_folder(workflow_module="onix_workflow"), "book_product.sql.jinja2"),
                 data_partners=data_partners,
@@ -698,6 +701,9 @@ def create_dag(
                 workid_table_id=workid_table_id,
                 workfamilyid_table_id=workfamilyid_table_id,
                 ga3_views_field=ga3_views_field,
+                bic_table_id=bic_table_id,
+                thema_table_id=thema_table_id,
+                bisac_table_id=bisac_table_id,
                 **dp_tables,
             )
             logging.info(f"Book Product SQL:\n{sql}")

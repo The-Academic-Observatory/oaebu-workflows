@@ -21,6 +21,7 @@ SELECT
     ISBN13 as product_id,
     work_id,
     work_family_id,
+    subjects,
     onix.ProductForm,
     (ARRAY_LENGTH(months) > 0) as usage_flag,
     onix.EditionNumber,
@@ -38,9 +39,4 @@ SELECT
             a.ORCID as ORCID
         )
         FROM UNNEST(onix.authors) as a) as authors,
-    STRUCT(
-        onix.bic_subjects as bic,
-        onix.bisac_subjects as bisac,
-        onix.thema_subjects as thema
-    ) as subjects
 FROM `{{ book_product_table_id }}`

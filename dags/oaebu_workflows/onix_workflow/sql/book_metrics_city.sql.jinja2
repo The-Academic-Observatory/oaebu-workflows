@@ -53,11 +53,7 @@ body as (
         month.month,
         city.city,
         CONCAT(CAST(MAX(city.latitude) as STRING), ", ", CAST(MAX(city.longitude) as STRING)) as coordinates,
-        STRUCT(
-          ARRAY_CONCAT_AGG(onix.bic_subjects) as bic,
-          ARRAY_CONCAT_AGG(onix.bisac_subjects) as bisac,
-          ARRAY_CONCAT_AGG(onix.thema_subjects) as thema
-        ) as subjects,
+        ANY_VALUE(subjects) as subjects, -- All subject structs created are the same for the group so take any value
         {# Currently only used by IRUS OAPEN #}
         STRUCT(
             SUM(city.title_requests) as title_requests,

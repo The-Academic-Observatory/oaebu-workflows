@@ -44,11 +44,7 @@ month_country as (
                 a.ORCID as ORCID
             )
             FROM UNNEST(onix.authors) as a) as authors,
-        STRUCT(
-            onix.bic_subjects as bic,
-            onix.bisac_subjects as bisac,
-            onix.thema_subjects as thema
-        ) as subjects,
+        subjects,
         month,
         alpha2,
         iso_name as country_name,

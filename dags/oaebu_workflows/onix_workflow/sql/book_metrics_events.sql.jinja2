@@ -52,11 +52,7 @@ body as (
         MAX(onix.published_date) as published_date,
         month.month,
         events.source as event_source,
-        STRUCT(
-          ARRAY_CONCAT_AGG(onix.bic_subjects) as bic,
-          ARRAY_CONCAT_AGG(onix.bisac_subjects) as bisac,
-          ARRAY_CONCAT_AGG(onix.thema_subjects) as thema
-        ) as subjects,
+        ANY_VALUE(subjects) as subjects, -- All subject structs created are the same for the group so take any value
         STRUCT(
             SUM(events.count) as count
         ) as crossref_events,

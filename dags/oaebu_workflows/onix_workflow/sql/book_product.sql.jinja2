@@ -14,6 +14,20 @@
 
 # Author: Richard Hosking, Keegan Smith #}
 
+# Helper Function: Get just the unique set of top level BISAC Subjects from the provided list
+CREATE TEMP FUNCTION top_level_subjects_bisac(subjects ARRAY<STRING>) AS (
+  ARRAY(SELECT
+    DISTINCT(SUBSTRING(subject, 0, 3)) as top_level
+  FROM UNNEST(subjects) as subject)
+);
+#
+# Helper Function: Get just the unique set of top level Thema/BIC Subjects from the provided list
+CREATE TEMP FUNCTION top_level_subjects_bic_thema(subjects ARRAY<STRING>) AS (
+  ARRAY(SELECT
+    DISTINCT(SUBSTRING(subject, 0, 1)) as top_level
+  FROM UNNEST(subjects) as subject)
+);
+
 # Add data partner temp functions
 {% for dp in data_partners %}
     {% if dp.book_product_functions %}
@@ -130,6 +144,28 @@ onix_ebook_titles as (
     )
 ),
 
+subjects AS (
+    SELECT
+        ISBN13,
+        onix.bic_subjects AS bic_codes,
+        top_level_subjects_bic_thema(onix.bic_subjects) AS bic_top,
+        ARRAY(
+            SELECT l.name FROM UNNEST(top_level_subjects_bic_thema(onix.bic_subjects)) AS c JOIN `{{ bic_table_id }}` AS l on c = l.code
+            ) AS bic_names,
+        onix.thema_subjects AS thema_codes,
+        top_level_subjects_bic_thema(onix.thema_subjects) AS thema_top,
+        ARRAY(
+            SELECT l.name FROM UNNEST(top_level_subjects_bic_thema(onix.thema_subjects)) AS c JOIN `{{ thema_table_id }}` AS l on c = l.code
+            ) AS thema_names,
+        onix.bisac_subjects AS bisac_codes,
+        top_level_subjects_bisac(onix.bisac_subjects) AS bisac_top,
+        ARRAY(
+            SELECT l.name FROM UNNEST(top_level_subjects_bisac(onix.bisac_subjects)) AS c JOIN `{{ bisac_table_id }}` AS l on c = l.code
+            ) AS bisac_names
+        
+    FROM 
+    onix_ebook_titles),
+
 crossref_events as (
     SELECT
         public_data.isbn as ISBN13,
@@ -210,6 +246,17 @@ Then we are able to pull in specific metadata from across all the various source
 #}
 SELECT
     onix_ebook_titles.*,
+    STRUCT(
+        s.bic_codes as bic_codes,
+        s.bic_top as bic_top,
+        s.bic_names as bic_names,
+        s.thema_codes as thema_codes,
+        s.thema_top as thema_top,
+        s.thema_names as thema_names,
+        s.bisac_codes as bisac_codes,
+        s.bisac_top as bisac_top,
+        s.bisac_names as bisac_names
+    ) as subjects,
     work_ids.work_id,
     work_family_ids.work_family_id,
     STRUCT(
@@ -222,6 +269,7 @@ SELECT
 FROM onix_ebook_titles
 LEFT JOIN `{{ workid_table_id }}` AS work_ids ON work_ids.isbn13 = onix_ebook_titles.ISBN13
 LEFT JOIN `{{ workfamilyid_table_id }}` AS work_family_ids ON work_family_ids.isbn13 = onix_ebook_titles.ISBN13
+LEFT JOIN subjects AS s ON s.ISBN13 = onix_ebook_titles.ISBN13
 LEFT JOIN metrics AS metrics ON metrics.ISBN13 = onix_ebook_titles.ISBN13
 {% for dp in data_partners | selectattr("has_metadata", "equalto", True) %}
     LEFT JOIN {{ dp.type_id + "_metadata" }} ON {{ dp.type_id + "_metadata.ISBN13" }} = onix_ebook_titles.ISBN13

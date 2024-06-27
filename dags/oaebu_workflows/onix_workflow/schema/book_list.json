@@ -81,27 +81,63 @@
     "fields": [
       {
         "mode": "REPEATED",
-        "name": "bic",
+        "name": "bic_codes",
         "type": "STRING",
-        "description": "BIC subject codes"
+        "description": "A list of BIC subject codes"
       },
       {
         "mode": "REPEATED",
-        "name": "bisac",
+        "name": "bic_top",
         "type": "STRING",
-        "description": "BISAC subject codes"
+        "description": "A list of BIC subject codes for the top level subject"
       },
       {
         "mode": "REPEATED",
-        "name": "thema",
+        "name": "bic_names",
         "type": "STRING",
-        "description": "THEMA subject codes"
+        "description": "A list of BIC subject names"
+      },
+      {
+        "mode": "REPEATED",
+        "name": "bisac_codes",
+        "type": "STRING",
+        "description": "A list of BISAC subject codes"
+      },
+      {
+        "mode": "REPEATED",
+        "name": "bisac_top",
+        "type": "STRING",
+        "description": "A list of BISAC subject codes for the top level subject"
+      },
+      {
+        "mode": "REPEATED",
+        "name": "bisac_names",
+        "type": "STRING",
+        "description": "A list of BISAC subject names"
+      },
+      {
+        "mode": "REPEATED",
+        "name": "thema_codes",
+        "type": "STRING",
+        "description": "A list of Thema subject codes"
+      },
+      {
+        "mode": "REPEATED",
+        "name": "thema_top",
+        "type": "STRING",
+        "description": "A list of Thema subject codes for the top level subject"
+      },
+      {
+        "mode": "REPEATED",
+        "name": "thema_names",
+        "type": "STRING",
+        "description": "A list of Thema subject names"
       }
     ],
     "mode": "NULLABLE",
     "name": "subjects",
     "type": "RECORD",
-    "description": "Subject codes"
+    "description": "Subjects associated with this product"
   },
   {
     "fields": [
