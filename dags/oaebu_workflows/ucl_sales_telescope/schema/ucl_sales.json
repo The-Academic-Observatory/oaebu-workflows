@@ -1,0 +1,56 @@
+[
+  {
+    "description": "ISBN13 of the book.",
+    "mode": "NULLABLE",
+    "name": "ISBN13",
+    "type": "STRING"
+  },
+  {
+    "description": "Title of the book.",
+    "mode": "NULLABLE",
+    "name": "Title",
+    "type": "STRING"
+  },
+  {
+    "description": "Country of sale",
+    "mode": "NULLABLE",
+    "name": "Country",
+    "type": "STRING"
+  },
+  {
+    "description": "Number of items sold",
+    "mode": "NULLABLE",
+    "name": "Quantity",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Sale type - free/paid/return",
+    "mode": "NULLABLE",
+    "name": "Sale_Type",
+    "type": "STRING"
+  },
+  {
+    "description": "Year of sale",
+    "mode": "NULLABLE",
+    "name": "Year",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Month of sale",
+    "mode": "NULLABLE",
+    "name": "Month",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "release_date",
+    "type": "DATE",
+    "description": "Last day of the release month. Table is partitioned on this column."
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "sheet_month",
+    "type": "STRING",
+    "description": "The sheet date from which this record is attributed to"
+  }
+]

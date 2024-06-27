@@ -128,10 +128,11 @@ class TestOnixWorkflow(SandboxTestCase):
             sharded=True,
             schema_path=os.path.join(default_schema_folder(workflow_module="onix_telescope"), "onix.json"),
         )
-        # Use all data partners except the jstor collections
+        # Use all data partners except the jstor collections and ucl_sales
         self.data_partner_list = [i for i in OAEBU_DATA_PARTNERS.keys()]
         self.data_partner_list.remove("jstor_country_collection")
         self.data_partner_list.remove("jstor_institution_collection")
+        self.data_partner_list.remove("ucl_sales")
 
         # fixtures folder location
         self.fixtures_folder = test_fixtures_folder(workflow_module="onix_workflow")
