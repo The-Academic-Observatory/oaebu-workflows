@@ -1192,9 +1192,9 @@ class TestOnixWorkflow(SandboxTestCase):
                     ("book_metrics_author", 3),
                     ("book_metrics_city", 39),
                     ("book_metrics_events", 3),
-                    ("book_metrics_subject_bic", 0),
-                    ("book_metrics_subject_bisac", 0),
-                    ("book_metrics_subject_thema", 0),
+                    ("book_metrics_subject_bic", 2),
+                    ("book_metrics_subject_bisac", 1),
+                    ("book_metrics_subject_thema", 2),
                 ]
 
                 # Create the export tables
@@ -1305,8 +1305,8 @@ class TestOnixWorkflow(SandboxTestCase):
                     "dag_id": dag_id,
                     "entity_id": "onix_workflow",
                     "dag_run_id": release.run_id,
-                        "created": datetime_normalise(now),
-                        "modified": datetime_normalise(now),
+                    "created": datetime_normalise(now),
+                    "modified": datetime_normalise(now),
                     "data_interval_start": "2021-05-17T00:00:00+00:00",
                     "data_interval_end": "2021-05-24T00:00:00+00:00",
                     "snapshot_date": "2021-05-24T00:00:00+00:00",
