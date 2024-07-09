@@ -200,7 +200,8 @@ class OnixTransformer:
         self._current_md_path = file_path
 
     def _load_metadata(self, file_path: str):
-        format = re.search(r"\.(.*)$", file_path).group(1)
+        fname = file_path.split("/")[-1]
+        format = re.search(r"\.(.*)$", fname).group(1)
         if format == "xml":
             with open(file_path, "rb") as f:
                 metadata = xmltodict.parse(f)
