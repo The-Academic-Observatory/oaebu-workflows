@@ -177,7 +177,7 @@ class OnixTransformer:
         return os.path.join(dir_, file_name)
 
     def _save_metadata(self, metadata: Union[List[dict], Mapping[str, Any]], file_path: str):
-        format = re.search(r"\.(.*)$", file_path).group(1)
+        format = get_file_ext(file_path)
         if format == "xml":
             if not isinstance(metadata, Mapping):
                 raise TypeError(f"Metadata must be of type Mapping, instead got type {type(metadata)}")
@@ -200,8 +200,7 @@ class OnixTransformer:
         self._current_md_path = file_path
 
     def _load_metadata(self, file_path: str):
-        fname = file_path.split("/")[-1]
-        format = re.search(r"\.(.*)$", fname).group(1)
+        format = get_file_ext(file_path)
         if format == "xml":
             with open(file_path, "rb") as f:
                 metadata = xmltodict.parse(f)
@@ -282,6 +281,19 @@ class OnixTransformer:
             raise TypeError(f"Metadata must be of type list, instead is type {type(metadata)}")
         metadata = collapse_subjects(metadata)
         self._save_metadata(metadata, self._intermediate_file_path("collapsed.jsonl"))
+
+
+def get_file_ext(file_path: str) -> str:
+    """Given a path to a file (or just the file itself), extracts the file extension.
+    E.g. if the input is some/path/my_file.txt, The extension returned will be "txt".
+
+    :param file_path: The path to the file or the filename itself
+    :return: The file extension"""
+    fname = file_path.split("/")[-1]
+    try:
+        return re.search(r"\.(.*)$", fname).group(1)
+    except AttributeError:  # No regex match
+        return ""
 
 
 def onix_parser_download(download_dir: str = observatory_home("bin")) -> Tuple[bool, str]:

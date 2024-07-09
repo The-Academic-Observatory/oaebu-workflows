@@ -25,15 +25,16 @@ from oaebu_workflows.onix_utils import (
     OnixTransformer,
     collapse_subjects,
     create_personname_fields,
-    onix_parser_download,
-    onix_parser_execute,
+    deduplicate_related_products,
     elevate_product_identifiers,
-    normalise_related_products,
     elevate_related_products,
     find_onix_product,
     filter_through_schema,
+    get_file_ext,
+    normalise_related_products,
+    onix_parser_download,
+    onix_parser_execute,
     remove_invalid_products,
-    deduplicate_related_products,
 )
 from oaebu_workflows.config import test_fixtures_folder, schema_folder
 from observatory_platform.files import load_jsonl
@@ -367,6 +368,34 @@ class TestNormaliseRelatedProducts(unittest.TestCase):
         ]
         result = elevate_product_identifiers(related_product)
         self.assertEqual(result, expected_result)
+
+
+class TestGetFileExt(unittest.TestCase):
+    """Tests the get_file_ext function"""
+
+    def test_path_provided(self):
+        """Should return the extension if a filepath is passed"""
+        input = "my.path/to/my_file.txt"
+        expected_output = "txt"
+        actual_output = get_file_ext(input)
+
+        self.assertEqual(expected_output, actual_output)
+
+    def test_name_provided(self):
+        """Should return the extension if a file name is passed"""
+        input = "my_file.txt"
+        expected_output = "txt"
+        actual_output = get_file_ext(input)
+
+        self.assertEqual(expected_output, actual_output)
+
+    def test_no_ext(self):
+        """Should return an empty string if there is no extension"""
+        input = "my/path/to/my_file"
+        expected_output = ""
+        actual_output = get_file_ext(input)
+
+        self.assertEqual(expected_output, actual_output)
 
 
 class TestElevateRelatedProducts(unittest.TestCase):
