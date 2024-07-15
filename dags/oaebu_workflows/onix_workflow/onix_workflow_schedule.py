@@ -1,4 +1,6 @@
-from pendulum import Date, DateTime, Time, datetime, timedelta, UTC
+from datetime import timedelta
+
+from pendulum import Date, DateTime, Time, datetime, UTC
 
 from airflow.plugins_manager import AirflowPlugin
 from airflow.timetables.base import DagRunInfo, DataInterval, TimeRestriction, Timetable
@@ -7,6 +9,23 @@ from airflow.timetables.base import DagRunInfo, DataInterval, TimeRestriction, T
 
 
 class OnixWorkflowTimetable(Timetable):
+    def get_start_of_interval(self, time: DateTime) -> DateTime:
+        """Gets the starting run time for the schedule, given an input datetime
+
+        :param time: The time with which to calculate the previous runtime for
+        :param inclusive: Whether to include the input time as a possible return
+        :return: The previous runtime
+        """
+
+        # Get the previous sunday
+        days_delta = time.weekday() + 1
+        if days_delta == 7:  # Input time is a sunday
+            return DateTime.combine(time, Time.min).replace(tzinfo=UTC)
+        previous_time -= timedelta(days_delta)
+
+        if time.day > 5 and previous_time.day > 5:
+            previous_time = datetime(year=previous_time.year, month=previous_time.month, day=5)
+        return DateTime.combine(previous_time, Time.min).replace(tzinfo=UTC)
 
     def get_end_of_interval(self, start_time: DateTime) -> DateTime:
         """Find the end time given a start time
@@ -14,6 +33,7 @@ class OnixWorkflowTimetable(Timetable):
         :param start_time: The starting datetime for which to find the ending interval for
         :return: The end of the interval
         """
+
         provisional_end = DateTime.combine((start_time + timedelta(days=7)).date(), Time.min)
         competing_end = datetime(year=provisional_end.year, month=provisional_end.month, day=5)
 
@@ -23,7 +43,7 @@ class OnixWorkflowTimetable(Timetable):
         else:
             end_time = provisional_end
 
-        return end_time
+        return end_time.replace(tzinfo=UTC)
 
     def infer_manual_data_interval(self, run_after: DateTime) -> DataInterval:
         """Overrides the base class function.
@@ -32,9 +52,8 @@ class OnixWorkflowTimetable(Timetable):
         :param run_after: The time that the run is triggered.
         """
 
-        # Start of interval - the end of the previous day
-        start_date = (run_after - timedelta(days=1)).date()
-        start = DateTime.combine(start_date, Time.min).replace(tzinfo=UTC)
+        # Start of interval - the end of the previous sunday or the 5th
+        start = self.get_start_of_interval(run_after)
         end = self.get_end_of_interval(start)
 
         return DataInterval(start=start, end=end)
@@ -65,7 +84,9 @@ class OnixWorkflowTimetable(Timetable):
 
         # Otherwise this is the first ever run on the regular schedule...
         else:
-            next_start = max(restriction.earliest, DateTime.combine(Date.today(), Time.min))
+            # Make sure the interval start is a sunday
+            after_start_date = self.get_start_of_interval(Date.today())
+            next_start = max(restriction.earliest, after_start_date)
 
         return DagRunInfo.interval(start=next_start, end=self.get_end_of_interval(next_start))
 
