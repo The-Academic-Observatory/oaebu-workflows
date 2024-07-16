@@ -14,6 +14,7 @@
 
 # Author: Keegan Smith
 
+import logging
 import unittest
 
 from airflow.decorators import dag
@@ -38,50 +39,88 @@ def make_test_dag(start_date=pendulum.datetime(year=2020, month=1, day=1), catch
 
 
 class TestOnixWorkflowSchedule(unittest.TestCase):
+    def test_get_start_of_interval(self):
+        timetable = OnixWorkflowTimetable()
+        inputs = [
+            pendulum.datetime(year=2020, month=1, day=1, tz=pendulum.UTC),  # Wednesday
+            pendulum.datetime(year=2020, month=1, day=31, tz=pendulum.UTC),  # Friday
+            pendulum.datetime(year=2020, month=1, day=5, tz=pendulum.UTC),  # Sunday the 5th
+            pendulum.datetime(year=2020, month=1, day=6, tz=pendulum.UTC),  # Monday
+            pendulum.datetime(year=2020, month=2, day=5, tz=pendulum.UTC),  # Wednesday
+            pendulum.datetime(year=2020, month=2, day=5, tz=pendulum.timezone("Etc/GMT+1")),  # Altered timezone
+        ]
+        expected_outputs = [
+            pendulum.datetime(year=2019, month=12, day=29, tz=pendulum.UTC),
+            pendulum.datetime(year=2020, month=1, day=26, tz=pendulum.UTC),
+            pendulum.datetime(year=2020, month=1, day=5, tz=pendulum.UTC),
+            pendulum.datetime(year=2020, month=1, day=5, tz=pendulum.UTC),
+            pendulum.datetime(year=2020, month=2, day=5, tz=pendulum.UTC),
+            pendulum.datetime(year=2020, month=2, day=5, tz=pendulum.UTC),
+        ]
+        for i, eo in zip(inputs, expected_outputs):
+            logging.info(f"Input time: {i}")
+            output = timetable.get_start_of_interval(i)
+            self.assertEqual(eo, output)
+
     def test_get_end_of_interval(self):
         timetable = OnixWorkflowTimetable()
         inputs = [
-            pendulum.datetime(year=2020, month=1, day=1, tz=pendulum.UTC),
-            pendulum.datetime(year=2020, month=1, day=31, tz=pendulum.UTC),
-            pendulum.datetime(year=2020, month=1, day=5, tz=pendulum.UTC),
-            pendulum.datetime(year=2020, month=1, day=6, tz=pendulum.UTC),
+            pendulum.datetime(year=2020, month=1, day=1, tz=pendulum.UTC),  # Wednesday
+            pendulum.datetime(year=2020, month=1, day=31, tz=pendulum.UTC),  # Friday
+            pendulum.datetime(year=2020, month=1, day=5, tz=pendulum.UTC),  # Sunday the 5th
+            pendulum.datetime(year=2020, month=1, day=6, tz=pendulum.UTC),  # Monday
+            pendulum.datetime(year=2020, month=2, day=5, tz=pendulum.UTC),  # Wednesday
+            pendulum.datetime(year=2020, month=2, day=5, tz=pendulum.timezone("Etc/GMT+1")),  # Altered timezone
         ]
         expected_outputs = [
             pendulum.datetime(year=2020, month=1, day=5, tz=pendulum.UTC),
-            pendulum.datetime(year=2020, month=2, day=5, tz=pendulum.UTC),
+            pendulum.datetime(year=2020, month=2, day=2, tz=pendulum.UTC),
             pendulum.datetime(year=2020, month=1, day=12, tz=pendulum.UTC),
-            pendulum.datetime(year=2020, month=1, day=13, tz=pendulum.UTC),
+            pendulum.datetime(year=2020, month=1, day=12, tz=pendulum.UTC),
+            pendulum.datetime(year=2020, month=2, day=9, tz=pendulum.UTC),
+            pendulum.datetime(year=2020, month=2, day=9, tz=pendulum.UTC),
         ]
         for i, eo in zip(inputs, expected_outputs):
+            logging.info(f"Input time: {i}")
             output = timetable.get_end_of_interval(i)
-            self.assertEqual(output, eo)
+            self.assertEqual(eo, output)
 
     def test_infer_manual_data_interval(self):
         timetable = OnixWorkflowTimetable()
         inputs = [
-            pendulum.datetime(year=2020, month=1, day=1, tz=pendulum.UTC),
-            pendulum.datetime(year=2020, month=1, day=31, tz=pendulum.UTC),
-            pendulum.datetime(year=2020, month=1, day=5, tz=pendulum.UTC),
-            pendulum.datetime(year=2020, month=1, day=6, tz=pendulum.UTC),
+            pendulum.datetime(year=2020, month=1, day=1, tz=pendulum.UTC),  # Wednesday
+            pendulum.datetime(year=2020, month=1, day=31, tz=pendulum.UTC),  # Friday
+            pendulum.datetime(year=2020, month=1, day=5, tz=pendulum.UTC),  # Sunday the 5th
+            pendulum.datetime(year=2020, month=1, day=6, tz=pendulum.UTC),  # Monday
+            pendulum.datetime(year=2020, month=2, day=5, tz=pendulum.UTC),  # Wednesday
+            pendulum.datetime(year=2020, month=2, day=5, tz=pendulum.timezone("Etc/GMT+1")),  # Altered timezone
         ]
         expected_outputs = [
             DataInterval(
-                pendulum.datetime(year=2020, month=1, day=1, tz=pendulum.UTC),
+                pendulum.datetime(year=2019, month=12, day=29, tz=pendulum.UTC),
                 pendulum.datetime(year=2020, month=1, day=5, tz=pendulum.UTC),
             ),
             DataInterval(
-                pendulum.datetime(year=2020, month=1, day=31, tz=pendulum.UTC),
-                pendulum.datetime(year=2020, month=2, day=5, tz=pendulum.UTC),
+                pendulum.datetime(year=2020, month=1, day=26, tz=pendulum.UTC),
+                pendulum.datetime(year=2020, month=2, day=2, tz=pendulum.UTC),
             ),
             DataInterval(
                 pendulum.datetime(year=2020, month=1, day=5, tz=pendulum.UTC),
                 pendulum.datetime(year=2020, month=1, day=12, tz=pendulum.UTC),
             ),
             DataInterval(
-                pendulum.datetime(year=2020, month=1, day=6, tz=pendulum.UTC),
-                pendulum.datetime(year=2020, month=1, day=13, tz=pendulum.UTC),
+                pendulum.datetime(year=2020, month=1, day=5, tz=pendulum.UTC),
+                pendulum.datetime(year=2020, month=1, day=12, tz=pendulum.UTC),
+            ),
+            DataInterval(
+                pendulum.datetime(year=2020, month=2, day=5, tz=pendulum.UTC),
+                pendulum.datetime(year=2020, month=2, day=9, tz=pendulum.UTC),
+            ),
+            DataInterval(
+                pendulum.datetime(year=2020, month=2, day=5, tz=pendulum.UTC),
+                pendulum.datetime(year=2020, month=2, day=9, tz=pendulum.UTC),
             ),
         ]
         for i, eo in zip(inputs, expected_outputs):
             output = timetable.infer_manual_data_interval(i)
-            self.assertEqual(output, eo)
+            self.assertEqual(eo, output)

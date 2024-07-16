@@ -1,3 +1,4 @@
+import logging
 from datetime import timedelta
 
 from pendulum import Date, DateTime, Time, datetime, UTC
@@ -10,40 +11,40 @@ from airflow.timetables.base import DagRunInfo, DataInterval, TimeRestriction, T
 
 class OnixWorkflowTimetable(Timetable):
     def get_start_of_interval(self, time: DateTime) -> DateTime:
-        """Gets the starting run time for the schedule, given an input datetime
+        """Gets the start of the interval for the schedule, given a current datetime
 
         :param time: The time with which to calculate the previous runtime for
-        :param inclusive: Whether to include the input time as a possible return
         :return: The previous runtime
         """
 
         # Get the previous sunday
         days_delta = time.weekday() + 1
-        if days_delta == 7:  # Input time is a sunday
-            return DateTime.combine(time, Time.min).replace(tzinfo=UTC)
-        previous_time -= timedelta(days_delta)
+        if days_delta == 7:  # Is a sunday, don't alter the input
+            days_delta = 0
+        start_time = time - timedelta(days_delta)
 
-        if time.day > 5 and previous_time.day > 5:
-            previous_time = datetime(year=previous_time.year, month=previous_time.month, day=5)
-        return DateTime.combine(previous_time, Time.min).replace(tzinfo=UTC)
+        # Don't allow the start date to cross the 5th of the month
+        if time >= time.replace(day=5) and start_time <= time.replace(day=5):
+            start_time = datetime(year=start_time.year, month=start_time.month, day=5)
+        return DateTime.combine(start_time, Time.min).replace(tzinfo=UTC)
 
-    def get_end_of_interval(self, start_time: DateTime) -> DateTime:
+    def get_end_of_interval(self, time: DateTime) -> DateTime:
         """Find the end time given a start time
 
-        :param start_time: The starting datetime for which to find the ending interval for
+        :param time: The starting datetime for which to find the ending interval for
         :return: The end of the interval
         """
 
-        provisional_end = DateTime.combine((start_time + timedelta(days=7)).date(), Time.min)
-        competing_end = datetime(year=provisional_end.year, month=provisional_end.month, day=5)
+        # Get the next sunday
+        days_delta = 7 - (time.weekday() + 1)
+        if days_delta == 0:  # Is a sunday, skip ahead 7 days
+            days_delta += 7
+        end_time = time + timedelta(days_delta)
 
-        # If the start date is before the 5th of the "end" month, cut the end date off at the 5th
-        if start_time < competing_end:
-            end_time = competing_end
-        else:
-            end_time = provisional_end
-
-        return end_time.replace(tzinfo=UTC)
+        # Don't allow the end date to cross the 5th of the month
+        if time < time.replace(day=5) and end_time > time.replace(day=5):
+            end_time = end_time.replace(day=5)
+        return DateTime.combine(end_time, Time.min).replace(tzinfo=UTC)
 
     def infer_manual_data_interval(self, run_after: DateTime) -> DataInterval:
         """Overrides the base class function.
