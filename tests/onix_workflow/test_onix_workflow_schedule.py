@@ -19,10 +19,11 @@ import unittest
 
 from airflow.decorators import dag
 from airflow.operators.empty import EmptyOperator
+from airflow.timetables.base import DagRunInfo, DataInterval, TimeRestriction
 import pendulum
 
 from oaebu_workflows.onix_workflow.onix_workflow_schedule import OnixWorkflowTimetable
-from airflow.timetables.base import DagRunInfo, DataInterval, TimeRestriction
+from observatory_platform.sandbox.sandbox_environment import SandboxEnvironment
 
 
 def make_test_dag(start_date=pendulum.datetime(year=2020, month=1, day=1), catchup=False):
@@ -39,6 +40,23 @@ def make_test_dag(start_date=pendulum.datetime(year=2020, month=1, day=1), catch
 
 
 class TestOnixWorkflowSchedule(unittest.TestCase):
+    def test_dag_run(self):
+        env = SandboxEnvironment()
+        with env.create():
+            start_date = pendulum.datetime(year=2020, month=1, day=6, tz=pendulum.UTC)  # Sunday
+            dag = make_test_dag(start_date)
+            dag_run_info = dag.next_dagrun_info(last_automated_dagrun=None)
+            self.assertEqual(dag_run_info.data_interval.start, start_date)
+            self.assertEqual(dag_run_info.data_interval.end, start_date + pendulum.timedelta(days=7))
+
+    def test_dag_run_with_catchup(self):
+        env = SandboxEnvironment()
+        with env.create():
+            start_date = pendulum.datetime(year=2020, month=1, day=6, tz=pendulum.UTC)  # Sunday
+            dag = make_test_dag(start_date, catchup=True)
+            with self.assertRaisesRegex(ValueError, "Onix Workflow timetable"):
+                dag.next_dagrun_info(last_automated_dagrun=None)
+
     def test_get_start_of_interval(self):
         timetable = OnixWorkflowTimetable()
         inputs = [
