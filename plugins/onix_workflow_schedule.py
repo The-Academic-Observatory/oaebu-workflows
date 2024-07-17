@@ -1,4 +1,3 @@
-import logging
 from datetime import timedelta
 
 from pendulum import Date, DateTime, Time, datetime, UTC
@@ -10,6 +9,15 @@ from airflow.timetables.base import DagRunInfo, DataInterval, TimeRestriction, T
 
 
 class OnixWorkflowTimetable(Timetable):
+    """A custom timetable for the Onix Workflow. The timetable runs every sunday and on the 5th of every month
+
+    *Known Quirks*
+    Airflow treats custom timetables slightly differently when scheduling. When using this scheduler, any calls to
+    dag.next_dagrun_info() must supply either None or a DataInterval. Passing a DateTime object WILL RAISE AN
+    EXCEPTION. When testing with sandbox_environment.create_dag_run(), you can pass a data interval with an empty end
+    date as the execution date.
+    """
+
     def get_start_of_interval(self, time: DateTime) -> DateTime:
         """Gets the start of the interval for the schedule, given a current datetime
 

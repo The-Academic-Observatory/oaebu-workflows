@@ -23,6 +23,7 @@ from unittest.mock import patch
 import pendulum
 import vcr
 from airflow.models import DagBag
+from airflow.timetables.base import DataInterval
 from airflow.utils.state import State
 from click.testing import CliRunner
 
@@ -39,6 +40,7 @@ from oaebu_workflows.onix_workflow.onix_workflow import (
     transform_crossref_events,
     transform_event,
 )
+from plugins.onix_workflow_schedule import OnixWorkflowTimetable
 from observatory_platform.airflow.workflow import Workflow
 from observatory_platform.config import module_file_path
 from observatory_platform.dataset_api import DatasetAPI
@@ -162,7 +164,9 @@ class TestOnixWorkflow(SandboxTestCase):
                 data_partners=[self.fake_onix_data_partner],
                 metadata_partner=metadata_partner,
             )
-            with env.create_dag_run(dag, self.snapshot_date.add(days=1)):
+            timetable = OnixWorkflowTimetable()
+            interval = timetable.infer_manual_data_interval(self.snapshot_date.add(days=1))
+            with env.create_dag_run(dag, data_interval=interval):
                 ti = env.run_task("make_release")
                 release_dict = ti.xcom_pull(task_ids="make_release", include_prior_dates=False)
                 release = OnixWorkflowRelease.from_dict(release_dict)

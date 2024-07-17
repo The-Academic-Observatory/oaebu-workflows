@@ -19,8 +19,9 @@ import unittest
 
 from airflow.decorators import dag
 from airflow.operators.empty import EmptyOperator
-from airflow.timetables.base import DagRunInfo, DataInterval, TimeRestriction
+from airflow.timetables.base import DataInterval
 import pendulum
+import time_machine
 
 from oaebu_workflows.onix_workflow.onix_workflow_schedule import OnixWorkflowTimetable
 from observatory_platform.sandbox.sandbox_environment import SandboxEnvironment
@@ -40,24 +41,43 @@ def make_test_dag(start_date=pendulum.datetime(year=2020, month=1, day=1), catch
 
 
 class TestOnixWorkflowSchedule(unittest.TestCase):
+    """Test the OnixWorkflowSchedule Class"""
+
     def test_dag_run(self):
+        """Test the schedule when it's called by airflow's next_dagrun_info function"""
         env = SandboxEnvironment()
         with env.create():
-            start_date = pendulum.datetime(year=2020, month=1, day=6, tz=pendulum.UTC)  # Sunday
-            dag = make_test_dag(start_date)
-            dag_run_info = dag.next_dagrun_info(last_automated_dagrun=None)
+            dag_start_date = pendulum.datetime(year=2020, month=1, day=1, tz=pendulum.UTC)
+            expected_start_date = pendulum.datetime(year=2020, month=1, day=26, tz=pendulum.UTC)  # Sunday
+            expected_end_date = pendulum.datetime(year=2020, month=2, day=2, tz=pendulum.UTC)  # Sunday
+            now = pendulum.datetime(year=2020, month=2, day=1, tz=pendulum.UTC)  # Saturday
+            with time_machine.travel(now):
+                dag = make_test_dag(dag_start_date)
+                dag_run_info = dag.next_dagrun_info(last_automated_dagrun=None)
+            self.assertEqual(dag_run_info.data_interval.start, expected_start_date)
+            self.assertEqual(dag_run_info.data_interval.end, expected_end_date)
+
+            # Now run the next interval
+            start_date = dag_run_info.data_interval.end
+            expected_end_date = pendulum.datetime(year=2020, month=2, day=5, tz=pendulum.UTC)  # The 5th
+            with time_machine.travel(dag_run_info.data_interval.end):
+                dag = make_test_dag(dag_run_info.data_interval.end)
+                dag_run_info = dag.next_dagrun_info(last_automated_dagrun=dag_run_info.data_interval)
             self.assertEqual(dag_run_info.data_interval.start, start_date)
-            self.assertEqual(dag_run_info.data_interval.end, start_date + pendulum.timedelta(days=7))
+            self.assertEqual(dag_run_info.data_interval.end, expected_end_date)
 
     def test_dag_run_with_catchup(self):
+        """Test the schedule when it's called by airflow's next_dagrun_info function with the catchup setting on"""
         env = SandboxEnvironment()
         with env.create():
             start_date = pendulum.datetime(year=2020, month=1, day=6, tz=pendulum.UTC)  # Sunday
             dag = make_test_dag(start_date, catchup=True)
-            with self.assertRaisesRegex(ValueError, "Onix Workflow timetable"):
-                dag.next_dagrun_info(last_automated_dagrun=None)
+            # The timetable raises a value error but it's caught by airflow. So we check that info==None
+            info = dag.next_dagrun_info(last_automated_dagrun=None)
+            self.assertIsNone(info)
 
     def test_get_start_of_interval(self):
+        """Test the get_start_of_interval function"""
         timetable = OnixWorkflowTimetable()
         inputs = [
             pendulum.datetime(year=2020, month=1, day=1, tz=pendulum.UTC),  # Wednesday
@@ -68,12 +88,12 @@ class TestOnixWorkflowSchedule(unittest.TestCase):
             pendulum.datetime(year=2020, month=2, day=5, tz=pendulum.timezone("Etc/GMT+1")),  # Altered timezone
         ]
         expected_outputs = [
-            pendulum.datetime(year=2019, month=12, day=29, tz=pendulum.UTC),
-            pendulum.datetime(year=2020, month=1, day=26, tz=pendulum.UTC),
-            pendulum.datetime(year=2020, month=1, day=5, tz=pendulum.UTC),
-            pendulum.datetime(year=2020, month=1, day=5, tz=pendulum.UTC),
-            pendulum.datetime(year=2020, month=2, day=5, tz=pendulum.UTC),
-            pendulum.datetime(year=2020, month=2, day=5, tz=pendulum.UTC),
+            pendulum.datetime(year=2019, month=12, day=29, tz=pendulum.UTC),  # Sunday
+            pendulum.datetime(year=2020, month=1, day=26, tz=pendulum.UTC),  # Sunday
+            pendulum.datetime(year=2020, month=1, day=5, tz=pendulum.UTC),  # Sunday The 5th
+            pendulum.datetime(year=2020, month=1, day=5, tz=pendulum.UTC),  # Sunday The 5th
+            pendulum.datetime(year=2020, month=2, day=5, tz=pendulum.UTC),  # The 5th
+            pendulum.datetime(year=2020, month=2, day=5, tz=pendulum.UTC),  # The 5th @ UTC
         ]
         for i, eo in zip(inputs, expected_outputs):
             logging.info(f"Input time: {i}")
@@ -81,6 +101,7 @@ class TestOnixWorkflowSchedule(unittest.TestCase):
             self.assertEqual(eo, output)
 
     def test_get_end_of_interval(self):
+        """Test the get_end_of_interval function"""
         timetable = OnixWorkflowTimetable()
         inputs = [
             pendulum.datetime(year=2020, month=1, day=1, tz=pendulum.UTC),  # Wednesday
@@ -91,12 +112,12 @@ class TestOnixWorkflowSchedule(unittest.TestCase):
             pendulum.datetime(year=2020, month=2, day=5, tz=pendulum.timezone("Etc/GMT+1")),  # Altered timezone
         ]
         expected_outputs = [
-            pendulum.datetime(year=2020, month=1, day=5, tz=pendulum.UTC),
-            pendulum.datetime(year=2020, month=2, day=2, tz=pendulum.UTC),
-            pendulum.datetime(year=2020, month=1, day=12, tz=pendulum.UTC),
-            pendulum.datetime(year=2020, month=1, day=12, tz=pendulum.UTC),
-            pendulum.datetime(year=2020, month=2, day=9, tz=pendulum.UTC),
-            pendulum.datetime(year=2020, month=2, day=9, tz=pendulum.UTC),
+            pendulum.datetime(year=2020, month=1, day=5, tz=pendulum.UTC),  # Sunday the 5th
+            pendulum.datetime(year=2020, month=2, day=2, tz=pendulum.UTC),  # Sunday
+            pendulum.datetime(year=2020, month=1, day=12, tz=pendulum.UTC),  # Sunday (1 week after start)
+            pendulum.datetime(year=2020, month=1, day=12, tz=pendulum.UTC),  # Sunday
+            pendulum.datetime(year=2020, month=2, day=9, tz=pendulum.UTC),  # Sunday
+            pendulum.datetime(year=2020, month=2, day=9, tz=pendulum.UTC),  # Sunday @ UTC
         ]
         for i, eo in zip(inputs, expected_outputs):
             logging.info(f"Input time: {i}")
@@ -104,6 +125,7 @@ class TestOnixWorkflowSchedule(unittest.TestCase):
             self.assertEqual(eo, output)
 
     def test_infer_manual_data_interval(self):
+        """Test the infer_manual_data_interval function"""
         timetable = OnixWorkflowTimetable()
         inputs = [
             pendulum.datetime(year=2020, month=1, day=1, tz=pendulum.UTC),  # Wednesday
@@ -140,5 +162,6 @@ class TestOnixWorkflowSchedule(unittest.TestCase):
             ),
         ]
         for i, eo in zip(inputs, expected_outputs):
+            logging.info(f"Input interval: {i}")
             output = timetable.infer_manual_data_interval(i)
             self.assertEqual(eo, output)
