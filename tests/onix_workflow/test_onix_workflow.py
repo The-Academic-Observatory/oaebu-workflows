@@ -40,7 +40,6 @@ from oaebu_workflows.onix_workflow.onix_workflow import (
     transform_crossref_events,
     transform_event,
 )
-from plugins.onix_workflow_schedule import OnixWorkflowTimetable
 from observatory_platform.airflow.workflow import Workflow
 from observatory_platform.config import module_file_path
 from observatory_platform.dataset_api import DatasetAPI
@@ -156,6 +155,7 @@ class TestOnixWorkflow(SandboxTestCase):
         )
         crossref_snapshot_date = self.snapshot_date
         mock_sel_table_suffixes.side_effect = [[onix_snapshot_date], [crossref_snapshot_date]]
+
         env = SandboxEnvironment(self.gcp_project_id, self.data_location)
         with env.create():
             dag = create_dag(
@@ -164,9 +164,10 @@ class TestOnixWorkflow(SandboxTestCase):
                 data_partners=[self.fake_onix_data_partner],
                 metadata_partner=metadata_partner,
             )
-            timetable = OnixWorkflowTimetable()
-            interval = timetable.infer_manual_data_interval(self.snapshot_date.add(days=1))
-            with env.create_dag_run(dag, data_interval=interval):
+
+            with env.create_dag_run(
+                dag, data_interval=DataInterval(self.snapshot_date, self.snapshot_date.add(days=7))
+            ):
                 ti = env.run_task("make_release")
                 release_dict = ti.xcom_pull(task_ids="make_release", include_prior_dates=False)
                 release = OnixWorkflowRelease.from_dict(release_dict)
@@ -227,7 +228,9 @@ class TestOnixWorkflow(SandboxTestCase):
                 data_partners=[self.fake_onix_data_partner],
                 metadata_partner=metadata_partner,
             )
-            with env.create_dag_run(dag, self.snapshot_date.add(days=1)):
+            with env.create_dag_run(
+                dag, data_interval=DataInterval(self.snapshot_date, self.snapshot_date.add(days=7))
+            ):
                 ti = env.run_task("make_release")
                 release_dict = ti.xcom_pull(task_ids="make_release", include_prior_dates=False)
                 release = OnixWorkflowRelease.from_dict(release_dict)
@@ -495,7 +498,9 @@ class TestOnixWorkflow(SandboxTestCase):
                 bq_workfamilyid_table_name=bq_workfamilyid_table_name,
                 metadata_partner="onix",
             )
-            with env.create_dag_run(dag, self.snapshot_date.add(days=1)):
+            with env.create_dag_run(
+                dag, data_interval=DataInterval(self.snapshot_date, self.snapshot_date.add(days=7))
+            ):
                 # Mock the table shard dates so the release can be made
                 with patch("oaebu_workflows.onix_workflow.onix_workflow.bq_select_table_shard_dates") as mock_date:
                     mock_date.return_value = [self.snapshot_date]
@@ -980,7 +985,7 @@ class TestOnixWorkflow(SandboxTestCase):
                 "onix",
             ]
 
-            start_date = pendulum.datetime(year=2021, month=5, day=9)
+            start_date = pendulum.datetime(year=2021, month=5, day=9)  # Sunday
             dag_id = "onix_workflow_test"
             bq_oaebu_crossref_metadata_table_name = "crossref_metadata"
             bq_crossref_events_table_name = "crossref_events"
@@ -1037,8 +1042,8 @@ class TestOnixWorkflow(SandboxTestCase):
                     ti = env.run_task("dummy_task")
                     self.assertEqual(ti.state, State.SUCCESS)
 
-            # Run end to end tests for DOI DAG
-            with env.create_dag_run(dag, execution_date):
+            # Run end to end tests for DAG
+            with env.create_dag_run(dag, data_interval=DataInterval(execution_date, execution_date.add(days=7))):
                 # Run dependency check
                 ti = env.run_task("check_dependencies")
                 self.assertEqual(ti.state, State.SUCCESS)

@@ -23,7 +23,7 @@ from airflow.timetables.base import DataInterval
 import pendulum
 import time_machine
 
-from oaebu_workflows.onix_workflow.onix_workflow_schedule import OnixWorkflowTimetable
+from onix_workflow_schedule import OnixWorkflowTimetable
 from observatory_platform.sandbox.sandbox_environment import SandboxEnvironment
 
 
