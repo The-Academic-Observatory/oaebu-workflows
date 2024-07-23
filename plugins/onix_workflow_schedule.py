@@ -25,11 +25,8 @@ class OnixWorkflowTimetable(Timetable):
         :return: The previous runtime
         """
 
-        # Get the previous sunday
-        days_delta = time.weekday() + 1
-        if days_delta == 7:  # Is a sunday, don't alter the input
-            days_delta = 0
-        start_time = time - timedelta(days_delta)
+        # Get the previous monday
+        start_time = time - timedelta(time.weekday())
 
         # Don't allow the start date to cross the 5th of the month
         if time >= time.replace(day=5) and start_time <= time.replace(day=5):
@@ -43,10 +40,8 @@ class OnixWorkflowTimetable(Timetable):
         :return: The end of the interval
         """
 
-        # Get the next sunday
-        days_delta = 7 - (time.weekday() + 1)
-        if days_delta == 0:  # Is a sunday, skip ahead 7 days
-            days_delta += 7
+        # Get the next monday
+        days_delta = 7 - (time.weekday())
         end_time = time + timedelta(days_delta)
 
         # Don't allow the end date to cross the 5th of the month
@@ -63,7 +58,7 @@ class OnixWorkflowTimetable(Timetable):
 
         # Start of interval - the end of the previous sunday or the 5th
         start = self.get_start_of_interval(run_after)
-        end = self.get_end_of_interval(start)
+        end = self.get_end_of_interval(run_after)
 
         return DataInterval(start=start, end=end)
 

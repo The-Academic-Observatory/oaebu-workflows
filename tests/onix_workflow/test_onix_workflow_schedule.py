@@ -48,9 +48,9 @@ class TestOnixWorkflowSchedule(unittest.TestCase):
         env = SandboxEnvironment()
         with env.create():
             dag_start_date = pendulum.datetime(year=2020, month=1, day=1, tz=pendulum.UTC)
-            expected_start_date = pendulum.datetime(year=2020, month=1, day=26, tz=pendulum.UTC)  # Sunday
-            expected_end_date = pendulum.datetime(year=2020, month=2, day=2, tz=pendulum.UTC)  # Sunday
-            now = pendulum.datetime(year=2020, month=2, day=1, tz=pendulum.UTC)  # Saturday
+            expected_start_date = pendulum.datetime(year=2020, month=1, day=27, tz=pendulum.UTC)  # Monday
+            expected_end_date = pendulum.datetime(year=2020, month=2, day=3, tz=pendulum.UTC)  # Monday
+            now = pendulum.datetime(year=2020, month=2, day=2, tz=pendulum.UTC)  # Sunday
             with time_machine.travel(now):
                 dag = make_test_dag(dag_start_date)
                 dag_run_info = dag.next_dagrun_info(last_automated_dagrun=None)
@@ -70,7 +70,7 @@ class TestOnixWorkflowSchedule(unittest.TestCase):
         """Test the schedule when it's called by airflow's next_dagrun_info function with the catchup setting on"""
         env = SandboxEnvironment()
         with env.create():
-            start_date = pendulum.datetime(year=2020, month=1, day=6, tz=pendulum.UTC)  # Sunday
+            start_date = pendulum.datetime(year=2020, month=1, day=7, tz=pendulum.UTC)  # Monday
             dag = make_test_dag(start_date, catchup=True)
             # The timetable raises a value error but it's caught by airflow. So we check that info==None
             info = dag.next_dagrun_info(last_automated_dagrun=None)
@@ -82,16 +82,16 @@ class TestOnixWorkflowSchedule(unittest.TestCase):
         inputs = [
             pendulum.datetime(year=2020, month=1, day=1, tz=pendulum.UTC),  # Wednesday
             pendulum.datetime(year=2020, month=1, day=31, tz=pendulum.UTC),  # Friday
-            pendulum.datetime(year=2020, month=1, day=5, tz=pendulum.UTC),  # Sunday the 5th
-            pendulum.datetime(year=2020, month=1, day=6, tz=pendulum.UTC),  # Monday
+            pendulum.datetime(year=2020, month=10, day=5, tz=pendulum.UTC),  # Monday the 5th
+            pendulum.datetime(year=2020, month=1, day=7, tz=pendulum.UTC),  # Tueday
             pendulum.datetime(year=2020, month=2, day=5, tz=pendulum.UTC),  # Wednesday
             pendulum.datetime(year=2020, month=2, day=5, tz=pendulum.timezone("Etc/GMT+1")),  # Altered timezone
         ]
         expected_outputs = [
-            pendulum.datetime(year=2019, month=12, day=29, tz=pendulum.UTC),  # Sunday
-            pendulum.datetime(year=2020, month=1, day=26, tz=pendulum.UTC),  # Sunday
-            pendulum.datetime(year=2020, month=1, day=5, tz=pendulum.UTC),  # Sunday The 5th
-            pendulum.datetime(year=2020, month=1, day=5, tz=pendulum.UTC),  # Sunday The 5th
+            pendulum.datetime(year=2019, month=12, day=30, tz=pendulum.UTC),  # Monday
+            pendulum.datetime(year=2020, month=1, day=27, tz=pendulum.UTC),  # Monday
+            pendulum.datetime(year=2020, month=10, day=5, tz=pendulum.UTC),  # Monday The 5th
+            pendulum.datetime(year=2020, month=1, day=6, tz=pendulum.UTC),  # Monday
             pendulum.datetime(year=2020, month=2, day=5, tz=pendulum.UTC),  # The 5th
             pendulum.datetime(year=2020, month=2, day=5, tz=pendulum.UTC),  # The 5th @ UTC
         ]
@@ -106,18 +106,18 @@ class TestOnixWorkflowSchedule(unittest.TestCase):
         inputs = [
             pendulum.datetime(year=2020, month=1, day=1, tz=pendulum.UTC),  # Wednesday
             pendulum.datetime(year=2020, month=1, day=31, tz=pendulum.UTC),  # Friday
-            pendulum.datetime(year=2020, month=1, day=5, tz=pendulum.UTC),  # Sunday the 5th
-            pendulum.datetime(year=2020, month=1, day=6, tz=pendulum.UTC),  # Monday
+            pendulum.datetime(year=2020, month=10, day=5, tz=pendulum.UTC),  # Monday the 5th
+            pendulum.datetime(year=2020, month=1, day=7, tz=pendulum.UTC),  # Tuesday
             pendulum.datetime(year=2020, month=2, day=5, tz=pendulum.UTC),  # Wednesday
             pendulum.datetime(year=2020, month=2, day=5, tz=pendulum.timezone("Etc/GMT+1")),  # Altered timezone
         ]
         expected_outputs = [
-            pendulum.datetime(year=2020, month=1, day=5, tz=pendulum.UTC),  # Sunday the 5th
-            pendulum.datetime(year=2020, month=2, day=2, tz=pendulum.UTC),  # Sunday
-            pendulum.datetime(year=2020, month=1, day=12, tz=pendulum.UTC),  # Sunday (1 week after start)
-            pendulum.datetime(year=2020, month=1, day=12, tz=pendulum.UTC),  # Sunday
-            pendulum.datetime(year=2020, month=2, day=9, tz=pendulum.UTC),  # Sunday
-            pendulum.datetime(year=2020, month=2, day=9, tz=pendulum.UTC),  # Sunday @ UTC
+            pendulum.datetime(year=2020, month=1, day=5, tz=pendulum.UTC),  # The 5th
+            pendulum.datetime(year=2020, month=2, day=3, tz=pendulum.UTC),  # Monday
+            pendulum.datetime(year=2020, month=10, day=12, tz=pendulum.UTC),  # Monday (1 week after start)
+            pendulum.datetime(year=2020, month=1, day=13, tz=pendulum.UTC),  # Monday
+            pendulum.datetime(year=2020, month=2, day=10, tz=pendulum.UTC),  # Monday
+            pendulum.datetime(year=2020, month=2, day=10, tz=pendulum.UTC),  # Monday @ UTC
         ]
         for i, eo in zip(inputs, expected_outputs):
             logging.info(f"Input time: {i}")
@@ -130,35 +130,35 @@ class TestOnixWorkflowSchedule(unittest.TestCase):
         inputs = [
             pendulum.datetime(year=2020, month=1, day=1, tz=pendulum.UTC),  # Wednesday
             pendulum.datetime(year=2020, month=1, day=31, tz=pendulum.UTC),  # Friday
-            pendulum.datetime(year=2020, month=1, day=5, tz=pendulum.UTC),  # Sunday the 5th
-            pendulum.datetime(year=2020, month=1, day=6, tz=pendulum.UTC),  # Monday
+            pendulum.datetime(year=2020, month=10, day=5, tz=pendulum.UTC),  # Monday the 5th
+            pendulum.datetime(year=2020, month=1, day=7, tz=pendulum.UTC),  # Tuesday
             pendulum.datetime(year=2020, month=2, day=5, tz=pendulum.UTC),  # Wednesday
             pendulum.datetime(year=2020, month=2, day=5, tz=pendulum.timezone("Etc/GMT+1")),  # Altered timezone
         ]
         expected_outputs = [
             DataInterval(
-                pendulum.datetime(year=2019, month=12, day=29, tz=pendulum.UTC),
+                pendulum.datetime(year=2019, month=12, day=30, tz=pendulum.UTC),
                 pendulum.datetime(year=2020, month=1, day=5, tz=pendulum.UTC),
             ),
             DataInterval(
-                pendulum.datetime(year=2020, month=1, day=26, tz=pendulum.UTC),
-                pendulum.datetime(year=2020, month=2, day=2, tz=pendulum.UTC),
+                pendulum.datetime(year=2020, month=1, day=27, tz=pendulum.UTC),
+                pendulum.datetime(year=2020, month=2, day=3, tz=pendulum.UTC),
             ),
             DataInterval(
-                pendulum.datetime(year=2020, month=1, day=5, tz=pendulum.UTC),
-                pendulum.datetime(year=2020, month=1, day=12, tz=pendulum.UTC),
+                pendulum.datetime(year=2020, month=10, day=5, tz=pendulum.UTC),
+                pendulum.datetime(year=2020, month=10, day=12, tz=pendulum.UTC),
             ),
             DataInterval(
-                pendulum.datetime(year=2020, month=1, day=5, tz=pendulum.UTC),
-                pendulum.datetime(year=2020, month=1, day=12, tz=pendulum.UTC),
+                pendulum.datetime(year=2020, month=1, day=6, tz=pendulum.UTC),
+                pendulum.datetime(year=2020, month=1, day=13, tz=pendulum.UTC),
             ),
             DataInterval(
                 pendulum.datetime(year=2020, month=2, day=5, tz=pendulum.UTC),
-                pendulum.datetime(year=2020, month=2, day=9, tz=pendulum.UTC),
+                pendulum.datetime(year=2020, month=2, day=10, tz=pendulum.UTC),
             ),
             DataInterval(
                 pendulum.datetime(year=2020, month=2, day=5, tz=pendulum.UTC),
-                pendulum.datetime(year=2020, month=2, day=9, tz=pendulum.UTC),
+                pendulum.datetime(year=2020, month=2, day=10, tz=pendulum.UTC),
             ),
         ]
         for i, eo in zip(inputs, expected_outputs):
