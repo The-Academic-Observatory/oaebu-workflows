@@ -12,10 +12,10 @@ class OnixWorkflowTimetable(Timetable):
     """A custom timetable for the Onix Workflow. The timetable runs every sunday and on the 5th of every month
 
     *Known Quirks*
-    Airflow treats custom timetables slightly differently when scheduling. When using this scheduler, any calls to
-    dag.next_dagrun_info() must supply either None or a DataInterval. Passing a DateTime object WILL RAISE AN
-    EXCEPTION. When testing with sandbox_environment.create_dag_run(), you can pass a data interval with an empty end
-    date as the execution date.
+    This timetable is a plugin and must be registered with airflow to be used. If it's not registered, it will raise
+    an exception. At the time of writing, airflow has specific requirements for timetable plugin imports. THEY MUST
+    BE IMPORTED RELATIVE TO THE PLUGIN FOLDER.
+    https://github.com/apache/airflow/discussions/23758
     """
 
     def get_start_of_interval(self, time: DateTime) -> DateTime:
@@ -101,6 +101,5 @@ class OnixWorkflowTimetable(Timetable):
 
 
 class OnixWorkflowTimetablePlugin(AirflowPlugin):
-    # I don't know why, but the documentation says this is required
     name = "onix_workflow_timetable_plugin"
     timetables = [OnixWorkflowTimetable]

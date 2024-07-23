@@ -38,7 +38,7 @@ from oaebu_workflows.airflow_pools import CrossrefEventsPool
 from oaebu_workflows.config import oaebu_user_agent_header, schema_folder as default_schema_folder, sql_folder
 from oaebu_workflows.oaebu_partners import DataPartner, OaebuPartner, partner_from_str, create_bespoke_data_partners
 from oaebu_workflows.onix_workflow.onix_work_aggregation import BookWorkAggregator, BookWorkFamilyAggregator
-from plugins.onix_workflow_schedule import OnixWorkflowTimetable
+from onix_workflow_schedule import OnixWorkflowTimetable
 from observatory_platform.airflow.airflow import on_failure_callback
 from observatory_platform.airflow.release import make_snapshot_date, set_task_state, SnapshotRelease
 from observatory_platform.airflow.sensors import DagCompleteSensor
