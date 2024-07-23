@@ -40,6 +40,7 @@ jobs:
       - name: Add dag folder to PYTHONPATH
         run: |
           echo "PYTHONPATH=$HOME/work/oaebu-workflows/oaebu-workflows/dags" >> "$GITHUB_ENV"
+          echo "PYTHONPATH=$HOME/work/oaebu-workflows/oaebu-workflows/plugins" >> "$GITHUB_ENV"
 
       # Required for testing ONIX Telescope
       - name: Set up JDK 11
