@@ -127,7 +127,7 @@ class TestIrusOapenTelescope(SandboxTestCase):
         env = SandboxEnvironment(self.project_id, self.data_location)
 
         # Setup DAG
-        execution_date = pendulum.datetime(year=2021, month=2, day=14)
+        logical_date = pendulum.datetime(year=2021, month=2, day=14)
         data_partner = partner_from_str("irus_oapen")
         data_partner.bq_dataset_id = env.add_dataset()
         dag_id = "irus_oapen_test"
@@ -172,7 +172,7 @@ class TestIrusOapenTelescope(SandboxTestCase):
 
         # Create the Observatory environment and run tests
         with env.create(task_logging=True):
-            with env.create_dag_run(dag, execution_date):
+            with env.create_dag_run(dag, logical_date=logical_date):
 
                 # Add airflow connections
                 geoip_license_conn_id = "geoip_license_key"
@@ -381,7 +381,7 @@ class TestIrusOapenTelescope(SandboxTestCase):
             env = SandboxEnvironment(
                 self.project_id, self.data_location, api_host="localhost", api_port=find_free_port()
             )
-            with env.create_dag_run(dag, pendulum.datetime(year=2023, month=1, day=1)):
+            with env.create_dag_run(dag, logical_date=pendulum.datetime(year=2023, month=1, day=1)):
 
                 ti = env.run_task("fetch_releases")
 

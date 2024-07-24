@@ -344,7 +344,7 @@ def create_dag(
         def make_release(**context) -> dict:
             """Creates a release object.
 
-            :param context: From Airflow. Contains the execution_date.
+            :param context: From Airflow. Contains the logical_date.
             :return: a dictionary representation of the OnixWorkflowRelease object.
             """
 
@@ -1026,7 +1026,7 @@ def create_dag(
             """Cleanup temporary files."""
 
             release = OnixWorkflowRelease.from_dict(release)
-            cleanup(dag_id=dag_id, execution_date=context["execution_date"], workflow_folder=release.workflow_folder)
+            cleanup(dag_id=dag_id, workflow_folder=release.workflow_folder)
 
         # Define DAG tasks
         task_check_dependencies = check_dependencies()

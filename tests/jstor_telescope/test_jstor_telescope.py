@@ -191,7 +191,7 @@ class TestJstorTelescopePublisher(SandboxTestCase):
             env.add_connection(dummy_gmail_connection())
 
             # Setup Telescope
-            execution_date = pendulum.datetime(year=2020, month=11, day=1)
+            logical_date = pendulum.datetime(year=2020, month=11, day=1)
             country_partner = partner_from_str("jstor_country")
             dataset_id = env.add_dataset()
             country_partner.bq_dataset_id = dataset_id
@@ -211,7 +211,7 @@ class TestJstorTelescopePublisher(SandboxTestCase):
             )
 
             # Begin DAG run
-            with env.create_dag_run(dag, execution_date):
+            with env.create_dag_run(dag, logical_date=logical_date):
                 # Test that all dependencies are specified: no error should be thrown
                 ti = env.run_task("check_dependencies")
                 self.assertEqual(ti.state, State.SUCCESS)
@@ -490,7 +490,7 @@ class TestJstorTelescopeCollection(SandboxTestCase):
             env.add_connection(dummy_gmail_connection())
 
             # Setup DAG
-            execution_date = pendulum.datetime(year=2023, month=10, day=4)
+            logical_date = pendulum.datetime(year=2023, month=10, day=4)
             country_partner = partner_from_str("jstor_country_collection")
             dataset_id = env.add_dataset()
             country_partner.bq_dataset_id = dataset_id
@@ -510,7 +510,7 @@ class TestJstorTelescopeCollection(SandboxTestCase):
             )
 
             # Begin DAG run
-            with env.create_dag_run(dag, execution_date):
+            with env.create_dag_run(dag, logical_date=logical_date):
                 # Test that all dependencies are specified: no error should be thrown
                 ti = env.run_task("check_dependencies")
                 self.assertEqual(ti.state, State.SUCCESS)

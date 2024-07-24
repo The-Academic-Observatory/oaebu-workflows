@@ -251,7 +251,7 @@ def create_dag(
             """Delete all files, folders and XComs associated with this release."""
 
             release = UclSalesRelease.from_dict(release)
-            cleanup(dag_id=dag_id, execution_date=context["execution_date"], workflow_folder=release.workflow_folder)
+            cleanup(dag_id=dag_id, workflow_folder=release.workflow_folder)
 
         task_check_dependencies = check_dependencies(airflow_conns=[oaebu_service_account_conn_id])
         xcom_release = _make_release()

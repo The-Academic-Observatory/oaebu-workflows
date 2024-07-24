@@ -123,7 +123,7 @@ class TestOnixTelescope(SandboxTestCase):
 
         with env.create(), sftp_server.create() as sftp_root:
             # Setup DAG
-            execution_date = pendulum.datetime(year=2021, month=3, day=31)
+            logical_date = pendulum.datetime(year=2021, month=3, day=31)
             metadata_partner = partner_from_str("onix", metadata_partner=True)
             metadata_partner.bq_dataset_id = env.add_dataset()
             api_bq_dataset_id = env.add_dataset()
@@ -143,7 +143,7 @@ class TestOnixTelescope(SandboxTestCase):
             # Add SFTP connection
             conn = Connection(conn_id=sftp_service_conn_id, uri=f"ssh://:password@localhost:{self.sftp_port}")
             env.add_connection(conn)
-            with env.create_dag_run(dag, execution_date):
+            with env.create_dag_run(dag, logical_date=logical_date):
                 # Test that all dependencies are specified: no error should be thrown
                 ti = env.run_task("check_dependencies")
                 self.assertEqual(ti.state, State.SUCCESS)
@@ -218,7 +218,7 @@ class TestOnixTelescope(SandboxTestCase):
                 self.assertEqual(len(dataset_releases), 0)
 
                 # Add dataset release task
-                now = pendulum.now()  
+                now = pendulum.now()
                 with patch("oaebu_workflows.onix_telescope.onix_telescope.pendulum.now") as mock_now:
                     mock_now.return_value = now
                     ti = env.run_task("process_release.add_new_dataset_releases", map_index=0)

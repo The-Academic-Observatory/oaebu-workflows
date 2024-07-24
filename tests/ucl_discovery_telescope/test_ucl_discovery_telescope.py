@@ -105,10 +105,10 @@ class TestUclDiscoveryTelescope(SandboxTestCase):
             max_threads=1,
             api_bq_dataset_id=api_bq_dataset_id,
         )
-        execution_date = pendulum.datetime(year=2023, month=6, day=1)
+        logical_date = pendulum.datetime(year=2023, month=6, day=1)
 
         # Create the Observatory environment and run tests
-        with env.create(), env.create_dag_run(dag, execution_date):
+        with env.create(), env.create_dag_run(dag, logical_date=logical_date):
             # Mock return values of download function
             interval_start = pendulum.instance(env.dag_run.data_interval_start)
             sheet_return = [

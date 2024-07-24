@@ -297,7 +297,7 @@ def create_dag(
         def cleanup_workflow(release: dict, **context) -> None:
             """Delete all files and folders associated with this release."""
             release = IrusFulcrumRelease.from_dict(release)
-            cleanup(dag_id, execution_date=context["execution_date"], workflow_folder=release.workflow_folder)
+            cleanup(dag_id, workflow_folder=release.workflow_folder)
 
         # Define DAG tasks
         task_check = check_dependencies(airflow_conns=[irus_oapen_api_conn_id])

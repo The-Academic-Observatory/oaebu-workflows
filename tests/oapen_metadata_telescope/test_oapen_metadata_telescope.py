@@ -120,7 +120,7 @@ class TestOapenMetadataTelescope(SandboxTestCase):
             )
 
             # first run
-            with env.create_dag_run(dag, pendulum.datetime(year=2021, month=2, day=1)):
+            with env.create_dag_run(dag, logical_date=pendulum.datetime(year=2021, month=2, day=1)):
                 # Test that all dependencies are specified: no error should be thrown
                 ti = env.run_task("check_dependencies")
                 self.assertEqual(ti.state, State.SUCCESS)

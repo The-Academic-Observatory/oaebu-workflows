@@ -396,11 +396,7 @@ def create_dag(
                 """Delete all files, folders and XComs associated with this release."""
 
                 release = IrusOapenRelease.from_dict(release)
-                cleanup(
-                    dag_id=dag_id,
-                    execution_date=context["execution_date"],
-                    workflow_folder=release.workflow_folder,
-                )
+                cleanup(dag_id=dag_id, workflow_folder=release.workflow_folder)
 
             (
                 call_cloud_function_(data)

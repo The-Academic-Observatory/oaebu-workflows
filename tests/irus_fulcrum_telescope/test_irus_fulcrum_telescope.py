@@ -106,7 +106,7 @@ class TestIrusFulcrumTelescope(SandboxTestCase):
         # Create the Observatory environment and run tests
         with env.create():
             # Setup DAG
-            execution_date = pendulum.datetime(year=2022, month=4, day=7)
+            logical_date = pendulum.datetime(year=2022, month=4, day=7)
             data_partner = partner_from_str("irus_fulcrum")
             data_partner.bq_dataset_id = env.add_dataset()
             api_bq_dataset_id = env.add_dataset()
@@ -121,7 +121,7 @@ class TestIrusFulcrumTelescope(SandboxTestCase):
             env.add_connection(Connection(conn_id="irus_api", uri=f"http://fake_api_login:@"))
 
             # Add the fake requestor ID as a connection
-            with env.create_dag_run(dag, execution_date):
+            with env.create_dag_run(dag, logical_date=logical_date):
                 # Test that all dependencies are specified: no error should be thrown
                 ti = env.run_task("check_dependencies")
                 self.assertEqual(ti.state, State.SUCCESS)

@@ -1034,16 +1034,16 @@ class TestOnixWorkflow(SandboxTestCase):
                 sensor.grace_period = timedelta(seconds=1)
 
             # Run Dummy Dags
-            execution_date = pendulum.datetime(year=2021, month=5, day=17)
+            logical_date = pendulum.datetime(year=2021, month=5, day=17)
             for sensor_id in sensor_dag_ids:
-                dummy_dag = make_dummy_dag(sensor_id, execution_date)
-                with env.create_dag_run(dummy_dag, execution_date):
+                dummy_dag = make_dummy_dag(sensor_id, logical_date)
+                with env.create_dag_run(dummy_dag, logical_date=logical_date):
                     # Running all of a DAGs tasks sets the DAG to finished
                     ti = env.run_task("dummy_task")
                     self.assertEqual(ti.state, State.SUCCESS)
 
             # Run end to end tests for DAG
-            with env.create_dag_run(dag, data_interval=DataInterval(execution_date, execution_date.add(days=7))):
+            with env.create_dag_run(dag, data_interval=DataInterval(logical_date, logical_date.add(days=7))):
                 # Run dependency check
                 ti = env.run_task("check_dependencies")
                 self.assertEqual(ti.state, State.SUCCESS)

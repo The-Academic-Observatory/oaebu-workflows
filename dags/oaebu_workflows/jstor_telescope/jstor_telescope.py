@@ -405,11 +405,7 @@ def create_dag(
 
                 release = JstorRelease.from_dict(release)
                 api = make_jstor_api(entity_type, entity_id)
-                cleanup(
-                    dag_id=dag_id,
-                    execution_date=context["execution_date"],
-                    workflow_folder=release.workflow_folder,
-                )
+                cleanup(dag_id=dag_id, workflow_folder=release.workflow_folder)
                 success = api.add_labels(release.reports)
                 set_task_state(success, context["ti"].task_id, release=release)
 
