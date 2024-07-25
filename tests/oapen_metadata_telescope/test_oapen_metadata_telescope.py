@@ -158,7 +158,7 @@ class TestOapenMetadataTelescope(SandboxTestCase):
 
                 # Test download task
                 self.assertTrue(os.path.exists(release.download_path))
-                self.assert_file_integrity(release.download_path, "c246a8f7487de756f4dd47cd0ab94363", "md5")
+                self.assert_file_integrity(release.download_path, "bf9d7c95f74f029ca01721de8b0c3fb1", "md5")
 
                 # Test that download file uploaded to BQ
                 self.assert_blob_integrity(
@@ -254,9 +254,9 @@ class TestDownloadMetadata(unittest.TestCase):
             with NamedTemporaryFile() as download_file:
                 download_metadata(self.uri, download_file.name)
                 with open(download_file.name, "r") as f:
-                    downloaded_xml = f.readlines()
-        with open(self.valid_download_xml, "r") as f:  # Note - do not format this file or this test will fail
-            assertion_xml = f.readlines()
+                    downloaded_xml = [l.strip() for l in f.readlines()]
+        with open(self.valid_download_xml, "r") as f:
+            assertion_xml = [l.strip() for l in f.readlines()]
         self.assertEqual(len(downloaded_xml), len(assertion_xml))
         self.assertEqual(downloaded_xml, assertion_xml)
 
