@@ -111,10 +111,10 @@ class TestUclSalesTelescope(SandboxTestCase):
             data_partner=data_partner,
             api_bq_dataset_id=api_bq_dataset_id,
         )
-        execution_date = pendulum.datetime(year=2024, month=2, day=4)
+        logical_date = pendulum.datetime(year=2024, month=2, day=4)
 
         # Create the Observatory environment and run tests
-        with env.create(), env.create_dag_run(dag, execution_date):
+        with env.create(), env.create_dag_run(dag, logical_date=logical_date):
             # Mock return values of download function
             sheet_return = [
                 ["Year", "Month", "Free/Paid/Return?", "Country", "ISBN", "Book", "Qty"],

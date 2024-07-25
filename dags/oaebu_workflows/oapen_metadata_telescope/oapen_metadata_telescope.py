@@ -277,11 +277,7 @@ def create_dag(
             """Delete all files, folders and XComs associated with this release."""
 
             release = OapenMetadataRelease.from_dict(release)
-            cleanup(
-                dag_id=dag_id,
-                execution_date=context["execution_date"],
-                workflow_folder=release.workflow_folder,
-            )
+            cleanup(dag_id=dag_id, workflow_folder=release.workflow_folder)
 
         task_check_dependencies = check_dependencies()
         xcom_release = make_release()

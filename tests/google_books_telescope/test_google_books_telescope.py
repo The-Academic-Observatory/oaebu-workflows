@@ -129,7 +129,7 @@ class TestGoogleBooksTelescope(SandboxTestCase):
             with sftp_server.create() as sftp_root:
 
                 # Setup DAG
-                execution_date = pendulum.datetime(year=2021, month=3, day=31)
+                logical_date = pendulum.datetime(year=2021, month=3, day=31)
                 sales_partner = partner_from_str("google_books_sales")
                 sales_partner.bq_dataset_id = dataset_id
                 traffic_partner = partner_from_str("google_books_traffic")
@@ -151,7 +151,7 @@ class TestGoogleBooksTelescope(SandboxTestCase):
                 env.add_connection(
                     Connection(conn_id=sftp_service_conn_id, uri=f"ssh://:password@localhost:{self.sftp_port}")
                 )
-                with env.create_dag_run(dag, execution_date):
+                with env.create_dag_run(dag, logical_date=logical_date):
                     # Test that all dependencies are specified: no error should be thrown
                     ti = env.run_task("check_dependencies")
                     self.assertEqual(ti.state, State.SUCCESS)

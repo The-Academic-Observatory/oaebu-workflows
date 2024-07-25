@@ -124,7 +124,7 @@ class TestThothTelescope(SandboxTestCase):
         # Create the Observatory environment and run tests
         with env.create():
             # Setup Telescope
-            execution_date = pendulum.datetime(year=2022, month=12, day=1)
+            logical_date = pendulum.datetime(year=2022, month=12, day=1)
             metadata_partner = partner_from_str("thoth", metadata_partner=True)
             metadata_partner.bq_dataset_id = env.add_dataset()
             dag_id = "thoth_telescope_test"
@@ -139,7 +139,7 @@ class TestThothTelescope(SandboxTestCase):
                 api_bq_dataset_id=api_bq_dataset_id,
             )
 
-            with env.create_dag_run(dag, execution_date):
+            with env.create_dag_run(dag, logical_date=logical_date):
                 # Check dependencies task
                 ti = env.run_task("check_dependencies")
                 self.assertEqual(ti.state, State.SUCCESS)
