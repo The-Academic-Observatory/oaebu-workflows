@@ -46,7 +46,8 @@
             "TitleType": null,
             "TitleElement": {
               "TitleElementLevel": null,
-              "TitleText": null
+              "TitleText": null,
+              "Subtitle": null
             }
           },
           "Contributor": {

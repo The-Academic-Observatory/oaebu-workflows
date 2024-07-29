@@ -605,17 +605,17 @@ class TestRemoveInvalidProducts(unittest.TestCase):
 
             # Make assertions of the processed xml
             with open(processed_file.name) as f:
-                processed_xml = f.readlines()
+                processed_xml = [l.strip() for l in f.readlines()]  # Strip to avoid formatting discrepancies
             with open(self.invalid_products_removed_xml) as f:
-                assertion_xml = f.readlines()
+                assertion_xml = [l.strip() for l in f.readlines()]
             self.assertEqual(len(processed_xml), len(assertion_xml))
             self.assertEqual(processed_xml, assertion_xml)
 
             # Make assertions of the invalid products
             with open(invalid_products_file.name) as f:
-                invalid_products_xml = f.readlines()
+                invalid_products_xml = [l.strip() for l in f.readlines()]
             with open(self.invalid_products_xml) as f:
-                assertion_xml = f.readlines()
+                assertion_xml = [l.strip() for l in f.readlines()]
             self.assertEqual(len(invalid_products_xml), len(assertion_xml))
             self.assertEqual(invalid_products_xml, assertion_xml)
 
