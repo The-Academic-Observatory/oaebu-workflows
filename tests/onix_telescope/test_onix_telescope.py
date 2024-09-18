@@ -232,7 +232,7 @@ class TestOnixTelescope(SandboxTestCase):
                     "created": datetime_normalise(now),
                     "modified": datetime_normalise(now),
                     "data_interval_start": "2021-03-31T00:00:00+00:00",
-                    "data_interval_end": "2021-04-04T12:00:00+00:00",
+                    "data_interval_end": "2021-03-31T12:00:00+00:00",
                     "snapshot_date": "2021-03-30T00:00:00+00:00",
                     "partition_date": None,
                     "changefile_start_date": None,
