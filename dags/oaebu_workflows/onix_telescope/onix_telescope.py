@@ -110,7 +110,7 @@ def create_dag(
     api_bq_dataset_id: str = "dataset_api",
     sftp_service_conn_id: str = "sftp_service",
     catchup: bool = False,
-    schedule: str = "0 12 * * Sun",  # Midday every sunday
+    schedule: str = "0 12 * * *",  # Midday everyday
     start_date: pendulum.DateTime = pendulum.datetime(2021, 3, 28),
     max_active_runs: int = 1,
     retries: int = 3,
