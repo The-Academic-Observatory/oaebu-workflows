@@ -41,14 +41,3 @@ class AirflowPool:
             return self.get_pool()
         except PoolNotFound:
             return self.create_pool()
-
-
-class CrossrefEventsPool(AirflowPool):
-    def __init__(self, pool_slots: int = 15):
-        """Constructor CrossrefEventsPool instance
-
-        :param pool_slots: The number of slots assigned to this pool
-        """
-        super().__init__(
-            pool_name="crossref_events_pool", pool_slots=pool_slots, pool_description="Crossref Events API Pool"
-        )

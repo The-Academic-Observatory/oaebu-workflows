@@ -19,23 +19,17 @@ import json
 import logging
 import os
 import re
-from typing import Iterable, List, Optional, Tuple, Union, Dict
+from typing import Iterable, List, Optional, Union, Dict
 
-import jsonlines
 import pendulum
 from airflow.decorators import dag, task, task_group
-from airflow.exceptions import AirflowSkipException
 from airflow.models.baseoperator import chain
 from airflow.utils.trigger_rule import TriggerRule
 from airflow.timetables.base import Timetable
 from google.cloud.bigquery import Client, SourceFormat
 from jinja2 import Environment, FileSystemLoader
-from ratelimit import limits, sleep_and_retry
-from requests import Request, Session
-from tenacity import wait_exponential_jitter
 
-from oaebu_workflows.airflow_pools import CrossrefEventsPool
-from oaebu_workflows.config import oaebu_user_agent_header, schema_folder as default_schema_folder, sql_folder
+from oaebu_workflows.config import schema_folder as default_schema_folder, sql_folder
 from oaebu_workflows.oaebu_partners import DataPartner, OaebuPartner, partner_from_str, create_bespoke_data_partners
 from oaebu_workflows.onix_workflow.onix_work_aggregation import BookWorkAggregator, BookWorkFamilyAggregator
 from onix_workflow_schedule import OnixWorkflowTimetable
@@ -45,7 +39,7 @@ from observatory_platform.airflow.sensors import DagCompleteSensor
 from observatory_platform.airflow.tasks import check_dependencies
 from observatory_platform.airflow.workflow import cleanup, CloudWorkspace
 from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
-from observatory_platform.files import save_jsonl_gz, yield_jsonl
+from observatory_platform.files import save_jsonl_gz
 from observatory_platform.google.bigquery import (
     bq_copy_table,
     bq_create_dataset,
@@ -53,22 +47,12 @@ from observatory_platform.google.bigquery import (
     bq_find_schema,
     bq_load_table,
     bq_run_query,
-    bq_select_latest_table,
     bq_select_table_shard_dates,
     bq_sharded_table_id,
     bq_table_id,
 )
 from observatory_platform.google.gcs import gcs_blob_name_from_path, gcs_blob_uri, gcs_upload_files
 from observatory_platform.jinja2_utils import render_template
-from observatory_platform.url_utils import retry_get_url
-
-# Crossref Events rate limit settings
-# These settings mean that, for instance, if there are n Crossref Events tasks queued, then at most
-# 15 tasks will run at once (due to the pool slots) and each task will only ever call Crossref Events
-# at a rate of once per second.
-MAX_POOL_SLOTS = 15  # Matches 15 requests
-CALLS_PER_PERIOD = 1  # 1 call per second
-PERIOD = 1  # 1 second
 
 
 class OnixWorkflowRelease(SnapshotRelease):
@@ -104,7 +88,6 @@ class OnixWorkflowRelease(SnapshotRelease):
         self.workslookup_errors_file_name = "worksid_errors.jsonl.gz"
         self.worksfamilylookup_file_name = "workfamilyid.jsonl.gz"
         self.crossref_metadata_file_name = "crossref_metadata.jsonl.gz"
-        self.crossref_events_file_name = "crossref_events.jsonl"
 
         # Generated Schemas
         self.book_product_schema_file_name = "book_product_schema.json"
@@ -131,14 +114,6 @@ class OnixWorkflowRelease(SnapshotRelease):
     @property
     def crossref_metadata_path(self):
         return os.path.join(self.transform_folder, self.crossref_metadata_file_name)
-
-    @property
-    def download_crossref_events_path(self):
-        return os.path.join(self.download_folder, self.crossref_events_file_name)
-
-    @property
-    def transformed_crossref_events_path(self):
-        return os.path.join(self.transform_folder, self.crossref_events_file_name)
 
     @property
     def book_product_schema_path(self):
@@ -185,10 +160,6 @@ class OnixWorkflowRelease(SnapshotRelease):
     def crossref_metadata_blob_name(self):
         return gcs_blob_name_from_path(self.crossref_metadata_path)
 
-    @property
-    def crossref_events_blob_name(self):
-        return gcs_blob_name_from_path(self.transformed_crossref_events_path)
-
     @staticmethod
     def from_dict(dict_: dict):
         return OnixWorkflowRelease(
@@ -220,7 +191,6 @@ def create_dag(
     bq_oaebu_crossref_dataset_id: str = "crossref",
     bq_master_crossref_metadata_table_name: str = "crossref_metadata",
     bq_oaebu_crossref_metadata_table_name: str = "crossref_metadata",
-    bq_crossref_events_table_name: str = "crossref_events",
     bq_country_project_id: str = "oaebu-public-data",
     bq_country_dataset_id: str = "oaebu_reference",
     bq_subject_project_id: str = "oaebu-public-data",
@@ -235,7 +205,6 @@ def create_dag(
     bq_worksid_table_name: str = "onix_workid_isbn",
     bq_worksid_error_table_name: str = "onix_workid_isbn_errors",
     bq_workfamilyid_table_name: str = "onix_workfamilyid_isbn",
-    skip_downloading_crossref_events: bool = True,
     # Run parameters
     data_partners: List[Union[str, OaebuPartner]] = None,
     bespoke_data_partners: List[Dict] = None,
@@ -265,7 +234,6 @@ def create_dag(
     :param bq_oaebu_crossref_dataset_id: GCP dataset ID of crossref OAeBU data
     :param bq_master_crossref_metadata_table_name: The name of the master crossref metadata table
     :param bq_oaebu_crossref_metadata_table_name: The name of the OAeBU crossref metadata table
-    :param bq_crossref_events_table_name: The name of the crossref events table
     :param bq_country_project_id: GCP project ID of the country table
     :param bq_country_dataset_id: GCP dataset containing the country table
     :param bq_subject_project_id: GCP project ID of the subject tables
@@ -280,7 +248,6 @@ def create_dag(
     :param bq_worksid_table_name: table ID of the worksid table
     :param bq_worksid_error_table_name: table ID of the worksid error table
     :param bq_workfamilyid_table_name: table ID of the workfamilyid table
-    :param skip_downloading_crossref_events: skip fetching new data for Crossref Events, when True, falls back to using
     a previous version of the table.
 
     :param data_partners: OAEBU data sources.
@@ -310,11 +277,6 @@ def create_dag(
     data_partners = [partner_from_str(p) for p in data_partners]
     if bespoke_data_partners:
         data_partners.extend(create_bespoke_data_partners(bespoke_data_partners))
-
-    # Create pool for crossref API calls (if they don't exist)
-    # Pools are necessary to throttle the maxiumum number of requests we can make per second and avoid 429 errors
-    crossref_events_pool = CrossrefEventsPool(pool_slots=MAX_POOL_SLOTS)
-    crossref_events_pool.create_pool()
 
     @dag(
         dag_id=dag_id,
@@ -551,7 +513,7 @@ def create_dag(
 
         @task(trigger_rule=TriggerRule.NONE_FAILED)
         def create_book_table(release: dict, **context) -> None:
-            """Create the oaebu book table using the crossref event and metadata tables"""
+            """Create the oaebu book table using the crossref metadata table"""
 
             release = OnixWorkflowRelease.from_dict(release)
             bq_create_dataset(
@@ -570,17 +532,8 @@ def create_dag(
                 release.snapshot_date,
             )
             client = Client(project=cloud_workspace.project_id)
-            crossref_events_table_id = bq_select_latest_table(
-                table_id=bq_table_id(
-                    cloud_workspace.project_id, bq_oaebu_crossref_dataset_id, bq_crossref_events_table_name
-                ),
-                end_date=release.snapshot_date,
-                sharded=True,
-                client=client,
-            )
             sql = render_template(
                 os.path.join(sql_folder(workflow_module="onix_workflow"), "book.sql.jinja2"),
-                crossref_events_table_id=crossref_events_table_id,
                 crossref_metadata_table_id=crossref_metadata_table_id,
             )
             logging.info(sql)
@@ -754,11 +707,6 @@ def create_dag(
                     "output_table": "book_list",
                     "query_template": os.path.join(sql_folder("onix_workflow"), "book_list.sql.jinja2"),
                     "schema": os.path.join(default_schema_folder("onix_workflow"), "book_list.json"),
-                },
-                {
-                    "output_table": "book_metrics_events",
-                    "query_template": os.path.join(sql_folder("onix_workflow"), "book_metrics_events.sql.jinja2"),
-                    "schema": os.path.join(default_schema_folder("onix_workflow"), "book_metrics_events.json"),
                 },
             ]
             if "jstor_institution" in [dp.type_id for dp in data_partners]:
@@ -1034,7 +982,6 @@ def create_dag(
         xcom_release = make_release()
         task_aggregate_works = aggregate_works(xcom_release)
         task_create_crossref_metadata_table = create_crossref_metadata_table(xcom_release)
-        task_create_crossref_events_table = create_crossref_events_table(xcom_release)
         task_create_book_table = create_book_table(xcom_release)
         task_group_create_intermediate_tables = _create_tasks_intermediate_tables(xcom_release)
         task_create_book_product_table = create_book_product_table(xcom_release)
@@ -1049,7 +996,6 @@ def create_dag(
             >> xcom_release
             >> task_aggregate_works
             >> task_create_crossref_metadata_table
-            >> task_create_crossref_events_table
             >> task_create_book_table
             >> task_group_create_intermediate_tables
             >> task_create_book_product_table
@@ -1156,192 +1102,8 @@ def dois_from_table(table_id: str, doi_column_name: str = "DOI", client: Client 
     return dois
 
 
-def download_crossref_events(
-    file_path: str,
-    doi_prefixes: Iterable[str],
-    start_date: pendulum.DateTime,
-    end_date: pendulum.DateTime,
-    mailto: str,
-):
-    """
-    Spawns multiple threads to download event data (DOI and publisher only) for each doi supplied.
-    The url template was made with reference to the crossref event api:
-    https://www.eventdata.crossref.org/guide/service/query-api/
-    Note that the max_threads will cap at 15 because the events API will return a 429 if more than 15 requests are made
-    per second. Each API request happens to take roughly 1 second. Having more threadsthan necessary slows down the
-    download process as the retry script will wait a minimum of two seconds between each attempt.
-
-    :param file_path: the path where the events should be saved.
-    :param doi_prefixes: the prefixes of DOIs to download data for.
-    :param dois: the prefixes of DOIs to download data for.
-    :param start_date: The start date for events we're interested in.
-    :param end_date: The end date for events we're interested in.
-    :param mailto: The email to use as a reference for who is requesting the data.
-    :return: All events for the input DOIs.
-    """
-
-    # Create queries per year
-    # requests = []
-    # for prefix in doi_prefixes:
-    #     for dt in pendulum.Period(start=start_date, end=end_date).range("years"):
-    #         period_start = dt.start_of("year")
-    #         period_end = dt.end_of("year")
-    #
-    #         # Make sure the end date does not exceed the original end date
-    #         if period_end > end_date:
-    #             period_end = end_date
-    #
-    #         request = Request(
-    #             method="GET",
-    #             url="https://api.eventdata.crossref.org/v1/events",
-    #             params={
-    #                 "mailto": mailto,
-    #                 "from-collected-date": period_start.strftime("%Y-%m-%d"),
-    #                 "until-collected-date": period_end.strftime("%Y-%m-%d"),
-    #                 "rows": 1000,
-    #                 "obj-id.prefix": prefix,
-    #             },
-    #         )
-    #         requests.append(request)
-    requests = [
-        Request(
-            method="GET",
-            url="https://api.eventdata.crossref.org/v1/events",
-            params={
-                "mailto": mailto,
-                "from-collected-date": start_date.strftime("%Y-%m-%d"),
-                "until-collected-date": end_date.strftime("%Y-%m-%d"),
-                "rows": 1000,
-                "obj-id.prefix": prefix,
-            },
-        )
-        for prefix in doi_prefixes
-    ]
-
-    logging.info(f"Beginning Crossref Event data download with {len(requests)} requests")
-    for request in requests:
-        paginate_crossref_events(request, file_path)
-
-
-def paginate_crossref_events(request: Request, file_path: str):
-    """Downloads all crossref events from a url, iterating through pages if there is more than one
-
-    :param request: the request.
-    :param file_path: Worker number
-    :return: The events from this URL
-    """
-
-    url = Session().prepare_request(request).url
-    logging.info(f"Fetching pages for {url} and saving to {file_path}")
-    next_cursor = None
-    total_counts = 0
-    headers = oaebu_user_agent_header()
-
-    while True:
-        # Update request parameters only if next_cursor is not None
-        if next_cursor is not None:
-            request.params["cursor"] = next_cursor
-
-        # Download page
-        next_cursor, page_counts, _, page_events = download_crossref_events_page(request, headers)
-
-        # Accumulate the results
-        total_counts += page_counts
-
-        # Append data to file
-        with open(file_path, mode="a") as f:
-            with jsonlines.Writer(f) as writer:
-                writer.write_all(page_events)
-
-        # Break the loop if no more cursor is provided
-        if not next_cursor:
-            break
-
-    logging.info(f"Successful: {url} ")
-    logging.info(f"Total no. events: {total_counts}")
-
-
-def download_crossref_events_page(request: Request, headers: dict) -> Tuple[str, int, int, List[dict]]:
-    """Download crossref events from a single page
-
-    :param request: the request.
-    :param headers: Headers to send with the request
-    :return: The cursor, event counter, total number of events and the events for the URL
-    """
-
-    crossref_events_limiter()
-    url = Session().prepare_request(request).url
-    response = retry_get_url(url, num_retries=5, wait=wait_exponential_jitter(initial=0.5, max=60), headers=headers)
-    response_json = response.json()
-    total_events = response_json["message"]["total-results"]
-    events = response_json["message"]["events"]
-    next_cursor = response_json["message"]["next-cursor"]
-    counter = len(events)
-
-    return next_cursor, counter, total_events, events
-
-
-@sleep_and_retry
-@limits(calls=CALLS_PER_PERIOD, period=PERIOD)
-def crossref_events_limiter():
-    """Task to throttle the calls to the crossref events API"""
-    return
-
-
 def clean_doi(doi: str) -> str:
     return re.sub(r"^https?://doi\.org/", "", doi).upper()
-
-
-def transform_crossref_events(input_path: str, dois_filter: set[str], output_path: str):
-    """Transforms crossref events.
-
-    :param input_path: A list of the events to transform
-    :param dois_filter: a set of DOIs to filter the input by.
-    :param output_path: The maximum number of threads to utilise for the transforming process
-    """
-
-    logging.info(f"Beginning crossref event transform")
-
-    with open(output_path, mode="w") as f:
-        with jsonlines.Writer(f) as writer:
-            for event in yield_jsonl(input_path):
-                doi = clean_doi(event["obj_id"])
-                if doi in dois_filter:
-                    row = transform_event(event)
-                    writer.write(row)
-
-    logging.info("Crossref event transformation complete")
-
-
-def transform_event(event: dict) -> dict:
-    """Transform the dictionary with event data by replacing '-' with '_' in key names, converting all int values to
-    string except for the 'total' field and parsing datetime columns for a valid datetime.
-
-    :param event: The event dictionary
-    :return: The transformed event dictionary
-    """
-
-    if isinstance(event, (str, int, float)):
-        return event
-    if isinstance(event, dict):
-        new = event.__class__()
-        for k, v in event.items():
-            if isinstance(v, int) and k != "total":
-                v = str(v)
-            if k in ["timestamp", "occurred_at", "issued", "dateModified", "updated_date"]:
-                try:
-                    v = str(pendulum.parse(v))
-                except ValueError:
-                    v = "0001-01-01T00:00:00Z"
-
-            # Replace hyphens with underscores for BigQuery compatibility
-            k = k.replace("-", "_")
-
-            # Replace @ symbol in keys left by DataCite between the 15 and 22 March 2019
-            k = k.replace("@", "")
-
-            new[k] = transform_event(v)
-        return new
 
 
 def copy_latest_export_tables(

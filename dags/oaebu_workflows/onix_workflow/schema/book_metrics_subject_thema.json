@@ -22,19 +22,6 @@
     "name": "month",
     "type": "DATE",
     "description": "The month in which the metrics occurred"
-  },
-  {
-    "fields": [
-      {
-        "mode": "NULLABLE",
-        "name": "count",
-        "type": "INTEGER",
-        "description": "Count of events"
-      }
-    ],
-    "mode": "NULLABLE",
-    "name": "crossref_events",
-    "type": "RECORD",
-    "description": "Metrics from Crossref events"
   }
 ]
+
