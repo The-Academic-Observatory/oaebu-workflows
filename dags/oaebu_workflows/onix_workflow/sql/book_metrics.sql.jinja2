@@ -37,12 +37,12 @@ SELECT
     (SELECT p.publisher_name as publisher_name FROM UNNEST(onix.publisher) as p WHERE p.publishing_role = "Publisher" LIMIT 1) as publisher_name, -- pull the publisher name from the onix.publisher field
     month.month,
     {% for dp in data_partners | selectattr("export_book_metrics", "equalto", True) %}
-        {% include dp.files.book_metrics_sql %},
+        {% include dp.files.book_metrics_sql %}
+        {% if not loop.last %},{% endif %}
     {% endfor %}
-    STRUCT((SELECT SUM(count) FROM UNNEST(month.crossref_events)) as count) as crossref_events
 FROM `{{ book_product_table_id }}`, UNNEST(months) AS month
 WHERE 
 {% for dp in data_partners | selectattr("export_book_metrics", "equalto", True) %}
-    {% include dp.files.month_null_sql %} OR
+    {% include dp.files.month_null_sql %}
+    {% if not loop.last %} OR{% endif %}
 {% endfor %}
-ARRAY_LENGTH(month.crossref_events) > 0
