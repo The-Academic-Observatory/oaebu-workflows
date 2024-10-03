@@ -33,12 +33,9 @@ from oaebu_workflows.onix_workflow.onix_workflow import (
     copy_latest_export_tables,
     create_dag,
     dois_from_table,
-    download_crossref_events,
     get_onix_records,
     insert_into_schema,
     OnixWorkflowRelease,
-    transform_crossref_events,
-    transform_event,
 )
 from observatory_platform.airflow.workflow import Workflow
 from observatory_platform.config import module_file_path
@@ -137,8 +134,6 @@ class TestOnixWorkflow(SandboxTestCase):
 
         # fixtures folder location
         self.fixtures_folder = test_fixtures_folder(workflow_module="onix_workflow")
-        # vcrpy cassettes for http request mocking
-        self.events_cassette = os.path.join(self.fixtures_folder, "crossref_events_request.yaml")
 
     @patch("oaebu_workflows.onix_workflow.onix_workflow.bq_select_table_shard_dates")
     def test_make_release_sharded(self, mock_sel_table_suffixes):
@@ -185,10 +180,6 @@ class TestOnixWorkflow(SandboxTestCase):
                 self.assertEqual(
                     release.crossref_metadata_path,
                     os.path.join(release.transform_folder, "crossref_metadata.jsonl.gz"),
-                )
-                self.assertEqual(
-                    release.transformed_crossref_events_path,
-                    os.path.join(release.transform_folder, "crossref_events.jsonl"),
                 )
 
                 # Test that the onix and crossref snapshots are as expected
@@ -248,10 +239,6 @@ class TestOnixWorkflow(SandboxTestCase):
                 self.assertEqual(
                     release.crossref_metadata_path,
                     os.path.join(release.transform_folder, "crossref_metadata.jsonl.gz"),
-                )
-                self.assertEqual(
-                    release.transformed_crossref_events_path,
-                    os.path.join(release.transform_folder, "crossref_events.jsonl"),
                 )
 
                 # Test that the onix table and crossref snapshots are as expected
@@ -327,29 +314,24 @@ class TestOnixWorkflow(SandboxTestCase):
                     "aggregate_works",
                     "export_tables.export_book_metrics",
                     "create_book_product_table",
-                    "export_tables.export_book_metrics_events",
                     "add_new_dataset_releases",
                     "create_crossref_metadata_table",
                     "create_book_table",
                     "update_latest_export_tables",
                     "cleanup_workflow",
                     "export_tables.export_book_metrics_subjects",
-                    "create_crossref_events_table",
                 ],
                 "aggregate_works": ["create_crossref_metadata_table"],
-                "create_crossref_metadata_table": ["create_crossref_events_table"],
-                "create_crossref_events_table": ["create_book_table"],
+                "create_crossref_metadata_table": ["create_book_table"],
                 "create_book_table": [],
                 "create_book_product_table": [
                     "export_tables.export_book_metrics_author",
                     "export_tables.export_book_list",
                     "export_tables.export_book_metrics_country",
                     "export_tables.export_book_metrics",
-                    "export_tables.export_book_metrics_events",
                     "export_tables.export_book_metrics_subjects",
                 ],
                 "export_tables.export_book_list": ["update_latest_export_tables"],
-                "export_tables.export_book_metrics_events": ["update_latest_export_tables"],
                 "export_tables.export_book_metrics": ["update_latest_export_tables"],
                 "export_tables.export_book_metrics_country": ["update_latest_export_tables"],
                 "export_tables.export_book_metrics_author": ["update_latest_export_tables"],
@@ -390,7 +372,6 @@ class TestOnixWorkflow(SandboxTestCase):
                     "export_tables.export_book_metrics_author",
                     "intermediate_tables.intermediate_google_books_sales",
                     "export_tables.export_book_institution_list",
-                    "create_crossref_events_table",
                     "export_tables.export_book_metrics",
                     "add_new_dataset_releases",
                     "intermediate_tables.intermediate_jstor_country",
@@ -398,7 +379,6 @@ class TestOnixWorkflow(SandboxTestCase):
                     "intermediate_tables.intermediate_irus_oapen",
                     "intermediate_tables.intermediate_google_books_traffic",
                     "create_book_table",
-                    "export_tables.export_book_metrics_events",
                     "export_tables.export_book_metrics_subjects",
                     "update_latest_export_tables",
                     "export_tables.export_book_list",
@@ -414,8 +394,7 @@ class TestOnixWorkflow(SandboxTestCase):
                     "export_tables.export_book_metrics_institution",
                 ],
                 "aggregate_works": ["create_crossref_metadata_table"],
-                "create_crossref_metadata_table": ["create_crossref_events_table"],
-                "create_crossref_events_table": ["create_book_table"],
+                "create_crossref_metadata_table": ["create_book_table"],
                 "create_book_table": [
                     "intermediate_tables.intermediate_worldreader",
                     "intermediate_tables.intermediate_jstor_country",
@@ -442,7 +421,6 @@ class TestOnixWorkflow(SandboxTestCase):
                     "export_tables.export_book_metrics_author",
                     "export_tables.export_book_institution_list",
                     "export_tables.export_book_metrics_country",
-                    "export_tables.export_book_metrics_events",
                     "export_tables.export_book_metrics_city",
                     "export_tables.export_book_metrics_institution",
                     "export_tables.export_book_metrics_subjects",
@@ -450,7 +428,6 @@ class TestOnixWorkflow(SandboxTestCase):
                     "export_tables.export_book_metrics",
                 ],
                 "export_tables.export_book_list": ["update_latest_export_tables"],
-                "export_tables.export_book_metrics_events": ["update_latest_export_tables"],
                 "export_tables.export_book_institution_list": ["update_latest_export_tables"],
                 "export_tables.export_book_metrics_institution": ["update_latest_export_tables"],
                 "export_tables.export_book_metrics_city": ["update_latest_export_tables"],
@@ -562,142 +539,12 @@ class TestOnixWorkflow(SandboxTestCase):
                 self.assert_table_content(table_id, load_jsonl(release.worksfamilylookup_path), primary_key="isbn13")
                 self.assert_table_content(table_id, worksfamilylookup_expected, primary_key="isbn13")
 
-    def test_crossref_events_api_calls(self):
-        """Test the functions that query the crossref event and metadata APIs"""
-
-        with CliRunner().isolated_filesystem() as t:
-            input_path = os.path.join(t, "input.jsonl")
-            doi_prefixes = ["10.5555", "10.2222"]
-            events_start = pendulum.date(2020, 1, 1)
-            events_end = pendulum.date(2021, 1, 1)
-            mailto = "agent@observatory.academy"
-
-            with vcr.use_cassette(
-                os.path.join(self.fixtures_folder, "crossref_events_api_calls.yaml"),
-                record_mode=vcr.record_mode.RecordMode.ONCE,
-            ):
-                download_crossref_events(input_path, doi_prefixes, events_start, events_end, mailto)
-
-            actual_events = load_jsonl(input_path)
-            expected_num_events = 242 + 3620
-            self.assertEqual(expected_num_events, len(actual_events))
-
     @patch("oaebu_workflows.onix_workflow.onix_workflow.bq_run_query")
     def test_get_onix_records(self, mock_bq_query):
         mock_bq_query.return_value = TestOnixWorkflow.onix_data
         records = get_onix_records("test_table_id")
         self.assertEqual(len(records), 3)
         self.assertEqual(records[0]["ISBN13"], "111")
-
-    def test_crossref_transform(self):
-        """Test the function that transforms the crossref events data"""
-
-        input_events = [
-            {
-                "license": "https://creativecommons.org/publicdomain/zero/1.0/",
-                "obj_id": "https://doi.org/10.5555/12345678",
-                "source_token": "36c35e23-8757-4a9d-aacf-345e9b7eb50d",
-                "occurred_at": "2021-07-21T13:27:50Z",
-                "subj_id": "https://en.wikipedia.org/api/rest_v1/page/html/Josiah_S._Carberry/1034726541",
-                "id": "c76bbfd9-5122-4859-82c8-505b1eb845fd",
-                "evidence_record": "https://evidence.eventdata.crossref.org/evidence/20210721-wikipedia-83789066-1794-4c4f-bb2c-ed47ccd82264",
-                "terms": "https://doi.org/10.13003/CED-terms-of-use",
-                "action": "add",
-                "subj": {
-                    "pid": "https://en.wikipedia.org/wiki/Josiah_S._Carberry",
-                    "url": "https://en.wikipedia.org/w/index.php?title=Josiah_S._Carberry&oldid=1034726541",
-                    "title": "Josiah S. Carberry",
-                    "work_type_id": "entry-encyclopedia",
-                    "api-url": "https://en.wikipedia.org/api/rest_v1/page/html/Josiah_S._Carberry/1034726541",
-                },
-                "source_id": "wikipedia",
-                "obj": {
-                    "pid": "https://doi.org/10.5555/12345678",
-                    "url": "http://psychoceramics.labs.crossref.org/10.5555-12345678.html",
-                    "method": "landing-page-meta-tag",
-                    "verification": "checked-url-exact",
-                },
-                "timestamp": "2021-07-21T14:00:58Z",
-                "relation_type_id": "references",
-            },
-            {
-                "license": "https://creativecommons.org/publicdomain/zero/1.0/",
-                "obj_id": "https://doi.org/10.5555/12345679",
-                "source_token": "36c35e23-8757-4a9d-aacf-345e9b7eb50e",
-                "occurred_at": "2021-07-21T13:27:50Z",
-                "subj_id": "https://en.wikipedia.org/api/rest_v1/page/html/Josiah_S._Carberry/1034726541",
-                "id": "c76bbfd9-5122-4859-82c8-505b1eb845fd",
-                "evidence_record": "https://evidence.eventdata.crossref.org/evidence/20210721-wikipedia-83789066-1794-4c4f-bb2c-ed47ccd82264",
-                "terms": "https://doi.org/10.13003/CED-terms-of-use",
-                "action": "add",
-                "subj": {
-                    "pid": "https://en.wikipedia.org/wiki/Josiah_S._Carberry",
-                    "url": "https://en.wikipedia.org/w/index.php?title=Josiah_S._Carberry&oldid=1034726541",
-                    "title": "Josiah S. Carberry",
-                    "work_type_id": "entry-encyclopedia",
-                    "api-url": "https://en.wikipedia.org/api/rest_v1/page/html/Josiah_S._Carberry/1034726541",
-                },
-                "source_id": "wikipedia",
-                "obj": {
-                    "pid": "https://doi.org/10.5555/12345678",
-                    "url": "http://psychoceramics.labs.crossref.org/10.5555-12345678.html",
-                    "method": "landing-page-meta-tag",
-                    "verification": "checked-url-exact",
-                },
-                "timestamp": "2021-07-21T14:00:58Z",
-                "relation_type_id": "references",
-            },
-        ]
-        expected = [
-            {
-                "license": "https://creativecommons.org/publicdomain/zero/1.0/",
-                "obj_id": "https://doi.org/10.5555/12345678",
-                "source_token": "36c35e23-8757-4a9d-aacf-345e9b7eb50d",
-                "occurred_at": "2021-07-21T13:27:50+00:00",
-                "subj_id": "https://en.wikipedia.org/api/rest_v1/page/html/Josiah_S._Carberry/1034726541",
-                "id": "c76bbfd9-5122-4859-82c8-505b1eb845fd",
-                "evidence_record": "https://evidence.eventdata.crossref.org/evidence/20210721-wikipedia-83789066-1794-4c4f-bb2c-ed47ccd82264",
-                "terms": "https://doi.org/10.13003/CED-terms-of-use",
-                "action": "add",
-                "subj": {
-                    "pid": "https://en.wikipedia.org/wiki/Josiah_S._Carberry",
-                    "url": "https://en.wikipedia.org/w/index.php?title=Josiah_S._Carberry&oldid=1034726541",
-                    "title": "Josiah S. Carberry",
-                    "work_type_id": "entry-encyclopedia",
-                    "api_url": "https://en.wikipedia.org/api/rest_v1/page/html/Josiah_S._Carberry/1034726541",
-                },
-                "source_id": "wikipedia",
-                "obj": {
-                    "pid": "https://doi.org/10.5555/12345678",
-                    "url": "http://psychoceramics.labs.crossref.org/10.5555-12345678.html",
-                    "method": "landing-page-meta-tag",
-                    "verification": "checked-url-exact",
-                },
-                "timestamp": "2021-07-21T14:00:58+00:00",
-                "relation_type_id": "references",
-            }
-        ]
-
-        # Standalone transform
-        actual = transform_event(input_events[0])
-        self.assertEqual(expected[0], actual)
-
-        # List transform
-        with CliRunner().isolated_filesystem() as t:
-            # Save input
-            input_path = os.path.join(t, "input.jsonl")
-            save_jsonl(input_path, input_events)
-
-            # Transform
-            # Also tests filtering of events
-            dois = {"10.5555/12345678"}
-            output_path = os.path.join(t, "output.jsonl")
-            transform_crossref_events(input_path, dois, output_path)
-
-            # Load actual and test
-            actual = load_jsonl(output_path)
-            self.assertEqual(len(actual), 1)
-            self.assertEqual(expected, actual)
 
     def test_insert_into_schema(self):
         """Tests the instert_into_schema function"""
@@ -932,15 +779,6 @@ class TestOnixWorkflow(SandboxTestCase):
     def test_workflow(self):
         """End to end test of the ONIX workflow"""
 
-        def vcr_ignore_condition(request):
-            """This function is used by vcrpy to allow requests to sources not in the cassette file.
-            At time of writing, the only mocked requests are the ones to crossref events."""
-            allowed_domains = ["https://api.eventdata.crossref.org"]
-            allow_request = any([request.url.startswith(i) for i in allowed_domains])
-            if not allow_request:
-                return None
-            return request
-
         # Setup Observatory environment
         env = SandboxEnvironment(self.gcp_project_id, self.data_location)
 
@@ -988,7 +826,6 @@ class TestOnixWorkflow(SandboxTestCase):
             start_date = pendulum.datetime(year=2021, month=5, day=9)  # Sunday
             dag_id = "onix_workflow_test"
             bq_oaebu_crossref_metadata_table_name = "crossref_metadata"
-            bq_crossref_events_table_name = "crossref_events"
             bq_book_table_name = "book"
             bq_book_product_table_name = "book_product"
             bq_worksid_table_name = "onix_workid_isbn"
@@ -1004,7 +841,6 @@ class TestOnixWorkflow(SandboxTestCase):
                 bq_oaebu_crossref_dataset_id=oaebu_crossref_dataset_id,
                 bq_oaebu_crossref_metadata_table_name=bq_oaebu_crossref_metadata_table_name,
                 bq_master_crossref_metadata_table_name="crossref_metadata_master",  # Set in setup_input_data()
-                bq_crossref_events_table_name=bq_crossref_events_table_name,
                 bq_book_table_name=bq_book_table_name,
                 bq_book_product_table_name=bq_book_product_table_name,
                 bq_country_project_id=env.cloud_workspace.project_id,
@@ -1024,7 +860,6 @@ class TestOnixWorkflow(SandboxTestCase):
                 sensor_dag_ids=sensor_dag_ids,
                 start_date=start_date,
                 crossref_start_date=pendulum.datetime(year=2018, month=5, day=14),
-                skip_downloading_crossref_events=False,
             )
 
             # Skip dag existence check in sensor.
@@ -1125,25 +960,6 @@ class TestOnixWorkflow(SandboxTestCase):
                     primary_key="DOI",
                 )
 
-                # Load crossref event table into bigquery
-                # Even though this is using VCR, this file is manually created, which is not ideal
-                with vcr.use_cassette(
-                    self.events_cassette, record_mode="none", before_record_request=vcr_ignore_condition
-                ):
-                    ti = env.run_task("create_crossref_events_table")
-                self.assertEqual(ti.state, State.SUCCESS)
-                table_id = bq_sharded_table_id(
-                    self.gcp_project_id,
-                    oaebu_crossref_dataset_id,
-                    bq_crossref_events_table_name,
-                    release.snapshot_date,
-                )
-                crossref_fixture_table = load_and_parse_json(
-                    os.path.join(self.fixtures_folder, "e2e_outputs", "crossref_events.json"),
-                    timestamp_fields=["timestamp", "occurred_at", "updated_date", "issued", "dateModified"],
-                )
-                self.assert_table_content(table_id, crossref_fixture_table, primary_key="id")
-
                 # Create book table in bigquery
                 ti = env.run_task("create_book_table")
                 self.assertEqual(ti.state, State.SUCCESS)
@@ -1189,21 +1005,19 @@ class TestOnixWorkflow(SandboxTestCase):
                     "export_tables.export_book_metrics_institution",
                     "export_tables.export_book_metrics_author",
                     "export_tables.export_book_metrics_city",
-                    "export_tables.export_book_metrics_events",
                     "export_tables.export_book_metrics_subjects",
                 ]
                 export_tables = [
                     ("book_list", 4),
                     ("book_institution_list", 1),
-                    ("book_metrics", 6),
+                    ("book_metrics", 3),
                     ("book_metrics_country", 32),
                     ("book_metrics_institution", 1),
-                    ("book_metrics_author", 3),
+                    ("book_metrics_author", 1),
                     ("book_metrics_city", 39),
-                    ("book_metrics_events", 3),
-                    ("book_metrics_subject_bic", 2),
-                    ("book_metrics_subject_bisac", 1),
-                    ("book_metrics_subject_thema", 2),
+                    ("book_metrics_subject_bic", 1),
+                    ("book_metrics_subject_bisac", 0),
+                    ("book_metrics_subject_thema", 1),
                 ]
 
                 # Create the export tables
