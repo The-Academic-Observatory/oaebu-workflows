@@ -92,17 +92,20 @@ onix_ebook_titles_raw as (
                 SELECT
                     subject.SubjectCode
                 FROM UNNEST(onix.Subjects) as subject
-                WHERE subject.SubjectSchemeIdentifier = "BIC_subject_category") as bic_subjects,
+                WHERE subject.SubjectSchemeIdentifier = "BIC_subject_category" 
+                AND subject.SubjectCode IS NOT NULL) as bic_subjects,
             ARRAY(
                 SELECT
                     subject.SubjectCode
                 FROM UNNEST(onix.Subjects) as subject
-                WHERE subject.SubjectSchemeIdentifier = "BISAC_Subject_Heading") as bisac_subjects,
+                WHERE subject.SubjectSchemeIdentifier = "BISAC_Subject_Heading"
+                AND subject.SubjectCode IS NOT NULL) as bisac_subjects,
             ARRAY(
                 SELECT
                     subject.SubjectCode
                 FROM UNNEST(onix.Subjects) as subject
-                WHERE subject.SubjectSchemeIdentifier = "Thema_subject_category") as thema_subjects,
+                WHERE subject.SubjectSchemeIdentifier = "Thema_subject_category"
+                AND subject.SubjectCode IS NOT NULL) as thema_subjects,
             (SELECT 
                 custom_split(heading,';') 
             FROM UNNEST(onix.Subjects) as subject, UNNEST(subject.SubjectHeadingText) as heading
