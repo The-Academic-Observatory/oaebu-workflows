@@ -549,7 +549,7 @@ def create_dag(
             )
             set_task_state(state, context["ti"].task_id, release=release)
 
-        @task(trigger_rule=TriggerRule.ALL_DONE)
+        @task(trigger_rule=TriggerRule.NONE_FAILED)
         def create_book_table(release: dict, **context) -> None:
             """Create the oaebu book table using the crossref event and metadata tables"""
 
