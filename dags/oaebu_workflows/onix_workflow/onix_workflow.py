@@ -462,55 +462,6 @@ def create_dag(
             )
             set_task_state(state, context["ti"].task_id, release=release)
 
-        @task(pool="crossref_events_pool")
-        def create_crossref_events_table(release: dict, **context) -> None:
-            """Download, transform, upload and create a table for crossref events"""
-
-            release = OnixWorkflowRelease.from_dict(release)
-
-            if skip_downloading_crossref_events:
-                raise AirflowSkipException("create_crossref_events_table: skipping fetching new Crossref Events data")
-
-            # Get the unique dois from the metadata table
-            metadata_table_id = bq_sharded_table_id(
-                cloud_workspace.project_id,
-                bq_oaebu_crossref_dataset_id,
-                bq_oaebu_crossref_metadata_table_name,
-                release.snapshot_date,
-            )
-            client = Client(project=cloud_workspace.project_id)
-            dois = dois_from_table(metadata_table_id, doi_column_name="DOI", client=client)
-            doi_prefixes = get_doi_prefixes(dois)
-            logging.info(f"Found DOI prefixes: {doi_prefixes}")
-
-            # Download and transform all events
-            start_date = crossref_start_date
-            end_date = release.snapshot_date
-            input_path = release.download_crossref_events_path
-            output_path = release.transformed_crossref_events_path
-            download_crossref_events(input_path, doi_prefixes, start_date, end_date, mailto)
-            transform_crossref_events(input_path, dois, output_path)
-
-            # Upload to google cloud and load into BigQuery
-            gcs_upload_files(
-                bucket_name=cloud_workspace.transform_bucket, file_paths=[release.transformed_crossref_events_path]
-            )
-            table_id = bq_sharded_table_id(
-                cloud_workspace.project_id,
-                bq_oaebu_crossref_dataset_id,
-                bq_crossref_events_table_name,
-                release.snapshot_date,
-            )
-            state = bq_load_table(
-                uri=gcs_blob_uri(cloud_workspace.transform_bucket, release.crossref_events_blob_name),
-                table_id=table_id,
-                schema_file_path=bq_find_schema(path=schema_folder, table_name=bq_crossref_events_table_name),
-                source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
-                write_disposition="WRITE_TRUNCATE",
-                client=client,
-            )
-            set_task_state(state, context["ti"].task_id, release=release)
-
         @task(trigger_rule=TriggerRule.NONE_FAILED)
         def create_book_table(release: dict, **context) -> None:
             """Create the oaebu book table using the crossref metadata table"""
