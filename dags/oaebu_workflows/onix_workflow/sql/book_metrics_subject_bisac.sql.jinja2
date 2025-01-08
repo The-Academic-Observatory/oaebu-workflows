@@ -43,19 +43,17 @@ FROM(
         month.month,
 
         {% for dp in data_partners | selectattr("export_subject", "equalto", True) %}
-            {% include dp.files.month_metrics_sum_sql %},
+            {% include dp.files.month_metrics_sum_sql %}
+        {% if not loop.last %},{% endif %}
         {% endfor %}
 
-        STRUCT(group_counts(ARRAY_CONCAT_AGG(month.crossref_events)) as count) as crossref_events,
-        
     FROM `{{ book_product_table_id }}`, UNNEST(top_level_subjects(onix.bisac_subjects)) as subject, UNNEST(months) as month
     WHERE 
 
     {% for dp in data_partners | selectattr("export_subject", "equalto", True) %}
-        {% include dp.files.month_null_sql %} OR 
+        {% include dp.files.month_null_sql %}{% if not loop.last %} OR{% endif %}
     {% endfor %}
     
-    ARRAY_LENGTH(month.crossref_events) > 0
     GROUP BY subject, month
     ORDER BY subject ASC, month DESC) as metrics
 LEFT JOIN `{{ bisac_table_id }}` as bisac on bisac.code = subject
