@@ -195,13 +195,10 @@ def create_dag(
                 release_info[release_date] += sftp_files
 
             if not bool(release_info):
-                sales_table_id = bq_table_id(
-                    cloud_workspace.project_id, sales_partner.bq_dataset_id, sales_partner.bq_table_name
-                )
                 traffic_table_id = bq_table_id(
                     cloud_workspace.project_id, traffic_partner.bq_dataset_id, traffic_partner.bq_table_name
                 )
-                _gb_early_stop(sales_table_id, traffic_table_id, cloud_workspace, logical_date=context["logical_date"])
+                _gb_early_stop(traffic_table_id, cloud_workspace, logical_date=context["logical_date"])
 
             releases = []
             run_id = context["run_id"]
@@ -456,27 +453,19 @@ def gb_transform(
         save_jsonl_gz(save_path, report_results)
 
 
-def _gb_early_stop(
-    sales_table_id: str, traffic_table_id: str, cloud_workspace: CloudWorkspace, logical_date: pendulum.DateTime
-) -> None:
+def _gb_early_stop(table_id: str, cloud_workspace: CloudWorkspace, logical_date: pendulum.DateTime) -> None:
     """Decides how to stop. Will normally send a skip exception. However, if it's past the 4th of the month, will
     send an AirlfowException instead with the intention of making an alert through slack.
-    Will also check that the sales and traffic tables have the same partitions presnt.
 
-    :param sales_table_id: The ID of the sales table
-    :param traffic_table_id: The ID of the traffic table
+    :param table_id: The ID of the traffic table
     :param cloud_workspace: The cloud workspace object
     :param logical_date: The logical date of this run
     """
 
     client = Client(project=cloud_workspace.project_id)
-    sales_dates = get_partitions(sales_table_id, client=client)
-    traffic_dates = get_partitions(traffic_table_id, client=client)
-    if not sales_dates == traffic_dates:
-        raise AirflowException(f"Tables do not have the same partitions: {sales_table_id} != {traffic_table_id}")
-
+    dates = get_partitions(table_id, client=client)
     this_run_date = logical_date.subtract(months=1).end_of("month")
-    most_recent_pd = sorted([pendulum.parse(s) for s in sales_dates])[-1]  # The most recent partition date
+    most_recent_pd = sorted([pendulum.parse(t) for t in dates])[-1]  # The most recent partition date
     if most_recent_pd < this_run_date:
         if logical_date.day > 4:
             raise AirflowException("It's past the 4th and there are no files avialable for upload!")
