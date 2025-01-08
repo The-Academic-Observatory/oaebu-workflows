@@ -30,7 +30,7 @@ from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
 from observatory_platform.files import convert, add_partition_date, save_jsonl_gz
 from observatory_platform.google.gcs import gcs_upload_files, gcs_blob_uri, gcs_blob_name_from_path, gcs_download_blob
 from observatory_platform.airflow.tasks import check_dependencies
-from observatory_platform.google.bigquery import bq_load_table, bq_table_id, bq_create_dataset
+from observatory_platform.google.bigquery import bq_load_table, bq_table_id, bq_create_dataset, bq_run_query
 from observatory_platform.sftp import SftpFolders, make_sftp_connection
 from observatory_platform.airflow.workflow import CloudWorkspace, cleanup
 from observatory_platform.airflow.release import PartitionRelease, set_task_state
@@ -195,7 +195,13 @@ def create_dag(
                 release_info[release_date] += sftp_files
 
             if not bool(release_info):
-                raise AirflowSkipException("No new releases available. Skipping downstream DAG tasks.")
+                sales_table_id = bq_table_id(
+                    cloud_workspace.project_id, sales_partner.bq_dataset_id, sales_partner.bq_table_name
+                )
+                traffic_table_id = bq_table_id(
+                    cloud_workspace.project_id, traffic_partner.bq_dataset_id, traffic_partner.bq_table_name
+                )
+                _gb_early_stop(sales_table_id, traffic_table_id, cloud_workspace, logical_date=context["logical_date"])
 
             releases = []
             run_id = context["run_id"]
@@ -448,3 +454,42 @@ def gb_transform(
         save_path = sales_path if report_type == "sales" else traffic_path
         print(f"SAVING REPORT '{report_type}' to {save_path}")
         save_jsonl_gz(save_path, report_results)
+
+
+def _gb_early_stop(
+    sales_table_id: str, traffic_table_id: str, cloud_workspace: CloudWorkspace, logical_date: pendulum.DateTime
+) -> None:
+    """Decides how to stop. Will normally send a skip exception. However, if it's past the 4th of the month, will
+    send an AirlfowException instead with the intention of making an alert through slack.
+    Will also check that the sales and traffic tables have the same partitions presnt.
+
+    :param sales_table_id: The ID of the sales table
+    :param traffic_table_id: The ID of the traffic table
+    :param cloud_workspace: The cloud workspace object
+    :param logical_date: The logical date of this run
+    """
+
+    client = Client(project=cloud_workspace.project_id)
+    sales_dates = get_partitions(sales_table_id, client=client)
+    traffic_dates = get_partitions(traffic_table_id, client=client)
+    if not sales_dates == traffic_dates:
+        raise AirflowException(f"Tables do not have the same partitions: {sales_table_id} != {traffic_table_id}")
+
+    this_run_date = logical_date.subtract(months=1).end_of("month")
+    most_recent_pd = sorted([pendulum.parse(s) for s in sales_dates])[-1]  # The most recent partition date
+    if most_recent_pd < this_run_date:
+        if logical_date.day > 4:
+            raise AirflowException("It's past the 4th and there are no files avialable for upload!")
+        else:
+            raise AirflowSkipException("No files required for processing. Skipping.")
+
+
+def get_partitions(table_id: str, partition_key: str = "release_date", client: Client = None) -> List[str]:
+    """Queries the table and returns a list of distinct partitions
+
+    :param table_id: The fully qualified table id to query
+    :param partition_key: The name of the column that the table is partitioned on
+    :return: List of partitions in descending order
+    """
+    query = f"SELECT DISTINCT({partition_key}) FROM {table_id} ORDER BY {partition_key} desc"
+    return bq_run_query(query, client=client)
