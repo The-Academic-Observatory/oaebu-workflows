@@ -23,6 +23,7 @@ from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.models.connection import Connection
 from airflow.utils.state import State
 from click.testing import CliRunner
+from google.cloud.bigquery.table import Row
 
 from oaebu_workflows.config import test_fixtures_folder, module_file_path
 from oaebu_workflows.oaebu_partners import partner_from_str
@@ -370,29 +371,42 @@ class TestGoogleBooksTelescope(SandboxTestCase):
 class TestGBEarlyStop(SandboxTestCase):
     """Tests for the _gb_early_stop function"""
 
-    def setUp(self):
-        """Set up test fixtures before each test method."""
-        self.table_id = "traffic_table"
-        self.logical_date = pendulum.datetime(2024, 2, 1)
+    table_id = "traffic_table"
+    logical_date = pendulum.datetime(2024, 2, 1)
+
+    @patch("oaebu_workflows.google_books_telescope.google_books_telescope.get_partitions")
+    def test_no_releases(self, mock_get_partitions):
+        """Test when data is current - should not raise any exception."""
+
+        mock_get_partitions.side_effect = [iter([])]
+        with self.assertRaisesRegex(AirflowSkipException, "No partitions available"):
+            _gb_early_stop(self.table_id, self.fake_cloud_workspace, self.logical_date)
 
     @patch("oaebu_workflows.google_books_telescope.google_books_telescope.get_partitions")
     def test_matching_partitions_with_current_data(self, mock_get_partitions):
         """Test when data is current - should not raise any exception."""
-        mock_get_partitions.side_effect = [["2024-01-31", "2024-02-28"]]
+
+        row1 = Row([pendulum.datetime(2024, 2, 28)], {"release_date": 0})
+        row2 = Row([pendulum.datetime(2024, 1, 31)], {"release_date": 0})
+        mock_get_partitions.side_effect = [iter([row1, row2])]
         _gb_early_stop(self.table_id, self.fake_cloud_workspace, self.logical_date)
 
     @patch("oaebu_workflows.google_books_telescope.google_books_telescope.get_partitions")
     def test_missing_data_before_fourth(self, mock_get_partitions):
         """Test when data is missing but it's before the 4th of the month."""
+
         logical_date = pendulum.datetime(2024, 2, 3)
-        mock_get_partitions.side_effect = [["2023-12-31"]]
-        with self.assertRaises(AirflowSkipException):
+        row = Row([pendulum.datetime(2023, 12, 31)], {"release_date": 0})
+        mock_get_partitions.side_effect = [iter([row])]
+        with self.assertRaisesRegex(AirflowSkipException, "No files required"):
             _gb_early_stop(self.table_id, self.fake_cloud_workspace, logical_date)
 
     @patch("oaebu_workflows.google_books_telescope.google_books_telescope.get_partitions")
     def test_missing_data_after_fourth(self, mock_get_partitions):
         """Test when data is missing and it's after the 4th of the month."""
+
         logical_date = pendulum.datetime(2024, 2, 5)
-        mock_get_partitions.side_effect = [["2023-12-31"]]
+        row = Row([pendulum.datetime(2023, 12, 31)], {"release_date": 0})
+        mock_get_partitions.side_effect = [iter([row])]
         with self.assertRaisesRegex(AirflowException, "It's past the 4th"):
             _gb_early_stop(self.table_id, self.fake_cloud_workspace, logical_date)
