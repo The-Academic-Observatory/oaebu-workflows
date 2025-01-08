@@ -465,9 +465,9 @@ def _gb_early_stop(table_id: str, cloud_workspace: CloudWorkspace, logical_date:
 
     client = Client(project=cloud_workspace.project_id)
     dates = get_partitions(table_id, client=client)
-    this_run_date = logical_date.subtract(months=1).end_of("month")
+    this_run_date = logical_date.subtract(months=1).end_of("month").date()
     try:
-        most_recent_pd = next(dates).get("release_date")  # Latest release date
+        most_recent_pd = dates[0].get("release_date")  # Latest release date
     except StopIteration:  # There are no partitions available
         raise AirflowSkipException("No partitions available and no files required for processing. Skipping.")
 
