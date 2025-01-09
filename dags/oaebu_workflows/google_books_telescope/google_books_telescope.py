@@ -24,7 +24,7 @@ import pendulum
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.decorators import dag, task, task_group
 from google.cloud.bigquery import TimePartitioningType, SourceFormat, WriteDisposition, Client
-from google.cloud.bigquery.table import RowIterator
+from google.cloud.bigquery.table import Row
 
 from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
@@ -464,12 +464,13 @@ def _gb_early_stop(table_id: str, cloud_workspace: CloudWorkspace, logical_date:
     """
 
     client = Client(project=cloud_workspace.project_id)
-    dates = get_partitions(table_id, client=client)
+    partition_key = "release_date"
+    dates = get_partitions(table_id, partition_key=partition_key, client=client)
     this_run_date = logical_date.subtract(months=1).end_of("month").date()
-    try:
-        most_recent_pd = dates[0].get("release_date")  # Latest release date
-    except StopIteration:  # There are no partitions available
+
+    if not dates:  # There are no partitions available
         raise AirflowSkipException("No partitions available and no files required for processing. Skipping.")
+    most_recent_pd = dates[0].get(partition_key)  # Latest release date
 
     if most_recent_pd < this_run_date:
         if logical_date.day > 4:
@@ -478,7 +479,7 @@ def _gb_early_stop(table_id: str, cloud_workspace: CloudWorkspace, logical_date:
             raise AirflowSkipException("No files required for processing. Skipping.")
 
 
-def get_partitions(table_id: str, partition_key: str = "release_date", client: Client = None) -> RowIterator:
+def get_partitions(table_id: str, partition_key: str = "release_date", client: Client = None) -> List[Row]:
     """Queries the table and returns a list of distinct partitions
 
     :param table_id: The fully qualified table id to query

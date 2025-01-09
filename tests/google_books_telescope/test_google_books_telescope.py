@@ -378,7 +378,7 @@ class TestGBEarlyStop(SandboxTestCase):
     def test_no_releases(self, mock_get_partitions):
         """Test when data is current - should not raise any exception."""
 
-        mock_get_partitions.side_effect = [iter([])]
+        mock_get_partitions.side_effect = [[]]
         with self.assertRaisesRegex(AirflowSkipException, "No partitions available"):
             _gb_early_stop(self.table_id, self.fake_cloud_workspace, self.logical_date)
 
@@ -386,9 +386,9 @@ class TestGBEarlyStop(SandboxTestCase):
     def test_matching_partitions_with_current_data(self, mock_get_partitions):
         """Test when data is current - should not raise any exception."""
 
-        row1 = Row([pendulum.datetime(2024, 2, 28)], {"release_date": 0})
-        row2 = Row([pendulum.datetime(2024, 1, 31)], {"release_date": 0})
-        mock_get_partitions.side_effect = [iter([row1, row2])]
+        row1 = Row([pendulum.date(2024, 2, 28)], {"release_date": 0})
+        row2 = Row([pendulum.date(2024, 1, 31)], {"release_date": 0})
+        mock_get_partitions.side_effect = [[row1, row2]]
         _gb_early_stop(self.table_id, self.fake_cloud_workspace, self.logical_date)
 
     @patch("oaebu_workflows.google_books_telescope.google_books_telescope.get_partitions")
@@ -396,8 +396,8 @@ class TestGBEarlyStop(SandboxTestCase):
         """Test when data is missing but it's before the 4th of the month."""
 
         logical_date = pendulum.datetime(2024, 2, 3)
-        row = Row([pendulum.datetime(2023, 12, 31)], {"release_date": 0})
-        mock_get_partitions.side_effect = [iter([row])]
+        row = Row([pendulum.date(2023, 12, 31)], {"release_date": 0})
+        mock_get_partitions.side_effect = [[row]]
         with self.assertRaisesRegex(AirflowSkipException, "No files required"):
             _gb_early_stop(self.table_id, self.fake_cloud_workspace, logical_date)
 
@@ -406,7 +406,7 @@ class TestGBEarlyStop(SandboxTestCase):
         """Test when data is missing and it's after the 4th of the month."""
 
         logical_date = pendulum.datetime(2024, 2, 5)
-        row = Row([pendulum.datetime(2023, 12, 31)], {"release_date": 0})
-        mock_get_partitions.side_effect = [iter([row])]
+        row = Row([pendulum.date(2023, 12, 31)], {"release_date": 0})
+        mock_get_partitions.side_effect = [[row]]
         with self.assertRaisesRegex(AirflowException, "It's past the 4th"):
             _gb_early_stop(self.table_id, self.fake_cloud_workspace, logical_date)
