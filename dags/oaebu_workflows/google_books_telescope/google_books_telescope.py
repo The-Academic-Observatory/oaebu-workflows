@@ -24,6 +24,7 @@ import pendulum
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.decorators import dag, task, task_group
 from google.cloud.bigquery import TimePartitioningType, SourceFormat, WriteDisposition, Client
+from google.cloud.bigquery.table import Row
 
 from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
@@ -463,9 +464,14 @@ def _gb_early_stop(table_id: str, cloud_workspace: CloudWorkspace, logical_date:
     """
 
     client = Client(project=cloud_workspace.project_id)
-    dates = get_partitions(table_id, client=client)
-    this_run_date = logical_date.subtract(months=1).end_of("month")
-    most_recent_pd = sorted([pendulum.parse(t) for t in dates])[-1]  # The most recent partition date
+    partition_key = "release_date"
+    dates = get_partitions(table_id, partition_key=partition_key, client=client)
+    this_run_date = logical_date.subtract(months=1).end_of("month").date()
+
+    if not dates:  # There are no partitions available
+        raise AirflowSkipException("No partitions available and no files required for processing. Skipping.")
+    most_recent_pd = dates[0].get(partition_key)  # Latest release date
+
     if most_recent_pd < this_run_date:
         if logical_date.day > 4:
             raise AirflowException("It's past the 4th and there are no files avialable for upload!")
@@ -473,12 +479,12 @@ def _gb_early_stop(table_id: str, cloud_workspace: CloudWorkspace, logical_date:
             raise AirflowSkipException("No files required for processing. Skipping.")
 
 
-def get_partitions(table_id: str, partition_key: str = "release_date", client: Client = None) -> List[str]:
+def get_partitions(table_id: str, partition_key: str = "release_date", client: Client = None) -> List[Row]:
     """Queries the table and returns a list of distinct partitions
 
     :param table_id: The fully qualified table id to query
     :param partition_key: The name of the column that the table is partitioned on
-    :return: List of partitions in descending order
+    :return: Query result as a RowIterator - rows are partition dates in descending order
     """
     query = f"SELECT DISTINCT({partition_key}) FROM {table_id} ORDER BY {partition_key} desc"
     return bq_run_query(query, client=client)
