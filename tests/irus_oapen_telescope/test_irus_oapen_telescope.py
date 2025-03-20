@@ -109,7 +109,7 @@ class TestIrusOapenTelescope(SandboxTestCase):
                 Workflow(
                     dag_id="irus_oapen_test",
                     name="My Oapen Irus UK Workflow",
-                    class_name="oaebu_workflows.irus_oapen_telescope.irus_oapen_telescope.create_dag",
+                    class_name="oaebu_workflows.irus_oapen_telescope.irus_oapen_telescope",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(publisher_name_v4=self.publisher_name_v4, publisher_uuid_v5=self.publisher_uuid_v5),
                 )
@@ -275,7 +275,6 @@ class TestIrusOapenTelescope(SandboxTestCase):
 
                 # Add_dataset_release_task
                 api = DatasetAPI(bq_project_id=self.project_id, bq_dataset_id=api_bq_dataset_id)
-                api.seed_db()
                 dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="irus_oapen")
                 self.assertEqual(len(dataset_releases), 0)
 

@@ -92,7 +92,7 @@ class TestGoogleBooksTelescope(SandboxTestCase):
                 Workflow(
                     dag_id="google_books",
                     name="My Google Books Telescope",
-                    class_name="oaebu_workflows.google_books_telescope.google_books_telescope.create_dag",
+                    class_name="oaebu_workflows.google_books_telescope.google_books_telescope",
                     cloud_workspace=self.fake_cloud_workspace,
                 )
             ]
@@ -267,7 +267,6 @@ class TestGoogleBooksTelescope(SandboxTestCase):
 
                     # Set up the API and check
                     api = DatasetAPI(bq_project_id=self.project_id, bq_dataset_id=api_bq_dataset_id)
-                    api.seed_db()
                     dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="google_books_sales")
                     self.assertEqual(len(dataset_releases), 0)
                     dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="google_books_traffic")

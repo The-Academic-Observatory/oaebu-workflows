@@ -96,7 +96,7 @@ class TestOnixTelescope(SandboxTestCase):
                 Workflow(
                     dag_id="onix",
                     name="ONIX Telescope",
-                    class_name="oaebu_workflows.onix_telescope.onix_telescope.create_dag",
+                    class_name="oaebu_workflows.onix_telescope.onix_telescope",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(date_regex=self.date_regex),
                 )
@@ -213,7 +213,6 @@ class TestOnixTelescope(SandboxTestCase):
 
                 # Set up the API
                 api = DatasetAPI(bq_project_id=self.project_id, bq_dataset_id=api_bq_dataset_id)
-                api.seed_db()
                 dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="onix")
                 self.assertEqual(len(dataset_releases), 0)
 

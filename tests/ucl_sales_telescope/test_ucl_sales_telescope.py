@@ -84,7 +84,7 @@ class TestUclSalesTelescope(SandboxTestCase):
                 Workflow(
                     dag_id="ucl_sales",
                     name="UCL Sales Telescope",
-                    class_name="oaebu_workflows.ucl_sales_telescope.ucl_sales_telescope.create_dag",
+                    class_name="oaebu_workflows.ucl_sales_telescope.ucl_sales_telescope",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(sheet_id="foo"),
                 )
@@ -210,7 +210,6 @@ class TestUclSalesTelescope(SandboxTestCase):
 
             # Set up the API
             api = DatasetAPI(bq_project_id=env.cloud_workspace.project_id, bq_dataset_id=api_bq_dataset_id)
-            api.seed_db()
             dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="ucl_sales")
             self.assertEqual(len(dataset_releases), 0)
 

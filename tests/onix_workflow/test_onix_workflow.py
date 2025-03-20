@@ -18,6 +18,7 @@ import os
 import shutil
 from datetime import timedelta
 from typing import List
+import tempfile
 from unittest.mock import patch
 
 import pendulum
@@ -259,7 +260,7 @@ class TestOnixWorkflow(SandboxTestCase):
                 Workflow(
                     dag_id="onix_workflow_test_dag_load",
                     name="Onix Workflow Test Dag Load",
-                    class_name="oaebu_workflows.onix_workflow.onix_workflow.create_dag",
+                    class_name="oaebu_workflows.onix_workflow.onix_workflow",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(
                         sensor_dag_ids=[
@@ -277,19 +278,19 @@ class TestOnixWorkflow(SandboxTestCase):
             ]
         )
 
-        with env.create() as dag_folder:
+        dag_file = os.path.join(module_file_path("dags"), "load_dags.py")
+        with env.create():
             # This should raise one error for nonexistent partner
-            shutil.copy(os.path.join(module_file_path("dags"), "load_dags.py"), "load_dags.py")
-            dag_bag = DagBag(dag_folder=dag_folder)
-            self.assertNotEqual({}, dag_bag.import_errors)
-            self.assertEqual(len(dag_bag.import_errors), 1)
-            dag_file = os.path.join(module_file_path("dags"), "load_dags.py")
+            with tempfile.TemporaryDirectory() as dag_folder:
+                shutil.copy(dag_file, os.path.join(dag_folder, os.path.basename(dag_file)))
+                dag_bag = DagBag(dag_folder=dag_folder)
+                self.assertNotEqual({}, dag_bag.import_errors)
+                self.assertEqual(len(dag_bag.import_errors), 1)
 
         # Remove the nonexistent partner and onix partner
         env.workflows[0].kwargs["data_partners"] = env.workflows[0].kwargs["data_partners"][:-1]
         with env.create():
             # Should not raise any errors
-            dag_file = os.path.join(module_file_path("dags"), "load_dags.py")
             self.assert_dag_load_from_config("onix_workflow_test_dag_load", dag_file)
 
     def test_dag_structure(self):
@@ -859,7 +860,6 @@ class TestOnixWorkflow(SandboxTestCase):
                 data_partners=data_partners,
                 sensor_dag_ids=sensor_dag_ids,
                 start_date=start_date,
-                crossref_start_date=pendulum.datetime(year=2018, month=5, day=14),
             )
 
             # Skip dag existence check in sensor.
@@ -1112,7 +1112,6 @@ class TestOnixWorkflow(SandboxTestCase):
 
                 # Set up the API
                 api = DatasetAPI(bq_project_id=self.gcp_project_id, bq_dataset_id=api_bq_dataset_id)
-                api.seed_db()
                 dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="onix_workflow")
                 self.assertEqual(len(dataset_releases), 0)
 

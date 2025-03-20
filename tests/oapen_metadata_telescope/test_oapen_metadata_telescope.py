@@ -89,7 +89,7 @@ class TestOapenMetadataTelescope(SandboxTestCase):
                 Workflow(
                     dag_id="oapen_metadata",
                     name="OAPEN Metadata Telescope",
-                    class_name="oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope.create_dag",
+                    class_name="oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(metadata_uri=""),
                 )
@@ -192,7 +192,6 @@ class TestOapenMetadataTelescope(SandboxTestCase):
 
                 # Set up the API
                 api = DatasetAPI(bq_project_id=self.project_id, bq_dataset_id=api_bq_dataset_id)
-                api.seed_db()
                 dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="oapen_metadata")
                 self.assertEqual(len(dataset_releases), 0)
 

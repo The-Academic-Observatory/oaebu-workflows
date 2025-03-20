@@ -87,7 +87,7 @@ class TestIrusFulcrumTelescope(SandboxTestCase):
                 Workflow(
                     dag_id="fulcrum_test",
                     name="Fulcrum Telescope",
-                    class_name="oaebu_workflows.irus_fulcrum_telescope.irus_fulcrum_telescope.create_dag",
+                    class_name="oaebu_workflows.irus_fulcrum_telescope.irus_fulcrum_telescope",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(publishers=[FAKE_PUBLISHERS]),
                 )
@@ -198,7 +198,6 @@ class TestIrusFulcrumTelescope(SandboxTestCase):
 
                 # Set up the API
                 api = DatasetAPI(bq_project_id=self.project_id, bq_dataset_id=api_bq_dataset_id)
-                api.seed_db()
                 dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="irus_fulcrum")
                 self.assertEqual(len(dataset_releases), 0)
 

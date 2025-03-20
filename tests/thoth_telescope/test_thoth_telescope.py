@@ -97,7 +97,7 @@ class TestThothTelescope(SandboxTestCase):
                 Workflow(
                     dag_id="thoth_telescope_test",
                     name="Thoth Telescope",
-                    class_name="oaebu_workflows.thoth_telescope.thoth_telescope.create_dag",
+                    class_name="oaebu_workflows.thoth_telescope.thoth_telescope",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(publisher_id=FAKE_PUBLISHER_ID, format_specification="onix::oapen"),
                 )
@@ -200,7 +200,6 @@ class TestThothTelescope(SandboxTestCase):
 
                 # Set up the API
                 api = DatasetAPI(bq_project_id=self.project_id, bq_dataset_id=api_bq_dataset_id)
-                api.seed_db()
                 dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="thoth")
                 self.assertEqual(len(dataset_releases), 0)
 
