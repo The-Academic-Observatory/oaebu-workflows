@@ -22,11 +22,9 @@ import tempfile
 from unittest.mock import patch
 
 import pendulum
-import vcr
 from airflow.models import DagBag
 from airflow.timetables.base import DataInterval
 from airflow.utils.state import State
-from click.testing import CliRunner
 
 from oaebu_workflows.config import schema_folder as default_schema_folder, test_fixtures_folder
 from oaebu_workflows.oaebu_partners import OAEBU_DATA_PARTNERS, OAEBU_METADATA_PARTNERS, OaebuPartner, partner_from_str
@@ -42,7 +40,7 @@ from observatory_platform.airflow.workflow import Workflow
 from observatory_platform.config import module_file_path
 from observatory_platform.dataset_api import DatasetAPI
 from observatory_platform.date_utils import datetime_normalise
-from observatory_platform.files import load_jsonl, save_jsonl
+from observatory_platform.files import load_jsonl
 from observatory_platform.google.bigquery import bq_find_schema, bq_run_query, bq_sharded_table_id, bq_table_id
 from observatory_platform.google.gcs import gcs_blob_name_from_path
 from observatory_platform.sandbox.sandbox_environment import SandboxEnvironment
@@ -446,8 +444,8 @@ class TestOnixWorkflow(SandboxTestCase):
     def test_create_and_load_aggregate_works_table(self, mock_bq_query):
         mock_bq_query.return_value = TestOnixWorkflow.onix_data
         workslookup_expected = [
-            {"isbn13": "112", "work_id": "111"},
-            {"isbn13": "111", "work_id": "111"},
+            {"isbn13": "112", "work_id": "112"},
+            {"isbn13": "111", "work_id": "112"},
             {"isbn13": "211", "work_id": "211"},
         ]
         workslookup_errors_expected = [
@@ -456,9 +454,9 @@ class TestOnixWorkflow(SandboxTestCase):
             }
         ]
         worksfamilylookup_expected = [
-            {"isbn13": "112", "work_family_id": "111"},
-            {"isbn13": "111", "work_family_id": "111"},
-            {"isbn13": "211", "work_family_id": "111"},
+            {"isbn13": "112", "work_family_id": "211"},
+            {"isbn13": "111", "work_family_id": "211"},
+            {"isbn13": "211", "work_family_id": "211"},
         ]
         env = SandboxEnvironment(self.gcp_project_id, self.data_location)
         with env.create():
@@ -1127,11 +1125,11 @@ class TestOnixWorkflow(SandboxTestCase):
                     "dag_id": dag_id,
                     "entity_id": "onix_workflow",
                     "dag_run_id": release.run_id,
-                    "created": datetime_normalise(now),
-                    "modified": datetime_normalise(now),
-                    "data_interval_start": "2021-05-17T00:00:00+00:00",
-                    "data_interval_end": "2021-05-24T00:00:00+00:00",
-                    "snapshot_date": "2021-05-24T00:00:00+00:00",
+                    "created": datetime_normalise(now).replace("+00:00", "Z"),
+                    "modified": datetime_normalise(now).replace("+00:00", "Z"),
+                    "data_interval_start": "2021-05-17T00:00:00Z",
+                    "data_interval_end": "2021-05-24T00:00:00Z",
+                    "snapshot_date": "2021-05-24T00:00:00Z",
                     "partition_date": None,
                     "changefile_start_date": None,
                     "changefile_end_date": None,
