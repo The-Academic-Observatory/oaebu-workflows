@@ -29,7 +29,7 @@ jobs:
           cd ..
           # Clone protection required until fix - https://github.com/git-lfs/git-lfs/issues/5749
           export GIT_CLONE_PROTECTION_ACTIVE=false 
-          git clone -b https://github.com/The-Academic-Observatory/observatory-platform.git 
+          git clone https://github.com/The-Academic-Observatory/observatory-platform.git 
           cd observatory-platform
           pip install -e .[tests] --constraint https://raw.githubusercontent.com/apache/airflow/constraints-2.10.5/constraints-no-providers-${{ matrix.python-version }}.txt
           cd ..
