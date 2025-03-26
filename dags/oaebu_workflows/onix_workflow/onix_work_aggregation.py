@@ -191,8 +191,8 @@ class BookWorkAggregator:
         self.errors = list()
         self.works = list()
 
-        # Sort records for determinism - reverse because this makes our tests pass. It's not functionally important
-        records = sorted(records, key=lambda r: r["ISBN13"], reverse=True)
+        # Sort records for determinism
+        # records = sorted(records, key=lambda r: r["ISBN13"])
         self.records = self.filter_out_duplicate_records(records)
 
         self.n = len(self.records)

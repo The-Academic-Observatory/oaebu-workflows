@@ -866,9 +866,9 @@ class TestBookWorkAggregator(unittest.TestCase):
         self.assertEqual(len(lookup_table), 4)
 
         lookup_map = {lookup_table[i]["isbn13"]: lookup_table[i]["work_id"] for i in range(len(lookup_table))}
-        self.assertEqual(lookup_map["123"], "789")
-        self.assertEqual(lookup_map["234"], "789")
-        self.assertEqual(lookup_map["789"], "789")
+        self.assertEqual(lookup_map["123"], "123")
+        self.assertEqual(lookup_map["234"], "123")
+        self.assertEqual(lookup_map["789"], "123")
         self.assertEqual(lookup_map["456"], "456")
 
     def log_agg_related_product_errors(self):

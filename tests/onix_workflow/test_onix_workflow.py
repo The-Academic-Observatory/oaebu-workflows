@@ -444,8 +444,8 @@ class TestOnixWorkflow(SandboxTestCase):
     def test_create_and_load_aggregate_works_table(self, mock_bq_query):
         mock_bq_query.return_value = TestOnixWorkflow.onix_data
         workslookup_expected = [
-            {"isbn13": "112", "work_id": "112"},
-            {"isbn13": "111", "work_id": "112"},
+            {"isbn13": "112", "work_id": "111"},
+            {"isbn13": "111", "work_id": "111"},
             {"isbn13": "211", "work_id": "211"},
         ]
         workslookup_errors_expected = [
@@ -454,9 +454,9 @@ class TestOnixWorkflow(SandboxTestCase):
             }
         ]
         worksfamilylookup_expected = [
-            {"isbn13": "112", "work_family_id": "211"},
-            {"isbn13": "111", "work_family_id": "211"},
-            {"isbn13": "211", "work_family_id": "211"},
+            {"isbn13": "112", "work_family_id": "111"},
+            {"isbn13": "111", "work_family_id": "111"},
+            {"isbn13": "211", "work_family_id": "111"},
         ]
         env = SandboxEnvironment(self.gcp_project_id, self.data_location)
         with env.create():

@@ -1105,7 +1105,7 @@ def get_onix_records(table_id: str, client: Client = None) -> List[dict]:
     :return: List of onix product records.
     """
 
-    sql = f"SELECT * FROM {table_id}"
+    sql = f"SELECT * FROM {table_id} ORDER BY ISBN13 DESC"
     records = bq_run_query(sql, client=client)
     products = [{key: records[i][key] for key in records[i].keys()} for i in range(len(records))]
     return products
