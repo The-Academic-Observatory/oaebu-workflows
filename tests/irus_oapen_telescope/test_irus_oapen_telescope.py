@@ -46,7 +46,6 @@ from oaebu_workflows.irus_oapen_telescope.irus_oapen_telescope import (
 )
 from observatory_platform.airflow.workflow import CloudWorkspace, Workflow
 from observatory_platform.dataset_api import DatasetAPI
-from observatory_platform.date_utils import datetime_normalise
 from observatory_platform.google.bigquery import bq_table_id
 from observatory_platform.google.gcs import gcs_blob_name_from_path, gcs_upload_file
 from observatory_platform.sandbox.sandbox_environment import SandboxEnvironment
@@ -279,7 +278,7 @@ class TestIrusOapenTelescope(SandboxTestCase):
                 self.assertEqual(len(dataset_releases), 0)
 
                 # Add_dataset_release_task
-                now = pendulum.now()
+                now = pendulum.now("UTC")
                 with patch("oaebu_workflows.irus_oapen_telescope.irus_oapen_telescope.pendulum.now") as mock_now:
                     mock_now.return_value = now
                     ti = env.run_task("process_release.add_new_dataset_releases", map_index=0)
@@ -290,8 +289,8 @@ class TestIrusOapenTelescope(SandboxTestCase):
                     "dag_id": dag_id,
                     "entity_id": "irus_oapen",
                     "dag_run_id": release.run_id,
-                    "created": datetime_normalise(now).replace("+00:00", "Z"),
-                    "modified": datetime_normalise(now).replace("+00:00", "Z"),
+                    "created": now.to_iso8601_string(),
+                    "modified": now.to_iso8601_string(),
                     "data_interval_start": "2021-02-01T00:00:00Z",
                     "data_interval_end": "2021-03-01T00:00:00Z",
                     "snapshot_date": None,

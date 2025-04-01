@@ -33,7 +33,6 @@ from oaebu_workflows.irus_fulcrum_telescope.irus_fulcrum_telescope import (
 from observatory_platform.airflow.workflow import Workflow
 from observatory_platform.config import module_file_path
 from observatory_platform.dataset_api import DatasetAPI
-from observatory_platform.date_utils import datetime_normalise
 from observatory_platform.files import load_jsonl
 from observatory_platform.google.gcs import gcs_blob_name_from_path
 from observatory_platform.google.bigquery import bq_table_id
@@ -202,7 +201,7 @@ class TestIrusFulcrumTelescope(SandboxTestCase):
                 self.assertEqual(len(dataset_releases), 0)
 
                 # Add_dataset_release_task
-                now = pendulum.now()
+                now = pendulum.now("UTC")
                 with patch("oaebu_workflows.irus_fulcrum_telescope.irus_fulcrum_telescope.pendulum.now") as mock_now:
                     mock_now.return_value = now
                     ti = env.run_task("add_new_dataset_releases")
@@ -213,8 +212,8 @@ class TestIrusFulcrumTelescope(SandboxTestCase):
                     "dag_id": dag_id,
                     "entity_id": "irus_fulcrum",
                     "dag_run_id": release.run_id,
-                    "created": datetime_normalise(now).replace("+00:00", "Z"),
-                    "modified": datetime_normalise(now).replace("+00:00", "Z"),
+                    "created": now.to_iso8601_string(),
+                    "modified": now.to_iso8601_string(),
                     "data_interval_start": "2022-04-01T00:00:00Z",
                     "data_interval_end": "2022-05-01T00:00:00Z",
                     "snapshot_date": None,
