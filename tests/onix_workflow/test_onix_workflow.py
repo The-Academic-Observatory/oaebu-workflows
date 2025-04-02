@@ -18,14 +18,13 @@ import os
 import shutil
 from datetime import timedelta
 from typing import List
+import tempfile
 from unittest.mock import patch
 
 import pendulum
-import vcr
 from airflow.models import DagBag
 from airflow.timetables.base import DataInterval
 from airflow.utils.state import State
-from click.testing import CliRunner
 
 from oaebu_workflows.config import schema_folder as default_schema_folder, test_fixtures_folder
 from oaebu_workflows.oaebu_partners import OAEBU_DATA_PARTNERS, OAEBU_METADATA_PARTNERS, OaebuPartner, partner_from_str
@@ -40,8 +39,7 @@ from oaebu_workflows.onix_workflow.onix_workflow import (
 from observatory_platform.airflow.workflow import Workflow
 from observatory_platform.config import module_file_path
 from observatory_platform.dataset_api import DatasetAPI
-from observatory_platform.date_utils import datetime_normalise
-from observatory_platform.files import load_jsonl, save_jsonl
+from observatory_platform.files import load_jsonl
 from observatory_platform.google.bigquery import bq_find_schema, bq_run_query, bq_sharded_table_id, bq_table_id
 from observatory_platform.google.gcs import gcs_blob_name_from_path
 from observatory_platform.sandbox.sandbox_environment import SandboxEnvironment
@@ -108,7 +106,6 @@ class TestOnixWorkflow(SandboxTestCase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.timestamp = pendulum.now()
         self.onix_table_id = "onix"
         self.test_onix_folder = random_id()  # "onix_workflow_test_onix_table"
 
@@ -259,7 +256,7 @@ class TestOnixWorkflow(SandboxTestCase):
                 Workflow(
                     dag_id="onix_workflow_test_dag_load",
                     name="Onix Workflow Test Dag Load",
-                    class_name="oaebu_workflows.onix_workflow.onix_workflow.create_dag",
+                    class_name="oaebu_workflows.onix_workflow.onix_workflow",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(
                         sensor_dag_ids=[
@@ -277,19 +274,19 @@ class TestOnixWorkflow(SandboxTestCase):
             ]
         )
 
-        with env.create() as dag_folder:
+        dag_file = os.path.join(module_file_path("dags"), "load_dags.py")
+        with env.create():
             # This should raise one error for nonexistent partner
-            shutil.copy(os.path.join(module_file_path("dags"), "load_dags.py"), "load_dags.py")
-            dag_bag = DagBag(dag_folder=dag_folder)
-            self.assertNotEqual({}, dag_bag.import_errors)
-            self.assertEqual(len(dag_bag.import_errors), 1)
-            dag_file = os.path.join(module_file_path("dags"), "load_dags.py")
+            with tempfile.TemporaryDirectory() as dag_folder:
+                shutil.copy(dag_file, os.path.join(dag_folder, os.path.basename(dag_file)))
+                dag_bag = DagBag(dag_folder=dag_folder)
+                self.assertNotEqual({}, dag_bag.import_errors)
+                self.assertEqual(len(dag_bag.import_errors), 1)
 
         # Remove the nonexistent partner and onix partner
         env.workflows[0].kwargs["data_partners"] = env.workflows[0].kwargs["data_partners"][:-1]
         with env.create():
             # Should not raise any errors
-            dag_file = os.path.join(module_file_path("dags"), "load_dags.py")
             self.assert_dag_load_from_config("onix_workflow_test_dag_load", dag_file)
 
     def test_dag_structure(self):
@@ -859,7 +856,6 @@ class TestOnixWorkflow(SandboxTestCase):
                 data_partners=data_partners,
                 sensor_dag_ids=sensor_dag_ids,
                 start_date=start_date,
-                crossref_start_date=pendulum.datetime(year=2018, month=5, day=14),
             )
 
             # Skip dag existence check in sensor.
@@ -1112,12 +1108,11 @@ class TestOnixWorkflow(SandboxTestCase):
 
                 # Set up the API
                 api = DatasetAPI(bq_project_id=self.gcp_project_id, bq_dataset_id=api_bq_dataset_id)
-                api.seed_db()
                 dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="onix_workflow")
                 self.assertEqual(len(dataset_releases), 0)
 
                 # Add_dataset_release_task
-                now = pendulum.now()
+                now = pendulum.now("UTC")
                 with patch("oaebu_workflows.onix_workflow.onix_workflow.pendulum.now") as mock_now:
                     mock_now.return_value = now
                     ti = env.run_task("add_new_dataset_releases")
@@ -1128,11 +1123,11 @@ class TestOnixWorkflow(SandboxTestCase):
                     "dag_id": dag_id,
                     "entity_id": "onix_workflow",
                     "dag_run_id": release.run_id,
-                    "created": datetime_normalise(now),
-                    "modified": datetime_normalise(now),
-                    "data_interval_start": "2021-05-17T00:00:00+00:00",
-                    "data_interval_end": "2021-05-24T00:00:00+00:00",
-                    "snapshot_date": "2021-05-24T00:00:00+00:00",
+                    "created": now.to_iso8601_string(),
+                    "modified": now.to_iso8601_string(),
+                    "data_interval_start": "2021-05-17T00:00:00Z",
+                    "data_interval_end": "2021-05-24T00:00:00Z",
+                    "snapshot_date": "2021-05-24T00:00:00Z",
                     "partition_date": None,
                     "changefile_start_date": None,
                     "changefile_end_date": None,

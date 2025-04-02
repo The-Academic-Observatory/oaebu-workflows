@@ -36,7 +36,6 @@ from oaebu_workflows.ucl_sales_telescope.ucl_sales_telescope import (
 )
 from observatory_platform.airflow.workflow import Workflow
 from observatory_platform.dataset_api import DatasetAPI
-from observatory_platform.date_utils import datetime_normalise
 from observatory_platform.google.bigquery import bq_table_id
 from observatory_platform.google.gcs import gcs_blob_name_from_path
 from observatory_platform.sandbox.sandbox_environment import SandboxEnvironment
@@ -84,7 +83,7 @@ class TestUclSalesTelescope(SandboxTestCase):
                 Workflow(
                     dag_id="ucl_sales",
                     name="UCL Sales Telescope",
-                    class_name="oaebu_workflows.ucl_sales_telescope.ucl_sales_telescope.create_dag",
+                    class_name="oaebu_workflows.ucl_sales_telescope.ucl_sales_telescope",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(sheet_id="foo"),
                 )
@@ -210,12 +209,11 @@ class TestUclSalesTelescope(SandboxTestCase):
 
             # Set up the API
             api = DatasetAPI(bq_project_id=env.cloud_workspace.project_id, bq_dataset_id=api_bq_dataset_id)
-            api.seed_db()
             dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="ucl_sales")
             self.assertEqual(len(dataset_releases), 0)
 
             # Add_dataset_release_task
-            now = pendulum.now()
+            now = pendulum.now("UTC")
             with patch("oaebu_workflows.ucl_sales_telescope.ucl_sales_telescope.pendulum.now") as mock_now:
                 mock_now.return_value = now
                 ti = env.run_task("_add_new_dataset_releases")
@@ -226,12 +224,12 @@ class TestUclSalesTelescope(SandboxTestCase):
                 "dag_id": dag_id,
                 "entity_id": "ucl_sales",
                 "dag_run_id": release.run_id,
-                "created": datetime_normalise(now),
-                "modified": datetime_normalise(now),
-                "data_interval_start": "2024-02-04T00:00:00+00:00",
-                "data_interval_end": "2024-03-04T00:00:00+00:00",
+                "created": now.to_iso8601_string(),
+                "modified": now.to_iso8601_string(),
+                "data_interval_start": "2024-02-04T00:00:00Z",
+                "data_interval_end": "2024-03-04T00:00:00Z",
                 "snapshot_date": None,
-                "partition_date": "2024-02-29T00:00:00+00:00",
+                "partition_date": "2024-02-29T00:00:00Z",
                 "changefile_start_date": None,
                 "changefile_end_date": None,
                 "sequence_start": None,

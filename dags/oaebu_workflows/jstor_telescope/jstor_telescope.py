@@ -36,7 +36,7 @@ from bs4 import BeautifulSoup, SoupStrainer
 from google.cloud.bigquery import TimePartitioningType, SourceFormat, WriteDisposition, Client
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import Resource, build
-from tenacity import retry, stop_after_attempt, wait_exponential, wait_fixed
+from tenacity import retry, stop_after_attempt, wait_exponential, wait_fixed, RetryCallState
 
 from oaebu_workflows.config import oaebu_user_agent_header
 from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
@@ -372,7 +372,6 @@ def create_dag(
                 api = DatasetAPI(
                     bq_project_id=cloud_workspace.project_id, bq_dataset_id=api_bq_dataset_id, client=client
                 )
-                api.seed_db()
                 # JSTOR country
                 dataset_release = DatasetRelease(
                     dag_id=dag_id,
@@ -620,17 +619,17 @@ class JstorPublishersAPI(JstorAPI):
             f.write(content)
 
     @retry(stop=stop_after_attempt(JSTOR_MAX_ATTEMPTS), reraise=True, wait=JSTOR_WAIT_FN)
-    def get_header_info(self, url: str) -> Tuple[str, str]:
+    def get_header_info(self, url: str, retry_state: RetryCallState = None) -> Tuple[str, str]:
         """Get header info from url and parse for filename and extension of file.
 
         :param url: Download url
+        :param retry_state: Provided by the retry decorater. Leave as-is.
         :return: Filename and file extension
         """
-        logging.info(
-            f"Getting HEAD of report: {url}, "
-            f'attempt: {self.get_header_info.retry.statistics["attempt_number"]}, '
-            f'idle for: {self.get_header_info.retry.statistics["idle_for"]}'
-        )
+        attempt_number = retry_state.attempt_number if retry_state else 1
+        idle_for = retry_state.idle_for if retry_state else 0
+        logging.info(f"Getting HEAD of report: {url}, attempt: {attempt_number}, idle for: {idle_for}")
+
         response = requests.head(url, allow_redirects=True, headers=oaebu_user_agent_header())
         if response.status_code != 200:
             raise AirflowException(

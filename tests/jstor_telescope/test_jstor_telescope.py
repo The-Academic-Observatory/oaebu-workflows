@@ -40,7 +40,6 @@ from oaebu_workflows.jstor_telescope.jstor_telescope import (
 )
 from observatory_platform.airflow.workflow import Workflow
 from observatory_platform.dataset_api import DatasetAPI
-from observatory_platform.date_utils import datetime_normalise
 from observatory_platform.google.bigquery import bq_table_id
 from observatory_platform.google.gcs import gcs_blob_name_from_path, gcs_upload_files
 from observatory_platform.sandbox.sandbox_environment import SandboxEnvironment
@@ -98,7 +97,7 @@ class TestTelescopeSetup(SandboxTestCase):
                     Workflow(
                         dag_id="jstor_test_telescope",
                         name="My JSTOR Workflow",
-                        class_name="oaebu_workflows.jstor_telescope.jstor_telescope.create_dag",
+                        class_name="oaebu_workflows.jstor_telescope.jstor_telescope",
                         cloud_workspace=self.fake_cloud_workspace,
                         kwargs=dict(entity_id=self.entity_id, entity_type=entity_type),
                     )
@@ -338,14 +337,13 @@ class TestJstorTelescopePublisher(SandboxTestCase):
 
                 # Set up the API
                 api = DatasetAPI(bq_project_id=self.project_id, bq_dataset_id=api_bq_dataset_id)
-                api.seed_db()
                 dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="jstor_country")
                 self.assertEqual(len(dataset_releases), 0)
                 dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="jstor_institution")
                 self.assertEqual(len(dataset_releases), 0)
 
                 # Add_dataset_release_task
-                now = pendulum.now()
+                now = pendulum.now("UTC")
                 with patch("oaebu_workflows.jstor_telescope.jstor_telescope.pendulum.now") as mock_now:
                     mock_now.return_value = now
                     ti = env.run_task("process_release.add_new_dataset_releases", map_index=0)
@@ -356,12 +354,12 @@ class TestJstorTelescopePublisher(SandboxTestCase):
                     "dag_id": dag_id,
                     "entity_id": "jstor_country",
                     "dag_run_id": release.run_id,
-                    "created": datetime_normalise(now),
-                    "modified": datetime_normalise(now),
-                    "data_interval_start": "2022-07-01T00:00:00+00:00",
-                    "data_interval_end": "2022-08-01T00:00:00+00:00",
+                    "created": now.to_iso8601_string(),
+                    "modified": now.to_iso8601_string(),
+                    "data_interval_start": "2022-07-01T00:00:00Z",
+                    "data_interval_end": "2022-08-01T00:00:00Z",
                     "snapshot_date": None,
-                    "partition_date": "2022-07-31T00:00:00+00:00",
+                    "partition_date": "2022-07-31T00:00:00Z",
                     "changefile_start_date": None,
                     "changefile_end_date": None,
                     "sequence_start": None,
@@ -375,12 +373,12 @@ class TestJstorTelescopePublisher(SandboxTestCase):
                     "dag_id": dag_id,
                     "entity_id": "jstor_institution",
                     "dag_run_id": release.run_id,
-                    "created": datetime_normalise(now),
-                    "modified": datetime_normalise(now),
-                    "data_interval_start": "2022-07-01T00:00:00+00:00",
-                    "data_interval_end": "2022-08-01T00:00:00+00:00",
+                    "created": now.to_iso8601_string(),
+                    "modified": now.to_iso8601_string(),
+                    "data_interval_start": "2022-07-01T00:00:00Z",
+                    "data_interval_end": "2022-08-01T00:00:00Z",
                     "snapshot_date": None,
-                    "partition_date": "2022-07-31T00:00:00+00:00",
+                    "partition_date": "2022-07-31T00:00:00Z",
                     "changefile_start_date": None,
                     "changefile_end_date": None,
                     "sequence_start": None,
@@ -615,14 +613,13 @@ class TestJstorTelescopeCollection(SandboxTestCase):
 
                 # Set up the API
                 api = DatasetAPI(bq_project_id=self.project_id, bq_dataset_id=api_bq_dataset_id)
-                api.seed_db()
                 dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="jstor_country")
                 self.assertEqual(len(dataset_releases), 0)
                 dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="jstor_institution")
                 self.assertEqual(len(dataset_releases), 0)
 
                 # Add_dataset_release_task
-                now = pendulum.now()
+                now = pendulum.now("UTC")
                 with patch("oaebu_workflows.jstor_telescope.jstor_telescope.pendulum.now") as mock_now:
                     mock_now.return_value = now
                     ti = env.run_task("process_release.add_new_dataset_releases", map_index=0)
@@ -633,12 +630,12 @@ class TestJstorTelescopeCollection(SandboxTestCase):
                     "dag_id": dag_id,
                     "entity_id": "jstor_country",
                     "dag_run_id": release.run_id,
-                    "created": datetime_normalise(now),
-                    "modified": datetime_normalise(now),
-                    "data_interval_start": "2023-09-01T00:00:00+00:00",
-                    "data_interval_end": "2023-10-01T00:00:00+00:00",
+                    "created": now.to_iso8601_string(),
+                    "modified": now.to_iso8601_string(),
+                    "data_interval_start": "2023-09-01T00:00:00Z",
+                    "data_interval_end": "2023-10-01T00:00:00Z",
                     "snapshot_date": None,
-                    "partition_date": "2023-09-30T00:00:00+00:00",
+                    "partition_date": "2023-09-30T00:00:00Z",
                     "changefile_start_date": None,
                     "changefile_end_date": None,
                     "sequence_start": None,
@@ -652,12 +649,12 @@ class TestJstorTelescopeCollection(SandboxTestCase):
                     "dag_id": dag_id,
                     "entity_id": "jstor_institution",
                     "dag_run_id": release.run_id,
-                    "created": datetime_normalise(now),
-                    "modified": datetime_normalise(now),
-                    "data_interval_start": "2023-09-01T00:00:00+00:00",
-                    "data_interval_end": "2023-10-01T00:00:00+00:00",
+                    "created": now.to_iso8601_string(),
+                    "modified": now.to_iso8601_string(),
+                    "data_interval_start": "2023-09-01T00:00:00Z",
+                    "data_interval_end": "2023-10-01T00:00:00Z",
                     "snapshot_date": None,
-                    "partition_date": "2023-09-30T00:00:00+00:00",
+                    "partition_date": "2023-09-30T00:00:00Z",
                     "changefile_start_date": None,
                     "changefile_end_date": None,
                     "sequence_start": None,

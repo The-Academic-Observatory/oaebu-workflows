@@ -334,7 +334,6 @@ def create_dag(
                 api = DatasetAPI(
                     bq_project_id=cloud_workspace.project_id, bq_dataset_id=api_bq_dataset_id, client=client
                 )
-                api.seed_db()
                 # Google Books sales
                 dataset_release = DatasetRelease(
                     dag_id=dag_id,

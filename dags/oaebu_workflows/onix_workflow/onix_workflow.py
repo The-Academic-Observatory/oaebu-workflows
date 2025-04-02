@@ -211,7 +211,6 @@ def create_dag(
     ga3_views_field="page_views",
     schema_folder: str = default_schema_folder(workflow_module="onix_workflow"),
     mailto: str = "agent@observatory.academy",
-    crossref_start_date: pendulum.DateTime = pendulum.datetime(2018, 5, 14),
     api_bq_dataset_id: str = "dataset_api",
     # Ariflow parameters
     sensor_dag_ids: List[str] = None,
@@ -907,7 +906,6 @@ def create_dag(
             release = OnixWorkflowRelease.from_dict(release)
             client = Client(project=cloud_workspace.project_id)
             api = DatasetAPI(bq_project_id=cloud_workspace.project_id, bq_dataset_id=api_bq_dataset_id, client=client)
-            api.seed_db()
             dataset_release = DatasetRelease(
                 dag_id=dag_id,
                 entity_id="onix_workflow",
@@ -1107,7 +1105,8 @@ def get_onix_records(table_id: str, client: Client = None) -> List[dict]:
     :return: List of onix product records.
     """
 
-    sql = f"SELECT * FROM {table_id}"
+    # Order by desc so the records are deterministically sorted.
+    sql = f"SELECT * FROM {table_id} ORDER BY ISBN13 DESC"
     records = bq_run_query(sql, client=client)
     products = [{key: records[i][key] for key in records[i].keys()} for i in range(len(records))]
     return products

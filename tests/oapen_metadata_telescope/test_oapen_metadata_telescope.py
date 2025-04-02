@@ -37,7 +37,6 @@ from oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope import (
 )
 from observatory_platform.airflow.workflow import Workflow
 from observatory_platform.dataset_api import DatasetAPI
-from observatory_platform.date_utils import datetime_normalise
 from observatory_platform.google.bigquery import bq_sharded_table_id
 from observatory_platform.google.gcs import gcs_blob_name_from_path
 from observatory_platform.sandbox.sandbox_environment import SandboxEnvironment
@@ -89,7 +88,7 @@ class TestOapenMetadataTelescope(SandboxTestCase):
                 Workflow(
                     dag_id="oapen_metadata",
                     name="OAPEN Metadata Telescope",
-                    class_name="oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope.create_dag",
+                    class_name="oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope",
                     cloud_workspace=self.fake_cloud_workspace,
                     kwargs=dict(metadata_uri=""),
                 )
@@ -192,11 +191,10 @@ class TestOapenMetadataTelescope(SandboxTestCase):
 
                 # Set up the API
                 api = DatasetAPI(bq_project_id=self.project_id, bq_dataset_id=api_bq_dataset_id)
-                api.seed_db()
                 dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="oapen_metadata")
                 self.assertEqual(len(dataset_releases), 0)
 
-                now = pendulum.now()
+                now = pendulum.now("UTC")
                 with patch(
                     "oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope.pendulum.now"
                 ) as mock_now:
@@ -209,11 +207,11 @@ class TestOapenMetadataTelescope(SandboxTestCase):
                     "dag_id": dag_id,
                     "entity_id": "oapen_metadata",
                     "dag_run_id": release.run_id,
-                    "created": datetime_normalise(now),
-                    "modified": datetime_normalise(now),
-                    "data_interval_start": "2021-02-01T00:00:00+00:00",
-                    "data_interval_end": "2021-02-07T12:00:00+00:00",
-                    "snapshot_date": "2021-02-07T00:00:00+00:00",
+                    "created": now.to_iso8601_string(),
+                    "modified": now.to_iso8601_string(),
+                    "data_interval_start": "2021-02-01T00:00:00Z",
+                    "data_interval_end": "2021-02-07T12:00:00Z",
+                    "snapshot_date": "2021-02-07T00:00:00Z",
                     "partition_date": None,
                     "changefile_start_date": None,
                     "changefile_end_date": None,

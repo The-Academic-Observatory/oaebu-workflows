@@ -22,20 +22,20 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install dependencies # TODO: checkout observatory platform from same branch, e.g. develop or master
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
 
           cd ..
           # Clone protection required until fix - https://github.com/git-lfs/git-lfs/issues/5749
           export GIT_CLONE_PROTECTION_ACTIVE=false 
-          git clone -b feature/astro-refactor https://github.com/The-Academic-Observatory/observatory-platform.git 
+          git clone https://github.com/The-Academic-Observatory/observatory-platform.git 
           cd observatory-platform
-          pip install -e .[tests] --constraint https://raw.githubusercontent.com/apache/airflow/constraints-2.7.3/constraints-no-providers-${{ matrix.python-version }}.txt
+          pip install -e .[tests] --constraint https://raw.githubusercontent.com/apache/airflow/constraints-2.10.5/constraints-no-providers-${{ matrix.python-version }}.txt
           cd ..
 
           cd oaebu-workflows
-          pip install -r requirements.txt --constraint https://raw.githubusercontent.com/apache/airflow/constraints-2.7.3/constraints-no-providers-${{ matrix.python-version }}.txt
+          pip install -r requirements.txt --constraint https://raw.githubusercontent.com/apache/airflow/constraints-2.10.5/constraints-no-providers-${{ matrix.python-version }}.txt
 
       - name: Add dag folder to PYTHONPATH
         run: |
