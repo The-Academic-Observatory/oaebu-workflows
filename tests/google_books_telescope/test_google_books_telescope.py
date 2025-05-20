@@ -17,6 +17,7 @@
 import os
 import shutil
 from unittest.mock import patch
+from typing import List
 
 import pendulum
 from airflow.exceptions import AirflowException, AirflowSkipException
@@ -41,6 +42,17 @@ from observatory_platform.sandbox.sandbox_environment import SandboxEnvironment
 from observatory_platform.sandbox.test_utils import SandboxTestCase, find_free_port
 from observatory_platform.sandbox.sftp_server import SftpServer
 from observatory_platform.sftp import SftpFolders
+
+
+def _normalise_release_dict(release_dicts: List[dict]):
+    """Normalise the 'sftp_files' lists in the release dict. Since we don't care about order, we sort it"""
+    return [
+        {
+            **d,
+            "sftp_files": sorted(d["sftp_files"]),
+        }
+        for d in release_dicts
+    ]
 
 
 class TestGoogleBooksTelescope(SandboxTestCase):
@@ -168,18 +180,21 @@ class TestGoogleBooksTelescope(SandboxTestCase):
                     ti = env.run_task("fetch_releases")
                     self.assertEqual(ti.state, State.SUCCESS)
                     release_dicts = ti.xcom_pull(task_ids="fetch_releases", include_prior_dates=False)
-                    expected_release_dicts = [
-                        {
-                            "dag_id": "google_books_test",
-                            "run_id": "scheduled__2021-03-31T00:00:00+00:00",
-                            "partition_date": "2020-02-29",
-                            "sftp_files": [
-                                "/workflows/google_books_test/in_progress/GoogleBooksTrafficReport_2020_02.csv",
-                                "/workflows/google_books_test/in_progress/GoogleSalesTransactionReport_2020_02.csv",
-                            ],
-                        }
-                    ]
-                    self.assertEqual(release_dicts, expected_release_dicts)
+                    expected_release_dicts = _normalise_release_dict(
+                        [
+                            {
+                                "dag_id": "google_books_test",
+                                "run_id": "scheduled__2021-03-31T00:00:00+00:00",
+                                "partition_date": "2020-02-29",
+                                "sftp_files": [
+                                    "/workflows/google_books_test/in_progress/GoogleBooksTrafficReport_2020_02.csv",
+                                    "/workflows/google_books_test/in_progress/GoogleSalesTransactionReport_2020_02.csv",
+                                ],
+                            }
+                        ]
+                    )
+                    # sort sftp_files because we don't care about the order when comparing
+                    self.assertEqual(_normalise_release_dict(release_dicts), expected_release_dicts)
                     release = GoogleBooksRelease.from_dict(release_dicts[0])
 
                     # Test move file to in progress

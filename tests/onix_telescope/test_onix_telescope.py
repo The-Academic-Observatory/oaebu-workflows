@@ -140,7 +140,7 @@ class TestOnixTelescope(SandboxTestCase):
             )
 
             # Add SFTP connection
-            conn = Connection(conn_id=sftp_service_conn_id, uri=f"ssh://:password@localhost:{self.sftp_port}")
+            conn = Connection(conn_id=sftp_service_conn_id, uri=f"ssh://username:password@localhost:{self.sftp_port}")
             env.add_connection(conn)
             with env.create_dag_run(dag, logical_date=logical_date):
                 # Test that all dependencies are specified: no error should be thrown
