@@ -305,6 +305,27 @@ def drop_empty_rows(data: List[List]) -> List[List]:
     return data
 
 
+def fill_with_nulls(data: List[List]) -> List[List]:
+    """If the data does not have a consistent number of columns, adds Nones to ensure the correct shape.
+    This can occur if the final column in the Google sheet is not filled for some items, but is for others.
+
+    :param data: The data to fill
+    :return: The filled data
+    """
+    # Find the longest row
+    longest = 0
+    for d in data:
+        if len(d) > longest:
+            longest = len(d)
+
+    # Extend everything with fewer rows than the longest
+    for d in data:
+        if len(d) < longest:
+            d.extend([None] * (longest - len(d)))
+
+    return data
+
+
 def make_release(dag_id: str, context: dict) -> UclSalesRelease:
     """Creates a new ucl discovery release instance
 
