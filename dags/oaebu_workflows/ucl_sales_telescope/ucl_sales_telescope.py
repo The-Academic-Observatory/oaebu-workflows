@@ -450,6 +450,7 @@ def transform(data: List[List], sheet_date: pendulum.DateTime) -> List[dict]:
     """
 
     data[0] = [h.strip().lower() for h in data[0]]  # The first row is the header
+    data = fill_with_nulls(data)
     data = drop_duplicate_headings(data)
     data = drop_empty_rows(data)
 
