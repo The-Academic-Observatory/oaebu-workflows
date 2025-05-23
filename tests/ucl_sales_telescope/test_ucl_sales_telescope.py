@@ -33,6 +33,7 @@ from oaebu_workflows.ucl_sales_telescope.ucl_sales_telescope import (
     drop_empty_rows,
     clean_row,
     convert_headings,
+    fill_with_nulls,
 )
 from observatory_platform.airflow.workflow import Workflow
 from observatory_platform.dataset_api import DatasetAPI
@@ -445,6 +446,32 @@ class TestDownloadSales(TestCase):
         # Call the function to test
         with self.assertRaisesRegex(ValueError, "No content found for sheet with ID"):
             download("sheet_id", "service_account_conn_id", "202001")
+
+
+class TestFillWithNulls(TestCase):
+    def test_all_rows_same_length(self):
+        data = [[1, 2], [3, 4]]
+        expected = [[1, 2], [3, 4]]
+        result = fill_with_nulls(data)
+        self.assertEqual(result, expected)
+
+    def test_some_rows_shorter(self):
+        data = [[1, 2], [3]]
+        expected = [[1, 2], [3, None]]
+        result = fill_with_nulls(data)
+        self.assertEqual(result, expected)
+
+    def test_empty_list(self):
+        data = []
+        expected = []
+        result = fill_with_nulls(data)
+        self.assertEqual(result, expected)
+
+    def test_rows_with_empty_lists(self):
+        data = [[], [1], [2, 3]]
+        expected = [[None, None], [1, None], [2, 3]]
+        result = fill_with_nulls(data)
+        self.assertEqual(result, expected)
 
 
 class TestTransform(TestCase):
