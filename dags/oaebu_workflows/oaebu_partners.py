@@ -304,6 +304,22 @@ OAEBU_DATA_PARTNERS = dict(
         export_country=False,
         export_subject=False,
     ),
+    muse=DataPartner(
+        type_id="muse",
+        bq_dataset_id="muse",
+        bq_table_name="muse",
+        isbn_field_name="isbn",
+        title_field_name="title",
+        sharded=False,
+        schema_path=os.path.join(schema_folder(), "muse", "muse.json"),
+        schema_directory=os.path.join(schema_folder(), "muse_telescope"),
+        sql_directory=os.path.join(sql_folder(), "muse_telescope"),
+        book_product_functions=False,  # TODO: Check these things
+        export_author=False,
+        export_book_metrics=True,
+        export_country=True,
+        export_subject=False,
+    ),
     irus_oapen=DataPartner(
         type_id="irus_oapen",
         bq_dataset_id="irus",

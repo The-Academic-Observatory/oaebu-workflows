@@ -20,6 +20,8 @@ from typing import List, Tuple, Union
 import shutil
 import gzip
 import csv
+import base64
+from tempfile import NamedTemporaryFile
 
 import chardet
 import pendulum
@@ -49,6 +51,7 @@ from observatory_platform.airflow.airflow import on_failure_callback
 from observatory_platform.url_utils import retry_get_url
 
 DATE_PARTITION_FIELD = "release_date"
+MUSE_PROCESSED_LABEL_NAME = "muse_processed"
 
 
 class MuseRelease(PartitionRelease):
@@ -71,17 +74,18 @@ class MuseRelease(PartitionRelease):
         super().__init__(dag_id=dag_id, run_id=run_id, partition_date=partition_date)
         self.data_interval_start = data_interval_start
         self.data_interval_end = data_interval_end
-        # TODO: Fix the below file name
-        self.download_file_name = "_country.json.gz"
-        self.transfrom_file_name = "muse.jsonl.gz"
+        self.download_file_name = "muse_download.csv.gz"
+        self.transfrom_file_name = "muse_transform.jsonl.gz"
 
     @property
     def download_path(self):
-        return os.path.join(self.download_folder, self.download_file_name)
+        partition_str = self.partition_date.date().to_date_string()
+        return os.path.join(self.download_folder, partition_str, self.download_file_name)
 
     @property
     def transform_path(self):
-        return os.path.join(self.transform_folder, self.transfrom_file_name)
+        partition_str = self.partition_date.date().to_date_string()
+        return os.path.join(self.transform_folder, partition_str, self.transfrom_file_name)
 
     @property
     def download_blob_name(self):
@@ -115,18 +119,20 @@ def create_dag(
     *,
     dag_id: str,
     cloud_workspace: CloudWorkspace,
+    publisher_subject_line: str,
     data_partner: Union[str, OaebuPartner] = "muse",
     bq_dataset_description: str = "MUSE dataset",
     bq_table_description: str = "Muse metrics",
     api_bq_dataset_id: str = "dataset_api",
     gmail_api_conn_id: str = "gmail_api",
     catchup: bool = True,
-    schedule: str = "0 0 10 * *",  # Run on the 4th of every month
+    schedule: str = "15 0 10 * *",  # Run on the 10th of every month at 0015 UTC
     start_date: pendulum.DateTime = pendulum.datetime(2022, 4, 1),  # Earliest available data
     max_active_runs: int = 1,
     retries: int = 3,
     retry_delay: Union[int, float] = 5,
 ):
+    # TODO: fix docstring
     """The Muse Telescope
     :param dag_id: The ID of the DAG
     :param cloud_workspace: The CloudWorkspace object for this DAG
@@ -158,7 +164,7 @@ def create_dag(
     )
     def muse():
         @task
-        def list_reports(self) -> List[dict]:  # TODO: fix this for muse
+        def create_releases(**context: dict) -> List[dict]:  # TODO: fix this for muse
             """List the available releases by going through the messages of a gmail account and looking for a specific pattern.
 
             If a message has been processed previously it has a specific label, messages with this label will be skipped.
@@ -170,64 +176,37 @@ def create_dag(
 
             :return: A list if dictionaries representing the messages with reports. Each has keys "type", "url" and "id".
             """
-            # List messages with specific query
+
+            # Get all of the viable reports for this publisher
             list_params = {
                 "userId": "me",
-                "q": f'-label:{JSTOR_PROCESSED_LABEL_NAME} subject:"JSTOR Publisher Report Available" from:no-reply@ithaka.org',
+                "q": f"-label:{MUSE_PROCESSED_LABEL_NAME} subject:{publisher_subject_line} from:muse_analytics@jh.edu.au",
                 "labelIds": ["INBOX"],
                 "maxResults": 500,
             }
-            available_reports = []
-            for message_info in self.get_messages(list_params):
-                message_id = message_info["id"]
-                message = self.service.users().messages().get(userId="me", id=message_id).execute()
+            service = create_gmail_service()
+            messages = get_messages(service, list_params)
+            download_paths = []
+            for msg in messages:
+                tmp_download_path = NamedTemporaryFile(delete=False).name
+                download_report(service, msg["id"], msg["attachment_id"], tmp_download_path)
+                download_paths.append(tmp_download_path)
 
-                # get download url
-                download_url = None
-                message_data = base64.urlsafe_b64decode(message["payload"]["body"]["data"])
-                for link in BeautifulSoup(message_data, "html.parser", parse_only=SoupStrainer("a")):
-                    if link.text == "Download Completed Report":
-                        download_url = link["href"]
-                        break
-                if download_url is None:
-                    raise AirflowException(
-                        f"Can't find download link for report in e-mail, message snippet: {message.snippet}"
+            # Get the release objects, using the dates found in the report files
+            releases = []
+            for report_file in download_paths:
+                release_date = get_release_date_from_report(report_file)
+                if release_date:
+                    release = MuseRelease(
+                        dag_id,
+                        context["run_id"],
+                        data_interval_start=release_date.start_of("month"),
+                        data_interval_end=release_date.end_of("month"),
+                        partition_date=release_date,
                     )
-
-                # Get filename and extension from headXX
-                filename, extension = self.get_header_info(download_url)
-
-                # Get publisher
-                report_publisher = filename.split("_")[1]
-                if report_publisher != self.entity_id:
-                    logging.info(
-                        f"Skipping report, because the publisher id in the report's file name '{report_publisher}' "
-                        f"does not match the current publisher id: {self.entity_id}"
-                    )
-                    continue
-
-                # get report_type
-                report_mapping = {"PUBBCU": "country", "PUBBIU": "institution"}
-                report_type = report_mapping.get(filename.split("_")[2])
-                if report_type is None:
-                    logging.info(f"Skipping unrecognized report type, filename {filename}")
-
-                # check format
-                original_email = f"https://mail.google.com/mail/u/0/#all/{message_id}"
-                if extension == "tsv":
-                    # add report info
-                    logging.info(
-                        f"Adding report. Report type: {report_type}, url: {download_url}, "
-                        f"original email: {original_email}."
-                    )
-                    available_reports.append({"type": report_type, "url": download_url, "id": message_id})
-                else:
-                    logging.warning(
-                        f'Excluding file "{filename}.{extension}", as it does not have ".tsv" extension. '
-                        f"Original email: {original_email}"
-                    )
-
-            return available_reports
+                    shutil.copy(tmp_download_path, release.download_path)
+                    releases.append(release.to_dict())
+            return releases
 
         @task
         def download(available_reports: List[dict], **context) -> List[dict]:
@@ -308,20 +287,7 @@ def create_dag(
                 )
                 if not success:
                     raise FileNotFoundError(f"Error downloading file: {release.download_blob_name}")
-
-                # Check the file encoding so we read it in properly
-                csv_file = os.path.splitext(release.download_path)[0]
-                with gzip.open(release.download_path, "rb") as gzf:
-                    rawdata = gzf.read(1000000)  # read up to 1MB
-                    encoding = chardet.detect(rawdata)["encoding"]
-                    logging.ingo(f"Detected encoding: {encoding}")
-                    gzf.seek(0)  # Go back to start of file
-                    with open(csv_file, "wb") as f:
-                        shutil.copyfileobj(gzf, f)
-
-                with open(csv_file, "r", encoding=encoding) as f:
-                    reader = csv.DictReader(f)
-                    data = [row for row in reader]
+                data = read_gzipped_report(release.download_path)
                 data = muse_data_transform(data)
                 save_jsonl_gz(release.transform_path, data)
 
@@ -455,3 +421,84 @@ def muse_row_transform(row: dict) -> List[dict]:
         rows.append({"isbn": i, **row})
 
     return rows
+
+
+# TODO: put this in some kind of common library. It's used in JSTOR as well
+def download_report(service: Resource, message_id: str, attachment_id: str, download_path: str) -> None:
+    """Download report from url to a file.
+
+    :param download_path: Path to download data to
+    """
+    logging.info(f"Downloading report: {message_id} to: {download_path}")
+    attachment = (
+        service.users().messages().attachments().get(userId="me", messageId=message_id, id=attachment_id).execute()
+    )
+    data = attachment["data"]
+    file_data = base64.urlsafe_b64decode(data)
+    with open(download_path, "wb") as f:
+        f.write(file_data)
+
+
+def read_gzipped_report(gz_path: str) -> List[dict]:
+    """Reads a gzipped csv file into a list of dictionaries. Automatically determines the encoding
+
+    :param gz_path: The filepath of the gzipped csv file
+    :return: The contents of the gzipped file as a list of dictionaries"""
+    # Check the file encoding so we read it in properly
+    tmp_file = NamedTemporaryFile().name
+    with gzip.open(gz_path, "rb") as gzf:
+        rawdata = gzf.read(1000000)  # read up to 1MB
+        encoding = chardet.detect(rawdata)["encoding"]
+        print(f"Detected encoding: {encoding}")
+        gzf.seek(0)  # Go back to start of file
+        with open(tmp_file, "wb") as f:
+            shutil.copyfileobj(gzf, f)
+
+    with open(tmp_file, "r", encoding=encoding) as f:
+        reader = csv.DictReader(f)
+        data = [row for row in reader]
+    return data
+
+
+def get_release_date_from_report(gz_path: str) -> Union[pendulum.Datetime, None]:
+    """Reads a gziped report and determines the release date from it
+
+    :param gz_path: The filepath of the gzipped csv file
+    :return: Returns the release date if it exists, otherwise returns None
+    """
+    data = read_gzipped_report(gz_path)
+    year = data[0].get("year")
+    month = data[0].get("month")
+    if not year or not month:
+        return None
+
+    # Check that all year/months are the same. Otherwise the report is invalid.
+    for row in data:
+        if not row.get("year") == year or not row.get("month") == month:
+            raise RuntimeError(
+                f"Inconsistent Year/Month found in report: Expected {year}/{month}, found {row.get('year')}/{row.get('month')}"
+            )
+
+    return pendulum.datetime(year=year, month=month, day=1).end_of("month")
+
+
+# TODO: put this in some kind of common library. It's used in JSTOR as well
+def get_messages(service: Resource, list_params: dict) -> List[dict]:
+    """Get messages from the Gmail API.
+
+    :param list_params: The parameters that will be passed to the Gmail API.
+    """
+    first_query = True
+    next_page_token = None
+    messages = []
+    while next_page_token or first_query:
+        # Set the next page token if it isn't the first query
+        if not first_query:
+            list_params["pageToken"] = next_page_token
+        first_query = False
+
+        # Get the results
+        results = service.users().messages().list(**list_params).execute()
+        next_page_token = results.get("nextPageToken")
+        messages += results["messages"]
+    return messages
