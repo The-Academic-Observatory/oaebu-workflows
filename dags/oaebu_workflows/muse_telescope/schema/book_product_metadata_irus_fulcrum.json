@@ -1,0 +1,26 @@
+{
+    "fields": [
+        {
+            "mode": "NULLABLE",
+            "name": "ISBN13",
+            "type": "STRING",
+            "description": "ISBN of the book"
+        },
+        {
+            "mode": "NULLABLE",
+            "name": "book_title",
+            "type": "STRING",
+            "description": "Title of the book"
+        },
+        {
+            "mode": "NULLABLE",
+            "name": "publisher",
+            "type": "STRING",
+            "description": "The publisher"
+        }
+    ],
+    "mode": "NULLABLE",
+    "name": "irus_fulcrum",
+    "type": "RECORD",
+    "description": "Metadata derived from IRUS Fulcrum"
+}
