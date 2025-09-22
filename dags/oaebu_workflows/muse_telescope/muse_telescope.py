@@ -27,7 +27,7 @@ import chardet
 import pendulum
 from airflow.hooks.base import BaseHook
 from airflow.decorators import dag, task, task_group
-from airflow.exceptions import AirflowException
+from airflow.exceptions import AirflowException, AirflowSkipException
 from google.cloud.bigquery import SourceFormat, WriteDisposition, Client
 from google.cloud.bigquery.table import TimePartitioningType
 from google.cloud.bigquery import TimePartitioningType, SourceFormat, WriteDisposition, Client
@@ -75,7 +75,7 @@ class MuseRelease(PartitionRelease):
         self.message_id = message_id
         self.partition_date = partition_date
         self.download_file_name = "muse_download.csv.gz"
-        self.transfrom_file_name = "muse_transform.jsonl.gz"
+        self.transform_file_name = "muse_transform.jsonl.gz"
 
     @property
     def download_path(self):
@@ -83,7 +83,7 @@ class MuseRelease(PartitionRelease):
 
     @property
     def transform_path(self):
-        return os.path.join(self.transform_folder, self.transfrom_file_name)
+        return os.path.join(self.transform_folder, self.transform_file_name)
 
     @property
     def download_blob_name(self):
@@ -200,6 +200,9 @@ def create_dag(
             service = create_gmail_service()
             messages = get_messages(service, list_params)
             logging.info(f"Found {len(messages)} messages to process")
+            if len(messages) == 0:
+                raise AirflowSkipException("No messages to process. Skipping downstream tasks")
+
             releases = []
             for msg in messages:
                 attachment_ids = get_message_attachement_ids(service, msg["id"])
@@ -316,7 +319,8 @@ def create_dag(
                 """Adds the processed label name to the message (email) so that it is not processed again"""
                 release = MuseRelease.from_dict(release)
                 service = create_gmail_service()
-                success = add_label(service=service, message_id=release.message_id, label=processed_label)
+                label_id = get_label_id(service=service, label_name=processed_label)
+                success = add_label_to_message(service=service, message_id=release.message_id, label_id=label_id)
                 set_task_state(success, context["ti"].task_id, release=release)
 
             @task
@@ -325,7 +329,13 @@ def create_dag(
                 release = MuseRelease.from_dict(release)
                 cleanup(dag_id, workflow_folder=release.workflow_folder)
 
-            transform(data) >> bq_load(data) >> add_new_dataset_releases(data) >> cleanup_workflow(data)
+            (
+                transform(data)
+                >> bq_load(data)
+                >> add_new_dataset_releases(data)
+                >> add_label(data)
+                >> cleanup_workflow(data)
+            )
 
         # Define DAG tasks
         task_check_dependencies = check_dependencies(airflow_conns=[gmail_api_conn_id])
@@ -361,7 +371,9 @@ def muse_data_transform(data: List[dict]) -> List[dict]:
 
 
 def muse_row_transform(row: dict, date_partition_field: str = "release_date") -> List[dict]:
-    """Process a row of muse data. Will always return a list, even if there is only one item in it
+    """Process a row of muse data. Will always return a list, even if there is only one item in it.
+    The 'isbns' field is a string of comma-delimited isbn13s and isbn10s. This function will drop isbn10s and duplicate
+    the data for each isbn
 
     :param row: The muse data row to transform
     :param date_partition_field: The added field that will hold the year/month to partition on
@@ -449,6 +461,30 @@ def get_release_date_from_report(gz_path: str) -> Union[pendulum.DateTime, None]
 
 
 # TODO: put this in some kind of common library. It's used in JSTOR as well
+def get_label_id(service: Resource, label_name: str) -> str:
+    """Get the id of a label based on the label name.
+
+    :param label_name: The name of the label
+    :return: The label id
+    """
+    existing_labels = service.users().labels().list(userId="me").execute()["labels"]
+    label_id = [label["id"] for label in existing_labels if label["name"] == label_name]
+    if label_id:
+        label_id = label_id[0]
+    else:
+        # create label
+        label_body = {
+            "name": label_name,
+            "messageListVisibility": "show",
+            "labelListVisibility": "labelShow",
+            "type": "user",
+        }
+        result = service.users().labels().create(userId="me", body=label_body).execute()
+        label_id = result["id"]
+    return label_id
+
+
+# TODO: put this in some kind of common library. It's used in JSTOR as well
 def get_messages(service: Resource, list_params: dict) -> List[dict]:
     """Get messages from the Gmail API.
 
@@ -466,7 +502,8 @@ def get_messages(service: Resource, list_params: dict) -> List[dict]:
         # Get the results
         results = service.users().messages().list(**list_params).execute()
         next_page_token = results.get("nextPageToken")
-        messages += results["messages"]
+        if results.get("messages"):
+            messages += results["messages"]
     return messages
 
 
@@ -491,24 +528,23 @@ def get_message_attachement_ids(service: Resource, message_id: str) -> List[str]
     return ids
 
 
-def add_label(
+def add_label_to_message(
     service: Resource,
     message_id: str,
-    label: str,
+    label_id: str,
 ) -> bool:
     """Adds a label name to a gmail message.
 
     :param service: The Gmail service resource
     :param message_id: The ID of the message to add the label to
-    :param label: The label to add the message
+    :param label_id: The id of the label to add the message
     :return: True if successful, False otherwise
     """
-    body = {"addLabelIds": [label]}
-    response = service.users().messages().modify(UserId="me", id=message_id, body=body).execute()
-    try:
-        message_id = response["id"]
-        logging.info(f"Added label '{label}' to GMAIL message, message_id: {message_id}")
-    except KeyError:
-        logging.warning(f"Could not add label '{label}' to GMAIL message, message_id: {message_id}")
-        return False
-    return True
+    body = {"addLabelIds": [label_id]}
+    response = service.users().messages().modify(userId="me", id=message_id, body=body).execute()
+    if response and label_id in response.get("labelIds", []):
+        logging.info(f"Added label_id '{label_id}' to GMAIL message, message_id: {message_id}")
+        return True
+
+    logging.warning(f"Could not add label_id '{label_id}' to GMAIL message, message_id: {message_id}")
+    return False
