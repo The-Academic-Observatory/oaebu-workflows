@@ -7,7 +7,7 @@
   },
   {
     "description": "ISBN13 of this book",
-    "mode": "REPEATED",
+    "mode": "REQUIRED",
     "name": "isbn",
     "type": "STRING"
   },
