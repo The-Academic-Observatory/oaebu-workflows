@@ -138,6 +138,8 @@ def create_dag(
     geoip_license_conn_id: str = "geoip_license_key",
     irus_oapen_api_conn_id: str = "irus_api",
     irus_oapen_login_conn_id: str = "irus_login",
+    irus_cloud_function_source_url: Optional[str] = None,
+    irus_cloud_function_hash: Optional[str] = None,
     catchup: bool = True,
     start_date: pendulum.DateTime = pendulum.datetime(2015, 6, 1),
     schedule: str = "0 0 4 * *",  # Run on the 4th of every month
@@ -160,6 +162,8 @@ def create_dag(
     :param geoip_license_conn_id: The Airflow connection ID for the GEOIP license
     :param irus_oapen_api_conn_id: The Airflow connection ID for IRUS API - for counter 5
     :param irus_oapen_login_conn_id: The Airflow connection ID for IRUS API (login) - for counter 4
+    :param irus_cloud_function_source_url: The url of the cloud function source code
+    :param irus_cloud_function_hash: The expected md5 hash of the cloud function source code
     :param catchup: Whether to catchup the DAG or not
     :param start_date: The start date of the DAG
     :param schedule: The schedule interval of the DAG
@@ -168,6 +172,10 @@ def create_dag(
     :param retries: The number of times to retry failed tasks
     :param retry_delay: The delay between retries in minutes
     """
+    if not all((irus_cloud_function_source_url, irus_cloud_function_hash)):
+        logging.info("IRUS cloud function not explicitly set. Falling back to defaults")
+        irus_cloud_function_source_url = IRUS_FUNCTION_SOURCE_URL
+        irus_cloud_function_hash = IRUS_FUNCTION_MD5_HASH
 
     data_partner = partner_from_str(data_partner)
 
@@ -224,11 +232,12 @@ def create_dag(
 
             # zip source code and upload to bucket
             success, upload = upload_source_code_to_bucket(
-                source_url=IRUS_FUNCTION_SOURCE_URL,
+                source_url=irus_cloud_function_source_url,
                 project_id=gdpr_oapen_project_id,
                 bucket_name=gdpr_oapen_bucket_id,
                 blob_name=IRUS_FUNCTION_BLOB_NAME,
                 cloud_function_path=release.cloud_function_path,
+                expected_md5_hash=irus_cloud_function_hash,
             )
             set_task_state(success, context["ti"].task_id, release=release)
 
