@@ -162,8 +162,6 @@ def create_dag(
     :param geoip_license_conn_id: The Airflow connection ID for the GEOIP license
     :param irus_oapen_api_conn_id: The Airflow connection ID for IRUS API - for counter 5
     :param irus_oapen_login_conn_id: The Airflow connection ID for IRUS API (login) - for counter 4
-    :param irus_cloud_function_source_url: The url of the cloud function source code
-    :param irus_cloud_function_hash: The expected md5 hash of the cloud function source code
     :param catchup: Whether to catchup the DAG or not
     :param start_date: The start date of the DAG
     :param schedule: The schedule interval of the DAG
@@ -172,8 +170,7 @@ def create_dag(
     :param retries: The number of times to retry failed tasks
     :param retry_delay: The delay between retries in minutes
     """
-    if not all((irus_cloud_function_source_url, irus_cloud_function_hash)):
-        logging.info("IRUS cloud function not explicitly set. Falling back to defaults")
+    if not all(irus_cloud_function_source_url, irus_cloud_function_hash):
         irus_cloud_function_source_url = IRUS_FUNCTION_SOURCE_URL
         irus_cloud_function_hash = IRUS_FUNCTION_MD5_HASH
 
