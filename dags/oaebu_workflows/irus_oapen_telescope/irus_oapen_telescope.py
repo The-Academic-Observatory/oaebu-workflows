@@ -53,9 +53,9 @@ IRUS_FUNCTION_NAME = "oapen-access-stats"  # Name of the google cloud function
 IRUS_FUNCTION_REGION = "europe-west1"  # Region of the google cloud function
 IRUS_FUNCTION_SOURCE_URL = (
     "https://github.com/The-Academic-Observatory/oapen-irus-uk-cloud-function/releases/"
-    "download/v1.1.9/oapen-irus-uk-cloud-function.zip"
+    "download/v1.2.0/oapen-irus-uk-cloud-function.zip"
 )  # URL to the zipped source code of the cloud function
-IRUS_FUNCTION_MD5_HASH = "946bb4d7ca229b15aba36ad7b5ed56d0"  # MD5 hash of the zipped source code
+IRUS_FUNCTION_MD5_HASH = "2f43df0a21c0c2353b48513653581e0c"  # MD5 hash of the zipped source code
 IRUS_FUNCTION_BLOB_NAME = "cloud_function_source_code.zip"  # blob name of zipped source code
 IRUS_FUNCTION_TIMEOUT = 1500  # Timeout of cloud function in seconds. Maximum of 60 minutes,
 # see https://cloud.google.com/functions/docs/2nd-gen/overview#enhanced_infrastructure
@@ -496,7 +496,7 @@ def create_cloud_function(
         "environment": "GEN_2",
         "description": "Pulls oapen irus uk data and replaces ip addresses with city and country info.",
         "buildConfig": {
-            "runtime": "python39",
+            "runtime": "python311",
             "entryPoint": "download",
             "source": {"storageSource": {"bucket": source_bucket, "object": blob_name}},
         },
