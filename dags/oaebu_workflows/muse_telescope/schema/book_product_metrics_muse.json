@@ -1,0 +1,41 @@
+{
+  "fields": [
+    {
+      "mode": "NULLABLE",
+      "name": "country",
+      "type": "STRING",
+      "description": "Country Name"
+    },
+    {
+      "mode": "NULLABLE",
+      "name": "usage",
+      "type": "INTEGER",
+      "description": "Total usage of this specific country"
+    }
+  ],
+  "mode": "REPEATED",
+  "name": "muse_country",
+  "type": "RECORD",
+  "description": "Country metrics derived from Muse"
+},
+{
+  "fields": [
+    {
+      "mode": "NULLABLE",
+      "name": "institution",
+      "type": "STRING",
+      "description": "Institution name"
+    },
+    {
+      "mode": "NULLABLE",
+      "name": "usage",
+      "type": "INTEGER",
+      "description": "Total number of request made from that specific institution"
+    }
+  ],
+  "mode": "REPEATED",
+  "name": "muse_institution",
+  "type": "RECORD",
+  "description": "Institution metrics derived from Muse"
+}
+

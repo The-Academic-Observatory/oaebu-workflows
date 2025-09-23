@@ -1,0 +1,14 @@
+{
+  "fields": [
+    {
+      "mode": "NULLABLE",
+      "name": "usage",
+      "type": "INTEGER",
+      "description": "Total number of request made"
+    }
+  ],
+  "mode": "NULLABLE",
+  "name": "muse",
+  "type": "RECORD",
+  "description": "Metrics from MUSE"
+}
