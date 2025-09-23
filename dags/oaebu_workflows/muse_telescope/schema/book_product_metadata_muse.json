@@ -1,0 +1,21 @@
+{
+  "fields": [
+    {
+      "mode": "NULLABLE",
+      "name": "ISBN13",
+      "type": "STRING",
+      "description": "ISBN of the book (13 digits)"
+    },
+    {
+      "mode": "NULLABLE",
+      "name": "title",
+      "type": "STRING",
+      "description": "Title of the book"
+    }
+  ],
+  "mode": "NULLABLE",
+  "name": "muse",
+  "type": "RECORD",
+  "description": "Metadata derived from Muse"
+}
+
