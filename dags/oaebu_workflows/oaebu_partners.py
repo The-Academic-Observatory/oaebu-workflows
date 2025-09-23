@@ -312,7 +312,7 @@ OAEBU_DATA_PARTNERS = dict(
         title_field_name="title",
         sharded=False,
         schema_path=os.path.join(schema_folder(workflow_module="muse_telescope"), "muse.json"),
-        schema_directory=os.path.join(schema_folder(workflow_module="muse_telescope"), "muse_telescope"),
+        schema_directory=os.path.join(schema_folder(workflow_module="muse_telescope")),
         sql_directory=os.path.join(sql_folder(workflow_module="muse_telescope")),
         book_product_functions=True,
         export_author=False,
