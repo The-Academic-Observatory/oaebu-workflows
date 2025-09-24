@@ -55,7 +55,7 @@ IRUS_FUNCTION_SOURCE_URL = (
     "https://github.com/The-Academic-Observatory/oapen-irus-uk-cloud-function/releases/"
     "download/v1.2.0/oapen-irus-uk-cloud-function.zip"
 )  # URL to the zipped source code of the cloud function
-IRUS_FUNCTION_MD5_HASH = "2f43df0a21c0c2353b48513653581e0c"  # MD5 hash of the zipped source code
+IRUS_FUNCTION_MD5_HASH = "71965db1009fc4d76bae9a8ca2734313"  # MD5 hash of the zipped source code
 IRUS_FUNCTION_BLOB_NAME = "cloud_function_source_code.zip"  # blob name of zipped source code
 IRUS_FUNCTION_TIMEOUT = 1500  # Timeout of cloud function in seconds. Maximum of 60 minutes,
 # see https://cloud.google.com/functions/docs/2nd-gen/overview#enhanced_infrastructure
