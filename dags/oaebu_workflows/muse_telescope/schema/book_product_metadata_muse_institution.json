@@ -8,14 +8,13 @@
     },
     {
       "mode": "NULLABLE",
-      "name": "title",
+      "name": "Book_Title",
       "type": "STRING",
       "description": "Title of the book"
     }
   ],
   "mode": "NULLABLE",
-  "name": "muse",
+  "name": "muse_institution",
   "type": "RECORD",
   "description": "Metadata derived from Muse"
 }
-

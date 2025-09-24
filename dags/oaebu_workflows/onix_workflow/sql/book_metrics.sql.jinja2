@@ -41,8 +41,9 @@ SELECT
         {% if not loop.last %},{% endif %}
     {% endfor %}
 FROM `{{ book_product_table_id }}`, UNNEST(months) AS month
-WHERE 
+ 
 {% for dp in data_partners | selectattr("export_book_metrics", "equalto", True) %}
+    {% if loop.first %} WHERE{% endif %}
     {% include dp.files.month_null_sql %}
     {% if not loop.last %} OR{% endif %}
 {% endfor %}

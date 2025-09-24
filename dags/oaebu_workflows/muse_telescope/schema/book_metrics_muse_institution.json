@@ -8,7 +8,7 @@
     }
   ],
   "mode": "NULLABLE",
-  "name": "muse_country",
+  "name": "muse_institution",
   "type": "RECORD",
   "description": "Metrics from Muse"
 }

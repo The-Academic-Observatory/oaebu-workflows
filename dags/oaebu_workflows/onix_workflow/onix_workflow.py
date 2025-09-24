@@ -638,6 +638,8 @@ def create_dag(
             )
 
             # Run the query
+
+            logging.info(f"Generated schema: {schema}")
             with open(release.book_product_schema_path, mode="w+") as f:
                 json.dump(schema, f)
             client = Client(project=cloud_workspace.project_id)
