@@ -30,22 +30,10 @@
     "type": "STRING"
   },
   {
-    "description": "The item usage per month, per country, per institution ",
+    "description": "The item usage per month, per country",
     "mode": "NULLABLE",
     "name": "usage",
     "type": "INTEGER"
-  },
-  {
-    "description": "The proprietary institution IDs",
-    "mode": "NULLABLE",
-    "name": "institution_ids",
-    "type": "STRING"
-  },
-  {
-    "description": "The institution name",
-    "mode": "NULLABLE",
-    "name": "institution",
-    "type": "STRING"
   },
   {
     "description": "Proprietary country ID",

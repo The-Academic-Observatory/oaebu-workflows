@@ -1,0 +1,56 @@
+[
+  {
+    "description": "Proprietary identifier of the book.",
+    "mode": "NULLABLE",
+    "name": "book_id",
+    "type": "STRING"
+  },
+  {
+    "description": "ISBN13 of this book",
+    "mode": "REQUIRED",
+    "name": "isbn",
+    "type": "STRING"
+  },
+  {
+    "description": "Title of the book",
+    "mode": "NULLABLE",
+    "name": "title",
+    "type": "STRING"
+  },
+  {
+    "description": "The investigated year.",
+    "mode": "NULLABLE",
+    "name": "year",
+    "type": "STRING"
+  },
+  {
+    "description": "The investigated month.",
+    "mode": "NULLABLE",
+    "name": "month",
+    "type": "STRING"
+  },
+  {
+    "description": "The item usage per month, per institution ",
+    "mode": "NULLABLE",
+    "name": "usage",
+    "type": "INTEGER"
+  },
+  {
+    "description": "The proprietary institution IDs",
+    "mode": "NULLABLE",
+    "name": "institution_ids",
+    "type": "STRING"
+  },
+  {
+    "description": "The institution name",
+    "mode": "NULLABLE",
+    "name": "institution",
+    "type": "STRING"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "release_date",
+    "type": "DATE",
+    "description": "Last day of the release month. Table is partitioned on this column."
+  }
+]
