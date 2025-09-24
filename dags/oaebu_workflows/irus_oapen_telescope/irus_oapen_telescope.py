@@ -474,9 +474,13 @@ def cloud_function_exists(service: Resource, full_name: str) -> Optional[str]:
     """
     try:
         response = service.projects().locations().functions().get(name=full_name).execute()
-        uri = response["serviceConfig"]["uri"]
     except HttpError:
         return None
+
+    if response.get("environment") == "GEN_2":  # Newer cloud run API response
+        uri = response["url"]
+    else:
+        uri = response["serviceConfig"]["uri"]
     return uri
 
 
