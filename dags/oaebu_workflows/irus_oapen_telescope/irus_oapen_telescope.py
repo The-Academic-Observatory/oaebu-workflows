@@ -242,7 +242,7 @@ def create_dag(
             set_task_state(success, context["ti"].task_id, release=release)
 
             # initialise cloud functions api
-            service = build("cloudfunctions", "v2beta", cache_discovery=False, static_discovery=False)
+            service = build("cloudfunctions", "v2", cache_discovery=False, static_discovery=False)
 
             # update or create cloud function
             exists = cloud_function_exists(service, full_name)
@@ -283,7 +283,7 @@ def create_dag(
                 password = BaseHook.get_connection(airflow_conn).password
 
                 # initialise cloud functions api
-                service = build("cloudfunctions", "v2beta", cache_discovery=False, static_discovery=False)
+                service = build("cloudfunctions", "v2", cache_discovery=False, static_discovery=False)
 
                 # Get cloud function uri
                 function_uri = cloud_function_exists(service, full_name)
@@ -477,10 +477,10 @@ def cloud_function_exists(service: Resource, full_name: str) -> Optional[str]:
     except HttpError:
         return None
 
-    if response.get("environment") == "GEN_2":  # Newer cloud run API response
-        uri = response["url"]
-    else:
+    try:
         uri = response["serviceConfig"]["uri"]
+    except KeyError:
+        uri = response["url"]
     return uri
 
 
