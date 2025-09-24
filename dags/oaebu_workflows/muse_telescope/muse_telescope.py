@@ -16,8 +16,9 @@
 
 import logging
 import os
-from typing import List, Union
 import shutil
+from typing import List, Union, Tuple
+from copy import deepcopy
 import gzip
 import csv
 import base64
@@ -75,23 +76,32 @@ class MuseRelease(PartitionRelease):
         self.message_id = message_id
         self.partition_date = partition_date
         self.download_file_name = "muse_download.csv.gz"
-        self.transform_file_name = "muse_transform.jsonl.gz"
+        self.country_transform_file_name = "muse_country_transform.jsonl.gz"
+        self.institution_transform_file_name = "muse_institution_transform.jsonl.gz"
 
     @property
     def download_path(self):
         return os.path.join(self.download_folder, self.download_file_name)
 
     @property
-    def transform_path(self):
-        return os.path.join(self.transform_folder, self.transform_file_name)
+    def country_transform_path(self):
+        return os.path.join(self.transform_folder, self.country_transform_file_name)
+
+    @property
+    def institution_transform_path(self):
+        return os.path.join(self.transform_folder, self.institution_transform_file_name)
 
     @property
     def download_blob_name(self):
         return gcs_blob_name_from_path(self.download_path)
 
     @property
-    def transform_blob_name(self):
-        return gcs_blob_name_from_path(self.transform_path)
+    def country_transform_blob_name(self):
+        return gcs_blob_name_from_path(self.country_transform_path)
+
+    @property
+    def institution_transform_blob_name(self):
+        return gcs_blob_name_from_path(self.institution_transform_path)
 
     @staticmethod
     def from_dict(dict_: dict):
@@ -120,12 +130,14 @@ def create_dag(
     dag_id: str,
     cloud_workspace: CloudWorkspace,
     publisher_subject_line: str,
-    email_sender: str = "muse_analytics@jh.edu.au",
+    email_sender: str = "dbloom9@jh.edu",  # Muse sender email
     processed_label: str = "muse_processed",
     date_parition_field: str = "release_date",
-    data_partner: Union[str, OaebuPartner] = "muse",
+    country_data_partner: Union[str, OaebuPartner] = "muse_country",
+    institution_data_partner: Union[str, OaebuPartner] = "muse_institution",
     bq_dataset_description: str = "MUSE dataset",
-    bq_table_description: str = "Muse metrics",
+    bq_country_table_description: str = "Muse Country metrics",
+    bq_institution_table_description: str = "Muse Institution metrics",
     api_bq_dataset_id: str = "dataset_api",
     gmail_api_conn_id: str = "gmail_api",
     catchup: bool = False,
@@ -151,7 +163,8 @@ def create_dag(
     :param retries: The number of times to retry failed tasks
     :param retry_delay: The delay between retries in minutes
     """
-    data_partner = partner_from_str(data_partner)
+    country_data_partner = partner_from_str(country_data_partner)
+    institution_data_partner = partner_from_str(institution_data_partner)
 
     @dag(
         dag_id=dag_id,
@@ -172,8 +185,8 @@ def create_dag(
         expected subject line and those that do not already have the 'processed' label will be considered. For each
         valid email found will download the attachement and create a new release object.
         Each release is processed concurrently, transformed, uploaded to GCloud storage, then loaded into Bigquery as
-        part of a partitioned table. Once loading is complete, the 'processed' label is added to the original
-        email/message so that it is ignored in future runs.
+        part of a partitioned table. There are two tables for muse - country and institution. Once loading is complete,
+        the 'processed' label is added to the original email/message so that it is ignored in future runs.
         """
 
         @task
@@ -251,40 +264,81 @@ def create_dag(
                     raise FileNotFoundError(f"Error downloading file: {release.download_blob_name}")
 
                 data = read_gzipped_report(release.download_path)
-                data = muse_data_transform(data)
-                save_jsonl_gz(release.transform_path, data)
+                country_data, institution_data = muse_data_transform(data)
+                save_jsonl_gz(release.country_transform_path, country_data)
+                save_jsonl_gz(release.institution_transform_path, institution_data)
 
-                # Upload transformed to GCS
-                success = gcs_upload_file(
+                # Upload transformed country data to GCS
+                success_c = gcs_upload_file(
                     bucket_name=cloud_workspace.transform_bucket,
-                    file_path=release.transform_path,
-                    blob_name=release.transform_blob_name,
+                    file_path=release.country_transform_path,
+                    blob_name=release.country_transform_blob_name,
                 )
-                set_task_state(success, context["ti"].task_id, release=release)
+                # Upload transformed institution data to GCS
+                success_i = gcs_upload_file(
+                    bucket_name=cloud_workspace.transform_bucket,
+                    file_path=release.institution_transform_path,
+                    blob_name=release.institution_transform_blob_name,
+                )
+                set_task_state(all((success_c, success_i)), context["ti"].task_id, release=release)
 
             @task
-            def bq_load(release: dict, **context) -> None:
+            def bq_load_country(release: dict, **context) -> None:
                 """Load the transfromed data into bigquery"""
                 release = MuseRelease.from_dict(release)
                 bq_create_dataset(
                     project_id=cloud_workspace.project_id,
-                    dataset_id=data_partner.bq_dataset_id,
+                    dataset_id=country_data_partner.bq_dataset_id,
                     location=cloud_workspace.data_location,
                     description=bq_dataset_description,
                 )
 
                 # Load each transformed release
-                uri = gcs_blob_uri(cloud_workspace.transform_bucket, release.transform_blob_name)
+                uri = gcs_blob_uri(cloud_workspace.transform_bucket, release.country_transform_blob_name)
                 table_id = bq_table_id(
-                    cloud_workspace.project_id, data_partner.bq_dataset_id, data_partner.bq_table_name
+                    cloud_workspace.project_id, country_data_partner.bq_dataset_id, country_data_partner.bq_table_name
                 )
                 client = Client(project=cloud_workspace.project_id)
                 success = bq_load_table(
                     uri=uri,
                     table_id=table_id,
-                    schema_file_path=data_partner.schema_path,
+                    schema_file_path=country_data_partner.schema_path,
                     source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
-                    table_description=bq_table_description,
+                    table_description=bq_country_table_description,
+                    partition=True,
+                    partition_type=TimePartitioningType.MONTH,
+                    write_disposition=WriteDisposition.WRITE_APPEND,
+                    partition_field=date_parition_field,
+                    ignore_unknown_values=True,
+                    client=client,
+                )
+                set_task_state(success, context["ti"].task_id, release=release)
+
+            @task
+            def bq_load_institution(release: dict, **context) -> None:
+                """Load the transfromed data into bigquery"""
+                release = MuseRelease.from_dict(release)
+                bq_create_dataset(
+                    project_id=cloud_workspace.project_id,
+                    dataset_id=institution_data_partner.bq_dataset_id,
+                    location=cloud_workspace.data_location,
+                    description=bq_dataset_description,
+                )
+
+                # Load each transformed release
+                uri = gcs_blob_uri(cloud_workspace.transform_bucket, release.institution_transform_blob_name)
+                table_id = bq_table_id(
+                    cloud_workspace.project_id,
+                    institution_data_partner.bq_dataset_id,
+                    institution_data_partner.bq_table_name,
+                )
+                client = Client(project=cloud_workspace.project_id)
+                success = bq_load_table(
+                    uri=uri,
+                    table_id=table_id,
+                    schema_file_path=institution_data_partner.schema_path,
+                    source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
+                    table_description=bq_institution_table_description,
                     partition=True,
                     partition_type=TimePartitioningType.MONTH,
                     write_disposition=WriteDisposition.WRITE_APPEND,
@@ -304,7 +358,18 @@ def create_dag(
                 )
                 dataset_release = DatasetRelease(
                     dag_id=dag_id,
-                    entity_id="muse",
+                    entity_id="muse_country",
+                    dag_run_id=release.run_id,
+                    created=pendulum.now(),
+                    modified=pendulum.now(),
+                    data_interval_start=release.data_interval_start,
+                    data_interval_end=release.data_interval_end,
+                    partition_date=release.partition_date,
+                )
+                api.add_dataset_release(dataset_release)
+                dataset_release = DatasetRelease(
+                    dag_id=dag_id,
+                    entity_id="muse_institution",
                     dag_run_id=release.run_id,
                     created=pendulum.now(),
                     modified=pendulum.now(),
@@ -331,7 +396,8 @@ def create_dag(
 
             (
                 transform(data)
-                >> bq_load(data)
+                >> bq_load_country(data)
+                >> bq_load_institution(data)
                 >> add_new_dataset_releases(data)
                 >> add_label(data)
                 >> cleanup_workflow(data)
@@ -359,25 +425,28 @@ def create_gmail_service() -> Resource:
     return service
 
 
-def muse_data_transform(data: List[dict]) -> List[dict]:
+def muse_data_transform(data: List[dict]) -> Tuple[List[dict], List[dict]]:
     """Process a muse dataset. Expect a list of dictionaries where each entry is a row of the data
 
     :param data: The muse dataset
-    :return: The transformed dataset"""
-    transformed_data = []
+    :return: The transformed datasets. Country, Institution"""
+    country_transformed = []
+    institution_transformed = []
     for row in data:
-        transformed_data.extend(muse_row_transform(row))
-    return transformed_data
+        c, i = muse_row_transform(row)
+        country_transformed.extend(c)
+        institution_transformed.extend(i)
+    return country_transformed, institution_transformed
 
 
-def muse_row_transform(row: dict, date_partition_field: str = "release_date") -> List[dict]:
+def muse_row_transform(row: dict, date_partition_field: str = "release_date") -> Tuple[List[dict], List[dict]]:
     """Process a row of muse data. Will always return a list, even if there is only one item in it.
     The 'isbns' field is a string of comma-delimited isbn13s and isbn10s. This function will drop isbn10s and duplicate
     the data for each isbn
 
     :param row: The muse data row to transform
     :param date_partition_field: The added field that will hold the year/month to partition on
-    :return: The transformed row(s) as a list"""
+    :return: The transformed row(s) as lists of dicts. Returns country, institution"""
     # Add the release date - the last day of the month
     row[date_partition_field] = str(pendulum.Date(int(row["year"]), int(row["month"]), 1).end_of("month"))
 
@@ -398,7 +467,14 @@ def muse_row_transform(row: dict, date_partition_field: str = "release_date") ->
     for i in valid_isbns:
         rows.append({"isbn": i, **row})
 
-    return rows
+    # Split the data into country and institution
+    inst_rows = deepcopy(rows)
+    del inst_rows["country"]
+    del inst_rows["country_id"]
+    del rows["institution"]  # use 'rows' as the country data so we don't have to deepcopy again
+    del rows["institution_id"]
+
+    return rows, inst_rows
 
 
 # TODO: put this in some kind of common library. It's used in JSTOR as well

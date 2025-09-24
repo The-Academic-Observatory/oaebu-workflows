@@ -14,7 +14,7 @@
     }
   ],
   "mode": "REPEATED",
-  "name": "muse_country",
+  "name": "country_metrics",
   "type": "RECORD",
   "description": "Country metrics derived from Muse"
 },
@@ -34,8 +34,7 @@
     }
   ],
   "mode": "REPEATED",
-  "name": "muse_institution",
+  "name": "institution_metrics",
   "type": "RECORD",
   "description": "Institution metrics derived from Muse"
 }
-
