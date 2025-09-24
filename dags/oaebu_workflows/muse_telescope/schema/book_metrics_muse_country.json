@@ -1,0 +1,14 @@
+{
+  "fields": [
+    {
+      "mode": "NULLABLE",
+      "name": "usage",
+      "type": "INTEGER",
+      "description": "Total item usage"
+    }
+  ],
+  "mode": "NULLABLE",
+  "name": "muse_country",
+  "type": "RECORD",
+  "description": "Metrics from Muse"
+}

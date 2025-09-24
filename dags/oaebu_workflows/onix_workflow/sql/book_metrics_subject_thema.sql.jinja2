@@ -47,10 +47,10 @@ FROM(
         {% endfor %}
 
     FROM `{{ book_product_table_id }}`, UNNEST(top_level_subjects(onix.thema_subjects)) as subject, UNNEST(months) as month
-    WHERE 
 
     {% for dp in data_partners | selectattr("export_subject", "equalto", True) %}
-        {% include dp.files.month_null_sql %}{% if not loop.last %} OR{% endif %}
+        {% if loop.first %} WHERE{% endif %}
+        {% include dp.files.month_null_sql %}{% if not loop.last %} OR {% endif %}
     {% endfor %}
     
     GROUP BY subject, month

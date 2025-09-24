@@ -1,0 +1,20 @@
+{
+  "fields": [
+    {
+      "mode": "NULLABLE",
+      "name": "country",
+      "type": "STRING",
+      "description": "Country Name"
+    },
+    {
+      "mode": "NULLABLE",
+      "name": "usage",
+      "type": "INTEGER",
+      "description": "Total usage of this specific country"
+    }
+  ],
+  "mode": "REPEATED",
+  "name": "muse_country",
+  "type": "RECORD",
+  "description": "Country metrics derived from Muse"
+}
