@@ -53,9 +53,9 @@ IRUS_FUNCTION_NAME = "oapen-access-stats"  # Name of the google cloud function
 IRUS_FUNCTION_REGION = "europe-west1"  # Region of the google cloud function
 IRUS_FUNCTION_SOURCE_URL = (
     "https://github.com/The-Academic-Observatory/oapen-irus-uk-cloud-function/releases/"
-    "download/v1.1.9/oapen-irus-uk-cloud-function.zip"
+    "download/v1.2.0/oapen-irus-uk-cloud-function.zip"
 )  # URL to the zipped source code of the cloud function
-IRUS_FUNCTION_MD5_HASH = "946bb4d7ca229b15aba36ad7b5ed56d0"  # MD5 hash of the zipped source code
+IRUS_FUNCTION_MD5_HASH = "71965db1009fc4d76bae9a8ca2734313"  # MD5 hash of the zipped source code
 IRUS_FUNCTION_BLOB_NAME = "cloud_function_source_code.zip"  # blob name of zipped source code
 IRUS_FUNCTION_TIMEOUT = 1500  # Timeout of cloud function in seconds. Maximum of 60 minutes,
 # see https://cloud.google.com/functions/docs/2nd-gen/overview#enhanced_infrastructure
@@ -138,6 +138,8 @@ def create_dag(
     geoip_license_conn_id: str = "geoip_license_key",
     irus_oapen_api_conn_id: str = "irus_api",
     irus_oapen_login_conn_id: str = "irus_login",
+    irus_cloud_function_source_url: Optional[str] = None,
+    irus_cloud_function_hash: Optional[str] = None,
     catchup: bool = True,
     start_date: pendulum.DateTime = pendulum.datetime(2015, 6, 1),
     schedule: str = "0 0 4 * *",  # Run on the 4th of every month
@@ -160,6 +162,8 @@ def create_dag(
     :param geoip_license_conn_id: The Airflow connection ID for the GEOIP license
     :param irus_oapen_api_conn_id: The Airflow connection ID for IRUS API - for counter 5
     :param irus_oapen_login_conn_id: The Airflow connection ID for IRUS API (login) - for counter 4
+    :param irus_cloud_function_source_url: The url of the cloud function source code
+    :param irus_cloud_function_hash: The expected md5 hash of the cloud function source code
     :param catchup: Whether to catchup the DAG or not
     :param start_date: The start date of the DAG
     :param schedule: The schedule interval of the DAG
@@ -168,6 +172,10 @@ def create_dag(
     :param retries: The number of times to retry failed tasks
     :param retry_delay: The delay between retries in minutes
     """
+    if not all((irus_cloud_function_source_url, irus_cloud_function_hash)):
+        logging.info("IRUS cloud function not explicitly set. Falling back to defaults")
+        irus_cloud_function_source_url = IRUS_FUNCTION_SOURCE_URL
+        irus_cloud_function_hash = IRUS_FUNCTION_MD5_HASH
 
     data_partner = partner_from_str(data_partner)
 
@@ -224,11 +232,12 @@ def create_dag(
 
             # zip source code and upload to bucket
             success, upload = upload_source_code_to_bucket(
-                source_url=IRUS_FUNCTION_SOURCE_URL,
+                source_url=irus_cloud_function_source_url,
                 project_id=gdpr_oapen_project_id,
                 bucket_name=gdpr_oapen_bucket_id,
                 blob_name=IRUS_FUNCTION_BLOB_NAME,
                 cloud_function_path=release.cloud_function_path,
+                expected_md5_hash=irus_cloud_function_hash,
             )
             set_task_state(success, context["ti"].task_id, release=release)
 
@@ -496,7 +505,7 @@ def create_cloud_function(
         "environment": "GEN_2",
         "description": "Pulls oapen irus uk data and replaces ip addresses with city and country info.",
         "buildConfig": {
-            "runtime": "python39",
+            "runtime": "python311",
             "entryPoint": "download",
             "source": {"storageSource": {"bucket": source_bucket, "object": blob_name}},
         },
