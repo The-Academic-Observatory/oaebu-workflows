@@ -4,11 +4,11 @@
       "mode": "NULLABLE",
       "name": "usage",
       "type": "INTEGER",
-      "description": "Total number of request made"
+      "description": "Total country usage"
     }
   ],
   "mode": "NULLABLE",
-  "name": "muse",
+  "name": "muse_country",
   "type": "RECORD",
-  "description": "Metrics from MUSE"
+  "description": "Country metrics from MUSE"
 }

@@ -463,18 +463,22 @@ def muse_row_transform(row: dict, date_partition_field: str = "release_date") ->
         return []
 
     # Dump the transformed row to a list. One for each unique ISBN
-    rows = []
+    country_rows = []
+    institution_rows = []
     for i in valid_isbns:
-        rows.append({"isbn": i, **row})
+        # Country - exclude the institution data
+        country_row = {"isbn": i, **row}
+        del country_row["institution"]
+        del country_row["institution_ids"]
+        country_rows.append(country_row)
 
-    # Split the data into country and institution
-    inst_rows = deepcopy(rows)
-    del inst_rows["country"]
-    del inst_rows["country_id"]
-    del rows["institution"]  # use 'rows' as the country data so we don't have to deepcopy again
-    del rows["institution_id"]
+        # institution - exclude the institution data
+        institution_row = {"isbn": i, **row}
+        del institution_row["country"]
+        del institution_row["country_id"]
+        institution_rows.append(institution_row)
 
-    return rows, inst_rows
+    return country_rows, institution_rows
 
 
 # TODO: put this in some kind of common library. It's used in JSTOR as well

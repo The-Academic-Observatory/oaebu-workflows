@@ -1,0 +1,20 @@
+{
+  "fields": [
+    {
+      "mode": "NULLABLE",
+      "name": "institution",
+      "type": "STRING",
+      "description": "Institution name"
+    },
+    {
+      "mode": "NULLABLE",
+      "name": "usage",
+      "type": "INTEGER",
+      "description": "Total number of request made from that specific institution"
+    }
+  ],
+  "mode": "REPEATED",
+  "name": "muse_institution",
+  "type": "RECORD",
+  "description": "Institution metrics derived from Muse"
+}
