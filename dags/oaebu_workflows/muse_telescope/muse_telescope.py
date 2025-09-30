@@ -459,8 +459,8 @@ def muse_row_transform(row: dict, date_partition_field: str = "release_date") ->
     del row["isbns"]
 
     if len(valid_isbns) == 0:
-        logging.warning(f"Row has no valid ISBNs, will return empty row: {row}")
-        return []
+        logging.warning(f"Row has no valid ISBNs, will return empty rows: {row}")
+        return ([], [])
 
     # Dump the transformed row to a list. One for each unique ISBN
     country_rows = []

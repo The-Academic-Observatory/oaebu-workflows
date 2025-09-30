@@ -78,13 +78,15 @@ class TestTelescopeSetup(SandboxTestCase):
                     "check_dependencies": ["create_releases"],
                     "create_releases": [
                         "process_release.transform",
-                        "process_release.bq_load",
+                        "process_release.bq_load_country",
+                        "process_release.bq_load_institution",
                         "process_release.add_new_dataset_releases",
                         "process_release.add_label",
                         "process_release.cleanup_workflow",
                     ],
-                    "process_release.transform": ["process_release.bq_load"],
-                    "process_release.bq_load": ["process_release.add_new_dataset_releases"],
+                    "process_release.transform": ["process_release.bq_load_country"],
+                    "process_release.bq_load_country": ["process_release.bq_load_institution"],
+                    "process_release.bq_load_institution": ["process_release.add_new_dataset_releases"],
                     "process_release.add_new_dataset_releases": ["process_release.add_label"],
                     "process_release.add_label": ["process_release.cleanup_workflow"],
                     "process_release.cleanup_workflow": [],
@@ -148,16 +150,18 @@ class TestMuseTelescope(SandboxTestCase):
 
             # Setup Telescope
             logical_date = pendulum.datetime(year=2024, month=3, day=1)
-            partner = partner_from_str("muse")
-            dataset_id = env.add_dataset()
-            partner.bq_dataset_id = dataset_id
+            country_partner = partner_from_str("muse_country")
+            institution_partner = partner_from_str("muse_institution")
+            country_partner.bq_dataset_id = env.add_dataset()
+            institution_partner.bq_dataset_id = env.add_dataset()
             api_bq_dataset_id = env.add_dataset()
             dag_id = "muse_test_telescope"
             dag = create_dag(
                 dag_id=dag_id,
                 cloud_workspace=env.cloud_workspace,
                 publisher_subject_line="MUSE Counter 5 Report",
-                data_partner=partner,
+                country_data_partner=country_partner,
+                institution_data_partner=institution_partner,
                 api_bq_dataset_id=api_bq_dataset_id,
             )
 
@@ -189,27 +193,59 @@ class TestMuseTelescope(SandboxTestCase):
                 # Check that transformed file was uploaded to GCS
                 self.assert_blob_integrity(
                     env.transform_bucket,
-                    release.transform_blob_name,
-                    release.transform_path,
+                    release.country_transform_blob_name,
+                    release.country_transform_path,
+                )
+                self.assert_blob_integrity(
+                    env.transform_bucket,
+                    release.institution_transform_blob_name,
+                    release.institution_transform_path,
                 )
 
-                # Test bq_load task
-                ti = env.run_task("process_release.bq_load", map_index=0)
+                # Test bq_load_country task
+                ti = env.run_task("process_release.bq_load_country", map_index=0)
                 self.assertEqual(ti.state, State.SUCCESS)
 
-                table_id = bq_table_id(
+                country_table_id = bq_table_id(
                     env.cloud_workspace.project_id,
-                    partner.bq_dataset_id,
-                    partner.bq_table_name,
+                    country_partner.bq_dataset_id,
+                    country_partner.bq_table_name,
                 )
-                self.assert_table_integrity(table_id, 6)
-                expected_output_file = os.path.join(test_fixtures_folder("muse_telescope"), "e2e_output.json")
-                expected_output = load_and_parse_json(expected_output_file, date_fields=["release_date"])
-                self.assert_table_content(table_id, expected_content=expected_output, primary_key="isbn")
+                self.assert_table_integrity(country_table_id, 6)
+                expected_country_output_file = os.path.join(
+                    test_fixtures_folder("muse_telescope"), "e2e_country_output.json"
+                )
+                expected_country_output = load_and_parse_json(
+                    expected_country_output_file, date_fields=["release_date"]
+                )
+                self.assert_table_content(
+                    country_table_id, expected_content=expected_country_output, primary_key="isbn"
+                )
+
+                # Test bq_load_institution task
+                ti = env.run_task("process_release.bq_load_institution", map_index=0)
+                self.assertEqual(ti.state, State.SUCCESS)
+
+                institution_table_id = bq_table_id(
+                    env.cloud_workspace.project_id,
+                    institution_partner.bq_dataset_id,
+                    institution_partner.bq_table_name,
+                )
+                self.assert_table_integrity(institution_table_id, 6)
+                expected_institution_output_file = os.path.join(
+                    test_fixtures_folder("muse_telescope"), "e2e_institution_output.json"
+                )
+                expected_institution_output = load_and_parse_json(
+                    expected_institution_output_file, date_fields=["release_date"]
+                )
+                self.assert_table_content(
+                    institution_table_id, expected_content=expected_institution_output, primary_key="isbn"
+                )
 
                 # Test add_new_dataset_releases task
                 api = DatasetAPI(bq_project_id=self.project_id, bq_dataset_id=api_bq_dataset_id)
-                self.assertEqual(len(api.get_dataset_releases(dag_id=dag_id, entity_id="muse")), 0)
+                self.assertEqual(len(api.get_dataset_releases(dag_id=dag_id, entity_id="muse_country")), 0)
+                self.assertEqual(len(api.get_dataset_releases(dag_id=dag_id, entity_id="muse_institution")), 0)
 
                 now = pendulum.now("UTC")
                 with patch("oaebu_workflows.muse_telescope.muse_telescope.pendulum.now") as mock_now:
@@ -217,8 +253,10 @@ class TestMuseTelescope(SandboxTestCase):
                     ti = env.run_task("process_release.add_new_dataset_releases", map_index=0)
                 self.assertEqual(ti.state, State.SUCCESS)
 
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="muse")
-                self.assertEqual(len(dataset_releases), 1)
+                dataset_releases_country = api.get_dataset_releases(dag_id=dag_id, entity_id="muse_country")
+                self.assertEqual(len(dataset_releases_country), 1)
+                dataset_releases_institution = api.get_dataset_releases(dag_id=dag_id, entity_id="muse_institution")
+                self.assertEqual(len(dataset_releases_institution), 1)
 
                 # Test add_label task
                 ti = env.run_task("process_release.add_label", map_index=0)
@@ -284,58 +322,90 @@ class TestMuseRowTransform(unittest.TestCase):
             "month": "2",
             "isbns": "1234567890123,9876543210987,1234567890123",  # includes a duplicate
             "title": "Sample Book",
+            "country": "US",
+            "country_id": "US",
+            "institution": "My Uni",
+            "institution_ids": "123",
         }
 
     def test_date_partition_field_added(self):
         row = self.base_row.copy()
-        result = muse_row_transform(row)
-        self.assertTrue(all("release_date" in r for r in result))
+        country_result, institution_result = muse_row_transform(row)
+        self.assertTrue(all("release_date" in r for r in country_result))
+        self.assertTrue(all("release_date" in r for r in institution_result))
         # Feb 2024 last day should be 2024-02-29
-        self.assertEqual(result[0]["release_date"], str(pendulum.date(2024, 2, 29)))
+        self.assertEqual(country_result[0]["release_date"], str(pendulum.date(2024, 2, 29)))
+        self.assertEqual(institution_result[0]["release_date"], str(pendulum.date(2024, 2, 29)))
 
     def test_valid_isbn_filtering(self):
         row = self.base_row.copy()
         row["isbns"] = "1234567890123,shortisbn,9876543210987"
-        result = muse_row_transform(row)
-        isbns = [r["isbn"] for r in result]
-        self.assertIn("1234567890123", isbns)
-        self.assertIn("9876543210987", isbns)
-        self.assertNotIn("shortisbn", isbns)  # invalid
+        country_result, institution_result = muse_row_transform(row)
+        country_isbns = [r["isbn"] for r in country_result]
+        institution_isbns = [r["isbn"] for r in institution_result]
+        self.assertIn("1234567890123", country_isbns)
+        self.assertIn("9876543210987", country_isbns)
+        self.assertNotIn("shortisbn", country_isbns)
+        self.assertIn("1234567890123", institution_isbns)
+        self.assertIn("9876543210987", institution_isbns)
+        self.assertNotIn("shortisbn", institution_isbns)
 
     def test_duplicates_are_removed(self):
         row = self.base_row.copy()
         row["isbns"] = "1234567890123,1234567890123,1234567890123"
-        result = muse_row_transform(row)
-        isbns = [r["isbn"] for r in result]
-        self.assertEqual(len(isbns), 1)  # should deduplicate
+        country_result, institution_result = muse_row_transform(row)
+        self.assertEqual(len(country_result), 1)
+        self.assertEqual(len(institution_result), 1)
 
     def test_multiple_valid_isbns_return_multiple_rows(self):
         row = self.base_row.copy()
         row["isbns"] = "1234567890123,9876543210987"
-        result = muse_row_transform(row)
-        self.assertEqual(len(result), 2)
-        isbns = {r["isbn"] for r in result}
-        self.assertEqual(isbns, {"1234567890123", "9876543210987"})
+        country_result, institution_result = muse_row_transform(row)
+        self.assertEqual(len(country_result), 2)
+        self.assertEqual(len(institution_result), 2)
+        country_isbns = {r["isbn"] for r in country_result}
+        institution_isbns = {r["isbn"] for r in institution_result}
+        self.assertEqual(country_isbns, {"1234567890123", "9876543210987"})
+        self.assertEqual(institution_isbns, {"1234567890123", "9876543210987"})
 
     def test_no_valid_isbns_returns_empty_list_and_warns(self):
         row = self.base_row.copy()
         row["isbns"] = "notvalid,alsoshort"
-        result = muse_row_transform(row)
-        self.assertEqual(result, [])
+        country_result, institution_result = muse_row_transform(row)
+        self.assertEqual(country_result, [])
+        self.assertEqual(institution_result, [])
+
+    def test_fields_are_separated(self):
+        row = self.base_row.copy()
+        row["country"] = "US"
+        row["country_id"] = "US"
+        row["institution"] = "My Uni"
+        row["institution_ids"] = "123"
+        country_result, institution_result = muse_row_transform(row)
+        self.assertIn("country", country_result[0])
+        self.assertIn("country_id", country_result[0])
+        self.assertNotIn("institution", country_result[0])
+        self.assertNotIn("institution_ids", country_result[0])
+        self.assertIn("institution", institution_result[0])
+        self.assertIn("institution_ids", institution_result[0])
+        self.assertNotIn("country", institution_result[0])
+        self.assertNotIn("country_id", institution_result[0])
 
 
 class TestMuseDataTransform(unittest.TestCase):
 
     @patch("oaebu_workflows.muse_telescope.muse_telescope.muse_row_transform")
     def test_muse_data_transform(self, mock_muse_row_transform):
-        mock_muse_row_transform.side_effect = lambda row: [row]  # Return the row in a list
+        mock_muse_row_transform.return_value = ([{"country": 1}], [{"institution": 1}])
         data = [{"id": 1}, {"id": 2}]
 
-        result = muse_data_transform(data)
+        country_result, institution_result = muse_data_transform(data)
 
-        self.assertEqual(len(result), 2)
-        self.assertEqual(result, data)
-        self.assertEqual(mock_muse_row_transform.call_count, 2)  # Should have been once for each list item
+        self.assertEqual(len(country_result), 2)
+        self.assertEqual(len(institution_result), 2)
+        self.assertEqual(country_result, [{"country": 1}, {"country": 1}])
+        self.assertEqual(institution_result, [{"institution": 1}, {"institution": 1}])
+        self.assertEqual(mock_muse_row_transform.call_count, 2)
 
 
 class TestReadGzippedReport(unittest.TestCase):
