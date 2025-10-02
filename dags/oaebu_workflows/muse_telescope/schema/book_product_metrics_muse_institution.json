@@ -8,9 +8,15 @@
     },
     {
       "mode": "NULLABLE",
-      "name": "usage",
+      "name": "book_usage",
       "type": "INTEGER",
-      "description": "Total number of request made from that specific institution"
+      "description": "Total usage of this specific institution for full books"
+    },
+    {
+      "mode": "NULLABLE",
+      "name": "chapter_usage",
+      "type": "INTEGER",
+      "description": "Total usage of this specific institution for chapters"
     }
   ],
   "mode": "REPEATED",

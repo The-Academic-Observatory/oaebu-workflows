@@ -5,7 +5,7 @@ muse_institution_metrics as (
         isbn as ISBN13,
         release_date,
         group_items_muse_institution(
-            ARRAY_AGG(STRUCT(institution, usage))
+            ARRAY_AGG(STRUCT(institution, usage, type))
         ) as metrics,
     FROM
         `{{ muse_institution_table_id }}`

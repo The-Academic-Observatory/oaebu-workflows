@@ -447,41 +447,50 @@ def muse_row_transform(row: dict, date_partition_field: str = "release_date") ->
     :param row: The muse data row to transform
     :param date_partition_field: The added field that will hold the year/month to partition on
     :return: The transformed row(s) as lists of dicts. Returns country, institution"""
-    # Add the release date - the last day of the month
-    row[date_partition_field] = str(pendulum.Date(int(row["year"]), int(row["month"]), 1).end_of("month"))
+    try:
+        # Add the release date - the last day of the month
+        row[date_partition_field] = str(pendulum.Date(int(row["year"]), int(row["month"]), 1).end_of("month"))
 
-    # Process ISBNS. In some cases we are given many isbns. Not all are ISBN13s.
-    valid_isbns = []
-    for i in row["isbns"].split(","):
-        if len(i) == 13:
-            valid_isbns.append(i)
-    valid_isbns = list(set(valid_isbns))  # Drop duplicate isbns
-    del row["isbns"]
+        # Process ISBNS. In some cases we are given many isbns. Not all are ISBN13s.
+        if row.get("isbns"):
+            isbn_keyname = "isbns"
+        else:
+            isbn_keyname = "isbn"
 
-    if len(valid_isbns) == 0:
-        logging.warning(f"Row has no valid ISBNs, will return empty rows: {row}")
-        return ([], [])
+        # Validate the isbn(s)
+        valid_isbns = []
+        for i in row[isbn_keyname].split(","):
+            if len(i) == 13:
+                valid_isbns.append(i)
+        valid_isbns = list(set(valid_isbns))  # Drop duplicate isbns
+        del row[isbn_keyname]
 
-    # Dump the transformed row to a list. One for each unique ISBN
-    country_rows = []
-    institution_rows = []
-    for i in valid_isbns:
-        # Country - exclude the institution data
-        country_row = {"isbn": i, **row}
-        del country_row["institution"]
-        del country_row["institution_ids"]
-        country_rows.append(country_row)
+        if len(valid_isbns) == 0:
+            logging.warning(f"Row has no valid ISBNs, will return empty rows: {row}")
+            return ([], [])
 
-        # institution - exclude the institution data
-        institution_row = {"isbn": i, **row}
-        del institution_row["country"]
-        del institution_row["country_id"]
-        institution_rows.append(institution_row)
+        # Dump the transformed row to a list. One for each unique ISBN
+        country_rows = []
+        institution_rows = []
+        for i in valid_isbns:
+            # Country - exclude the institution data
+            country_row = {"isbn": i, **row}
+            del country_row["institution"]
+            del country_row["institution_ids"]
+            country_rows.append(country_row)
+
+            # institution - exclude the institution data
+            institution_row = {"isbn": i, **row}
+            del institution_row["country"]
+            del institution_row["country_id"]
+            institution_rows.append(institution_row)
+    except Exception as e:
+        print(f"Issue tranforming row: {row}")
+        raise (e)
 
     return country_rows, institution_rows
 
 
-# TODO: put this in some kind of common library. It's used in JSTOR as well
 def download_attachment(service: Resource, message_id: str, attachment_id: str, download_path: str) -> None:
     """Download report from url to a file.
 

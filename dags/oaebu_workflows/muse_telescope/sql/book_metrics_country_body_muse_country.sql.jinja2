@@ -4,7 +4,8 @@ muse_month_country as (
         month,
         country as country_muse_name,
         -- for muse, country_name is the full name not the alpha2 code. This is accounted for in the join to month_country.country_muse_name instead of month_country.alpha2
-        usage
+        book_usage,
+        chapter_usage,
     FROM
         months,
         UNNEST(muse_country)

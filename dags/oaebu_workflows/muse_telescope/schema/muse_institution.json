@@ -30,7 +30,13 @@
     "type": "STRING"
   },
   {
-    "description": "The item usage per month, per institution ",
+    "description": "The type of item - full book or chapter",
+    "mode": "NULLABLE",
+    "name": "type",
+    "type": "STRING"
+  },
+  {
+    "description": "The item usage per month, per institution, per type",
     "mode": "NULLABLE",
     "name": "usage",
     "type": "INTEGER"

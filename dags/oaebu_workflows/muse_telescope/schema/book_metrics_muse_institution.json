@@ -2,9 +2,15 @@
   "fields": [
     {
       "mode": "NULLABLE",
-      "name": "usage",
+      "name": "book_usage",
       "type": "INTEGER",
-      "description": "Total item usage"
+      "description": "Total full book usage"
+    },
+    {
+      "mode": "NULLABLE",
+      "name": "chapter_usage",
+      "type": "INTEGER",
+      "description": "Total chapter usage"
     }
   ],
   "mode": "NULLABLE",

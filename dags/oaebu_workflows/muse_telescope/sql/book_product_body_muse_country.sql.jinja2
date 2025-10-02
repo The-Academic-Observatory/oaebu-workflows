@@ -5,7 +5,7 @@ muse_country_metrics as (
         isbn as ISBN13,
         release_date,
         group_items_muse_country(
-            ARRAY_AGG(STRUCT(country, usage))
+            ARRAY_AGG(STRUCT(country, usage, type))
         ) as metrics,
     FROM
         `{{ muse_country_table_id }}`
