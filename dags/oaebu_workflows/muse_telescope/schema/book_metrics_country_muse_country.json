@@ -1,0 +1,20 @@
+{
+  "fields": [
+    {
+      "mode": "NULLABLE",
+      "name": "book_usage",
+      "type": "INTEGER",
+      "description": "Total country book usage"
+    },
+    {
+      "mode": "NULLABLE",
+      "name": "chapter_usage",
+      "type": "INTEGER",
+      "description": "Total country chapter usage"
+    }
+  ],
+  "mode": "NULLABLE",
+  "name": "muse_country",
+  "type": "RECORD",
+  "description": "Country metrics from MUSE"
+}

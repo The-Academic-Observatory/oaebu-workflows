@@ -1,0 +1,27 @@
+# The purpose of this block of SQL is to organise the metrics from MUSE for easier consumption of downstream queries.
+# Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'muse_table_id'.
+muse_country_metrics as (
+    SELECT
+        isbn as ISBN13,
+        release_date,
+        group_items_muse_country(
+            ARRAY_AGG(STRUCT(country, usage, type))
+        ) as metrics,
+    FROM
+        `{{ muse_country_table_id }}`
+    GROUP BY
+        ISBN13,
+        release_date
+),
+
+# The purpose of this block of SQL is to organise the Metadata from MUSE country for easier consumption of downstream queries.
+# Defined in the create_oaebu_book_product_table method, in onix_workflow.py, is the value of 'muse_table_id'.
+muse_country_metadata as (
+    SELECT
+        isbn as ISBN13,
+        MAX(title) as Book_Title,
+    FROM
+        `{{ muse_country_table_id }}`
+    GROUP BY
+        ISBN13
+)

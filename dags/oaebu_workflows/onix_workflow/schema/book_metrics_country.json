@@ -170,5 +170,11 @@
     "name": "country_wikipedia_name",
     "type": "STRING",
     "description": "The Country Wikipedia Name"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "country_muse_name",
+    "type": "STRING",
+    "description": "The Country Muse Name"
   }
 ]

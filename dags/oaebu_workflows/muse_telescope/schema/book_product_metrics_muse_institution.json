@@ -1,0 +1,26 @@
+{
+  "fields": [
+    {
+      "mode": "NULLABLE",
+      "name": "institution",
+      "type": "STRING",
+      "description": "Institution name"
+    },
+    {
+      "mode": "NULLABLE",
+      "name": "book_usage",
+      "type": "INTEGER",
+      "description": "Total usage of this specific institution for full books"
+    },
+    {
+      "mode": "NULLABLE",
+      "name": "chapter_usage",
+      "type": "INTEGER",
+      "description": "Total usage of this specific institution for chapters"
+    }
+  ],
+  "mode": "REPEATED",
+  "name": "muse_institution",
+  "type": "RECORD",
+  "description": "Institution metrics derived from Muse"
+}
