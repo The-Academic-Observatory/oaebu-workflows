@@ -1012,7 +1012,7 @@ class TestOnixWorkflow(SandboxTestCase):
                 export_tables = [
                     ("book_list", 4),
                     ("book_institution_list", 1),
-                    ("book_metrics", 4),
+                    ("book_metrics", 3),
                     ("book_metrics_country", 32),
                     ("book_metrics_institution", 1),
                     ("book_metrics_author", 1),

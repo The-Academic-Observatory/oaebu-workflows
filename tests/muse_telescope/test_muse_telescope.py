@@ -152,8 +152,9 @@ class TestMuseTelescope(SandboxTestCase):
             logical_date = pendulum.datetime(year=2024, month=3, day=1)
             country_partner = partner_from_str("muse_country")
             institution_partner = partner_from_str("muse_institution")
-            country_partner.bq_dataset_id = env.add_dataset()
-            institution_partner.bq_dataset_id = env.add_dataset()
+            output_dataset = env.add_dataset()
+            country_partner.bq_dataset_id = output_dataset
+            institution_partner.bq_dataset_id = output_dataset
             api_bq_dataset_id = env.add_dataset()
             dag_id = "muse_test_telescope"
             dag = create_dag(
