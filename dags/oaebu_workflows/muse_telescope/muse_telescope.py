@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Curtin University
+# Copyright 2025 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,10 +18,8 @@ import logging
 import os
 import shutil
 from typing import List, Union, Tuple
-from copy import deepcopy
 import gzip
 import csv
-import base64
 from tempfile import NamedTemporaryFile
 
 import chardet
@@ -32,8 +30,6 @@ from airflow.exceptions import AirflowException, AirflowSkipException
 from google.cloud.bigquery import SourceFormat, WriteDisposition, Client
 from google.cloud.bigquery.table import TimePartitioningType
 from google.cloud.bigquery import TimePartitioningType, SourceFormat, WriteDisposition, Client
-from google.oauth2.credentials import Credentials
-from googleapiclient.discovery import Resource, build
 
 from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
@@ -45,6 +41,14 @@ from observatory_platform.google.gcs import (
     gcs_download_blob,
 )
 from observatory_platform.google.bigquery import bq_load_table, bq_create_dataset, bq_table_id
+from observatory_platform.google.gmail import (
+    gmail_create_service,
+    gmail_download_attachment,
+    gmail_get_messages,
+    gmail_add_label_to_message,
+    gmail_get_message_attachment_ids,
+    gmail_get_label_id,
+)
 from observatory_platform.airflow.tasks import check_dependencies
 from observatory_platform.airflow.workflow import CloudWorkspace, cleanup
 from observatory_platform.airflow.release import PartitionRelease, set_task_state
@@ -183,7 +187,7 @@ def create_dag(
 
         For a data partner, will search emails for messages from the designated email sender only messages with the
         expected subject line and those that do not already have the 'processed' label will be considered. For each
-        valid email found will download the attachement and create a new release object.
+        valid email found will download the attachment and create a new release object.
         Each release is processed concurrently, transformed, uploaded to GCloud storage, then loaded into Bigquery as
         part of a partitioned table. There are two tables for muse - country and institution. Once loading is complete,
         the 'processed' label is added to the original email/message so that it is ignored in future runs.
@@ -210,21 +214,22 @@ def create_dag(
                 "labelIds": ["INBOX"],
                 "maxResults": 500,
             }
-            service = create_gmail_service()
-            messages = get_messages(service, list_params)
+            conn = BaseHook.get_connection(gmail_api_conn_id)
+            service = gmail_create_service(conn.extra_dejson)
+            messages = gmail_get_messages(service, list_params)
             logging.info(f"Found {len(messages)} messages to process")
             if len(messages) == 0:
                 raise AirflowSkipException("No messages to process. Skipping downstream tasks")
 
             releases = []
             for msg in messages:
-                attachment_ids = get_message_attachement_ids(service, msg["id"])
+                attachment_ids = gmail_get_message_attachment_ids(service, msg["id"])
                 if len(attachment_ids) != 1:
                     raise AirflowException(f"Expected 1 attachment in message, instead got {len(attachment_ids)}")
                 attachment_id = attachment_ids[0]
 
                 tmp_download_path = NamedTemporaryFile(delete=False).name
-                download_attachment(service, msg["id"], attachment_id, tmp_download_path)
+                gmail_download_attachment(service, msg["id"], attachment_id, tmp_download_path)
                 release_date = get_release_date_from_report(tmp_download_path)
                 if not release_date:
                     raise AirflowException(f"Could not determine release date for report. Cannot proceed")
@@ -383,9 +388,10 @@ def create_dag(
             def add_label(release: dict, **context) -> None:
                 """Adds the processed label name to the message (email) so that it is not processed again"""
                 release = MuseRelease.from_dict(release)
-                service = create_gmail_service()
-                label_id = get_label_id(service=service, label_name=processed_label)
-                success = add_label_to_message(service=service, message_id=release.message_id, label_id=label_id)
+                conn = BaseHook.get_connection(gmail_api_conn_id)
+                service = gmail_create_service(conn.extra_dejson)
+                label_id = gmail_get_label_id(service=service, label_name=processed_label)
+                success = gmail_add_label_to_message(service=service, message_id=release.message_id, label_id=label_id)
                 set_task_state(success, context["ti"].task_id, release=release)
 
             @task
@@ -411,18 +417,6 @@ def create_dag(
         (task_check_dependencies >> xcom_releases >> process_release_task_group)
 
     return muse()
-
-
-def create_gmail_service() -> Resource:
-    """Build the gmail service.
-
-    :return: Gmail service instance
-    """
-    gmail_api_conn = BaseHook.get_connection("gmail_api")
-    scopes = ["https://www.googleapis.com/auth/gmail.readonly", "https://www.googleapis.com/auth/gmail.modify"]
-    creds = Credentials.from_authorized_user_info(gmail_api_conn.extra_dejson, scopes=scopes)
-    service = build("gmail", "v1", credentials=creds, cache_discovery=False)
-    return service
 
 
 def muse_data_transform(data: List[dict]) -> Tuple[List[dict], List[dict]]:
@@ -491,21 +485,6 @@ def muse_row_transform(row: dict, date_partition_field: str = "release_date") ->
     return country_rows, institution_rows
 
 
-def download_attachment(service: Resource, message_id: str, attachment_id: str, download_path: str) -> None:
-    """Download report from url to a file.
-
-    :param download_path: Path to download data to
-    """
-    logging.info(f"Downloading report: {message_id} to: {download_path}")
-    attachment = (
-        service.users().messages().attachments().get(userId="me", messageId=message_id, id=attachment_id).execute()
-    )
-    data = attachment["data"]
-    file_data = base64.urlsafe_b64decode(data)
-    with open(download_path, "wb") as f:
-        f.write(file_data)
-
-
 def read_gzipped_report(gz_path: str) -> List[dict]:
     """Reads a gzipped csv file into a list of dictionaries. Automatically determines the encoding
 
@@ -547,93 +526,3 @@ def get_release_date_from_report(gz_path: str) -> Union[pendulum.DateTime, None]
             )
 
     return pendulum.datetime(year=int(year), month=int(month), day=1).end_of("month").start_of("day")
-
-
-# TODO: put this in some kind of common library. It's used in JSTOR as well
-def get_label_id(service: Resource, label_name: str) -> str:
-    """Get the id of a label based on the label name.
-
-    :param label_name: The name of the label
-    :return: The label id
-    """
-    existing_labels = service.users().labels().list(userId="me").execute()["labels"]
-    label_id = [label["id"] for label in existing_labels if label["name"] == label_name]
-    if label_id:
-        label_id = label_id[0]
-    else:
-        # create label
-        label_body = {
-            "name": label_name,
-            "messageListVisibility": "show",
-            "labelListVisibility": "labelShow",
-            "type": "user",
-        }
-        result = service.users().labels().create(userId="me", body=label_body).execute()
-        label_id = result["id"]
-    return label_id
-
-
-# TODO: put this in some kind of common library. It's used in JSTOR as well
-def get_messages(service: Resource, list_params: dict) -> List[dict]:
-    """Get messages from the Gmail API.
-
-    :param list_params: The parameters that will be passed to the Gmail API.
-    """
-    first_query = True
-    next_page_token = None
-    messages = []
-    while next_page_token or first_query:
-        # Set the next page token if it isn't the first query
-        if not first_query:
-            list_params["pageToken"] = next_page_token
-        first_query = False
-
-        # Get the results
-        results = service.users().messages().list(**list_params).execute()
-        next_page_token = results.get("nextPageToken")
-        if results.get("messages"):
-            messages += results["messages"]
-    return messages
-
-
-# TODO: put this in some kind of common library. It's used in JSTOR as well
-def get_message_attachement_ids(service: Resource, message_id: str) -> List[str]:
-    """Get attachement IDs from a message
-
-    :param service: The Gmail service client
-    :param message_id: The message ID to get the attachments of
-    """
-
-    msg_detail = service.users().messages().get(userId="me", id=message_id).execute()
-    parts = msg_detail.get("payload", {}).get("parts", [])
-
-    ids = []
-    for part in parts:
-        filename = part.get("filename")
-        body = part.get("body", {})
-        if filename:  # Only parts with a filename are attachments
-            ids.append(body["attachmentId"])
-
-    return ids
-
-
-def add_label_to_message(
-    service: Resource,
-    message_id: str,
-    label_id: str,
-) -> bool:
-    """Adds a label name to a gmail message.
-
-    :param service: The Gmail service resource
-    :param message_id: The ID of the message to add the label to
-    :param label_id: The id of the label to add the message
-    :return: True if successful, False otherwise
-    """
-    body = {"addLabelIds": [label_id]}
-    response = service.users().messages().modify(userId="me", id=message_id, body=body).execute()
-    if response and label_id in response.get("labelIds", []):
-        logging.info(f"Added label_id '{label_id}' to GMAIL message, message_id: {message_id}")
-        return True
-
-    logging.warning(f"Could not add label_id '{label_id}' to GMAIL message, message_id: {message_id}")
-    return False
