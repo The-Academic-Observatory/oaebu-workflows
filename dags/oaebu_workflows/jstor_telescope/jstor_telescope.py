@@ -34,8 +34,6 @@ from airflow.hooks.base import BaseHook
 from airflow.decorators import dag, task, task_group
 from bs4 import BeautifulSoup, SoupStrainer
 from google.cloud.bigquery import TimePartitioningType, SourceFormat, WriteDisposition, Client
-from google.oauth2.credentials import Credentials
-from googleapiclient.discovery import Resource, build
 from tenacity import retry, stop_after_attempt, wait_exponential, wait_fixed, RetryCallState
 
 from oaebu_workflows.config import oaebu_user_agent_header
@@ -43,8 +41,15 @@ from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
 from observatory_platform.files import save_jsonl_gz
 from observatory_platform.url_utils import retry_get_url
-from observatory_platform.google.gcs import gcs_upload_files, gcs_blob_uri, gcs_blob_name_from_path, gcs_download_blob
 from observatory_platform.google.bigquery import bq_load_table, bq_table_id, bq_create_dataset
+from observatory_platform.google.gcs import gcs_upload_files, gcs_blob_uri, gcs_blob_name_from_path, gcs_download_blob
+from observatory_platform.google.gmail import (
+    gmail_add_label_to_message,
+    gmail_get_messages,
+    gmail_download_attachment,
+    gmail_create_service,
+    gmail_get_label_id,
+)
 from observatory_platform.airflow.tasks import check_dependencies
 from observatory_platform.files import add_partition_date, convert
 from observatory_platform.airflow.release import PartitionRelease, set_task_state
@@ -217,7 +222,7 @@ def create_dag(
             """
 
             # Get the reports from GMAIL API
-            api = make_jstor_api(entity_type, entity_id)
+            api = make_jstor_api(entity_type, entity_id, gmail_api_conn_id)
             available_reports = api.list_reports()
             if not len(available_reports) > 0:
                 raise AirflowSkipException("No reports available. Skipping downstream DAG taks.")
@@ -233,7 +238,7 @@ def create_dag(
 
             # Download reports and determine dates
             available_releases = {}
-            api = make_jstor_api(entity_type, entity_id)
+            api = make_jstor_api(entity_type, entity_id, gmail_api_conn_id)
             for report in available_reports:
                 # Download report to temporary file
                 tmp_download_path = NamedTemporaryFile().name
@@ -295,7 +300,7 @@ def create_dag(
                 """Task to transform the Jstor releases for a given month."""
 
                 release = JstorRelease.from_dict(release)
-                api = make_jstor_api(entity_type, entity_id)
+                api = make_jstor_api(entity_type, entity_id, gmail_api_conn_id)
                 # Download files from GCS
                 success = gcs_download_blob(
                     bucket_name=cloud_workspace.download_bucket,
@@ -403,7 +408,7 @@ def create_dag(
                 Assign a label to the gmail messages that have been processed."""
 
                 release = JstorRelease.from_dict(release)
-                api = make_jstor_api(entity_type, entity_id)
+                api = make_jstor_api(entity_type, entity_id, gmail_api_conn_id)
                 cleanup(dag_id=dag_id, workflow_folder=release.workflow_folder)
                 success = api.add_labels(release.reports)
                 set_task_state(success, context["ti"].task_id, release=release)
@@ -421,29 +426,17 @@ def create_dag(
     return jstor()
 
 
-def create_gmail_service() -> Resource:
-    """Build the gmail service.
-
-    :return: Gmail service instance
-    """
-    gmail_api_conn = BaseHook.get_connection("gmail_api")
-    scopes = ["https://www.googleapis.com/auth/gmail.readonly", "https://www.googleapis.com/auth/gmail.modify"]
-    creds = Credentials.from_authorized_user_info(gmail_api_conn.extra_dejson, scopes=scopes)
-
-    service = build("gmail", "v1", credentials=creds, cache_discovery=False)
-
-    return service
-
-
-def make_jstor_api(entity_type: Literal["publisher", "collection"], entity_id: str):
+def make_jstor_api(entity_type: Literal["publisher", "collection"], entity_id: str, conn_id: str = "gmail_api"):
     """Create the Jstor API Instance.
 
     :param entity_type: The entity type. Should be either 'publisher' or 'collection'.
     :param entity_id: The entity id.
+    :param conn_id: The Gmail connection ID.
     :return: The Jstor API instance
     """
 
-    service = create_gmail_service()
+    conn = BaseHook.get_connection(conn_id)
+    service = gmail_create_service(conn.extra_dejson)
     if entity_type == "publisher":
         jstor_api = JstorPublishersAPI(service, entity_id)
     elif entity_type == "collection":
@@ -457,48 +450,6 @@ class JstorAPI(ABC):
     def __init__(self, service: Any, entity_id: str):
         self.service = service
         self.entity_id = entity_id
-
-    def get_messages(self, list_params: dict) -> List[dict]:
-        """Get messages from the Gmail API.
-
-        :param list_params: The parameters that will be passed to the Gmail API.
-        """
-        first_query = True
-        next_page_token = None
-        messages = []
-        while next_page_token or first_query:
-            # Set the next page token if it isn't the first query
-            if not first_query:
-                list_params["pageToken"] = next_page_token
-            first_query = False
-
-            # Get the results
-            results = self.service.users().messages().list(**list_params).execute()
-            next_page_token = results.get("nextPageToken")
-            messages += results["messages"]
-        return messages
-
-    def get_label_id(self, label_name: str) -> str:
-        """Get the id of a label based on the label name.
-
-        :param label_name: The name of the label
-        :return: The label id
-        """
-        existing_labels = self.service.users().labels().list(userId="me").execute()["labels"]
-        label_id = [label["id"] for label in existing_labels if label["name"] == label_name]
-        if label_id:
-            label_id = label_id[0]
-        else:
-            # create label
-            label_body = {
-                "name": label_name,
-                "messageListVisibility": "show",
-                "labelListVisibility": "labelShow",
-                "type": "user",
-            }
-            result = self.service.users().labels().create(userId="me", body=label_body).execute()
-            label_id = result["id"]
-        return label_id
 
     @abstractmethod
     def list_reports(self) -> List[dict]:
@@ -549,7 +500,7 @@ class JstorPublishersAPI(JstorAPI):
             "maxResults": 500,
         }
         available_reports = []
-        for message_info in self.get_messages(list_params):
+        for message_info in gmail_get_messages(self.service, list_params):
             message_id = message_info["id"]
             message = self.service.users().messages().get(userId="me", id=message_id).execute()
 
@@ -759,16 +710,11 @@ class JstorPublishersAPI(JstorAPI):
         :param reports: List of report info
         :return: True if successful, False otherwise
         """
-        label_id = self.get_label_id(JSTOR_PROCESSED_LABEL_NAME)
-        body = {"addLabelIds": [label_id]}
+        label_id = gmail_get_label_id(self.service, JSTOR_PROCESSED_LABEL_NAME)
+        successes = []
         for message in [report["id"] for report in reports]:
-            response = self.service.users().messages().modify(userId="me", id=message, body=body).execute()
-            try:
-                message_id = response["id"]
-                logging.info(f"Added label '{JSTOR_PROCESSED_LABEL_NAME}' to GMAIL message, message_id: {message_id}")
-            except KeyError:
-                return False
-        return True
+            successes.append(gmail_add_label_to_message(self.service, message, label_id))
+        return all(successes)
 
 
 class JstorCollectionsAPI(JstorAPI):
@@ -791,7 +737,7 @@ class JstorCollectionsAPI(JstorAPI):
         available_reports = []
         country_regex = rf"^{self.entity_id}_(Open_Country|Country_Open)_Usage\.csv$"
         institution_regex = rf"^{self.entity_id}_(Open_Institution|Institution_Open)_Usage\.csv$"
-        for message_info in self.get_messages(list_params):
+        for message_info in gmail_get_messages(self.service, list_params):
             message_id = message_info["id"]
             message = self.service.users().messages().get(userId="me", id=message_id).execute()
 
@@ -824,19 +770,9 @@ class JstorCollectionsAPI(JstorAPI):
         attachment_id = report.get("attachment_id")
         if not all((message_id, attachment_id)):
             raise KeyError(f"'id' and/or 'attachment_id' not found in report: {report}")
-
-        logging.info(f"Downloading report: {message_id} to: {download_path}")
-        attachment = (
-            self.service.users()
-            .messages()
-            .attachments()
-            .get(userId="me", messageId=message_id, id=attachment_id)
-            .execute()
+        gmail_download_attachment(
+            service=self.service, message_id=message_id, attachment_id=attachment_id, download_path=download_path
         )
-        data = attachment["data"]
-        file_data = base64.urlsafe_b64decode(data)
-        with open(download_path, "wb") as f:
-            f.write(file_data)
 
     def get_release_date(self, report_path: str) -> Tuple[pendulum.DateTime, pendulum.DateTime]:
         """Get the release date from the report. This should be under the "Month, Year of monthdt" column
@@ -909,13 +845,6 @@ class JstorCollectionsAPI(JstorAPI):
         :param reports: List of report info
         :return: True if successful, False otherwise
         """
-        label_id = self.get_label_id(JSTOR_PROCESSED_LABEL_NAME)
-        body = {"addLabelIds": [label_id]}
+        label_id = gmail_get_label_id(self.service, JSTOR_PROCESSED_LABEL_NAME)
         message = reports[0]["id"]  # Only one message for collections
-        response = self.service.users().messages().modify(userId="me", id=message, body=body).execute()
-        try:
-            message_id = response["id"]
-            logging.info(f"Added label '{JSTOR_PROCESSED_LABEL_NAME}' to GMAIL message, message_id: {message_id}")
-        except KeyError:
-            return False
-        return True
+        return gmail_add_label_to_message(self.service, message, label_id)
