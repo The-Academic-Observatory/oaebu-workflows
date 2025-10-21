@@ -1,4 +1,4 @@
-# Copyright 2020-2024 Curtin University
+# Copyright 2025 Curtin University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ import json
 import os
 import gzip
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 from tempfile import NamedTemporaryFile
 
 import pendulum
@@ -31,12 +31,7 @@ from googleapiclient.http import HttpMockSequence
 from oaebu_workflows.config import test_fixtures_folder, module_file_path
 from oaebu_workflows.oaebu_partners import partner_from_str
 from oaebu_workflows.muse_telescope.muse_telescope import (
-    add_label_to_message,
     create_dag,
-    create_gmail_service,
-    download_attachment,
-    get_message_attachement_ids,
-    get_messages,
     get_release_date_from_report,
     muse_data_transform,
     muse_row_transform,
@@ -48,7 +43,6 @@ from observatory_platform.dataset_api import DatasetAPI
 from observatory_platform.google.bigquery import bq_table_id
 from observatory_platform.sandbox.sandbox_environment import SandboxEnvironment
 from observatory_platform.sandbox.test_utils import SandboxTestCase, load_and_parse_json
-from observatory_platform.files import load_jsonl
 
 
 def dummy_gmail_connection() -> Connection:
@@ -131,8 +125,8 @@ class TestMuseTelescope(SandboxTestCase):
             with gzip.open(self.report_file, "wb") as gzf:
                 gzf.write(f.read())
 
-    @patch("oaebu_workflows.muse_telescope.muse_telescope.build")
-    @patch("oaebu_workflows.muse_telescope.muse_telescope.Credentials")
+    @patch("observatory_platform.google.gmail.build")
+    @patch("observatory_platform.google.gmail.Credentials")
     def test_telescope(self, mock_account_credentials, mock_build):
         """Test the Muse telescope end to end."""
 
@@ -260,6 +254,9 @@ class TestMuseTelescope(SandboxTestCase):
                 self.assertEqual(len(dataset_releases_institution), 1)
 
                 # Test add_label task
+                # with patch("observatory_platform.google.gmail.Resource") as mock_service:
+                #     mock_service.users.return_value.messages.return_value.modify.return_value.execute.return_value = http
+
                 ti = env.run_task("process_release.add_label", map_index=0)
                 self.assertEqual(ti.state, State.SUCCESS)
 
@@ -453,77 +450,3 @@ class TestGetReleaseDateFromReport(unittest.TestCase):
 
         with self.assertRaises(RuntimeError):
             get_release_date_from_report("dummy_path")
-
-
-class TestGmailFunctions(unittest.TestCase):
-    def setUp(self):
-        self.mock_service = Mock()
-
-    def test_create_gmail_service(self):
-        with patch("oaebu_workflows.muse_telescope.muse_telescope.BaseHook") as mock_hook, patch(
-            "oaebu_workflows.muse_telescope.muse_telescope.Credentials"
-        ) as mock_creds, patch("oaebu_workflows.muse_telescope.muse_telescope.build") as mock_build:
-            mock_conn = Mock()
-            mock_conn.extra_dejson = {}
-            mock_hook.get_connection.return_value = mock_conn
-            mock_creds.from_authorized_user_info.return_value = "dummy_creds"
-            mock_build.return_value = self.mock_service
-
-            service = create_gmail_service()
-
-            self.assertEqual(service, self.mock_service)
-            mock_hook.get_connection.assert_called_once_with("gmail_api")
-            mock_creds.from_authorized_user_info.assert_called_once()
-            mock_build.assert_called_once_with("gmail", "v1", credentials="dummy_creds", cache_discovery=False)
-
-    def test_download_attachment(self):
-        self.mock_service.users.return_value.messages.return_value.attachments.return_value.get.return_value.execute.return_value = {
-            "data": base64.urlsafe_b64encode(b"test_data").decode("utf-8")
-        }
-        with patch("builtins.open", unittest.mock.mock_open()) as mock_file:
-            download_attachment(self.mock_service, "msg_id", "att_id", "dummy_path")
-
-            mock_file.assert_called_once_with("dummy_path", "wb")
-            mock_file().write.assert_called_once_with(b"test_data")
-
-    def test_get_messages(self):
-        self.mock_service.users.return_value.messages.return_value.list.return_value.execute.side_effect = [
-            {"messages": [{"id": 1}], "nextPageToken": "token"},
-            {"messages": [{"id": 2}]},
-        ]
-
-        messages = get_messages(self.mock_service, {})
-
-        self.assertEqual(messages, [{"id": 1}, {"id": 2}])
-
-    def test_get_message_attachement_ids(self):
-        self.mock_service.users.return_value.messages.return_value.get.return_value.execute.return_value = {
-            "payload": {
-                "parts": [
-                    {"filename": "file1.csv", "body": {"attachmentId": "att_id_1"}},
-                    {"filename": "", "body": {}},  # Not an attachment
-                    {"filename": "file2.csv", "body": {"attachmentId": "att_id_2"}},
-                ]
-            }
-        }
-
-        ids = get_message_attachement_ids(self.mock_service, "msg_id")
-
-        self.assertEqual(ids, ["att_id_1", "att_id_2"])
-
-    def test_add_label_success(self):
-        self.mock_service.users.return_value.messages.return_value.modify.return_value.execute.return_value = {
-            "id": "msg_id",
-            "labelIds": ["label_id"],
-        }
-
-        success = add_label_to_message(self.mock_service, "msg_id", "label_id")
-
-        self.assertTrue(success)
-
-    def test_add_label_failure(self):
-        self.mock_service.users.return_value.messages.return_value.modify.return_value.execute.return_value = {}
-
-        success = add_label_to_message(self.mock_service, "msg_id", "label_id")
-
-        self.assertFalse(success)

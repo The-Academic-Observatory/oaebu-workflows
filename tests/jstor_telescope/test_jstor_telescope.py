@@ -167,8 +167,8 @@ class TestJstorTelescopePublisher(SandboxTestCase):
             },
         }
 
-    @patch("oaebu_workflows.jstor_telescope.jstor_telescope.build")
-    @patch("oaebu_workflows.jstor_telescope.jstor_telescope.Credentials")
+    @patch("observatory_platform.google.gmail.build")
+    @patch("observatory_platform.google.gmail.Credentials")
     def test_telescope_publisher(self, mock_account_credentials, mock_build):
         """Test the Jstor telescope end to end."""
 
@@ -468,8 +468,8 @@ class TestJstorTelescopeCollection(SandboxTestCase):
             "table_rows": 6,
         }
 
-    @patch("oaebu_workflows.jstor_telescope.jstor_telescope.build")
-    @patch("oaebu_workflows.jstor_telescope.jstor_telescope.Credentials")
+    @patch("observatory_platform.google.gmail.build")
+    @patch("observatory_platform.google.gmail.Credentials")
     def test_telescope_collection(self, mock_account_credentials, mock_build):
         """Test the Jstor telescope end to end."""
 
@@ -700,8 +700,8 @@ class TestJstorTelescopeCollection(SandboxTestCase):
                 api.get_release_date(reports[1]["file"])
 
 
-@patch("oaebu_workflows.jstor_telescope.jstor_telescope.build")
-@patch("oaebu_workflows.jstor_telescope.jstor_telescope.Credentials")
+@patch("observatory_platform.google.gmail.build")
+@patch("observatory_platform.google.gmail.Credentials")
 def test_get_label_id(self, mock_account_credentials, mock_build):
     """Test getting label id both when label already exists and does not exist yet."""
     mock_account_credentials.from_json_keyfile_dict.return_value = ""
