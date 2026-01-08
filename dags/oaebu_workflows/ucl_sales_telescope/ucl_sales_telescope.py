@@ -21,7 +21,7 @@ import os
 from typing import List, Union
 
 import pendulum
-from airflow.decorators import dag, task
+from airflow.sdk import dag, task
 from airflow.hooks.base import BaseHook
 from google.cloud.bigquery import SourceFormat, TimePartitioningType, WriteDisposition, Client
 from google.oauth2 import service_account

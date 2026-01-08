@@ -23,7 +23,7 @@ from typing import List, Optional, Tuple, Union
 
 import pendulum
 import requests
-from airflow.decorators import dag, task, task_group
+from airflow.sdk import dag, task, task_group
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.hooks.base import BaseHook
 from google.auth import transport, compute_engine

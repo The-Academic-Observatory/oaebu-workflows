@@ -22,7 +22,7 @@ from typing import List, Tuple, Union
 
 import pendulum
 from airflow.exceptions import AirflowException, AirflowSkipException
-from airflow.decorators import dag, task, task_group
+from airflow.sdk import dag, task, task_group
 from google.cloud.bigquery import TimePartitioningType, SourceFormat, WriteDisposition, Client
 from google.cloud.bigquery.table import Row
 

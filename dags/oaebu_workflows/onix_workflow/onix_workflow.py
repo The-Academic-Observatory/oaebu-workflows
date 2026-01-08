@@ -22,8 +22,7 @@ import re
 from typing import Iterable, List, Optional, Union, Dict
 
 import pendulum
-from airflow.decorators import dag, task, task_group
-from airflow.models.baseoperator import chain
+from airflow.sdk import dag, task, task_group, chain
 from airflow.utils.trigger_rule import TriggerRule
 from airflow.timetables.base import Timetable
 from google.cloud.bigquery import Client, SourceFormat

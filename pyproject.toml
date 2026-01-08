@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "oaebu-workflows"
+version = "0.1.0"
+description = "OAEBU Workflows package for Observatory Platform"
+dependencies = [
+    # Add any specific dependencies here if they aren't in your requirements.txt
+]
+
+[tool.setuptools.packages.find]
+where = ["dags"]
+include = ["oaebu_workflows*"]

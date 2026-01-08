@@ -24,7 +24,7 @@ from xml.parsers.expat import ExpatError
 from typing import Union
 
 import pendulum
-from airflow.decorators import dag, task
+from airflow.sdk import dag, task
 from airflow.exceptions import AirflowException
 from google.cloud.bigquery import SourceFormat, Client
 from tenacity import (

@@ -20,7 +20,7 @@ from typing import List, Tuple, Union
 
 import pendulum
 from airflow.hooks.base import BaseHook
-from airflow.decorators import dag, task
+from airflow.sdk import dag, task
 from google.cloud.bigquery import SourceFormat, WriteDisposition, Client
 from google.cloud.bigquery.table import TimePartitioningType
 

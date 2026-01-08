@@ -31,7 +31,7 @@ import pendulum
 import requests
 from airflow.exceptions import AirflowException, AirflowSkipException
 from airflow.hooks.base import BaseHook
-from airflow.decorators import dag, task, task_group
+from airflow.sdk import dag, task, task_group
 from bs4 import BeautifulSoup, SoupStrainer
 from google.cloud.bigquery import TimePartitioningType, SourceFormat, WriteDisposition, Client
 from tenacity import retry, stop_after_attempt, wait_exponential, wait_fixed, RetryCallState
