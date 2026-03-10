@@ -623,7 +623,7 @@ class TestRemoveInvalidProducts(unittest.TestCase):
         """Tests the function used to remove invalid products from an xml file"""
         with NamedTemporaryFile() as invalid_products_file, NamedTemporaryFile() as processed_file:
             self.assertRaises(
-                AttributeError,
+                IndexError,
                 remove_invalid_products,
                 self.empty_xml,
                 processed_file.name,
