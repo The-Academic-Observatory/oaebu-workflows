@@ -154,9 +154,17 @@ class TestUclDiscoveryTelescope(SandboxTestCase):
             cassette = vcr.VCR(record_mode="none")
             sa_patch = patch("oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.service_account")
             build_patch = patch("oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.discovery.build")
-            with sa_patch, build_patch as mock_build, cassette.use_cassette(
+            retry_patch = patch("oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.retry_get_url")
+
+            def retry_get_url_side_effect(url, **kwargs):
+                import requests
+
+                return requests.get(url)
+
+            with sa_patch, build_patch as mock_build, retry_patch as mock_retry, cassette.use_cassette(
                 self.download_cassette, ignore_hosts=["oauth2.googleapis.com", "storage.googleapis.com"]
             ):
+                mock_retry.side_effect = retry_get_url_side_effect
                 mock_service = mock_build.return_value.spreadsheets.return_value.values.return_value.get.return_value
                 mock_service.execute.return_value = {"values": sheet_return}
                 ti = env.run_task("download")
@@ -367,7 +375,12 @@ class TestDownloadDiscoveryStats(TestCase):
         result = download_discovery_stats(self.eprint_id, self.start_date, self.end_date)
 
         # Check that constructed urls are correct
-        expected_calls = [call(expected_countries_url), call().json(), call(expected_totals_url), call().json()]
+        expected_calls = [
+            call(expected_countries_url, impersonate="chrome124"),
+            call().json(),
+            call(expected_totals_url, impersonate="chrome124"),
+            call().json(),
+        ]
         mock_retry_get_url.assert_has_calls(expected_calls)
 
         # Check that returned results are correct
