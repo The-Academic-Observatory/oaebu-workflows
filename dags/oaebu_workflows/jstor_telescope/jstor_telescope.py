@@ -167,6 +167,7 @@ def create_dag(
     bq_dataset_description: str = "Data from JSTOR sources",
     bq_country_table_description: Optional[str] = None,
     bq_institution_table_description: Optional[str] = None,
+    jstor_send_email: str = "no-reply@ithaka.org",
     api_bq_dataset_id: str = "dataset_api",
     gmail_api_conn_id: str = "gmail_api",
     catchup: bool = False,
@@ -199,6 +200,7 @@ def create_dag(
 
     country_partner = partner_from_str(country_partner)
     institution_partner = partner_from_str(institution_partner)
+    jstor_api = make_jstor_api(entity_type, entity_id, sender=jstor_send_email, conn_id=gmail_api_conn_id)
 
     @dag(
         dag_id=dag_id,
@@ -222,8 +224,7 @@ def create_dag(
             """
 
             # Get the reports from GMAIL API
-            api = make_jstor_api(entity_type, entity_id, gmail_api_conn_id)
-            available_reports = api.list_reports()
+            available_reports = jstor_api.list_reports()
             if not len(available_reports) > 0:
                 raise AirflowSkipException("No reports available. Skipping downstream DAG taks.")
             return available_reports
@@ -238,12 +239,11 @@ def create_dag(
 
             # Download reports and determine dates
             available_releases = {}
-            api = make_jstor_api(entity_type, entity_id, gmail_api_conn_id)
             for report in available_reports:
                 # Download report to temporary file
                 tmp_download_path = NamedTemporaryFile().name
-                api.download_report(report, download_path=tmp_download_path)
-                start_date, end_date = api.get_release_date(tmp_download_path)
+                jstor_api.download_report(report, download_path=tmp_download_path)
+                start_date, end_date = jstor_api.get_release_date(tmp_download_path)
 
                 # Create temporary release and move report to correct path
                 release = JstorRelease(
@@ -300,7 +300,6 @@ def create_dag(
                 """Task to transform the Jstor releases for a given month."""
 
                 release = JstorRelease.from_dict(release)
-                api = make_jstor_api(entity_type, entity_id, gmail_api_conn_id)
                 # Download files from GCS
                 success = gcs_download_blob(
                     bucket_name=cloud_workspace.download_bucket,
@@ -317,7 +316,7 @@ def create_dag(
                 if not success:
                     raise FileNotFoundError(f"Error downloading file: {release.download_institution_blob_name}")
 
-                api.transform_reports(
+                jstor_api.transform_reports(
                     download_country=release.download_country_path,
                     download_institution=release.download_institution_path,
                     transform_country=release.transform_country_path,
@@ -408,7 +407,7 @@ def create_dag(
                 Assign a label to the gmail messages that have been processed."""
 
                 release = JstorRelease.from_dict(release)
-                api = make_jstor_api(entity_type, entity_id, gmail_api_conn_id)
+                api = make_jstor_api(entity_type, entity_id, sender=jstor_send_email, conn_id=gmail_api_conn_id)
                 cleanup(dag_id=dag_id, workflow_folder=release.workflow_folder)
                 success = api.add_labels(release.reports)
                 set_task_state(success, context["ti"].task_id, release=release)
@@ -426,30 +425,45 @@ def create_dag(
     return jstor()
 
 
-def make_jstor_api(entity_type: Literal["publisher", "collection"], entity_id: str, conn_id: str = "gmail_api"):
+def make_jstor_api(
+    entity_type: Literal["publisher", "collection"], entity_id: str, sender: str, conn_id: str = "gmail_api"
+):
     """Create the Jstor API Instance.
 
     :param entity_type: The entity type. Should be either 'publisher' or 'collection'.
     :param entity_id: The entity id.
+    :param sender: The email sending the report
     :param conn_id: The Gmail connection ID.
     :return: The Jstor API instance
     """
 
+    # Validate sender email
+    if not re.match(r"[^@]+@[^@]+\.[^@]+", sender):
+        raise AirflowException(f"Invalid sender email address: {sender}")
+
     conn = BaseHook.get_connection(conn_id)
     service = gmail_create_service(conn.extra_dejson)
     if entity_type == "publisher":
-        jstor_api = JstorPublishersAPI(service, entity_id)
+        jstor_api = JstorPublishersAPI(service, entity_id, sender)
     elif entity_type == "collection":
-        jstor_api = JstorCollectionsAPI(service, entity_id)
+        jstor_api = JstorCollectionsAPI(service, entity_id, sender)
     else:
         raise AirflowException(f"Entity type must be 'publisher' or 'collection', got {entity_type}.")
     return jstor_api
 
 
 class JstorAPI(ABC):
-    def __init__(self, service: Any, entity_id: str):
+    def __init__(self, service: Any, entity_id: str, sender: str):
+        """
+        An interface for extracting JSTOR data from gmail.
+
+        :param service: The google service object
+        :param entity_id: The entity id
+        :param sender: The email sending the report
+        """
         self.service = service
         self.entity_id = entity_id
+        self.sender = sender
 
     @abstractmethod
     def list_reports(self) -> List[dict]:
@@ -480,8 +494,8 @@ class JstorAPI(ABC):
 
 
 class JstorPublishersAPI(JstorAPI):
-    def __init__(self, service: Any, entity_id: str):
-        super().__init__(service, entity_id)
+    def __init__(self, service: Any, entity_id: str, sender: str):
+        super().__init__(service, entity_id, sender)
 
     def list_reports(self) -> List[dict]:
         """List the available releases by going through the messages of a gmail account and looking for a specific pattern.
@@ -495,7 +509,7 @@ class JstorPublishersAPI(JstorAPI):
         # List messages with specific query
         list_params = {
             "userId": "me",
-            "q": f'-label:{JSTOR_PROCESSED_LABEL_NAME} subject:"JSTOR Publisher Report Available" from:no-reply@ithaka.org',
+            "q": f'-label:{JSTOR_PROCESSED_LABEL_NAME} subject:"JSTOR Publisher Report Available" from:{self.sender}',
             "labelIds": ["INBOX"],
             "maxResults": 500,
         }
@@ -718,8 +732,8 @@ class JstorPublishersAPI(JstorAPI):
 
 
 class JstorCollectionsAPI(JstorAPI):
-    def __init__(self, service: Any, entity_id: str):
-        super().__init__(service, entity_id)
+    def __init__(self, service: Any, entity_id: str, sender: str):
+        super().__init__(service, entity_id, sender)
 
     def list_reports(self) -> List[dict]:
         """List the available reports by going through the gmail messages from a specific sender.
@@ -730,7 +744,7 @@ class JstorCollectionsAPI(JstorAPI):
         # List messages with specific query
         list_params = {
             "userId": "me",
-            "q": f"-label:{JSTOR_PROCESSED_LABEL_NAME} from:grp_ithaka_data_intelligence@ithaka.org",
+            "q": f"-label:{JSTOR_PROCESSED_LABEL_NAME} from:{self.sender}",
             "labelIds": ["INBOX"],
             "maxResults": 500,
         }

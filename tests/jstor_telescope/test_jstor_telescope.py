@@ -17,7 +17,8 @@
 import base64
 import json
 import os
-from unittest.mock import Mock, patch
+import unittest
+from unittest.mock import MagicMock, Mock, patch
 
 import httpretty
 import pendulum
@@ -42,6 +43,7 @@ from observatory_platform.airflow.workflow import Workflow
 from observatory_platform.dataset_api import DatasetAPI
 from observatory_platform.google.bigquery import bq_table_id
 from observatory_platform.google.gcs import gcs_blob_name_from_path, gcs_upload_files
+from observatory_platform.google.gmail import gmail_get_label_id
 from observatory_platform.sandbox.sandbox_environment import SandboxEnvironment
 from observatory_platform.sandbox.test_utils import SandboxTestCase, load_and_parse_json
 
@@ -115,9 +117,9 @@ class TestTelescopeSetup(SandboxTestCase):
         with env.create():
             env.add_connection(dummy_gmail_connection())
             for entity_type in ["collection", "publisher"]:
-                make_jstor_api(entity_type, self.entity_id)
+                make_jstor_api(entity_type, self.entity_id, sender="no-reply@ithaka.org")
             with self.assertRaisesRegex(AirflowException, "Entity type must be"):
-                make_jstor_api("invalid", self.entity_id)
+                make_jstor_api("invalid", self.entity_id, sender="no-reply@ithaka.org")
 
 
 class TestJstorTelescopePublisher(SandboxTestCase):
@@ -421,7 +423,7 @@ class TestJstorTelescopePublisher(SandboxTestCase):
                         f.write(old_report_content.format(start_date=report["start"], end_date=report["end"]))
 
             # Test new report is successful
-            api = JstorPublishersAPI(Mock(), self.entity_id)
+            api = JstorPublishersAPI(Mock(), self.entity_id, sender="no-reply@ithaka.org")
             start_date, end_date = api.get_release_date(reports[0]["file"])
             self.assertEqual(pendulum.parse(reports[0]["start"]), start_date)
             self.assertEqual(pendulum.parse(reports[0]["end"]), end_date)
@@ -438,6 +440,73 @@ class TestJstorTelescopePublisher(SandboxTestCase):
             # Test old report fails
             with self.assertRaises(AirflowException):
                 api.get_release_date(reports[3]["file"])
+
+    @patch("observatory_platform.google.gmail.build")
+    @patch("observatory_platform.google.gmail.Credentials")
+    def test_get_label_id(self, mock_account_credentials, mock_build):
+        """Test getting label id both when label already exists and does not exist yet."""
+        mock_account_credentials.from_json_keyfile_dict.return_value = ""
+
+        http = HttpMockSequence(
+            publisher_http_mock_sequence(
+                self.country_report["url"], self.institution_report["url"], self.wrong_publisher_report["url"]
+            )
+        )
+        mock_build.return_value = build("gmail", "v1", http=http)
+
+        list_labels_no_match = {
+            "labels": [
+                {
+                    "id": "CHAT",
+                    "name": "CHAT",
+                    "messageListVisibility": "hide",
+                    "labelListVisibility": "labelHide",
+                    "type": "system",
+                },
+                {"id": "SENT", "name": "SENT", "type": "system"},
+            ]
+        }
+        create_label = {
+            "id": "created_label",
+            "name": JSTOR_PROCESSED_LABEL_NAME,
+            "messageListVisibility": "show",
+            "labelListVisibility": "labelShow",
+        }
+        list_labels_match = {
+            "labels": [
+                {
+                    "id": "CHAT",
+                    "name": "CHAT",
+                    "messageListVisibility": "hide",
+                    "labelListVisibility": "labelHide",
+                    "type": "system",
+                },
+                {
+                    "id": "existing_label",
+                    "name": JSTOR_PROCESSED_LABEL_NAME,
+                    "messageListVisibility": "show",
+                    "labelListVisibility": "labelShow",
+                    "type": "user",
+                },
+            ]
+        }
+        http = HttpMockSequence(
+            [
+                ({"status": "200"}, json.dumps(list_labels_no_match)),
+                ({"status": "200"}, json.dumps(create_label)),
+                ({"status": "200"}, json.dumps(list_labels_match)),
+            ]
+        )
+        service = build("gmail", "v1", http=http)
+        _api = JstorPublishersAPI(service, self.entity_id, sender="no-reply@ithaka.org")
+
+        # call function without match for label, so label is created
+        label_id = gmail_get_label_id(service, JSTOR_PROCESSED_LABEL_NAME)
+        self.assertEqual("created_label", label_id)
+
+        # call function with match for label
+        label_id = gmail_get_label_id(service, JSTOR_PROCESSED_LABEL_NAME)
+        self.assertEqual("existing_label", label_id)
 
 
 class TestJstorTelescopeCollection(SandboxTestCase):
@@ -691,81 +760,13 @@ class TestJstorTelescopeCollection(SandboxTestCase):
                     )
 
             # Test new report is successful
-            api = JstorCollectionsAPI(Mock(), self.entity_id)
+            api = JstorCollectionsAPI(Mock(), self.entity_id, sender="no-reply@ithaka.org")
             start_date, end_date = api.get_release_date(reports[0]["file"])
             self.assertEqual(pendulum.parse("2020-01-01"), start_date)
             self.assertEqual(pendulum.parse("2020-01-31"), end_date)
             # Test new report fails
             with self.assertRaises(AirflowException):
                 api.get_release_date(reports[1]["file"])
-
-
-@patch("observatory_platform.google.gmail.build")
-@patch("observatory_platform.google.gmail.Credentials")
-def test_get_label_id(self, mock_account_credentials, mock_build):
-    """Test getting label id both when label already exists and does not exist yet."""
-    mock_account_credentials.from_json_keyfile_dict.return_value = ""
-
-    http = HttpMockSequence(
-        publisher_http_mock_sequence(
-            self.country_report["url"], self.institution_report["url"], self.wrong_publisher_report["url"]
-        )
-    )
-    mock_build.return_value = build("gmail", "v1", http=http)
-
-    list_labels_no_match = {
-        "labels": [
-            {
-                "id": "CHAT",
-                "name": "CHAT",
-                "messageListVisibility": "hide",
-                "labelListVisibility": "labelHide",
-                "type": "system",
-            },
-            {"id": "SENT", "name": "SENT", "type": "system"},
-        ]
-    }
-    create_label = {
-        "id": "created_label",
-        "name": JSTOR_PROCESSED_LABEL_NAME,
-        "messageListVisibility": "show",
-        "labelListVisibility": "labelShow",
-    }
-    list_labels_match = {
-        "labels": [
-            {
-                "id": "CHAT",
-                "name": "CHAT",
-                "messageListVisibility": "hide",
-                "labelListVisibility": "labelHide",
-                "type": "system",
-            },
-            {
-                "id": "existing_label",
-                "name": JSTOR_PROCESSED_LABEL_NAME,
-                "messageListVisibility": "show",
-                "labelListVisibility": "labelShow",
-                "type": "user",
-            },
-        ]
-    }
-    http = HttpMockSequence(
-        [
-            ({"status": "200"}, json.dumps(list_labels_no_match)),
-            ({"status": "200"}, json.dumps(create_label)),
-            ({"status": "200"}, json.dumps(list_labels_match)),
-        ]
-    )
-    service = build("gmail", "v1", http=http)
-    api = JstorPublishersAPI(service, self.entity_id)
-
-    # call function without match for label, so label is created
-    label_id = api.get_label_id(service, JSTOR_PROCESSED_LABEL_NAME)
-    self.assertEqual("created_label", label_id)
-
-    # call function with match for label
-    label_id = api.get_label_id(service, JSTOR_PROCESSED_LABEL_NAME)
-    self.assertEqual("existing_label", label_id)
 
 
 def publisher_http_mock_sequence(
@@ -1000,3 +1001,27 @@ def collection_http_mock_sequence(country_json: str, institution_json: str) -> l
         ({"status": "200"}, json.dumps(modify_message1)),
     ]
     return http_mock_sequence
+
+
+class TestSenderValidation(unittest.TestCase):
+    @patch("oaebu_workflows.jstor_telescope.jstor_telescope.BaseHook.get_connection")
+    @patch("oaebu_workflows.jstor_telescope.jstor_telescope.gmail_create_service")
+    def test_make_jstor_api_invalid_sender(self, mock_create_service, mock_get_connection):
+        mock_get_connection.return_value = MagicMock()
+
+        invalid_emails = ["invalid-email", "user@", "@domain.com", "user@domain", "user@.com"]
+        for email in invalid_emails:
+            with self.subTest(email=email):
+                with self.assertRaisesRegex(AirflowException, f"Invalid sender email address: {email}"):
+                    make_jstor_api("publisher", "entity_id", sender=email)
+
+    @patch("oaebu_workflows.jstor_telescope.jstor_telescope.BaseHook.get_connection")
+    @patch("oaebu_workflows.jstor_telescope.jstor_telescope.gmail_create_service")
+    def test_make_jstor_api_valid_sender(self, mock_create_service, mock_get_connection):
+        mock_get_connection.return_value = MagicMock()
+
+        valid_emails = ["user@domain.com", "first.last@domain.co.uk", "user123@sub.domain.org"]
+        for email in valid_emails:
+            with self.subTest(email=email):
+                # Should not raise exception
+                make_jstor_api("publisher", "entity_id", sender=email)
