@@ -17,7 +17,7 @@
 
 import logging
 import os
-from typing import List, Union
+from typing import Union
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import pendulum
@@ -379,7 +379,7 @@ def get_isbn_eprint_mappings(sheet_id: str, service_account_conn_id: str, cutoff
         isbn = item.get("ISBN13")
         title = item.get("title_list_title")
         if not eprint_id or not isbn:
-            logging.warn(f"Item with missing information will be skipped: {item}")
+            logging.warning(f"Item with missing information will be skipped: {item}")
             continue
         if pendulum.parse(item["date"]) > cutoff_date:
             logging.info(f"Item released after cutoff date will be skipped: {item}")
@@ -409,9 +409,9 @@ def download_discovery_stats(eprint_id: str, start_date: pendulum.DateTime, end_
         f"&irs2report=eprint&set_name=eprint&set_value={eprint_id}&datatype=downloads&graph_type=column"
         "&view=Google%3A%3AGraph&date_resolution=month&title=Download+activity+-+last+12+months&export=JSON"
     )
-    response = retry_get_url(countries_url)
+    response = retry_get_url(countries_url, impersonate="chrome124")
     country = response.json()
-    response = retry_get_url(totals_url)
+    response = retry_get_url(totals_url, impersonate="chrome124")
     totals = response.json()
 
     # Perform some checks on the returned data
