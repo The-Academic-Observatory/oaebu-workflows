@@ -45,6 +45,7 @@ from observatory_platform.google.bigquery import bq_load_table, bq_sharded_table
 from observatory_platform.airflow.release import SnapshotRelease, set_task_state, make_snapshot_date
 from observatory_platform.airflow.workflow import CloudWorkspace, cleanup
 from observatory_platform.airflow.airflow import on_failure_callback
+from observatory_platform.url_utils import retry_get_url
 
 
 # Download job will wait 120 seconds between first 2 attempts, then 30 minutes for the following 3
@@ -318,7 +319,7 @@ def download_metadata(uri: str, download_path: str) -> None:
     :raises ConnectionError: raised if the response from the metadata server does not have code 200
     :raises AirflowException: raised if the response does not contain any Product fields
     """
-    response = requests.get(uri, headers=oaebu_user_agent_header())
+    response = retry_get_url(uri, headers=oaebu_user_agent_header(), impersonate="chrome146")
     if response.status_code != 200:
         raise ConnectionError(f"Expected status code 200 from url {uri}, instead got response: {response.text}")
     with open(download_path, "w") as f:
