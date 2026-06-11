@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import logging
 import os
-import requests
 import xmltodict
 from xml.parsers.expat import ExpatError
 from typing import Union
@@ -319,7 +318,7 @@ def download_metadata(uri: str, download_path: str) -> None:
     :raises ConnectionError: raised if the response from the metadata server does not have code 200
     :raises AirflowException: raised if the response does not contain any Product fields
     """
-    response = retry_get_url(uri, headers=oaebu_user_agent_header(), impersonate="chrome146")
+    response = retry_get_url(uri, headers=oaebu_user_agent_header(), impersonate="chrome146", num_retries=0)
     if response.status_code != 200:
         raise ConnectionError(f"Expected status code 200 from url {uri}, instead got response: {response.text}")
     with open(download_path, "w") as f:
