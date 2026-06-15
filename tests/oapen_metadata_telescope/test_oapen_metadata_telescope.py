@@ -22,7 +22,6 @@ from tempfile import TemporaryDirectory, NamedTemporaryFile
 from xml.parsers.expat import ExpatError
 
 import pendulum
-import vcr
 from airflow.exceptions import AirflowException
 from airflow.utils.state import State
 from tenacity import stop_after_attempt
@@ -58,7 +57,7 @@ class TestOapenMetadataTelescope(SandboxTestCase):
         self.metadata_uri = "https://library.oapen.org/download-export?format=onix"  # metadata URI
 
         fixtures_folder = test_fixtures_folder(workflow_module="oapen_metadata_telescope")
-        self.valid_download_cassette = os.path.join(fixtures_folder, "cassette_valid.yaml")  # VCR Cassette
+        self.valid_download_xml = os.path.join(fixtures_folder, "metadata_download_valid.xml")  # Valid XML
         self.test_table = os.path.join(fixtures_folder, "test_table.json")  # File for testing final table
 
     def test_dag_structure(self):
@@ -137,11 +136,14 @@ class TestOapenMetadataTelescope(SandboxTestCase):
                 release = OapenMetadataRelease.from_dict(release_dict)
 
                 # Download task
-                with vcr.VCR().use_cassette(
-                    self.valid_download_cassette,
-                    record_mode="None",
-                    ignore_hosts=["oauth2.googleapis.com", "storage.googleapis.com"],
-                ):
+                with open(self.valid_download_xml, "rb") as f:
+                    content = f.read()
+                with patch(
+                    "oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope.retry_get_url"
+                ) as mock_retry_get_url:
+                    mock_retry_get_url.return_value = MagicMock(
+                        status_code=200, content=content, text=content.decode("utf-8")
+                    )
                     ti = env.run_task("download")
                     self.assertEqual(ti.state, State.SUCCESS)
 
@@ -157,7 +159,7 @@ class TestOapenMetadataTelescope(SandboxTestCase):
 
                 # Test download task
                 self.assertTrue(os.path.exists(release.download_path))
-                self.assert_file_integrity(release.download_path, "bf9d7c95f74f029ca01721de8b0c3fb1", "md5")
+                self.assert_file_integrity(release.download_path, "c35696a6e95912e7eb6a7246f2d17c31", "md5")
 
                 # Test that download file uploaded to BQ
                 self.assert_blob_integrity(
@@ -229,15 +231,8 @@ class TestOapenMetadataTelescope(SandboxTestCase):
 
 
 class TestDownloadMetadata(unittest.TestCase):
-    # Cassettes
-    fixtures_folder = test_fixtures_folder(workflow_module="oapen_metadata_telescope")
-    valid_download_cassette = os.path.join(fixtures_folder, "cassette_valid.yaml")
-    invalid_download_cassette = os.path.join(fixtures_folder, "cassette_invalid.yaml")
-    empty_download_cassette = os.path.join(fixtures_folder, "cassette_empty.yaml")
-    bad_response_cassette = os.path.join(fixtures_folder, "cassette_bad_response.yaml")
-    header_only_download_cassette = os.path.join(fixtures_folder, "cassette_header_only.yaml")
-
     # XMLs
+    fixtures_folder = test_fixtures_folder(workflow_module="oapen_metadata_telescope")
     valid_download_xml = os.path.join(fixtures_folder, "metadata_download_valid.xml")
 
     # Download URI
@@ -246,52 +241,63 @@ class TestDownloadMetadata(unittest.TestCase):
     # Remove the wait time before retries for testing
     download_metadata.retry.sleep = MagicMock()
 
-    def test_download_metadata(self):
+    @patch("oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope.retry_get_url")
+    def test_download_metadata(self, mock_retry_get_url):
         """Test that metadata successfully downloads after 200 respose"""
-        with vcr.VCR().use_cassette(self.valid_download_cassette, record_mode="none", allow_playback_repeats=True):
-            with NamedTemporaryFile() as download_file:
-                download_metadata(self.uri, download_file.name)
-                with open(download_file.name, "r") as f:
-                    downloaded_xml = [l.strip() for l in f.readlines()]
+        with open(self.valid_download_xml, "rb") as f:
+            content = f.read()
+        mock_retry_get_url.return_value = MagicMock(status_code=200, content=content, text=content.decode("utf-8"))
+
+        with NamedTemporaryFile() as download_file:
+            download_metadata(self.uri, download_file.name)
+            with open(download_file.name, "r") as f:
+                downloaded_xml = [l.strip() for l in f.readlines()]
         with open(self.valid_download_xml, "r") as f:
             assertion_xml = [l.strip() for l in f.readlines()]
         self.assertEqual(len(downloaded_xml), len(assertion_xml))
         self.assertEqual(downloaded_xml, assertion_xml)
 
-    def test_download_metadata_invalid_xml(self):
+    @patch("oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope.retry_get_url")
+    def test_download_metadata_invalid_xml(self, mock_retry_get_url):
         """Test behaviour when the downloaded file is an invalid XML"""
-        download_metadata.retry.stop = stop_after_attempt(1)
-        with vcr.VCR().use_cassette(self.invalid_download_cassette, record_mode="none", allow_playback_repeats=True):
-            with NamedTemporaryFile() as download_file:
-                self.assertRaises(ExpatError, download_metadata, self.uri, download_file.name)
+        mock_retry_get_url.return_value = MagicMock(status_code=200, content=b"invalid xml", text="invalid xml")
 
-    def test_download_metadata_empty_xml(self):
-        """Test behaviour when the downloaded file is an empty XML"""
         download_metadata.retry.stop = stop_after_attempt(1)
-        with vcr.VCR().use_cassette(self.empty_download_cassette, record_mode="none", allow_playback_repeats=True):
-            with NamedTemporaryFile() as download_file:
-                self.assertRaises(ExpatError, download_metadata, self.uri, download_file.name)
+        with NamedTemporaryFile() as download_file:
+            self.assertRaises(ExpatError, download_metadata, self.uri, download_file.name)
 
-    def test_download_metadata_no_products(self):
+    @patch("oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope.retry_get_url")
+    def test_download_metadata_empty_xml(self, mock_retry_get_url):
         """Test behaviour when the downloaded file is an empty XML"""
+        mock_retry_get_url.return_value = MagicMock(status_code=200, content=b"", text="")
+
+        download_metadata.retry.stop = stop_after_attempt(1)
+        with NamedTemporaryFile() as download_file:
+            self.assertRaises(ExpatError, download_metadata, self.uri, download_file.name)
+
+    @patch("oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope.retry_get_url")
+    def test_download_metadata_no_products(self, mock_retry_get_url):
+        """Test behaviour when the downloaded file is an empty XML"""
+        content = b"<ONIXMessage><Header></Header></ONIXMessage>"
+        mock_retry_get_url.return_value = MagicMock(status_code=200, content=content, text=content.decode("utf-8"))
+
         download_metadata.retry.stop = stop_after_attempt(1)
         # For only-header XML
-        with vcr.VCR().use_cassette(
-            self.header_only_download_cassette, record_mode="none", allow_playback_repeats=True
-        ):
-            with NamedTemporaryFile() as download_file:
-                self.assertRaisesRegex(
-                    AirflowException, "No products found", download_metadata, self.uri, download_file.name
-                )
+        with NamedTemporaryFile() as download_file:
+            self.assertRaisesRegex(
+                AirflowException, "No products found", download_metadata, self.uri, download_file.name
+            )
 
-    def test_download_metadata_bad_response(self):
+    @patch("oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope.retry_get_url")
+    def test_download_metadata_bad_response(self, mock_retry_get_url):
         """Test behaviour when the downloaded file has a non-200 response code"""
+        mock_retry_get_url.return_value = MagicMock(status_code=404, content=b"Not Found", text="Not Found")
+
         download_metadata.retry.stop = stop_after_attempt(1)
-        with vcr.VCR().use_cassette(self.bad_response_cassette, record_mode="none", allow_playback_repeats=True):
-            with NamedTemporaryFile() as download_file:
-                self.assertRaisesRegex(
-                    ConnectionError, "Expected status code 200", download_metadata, self.uri, download_file.name
-                )
+        with NamedTemporaryFile() as download_file:
+            self.assertRaisesRegex(
+                ConnectionError, "Expected status code 200", download_metadata, self.uri, download_file.name
+            )
 
 
 class TestFilterApplication(unittest.TestCase):
