@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import logging
 import os
+from airflow.sdk import DAG
 import xmltodict
 from xml.parsers.expat import ExpatError
 from typing import Union
@@ -45,7 +46,6 @@ from observatory_platform.airflow.release import SnapshotRelease, set_task_state
 from observatory_platform.airflow.workflow import CloudWorkspace, cleanup
 from observatory_platform.airflow.airflow import on_failure_callback
 from observatory_platform.url_utils import retry_get_url
-
 
 # Download job will wait 120 seconds between first 2 attempts, then 30 minutes for the following 3
 DOWNLOAD_RETRY_CHAIN = wait_chain(*[wait_fixed(120) for _ in range(2)] + [wait_fixed(1800) for _ in range(3)])
@@ -150,7 +150,7 @@ def create_dag(
             retries=retries, retry_delay=pendulum.duration(minutes=retry_delay), on_failure_callback=on_failure_callback
         ),
     )
-    def oapen_metadata():
+    def oapen_metadata() -> DAG:
         @task()
         def make_release(**context) -> dict:
             """Make release instances. The release is passed as an argument to the function (TelescopeFunction) that is
@@ -276,7 +276,7 @@ def create_dag(
             """Delete all files, folders and XComs associated with this release."""
 
             release = OapenMetadataRelease.from_dict(release)
-            cleanup(dag_id=dag_id, workflow_folder=release.workflow_folder)
+            cleanup(workflow_folder=release.workflow_folder)
 
         task_check_dependencies = check_dependencies()
         xcom_release = make_release()
