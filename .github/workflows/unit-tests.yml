@@ -29,14 +29,13 @@ jobs:
           cd ..
           # Clone protection required until fix - https://github.com/git-lfs/git-lfs/issues/5749
           export GIT_CLONE_PROTECTION_ACTIVE=false 
-          git clone https://github.com/The-Academic-Observatory/observatory-platform.git 
+          git clone -b airflow_3 https://github.com/The-Academic-Observatory/observatory-platform.git 
+          # TODO: Remove branch when airflow_3 is merged
           cd observatory-platform
           pip install -e .[tests] --constraint https://raw.githubusercontent.com/apache/airflow/constraints-3.2.2/constraints-no-providers-${{ matrix.python-version }}.txt
           cd ..
-
           cd oaebu-workflows
-          pip install -r requirements.txt -b airflow_3 --constraint https://raw.githubusercontent.com/apache/airflow/constraints-3.2.2/constraints-no-providers-${{ matrix.python-version }}.txt
-          # TODO: Remove branch when airflow_3 is merged
+          pip install -r requirements.txt --constraint https://raw.githubusercontent.com/apache/airflow/constraints-3.2.2/constraints-no-providers-${{ matrix.python-version }}.txt
 
       - name: Add dag folder to PYTHONPATH
         run: |
