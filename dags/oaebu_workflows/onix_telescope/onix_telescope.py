@@ -21,7 +21,7 @@ import shutil
 from typing import List, Union
 
 import pendulum
-from airflow.decorators import dag, task, task_group
+from airflow.sdk import dag, task, task_group
 from airflow.exceptions import AirflowException, AirflowSkipException
 from google.cloud.bigquery import Client, SourceFormat
 
@@ -304,7 +304,7 @@ def create_dag(
                 """Delete all files, folders and XComs associated with this release."""
 
                 release = OnixRelease.from_dict(release)
-                cleanup(dag_id=dag_id, workflow_folder=release.workflow_folder)
+                cleanup(release.workflow_folder)
 
             (
                 move_files_to_in_progress(data)
