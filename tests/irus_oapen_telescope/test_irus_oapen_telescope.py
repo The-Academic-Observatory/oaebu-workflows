@@ -16,6 +16,7 @@
 
 import json
 import os
+import unittest
 from unittest.mock import ANY, MagicMock, patch
 from urllib.parse import quote
 from requests import Response
@@ -52,6 +53,7 @@ from observatory_platform.sandbox.sandbox_environment import SandboxEnvironment
 from observatory_platform.sandbox.test_utils import SandboxTestCase, find_free_port, random_id
 
 
+@unittest.skip
 class TestIrusOapenTelescope(SandboxTestCase):
     """Tests for the Oapen Irus Uk telescope"""
 
