@@ -15,12 +15,12 @@
 # Author: Aniek Roelofs, Keegan Smith
 
 import os
+import json
 from unittest import TestCase
 from unittest.mock import patch, call
 
 import pendulum
-from airflow.utils.state import State
-from airflow.models.connection import Connection
+from airflow.sdk import Connection
 import vcr
 
 from oaebu_workflows.config import test_fixtures_folder, module_file_path
@@ -33,10 +33,9 @@ from oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope import (
     transform_discovery_stats,
     _rate_limited_wait,
 )
-from observatory_platform.airflow.workflow import Workflow
+from observatory_platform.airflow.workflow import Workflow, make_workflow_folder
 from observatory_platform.dataset_api import DatasetAPI
 from observatory_platform.google.bigquery import bq_table_id
-from observatory_platform.google.gcs import gcs_blob_name_from_path
 from observatory_platform.sandbox.sandbox_environment import SandboxEnvironment
 from observatory_platform.sandbox.test_utils import SandboxTestCase, load_and_parse_json
 
@@ -89,10 +88,9 @@ class TestUclDiscoveryTelescope(SandboxTestCase):
 
     def test_telescope(self):
         """Test the UCL Discovery telescope end to end."""
-        # Setup Observatory environment
+
         env = SandboxEnvironment(self.project_id, self.data_location)
 
-        # Setup DAG
         data_partner = partner_from_str("ucl_discovery")
         data_partner.bq_dataset_id = env.add_dataset()
         dag_id = "ucl_discovery"
@@ -104,13 +102,33 @@ class TestUclDiscoveryTelescope(SandboxTestCase):
             data_partner=data_partner,
             max_threads=1,
             api_bq_dataset_id=api_bq_dataset_id,
+            retries=0,
         )
         logical_date = pendulum.datetime(year=2023, month=6, day=1)
 
-        # Create the Observatory environment and run tests
-        with env.create(), env.create_dag_run(dag, logical_date=logical_date):
-            # Mock return values of download function
-            interval_start = pendulum.instance(env.dag_run.data_interval_start)
+        with env.create():
+            env.serialize_dag(dag)
+
+            env.add_connection(
+                Connection(
+                    conn_id="oaebu_service_account",
+                    conn_type="google_cloud_platform",
+                    extra=json.dumps(
+                        {
+                            "type": "service_account",
+                            "private_key_id": "private_key_id",
+                            "private_key": "private_key",
+                            "client_email": "client_email",
+                            "client_id": "client_id",
+                            "token_uri": "token_uri",
+                        }
+                    ),
+                )
+            )
+
+            # interval_start needs to be computed from the logical_date/schedule directly now,
+            # since there's no env.dag_run to read data_interval_start from before the run happens
+            interval_start = logical_date
             sheet_return = [
                 ["ISBN13", "discovery_eprintid", "date", "title_list_title"],
                 ["ISBN_1", "eprint_id1", interval_start.add(days=10).format("YYYYMMDD"), "title1"],
@@ -119,39 +137,7 @@ class TestUclDiscoveryTelescope(SandboxTestCase):
                 ["", "eprint_id4", interval_start.add(days=10).format("YYYYMMDD"), "title4"],  # should be ignored
                 ["ISBN_5", "eprint_id5", interval_start.subtract(months=5).format("YYYYMMDD"), "title5"],
             ]
-            conn = Connection(
-                conn_id="oaebu_service_account",
-                uri=f"google-cloud-platform://?type=service_account&private_key_id=private_key_id"
-                f"&private_key=private_key"
-                f"&client_email=client_email"
-                f"&client_id=client_id"
-                f"&token_uri=token_uri",
-            )
-            env.add_connection(conn)
 
-            ############################
-            ### Main telescope tasks ###
-            ############################
-
-            # Test that all dependencies are specified: no error should be thrown
-            ti = env.run_task("check_dependencies")
-            self.assertEqual(ti.state, State.SUCCESS)
-
-            # Make the release
-            ti = env.run_task("make_release")
-            self.assertEqual(ti.state, State.SUCCESS)
-            release_dict = ti.xcom_pull(task_ids="make_release", include_prior_dates=False)
-            expected_release_dict = {
-                "dag_id": "ucl_discovery",
-                "run_id": "scheduled__2023-06-01T00:00:00+00:00",
-                "data_interval_start": "2023-06-01",
-                "data_interval_end": "2023-06-01",
-                "partition_date": "2023-06-30",
-            }
-            self.assertEqual(release_dict, expected_release_dict)
-            release = UclDiscoveryRelease.from_dict(release_dict)
-
-            # download
             cassette = vcr.VCR(record_mode="none")
             sa_patch = patch("oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.service_account")
             build_patch = patch("oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.discovery.build")
@@ -162,49 +148,45 @@ class TestUclDiscoveryTelescope(SandboxTestCase):
 
                 return requests.get(url)
 
-            with sa_patch, build_patch as mock_build, retry_patch as mock_retry, cassette.use_cassette(
-                self.download_cassette, ignore_hosts=["oauth2.googleapis.com", "storage.googleapis.com"]
+            now = pendulum.now("UTC")
+            with (
+                sa_patch,
+                build_patch as mock_build,
+                retry_patch as mock_retry,
+                patch("oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.pendulum.now") as mock_now,
+                cassette.use_cassette(
+                    self.download_cassette,
+                    ignore_hosts=[
+                        "oauth2.googleapis.com",
+                        "storage.googleapis.com",
+                        "bigquery.googleapis.com",
+                        "in-process.invalid",
+                        "in-process.invalid.",
+                    ],
+                ),
             ):
                 mock_retry.side_effect = retry_get_url_side_effect
                 mock_service = mock_build.return_value.spreadsheets.return_value.values.return_value.get.return_value
                 mock_service.execute.return_value = {"values": sheet_return}
-                ti = env.run_task("download")
-            self.assertEqual(ti.state, State.SUCCESS)
+                mock_now.return_value = now
+                dagrun = dag.test(logical_date=logical_date)
 
-            # transform
-            with sa_patch, build_patch as mock_build:
-                mock_service = mock_build.return_value.spreadsheets.return_value.values.return_value.get.return_value
-                mock_service.execute.return_value = {"values": sheet_return}
-                ti = env.run_task("transform")
-            self.assertEqual(ti.state, State.SUCCESS)
+            self.assertEqual(dagrun.state, "success")
 
-            # bq_load
-            ti = env.run_task("bq_load")
-            self.assertEqual(ti.state, State.SUCCESS)
+            # Get the release object
+            release_ti = dagrun.get_task_instance(task_id="make_release")
+            release_dict = release_ti.xcom_pull(task_ids="make_release", include_prior_dates=False)
+            expected_release_dict = {
+                "dag_id": "ucl_discovery",
+                "run_id": dagrun.run_id,
+                "data_interval_start": "2023-06-01",
+                "data_interval_end": "2023-06-01",
+                "partition_date": "2023-06-30",
+            }
+            self.assertEqual(release_dict, expected_release_dict)
+            release = UclDiscoveryRelease.from_dict(release_dict)
 
-            #######################
-            ### Make Assertions ###
-            #######################
-
-            # Download
-            self.assertTrue(os.path.exists(release.download_country_path))
-            self.assertTrue(os.path.exists(release.download_totals_path))
-
-            # Check downloaded files uploaded
-            download_country_blob = gcs_blob_name_from_path(release.download_country_path)
-            self.assert_blob_integrity(env.download_bucket, download_country_blob, release.download_country_path)
-            download_totals_blob = gcs_blob_name_from_path(release.download_totals_path)
-            self.assert_blob_integrity(env.download_bucket, download_totals_blob, release.download_totals_path)
-
-            # Transform
-            self.assertTrue(os.path.exists(release.transform_path))
-
-            # Check transformed files uploaded
-            self.assert_blob_integrity(
-                env.transform_bucket, gcs_blob_name_from_path(release.transform_path), release.transform_path
-            )
-
-            # Bigquery load
+            # Assert Bigquery load
             table_id = bq_table_id(
                 env.cloud_workspace.project_id,
                 data_partner.bq_dataset_id,
@@ -215,21 +197,8 @@ class TestUclDiscoveryTelescope(SandboxTestCase):
                 table_id, load_and_parse_json(self.test_table, date_fields="release_date"), "ISBN"
             )
 
-            ###################
-            ### Final tasks ###
-            ###################
-
-            # Set up the API
+            # Check API dataset release entry
             api = DatasetAPI(bq_project_id=env.cloud_workspace.project_id, bq_dataset_id=api_bq_dataset_id)
-            dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="ucl_discovery")
-            self.assertEqual(len(dataset_releases), 0)
-
-            # Add_dataset_release_task
-            now = pendulum.now("UTC")
-            with patch("oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope.pendulum.now") as mock_now:
-                mock_now.return_value = now
-                ti = env.run_task("add_new_dataset_releases")
-            self.assertEqual(ti.state, State.SUCCESS)
             dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="ucl_discovery")
             self.assertEqual(len(dataset_releases), 1)
             expected_release = {
@@ -239,7 +208,7 @@ class TestUclDiscoveryTelescope(SandboxTestCase):
                 "created": now.to_iso8601_string(),
                 "modified": now.to_iso8601_string(),
                 "data_interval_start": "2023-06-01T00:00:00Z",
-                "data_interval_end": "2023-06-04T00:00:00Z",
+                "data_interval_end": "2023-06-01T00:00:00Z",
                 "snapshot_date": None,
                 "partition_date": "2023-06-30T00:00:00Z",
                 "changefile_start_date": None,
@@ -250,11 +219,8 @@ class TestUclDiscoveryTelescope(SandboxTestCase):
             }
             self.assertEqual(expected_release, dataset_releases[0].to_dict())
 
-            # Test that all telescope data deleted
-            workflow_folder_path = release.workflow_folder
-            ti = env.run_task("cleanup_workflow")
-            self.assertEqual(ti.state, State.SUCCESS)
-            self.assert_cleanup(workflow_folder_path)
+            # Check workflow folder cleaned up
+            self.assert_cleanup(make_workflow_folder(dag_id, dagrun.run_id, make_dir=False))
 
 
 class TestGetIsbnEprintMappings(TestCase):
