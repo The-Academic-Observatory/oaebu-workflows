@@ -17,7 +17,6 @@
 import os
 import shutil
 from unittest.mock import patch
-from typing import List
 
 import pendulum
 from airflow.exceptions import AirflowException, AirflowSkipException
@@ -42,17 +41,6 @@ from observatory_platform.sandbox.sandbox_environment import SandboxEnvironment
 from observatory_platform.sandbox.test_utils import SandboxTestCase, find_free_port
 from observatory_platform.sandbox.sftp_server import SftpServer
 from observatory_platform.sftp import SftpFolders
-
-
-def _normalise_release_dict(release_dicts: List[dict]):
-    """Normalise the 'sftp_files' lists in the release dict. Since we don't care about order, we sort it"""
-    return [
-        {
-            **d,
-            "sftp_files": sorted(d["sftp_files"]),
-        }
-        for d in release_dicts
-    ]
 
 
 class TestGoogleBooksTelescope(SandboxTestCase):

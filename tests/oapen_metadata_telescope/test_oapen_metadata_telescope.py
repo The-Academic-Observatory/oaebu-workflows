@@ -23,7 +23,6 @@ from xml.parsers.expat import ExpatError
 
 import pendulum
 from airflow.exceptions import AirflowException
-from airflow.utils.state import State
 from tenacity import stop_after_attempt
 
 from oaebu_workflows.config import test_fixtures_folder, module_file_path
@@ -141,7 +140,7 @@ class TestOapenMetadataTelescope(SandboxTestCase):
 
             # Get the release object
             release_ti = dagrun.get_task_instance(task_id="make_release")
-            self.assertEqual(release_ti.state, State.SUCCESS)
+            self.assertEqual(release_ti.state, "success")
             release_dict = release_ti.xcom_pull(task_ids="make_release", include_prior_dates=False)
             release = OapenMetadataRelease.from_dict(release_dict)
 

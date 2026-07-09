@@ -30,7 +30,7 @@ from abc import ABC, abstractmethod
 import pendulum
 import requests
 from airflow.exceptions import AirflowException, AirflowSkipException
-from airflow.hooks.base import BaseHook
+from airflow.sdk import BaseHook
 from airflow.decorators import dag, task, task_group
 from bs4 import BeautifulSoup, SoupStrainer
 from google.cloud.bigquery import TimePartitioningType, SourceFormat, WriteDisposition, Client
@@ -55,7 +55,6 @@ from observatory_platform.files import add_partition_date, convert
 from observatory_platform.airflow.release import PartitionRelease, set_task_state
 from observatory_platform.airflow.workflow import CloudWorkspace, cleanup
 from observatory_platform.airflow.airflow import on_failure_callback
-
 
 JSTOR_PROCESSED_LABEL_NAME = "processed_report"
 
@@ -408,7 +407,7 @@ def create_dag(
 
                 release = JstorRelease.from_dict(release)
                 api = make_jstor_api(entity_type, entity_id, sender=jstor_send_email, conn_id=gmail_api_conn_id)
-                cleanup(dag_id=dag_id, workflow_folder=release.workflow_folder)
+                cleanup(release.workflow_folder)
                 success = api.add_labels(release.reports)
                 set_task_state(success, context["ti"].task_id, release=release)
 
