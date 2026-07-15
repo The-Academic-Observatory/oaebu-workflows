@@ -387,6 +387,7 @@ class TestOnixWorkflow(SandboxTestCase):
                     "cleanup_workflow",
                     "create_book_product_table",
                     "export_tables.export_book_metrics_country",
+                    "export_tables.export_book_metrics_city",
                     "create_crossref_metadata_table",
                     "export_tables.export_book_metrics_institution",
                     *intermediate_tasks,
@@ -401,6 +402,7 @@ class TestOnixWorkflow(SandboxTestCase):
                     "export_tables.export_book_metrics_author",
                     "export_tables.export_book_institution_list",
                     "export_tables.export_book_metrics_country",
+                    "export_tables.export_book_metrics_city",
                     "export_tables.export_book_metrics_institution",
                     "export_tables.export_book_metrics_subjects",
                     "export_tables.export_book_list",
@@ -411,6 +413,7 @@ class TestOnixWorkflow(SandboxTestCase):
                 "export_tables.export_book_metrics_institution": ["update_latest_export_tables"],
                 "export_tables.export_book_metrics": ["update_latest_export_tables"],
                 "export_tables.export_book_metrics_country": ["update_latest_export_tables"],
+                "export_tables.export_book_metrics_city": ["update_latest_export_tables"],
                 "export_tables.export_book_metrics_author": ["update_latest_export_tables"],
                 "export_tables.export_book_metrics_subjects": ["update_latest_export_tables"],
                 "update_latest_export_tables": ["add_new_dataset_releases"],
@@ -926,16 +929,6 @@ class TestOnixWorkflow(SandboxTestCase):
                 self.gcp_project_id, oaebu_output_dataset_id, bq_book_product_table_name, release.snapshot_date
             )
 
-            # TODO: Remove
-            rows = list(self.bigquery_client.list_rows(table_id))
-            actual_content = [dict(row) for row in rows]
-            print(actual_content)
-            print(
-                load_and_parse_json(
-                    os.path.join(self.fixtures_folder, "e2e_outputs", "book_product.json"),
-                    date_fields={"month", "published_date"},
-                )
-            )
             self.assert_table_content(
                 table_id,
                 load_and_parse_json(
@@ -950,10 +943,10 @@ class TestOnixWorkflow(SandboxTestCase):
                 ("book_list", 4),
                 ("book_institution_list", 1),
                 ("book_metrics", 3),
-                ("book_metrics_country", 14),
+                ("book_metrics_country", 32),
                 ("book_metrics_institution", 1),
                 ("book_metrics_author", 1),
-                # ("book_metrics_city", 39), # No data sources currently use city
+                ("book_metrics_city", 39),
                 ("book_metrics_subject_bic", 1),
                 ("book_metrics_subject_bisac", 0),
                 ("book_metrics_subject_thema", 1),
