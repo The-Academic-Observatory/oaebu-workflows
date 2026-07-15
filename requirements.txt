@@ -12,5 +12,5 @@ liccheck>=0.4.9,<1
 flake8>=6.0.0,<7
 coverage>=5.2,<6
 faker>=8.12.1,<9
-vcrpy>=7.0.0, <8
+vcrpy==8.3.0
 responses>=0,<1
