@@ -525,7 +525,7 @@ def create_dag(
                 bisac_table_id=bisac_table_id,
                 **dp_tables,
             )
-            logging.info(f"Book Product SQL:\n{sql}")
+            logging.debug(f"Book Product SQL:\n{sql}")
 
             # Create the table
             with open(os.path.join(default_schema_folder("onix_workflow"), "book_product.json"), "r") as f:
@@ -673,7 +673,7 @@ def create_dag(
                 bisac_table_id=bisac_table_id,
                 thema_table_id=thema_table_id,
             )
-            logging.info(f"{output_table} SQL:\n{sql}")
+            logging.debug(f"{output_table} SQL:\n{sql}")
 
             client = Client(project=cloud_workspace.project_id)
             status = bq_create_table_from_query(

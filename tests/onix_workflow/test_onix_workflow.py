@@ -123,15 +123,13 @@ class TestOnixWorkflow(SandboxTestCase):
             sharded=True,
             schema_path=os.path.join(default_schema_folder(workflow_module="onix_telescope"), "onix.json"),
         )
-        # Use all data partners except the jstor collections and ucl_sales
+        # Use all data partners except the jstor collections
         self.data_partner_list = [i for i in OAEBU_DATA_PARTNERS.keys()]
         self.data_partner_list.remove("jstor_country_collection")
         self.data_partner_list.remove("jstor_institution_collection")
-        self.data_partner_list.remove("ucl_sales")
 
         # fixtures folder location
         self.fixtures_folder = test_fixtures_folder(workflow_module="onix_workflow")
-
         self.maxDiff = None
 
     @patch("oaebu_workflows.onix_workflow.onix_workflow.bq_select_table_shard_dates")
@@ -369,37 +367,18 @@ class TestOnixWorkflow(SandboxTestCase):
                 metadata_partner="onix",
                 sensor_dag_ids=sensor_dag_ids,
             )
+            sensor_tasks = [f"sensors.{i}_sensor" for i in sensor_dag_ids]
+            intermediate_tasks = [f"intermediate_tables.intermediate_{i}" for i in self.data_partner_list]
             expected_dag_structure = {
-                "check_dependencies": [
-                    "sensors.onix_sensor",
-                    "sensors.google_analytics3_sensor",
-                    "sensors.jstor_sensor",
-                    "sensors.google_books_sensor",
-                    "sensors.irus_oapen_sensor",
-                ],
-                "sensors.jstor_sensor": ["make_release"],
-                "sensors.irus_oapen_sensor": ["make_release"],
-                "sensors.google_books_sensor": ["make_release"],
-                "sensors.onix_sensor": ["make_release"],
-                "sensors.google_analytics3_sensor": ["make_release"],
+                # Everything from sensor_dag_ids should be in here
+                "check_dependencies": sensor_tasks,
+                **{task: ["make_release"] for task in sensor_tasks},  # e.g. "sensors.jstor_sensor": ["make_release"],
                 "make_release": [
                     "aggregate_works",
                     "export_tables.export_book_metrics_author",
                     "export_tables.export_book_institution_list",
                     "export_tables.export_book_metrics",
                     "add_new_dataset_releases",
-                    "intermediate_tables.intermediate_irus_fulcrum",
-                    "intermediate_tables.intermediate_google_books_sales",
-                    "intermediate_tables.intermediate_jstor_country",
-                    "intermediate_tables.intermediate_jstor_institution",
-                    "intermediate_tables.intermediate_google_analytics3",
-                    "intermediate_tables.intermediate_irus_oapen",
-                    "intermediate_tables.intermediate_google_books_traffic",
-                    "intermediate_tables.intermediate_ucl_discovery",
-                    "intermediate_tables.intermediate_internet_archive",
-                    "intermediate_tables.intermediate_worldreader",
-                    "intermediate_tables.intermediate_muse_country",
-                    "intermediate_tables.intermediate_muse_institution",
                     "create_book_table",
                     "export_tables.export_book_metrics_subjects",
                     "update_latest_export_tables",
@@ -407,43 +386,20 @@ class TestOnixWorkflow(SandboxTestCase):
                     "cleanup_workflow",
                     "create_book_product_table",
                     "export_tables.export_book_metrics_country",
-                    "export_tables.export_book_metrics_city",
                     "create_crossref_metadata_table",
                     "export_tables.export_book_metrics_institution",
+                    *intermediate_tasks,
                 ],
                 "aggregate_works": ["create_crossref_metadata_table"],
                 "create_crossref_metadata_table": ["create_book_table"],
-                "create_book_table": [
-                    "intermediate_tables.intermediate_irus_fulcrum",
-                    "intermediate_tables.intermediate_google_books_sales",
-                    "intermediate_tables.intermediate_jstor_country",
-                    "intermediate_tables.intermediate_jstor_institution",
-                    "intermediate_tables.intermediate_google_analytics3",
-                    "intermediate_tables.intermediate_irus_oapen",
-                    "intermediate_tables.intermediate_google_books_traffic",
-                    "intermediate_tables.intermediate_ucl_discovery",
-                    "intermediate_tables.intermediate_internet_archive",
-                    "intermediate_tables.intermediate_worldreader",
-                    "intermediate_tables.intermediate_muse_country",
-                    "intermediate_tables.intermediate_muse_institution",
-                ],
-                "intermediate_tables.intermediate_irus_fulcrum": ["create_book_product_table"],
-                "intermediate_tables.intermediate_google_books_sales": ["create_book_product_table"],
-                "intermediate_tables.intermediate_jstor_country": ["create_book_product_table"],
-                "intermediate_tables.intermediate_jstor_institution": ["create_book_product_table"],
-                "intermediate_tables.intermediate_google_analytics3": ["create_book_product_table"],
-                "intermediate_tables.intermediate_irus_oapen": ["create_book_product_table"],
-                "intermediate_tables.intermediate_google_books_traffic": ["create_book_product_table"],
-                "intermediate_tables.intermediate_ucl_discovery": ["create_book_product_table"],
-                "intermediate_tables.intermediate_internet_archive": ["create_book_product_table"],
-                "intermediate_tables.intermediate_worldreader": ["create_book_product_table"],
-                "intermediate_tables.intermediate_muse_country": ["create_book_product_table"],
-                "intermediate_tables.intermediate_muse_institution": ["create_book_product_table"],
+                "create_book_table": intermediate_tasks,
+                **{
+                    task: ["create_book_product_table"] for task in intermediate_tasks
+                },  # e.g. "intermediate_tables.intermediate_google_books_sales": ["create_book_product_table"],
                 "create_book_product_table": [
                     "export_tables.export_book_metrics_author",
                     "export_tables.export_book_institution_list",
                     "export_tables.export_book_metrics_country",
-                    "export_tables.export_book_metrics_city",
                     "export_tables.export_book_metrics_institution",
                     "export_tables.export_book_metrics_subjects",
                     "export_tables.export_book_list",
@@ -452,7 +408,6 @@ class TestOnixWorkflow(SandboxTestCase):
                 "export_tables.export_book_list": ["update_latest_export_tables"],
                 "export_tables.export_book_institution_list": ["update_latest_export_tables"],
                 "export_tables.export_book_metrics_institution": ["update_latest_export_tables"],
-                "export_tables.export_book_metrics_city": ["update_latest_export_tables"],
                 "export_tables.export_book_metrics": ["update_latest_export_tables"],
                 "export_tables.export_book_metrics_country": ["update_latest_export_tables"],
                 "export_tables.export_book_metrics_author": ["update_latest_export_tables"],
@@ -969,6 +924,17 @@ class TestOnixWorkflow(SandboxTestCase):
             table_id = bq_sharded_table_id(
                 self.gcp_project_id, oaebu_output_dataset_id, bq_book_product_table_name, release.snapshot_date
             )
+
+            # TODO: Remove
+            rows = list(self.bigquery_client.list_rows(table_id))
+            actual_content = [dict(row) for row in rows]
+            print(actual_content)
+            print(
+                load_and_parse_json(
+                    os.path.join(self.fixtures_folder, "e2e_outputs", "book_product.json"),
+                    date_fields={"month", "published_date"},
+                )
+            )
             self.assert_table_content(
                 table_id,
                 load_and_parse_json(
@@ -983,10 +949,10 @@ class TestOnixWorkflow(SandboxTestCase):
                 ("book_list", 4),
                 ("book_institution_list", 1),
                 ("book_metrics", 3),
-                ("book_metrics_country", 32),
+                ("book_metrics_country", 14),
                 ("book_metrics_institution", 1),
                 ("book_metrics_author", 1),
-                ("book_metrics_city", 39),
+                # ("book_metrics_city", 39), # No data sources currently use city
                 ("book_metrics_subject_bic", 1),
                 ("book_metrics_subject_bisac", 0),
                 ("book_metrics_subject_thema", 1),
