@@ -1,5 +1,4 @@
 name: Unit Tests
-
 on: [push]
 
 jobs:
@@ -17,25 +16,23 @@ jobs:
         with:
           lfs: true
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-
           cd ..
           # Clone protection required until fix - https://github.com/git-lfs/git-lfs/issues/5749
           export GIT_CLONE_PROTECTION_ACTIVE=false 
           git clone -b airflow_3 https://github.com/The-Academic-Observatory/observatory-platform.git 
           # TODO: Remove branch when airflow_3 is merged
           cd observatory-platform
-          pip install -e .[tests] --constraint https://raw.githubusercontent.com/apache/airflow/constraints-3.2.2/constraints-no-providers-${{ matrix.python-version }}.txt
+          uv pip install --system -e .[tests] --constraint https://raw.githubusercontent.com/apache/airflow/constraints-3.2.2/constraints-no-providers-${{ matrix.python-version }}.txt
           cd ..
           cd oaebu-workflows
-          pip install -r requirements.txt --constraint https://raw.githubusercontent.com/apache/airflow/constraints-3.2.2/constraints-no-providers-${{ matrix.python-version }}.txt
+          uv pip install --system -r requirements.txt --constraint https://raw.githubusercontent.com/apache/airflow/constraints-3.2.2/constraints-no-providers-${{ matrix.python-version }}.txt
 
       - name: Add dag folder to PYTHONPATH
         run: |
@@ -51,7 +48,9 @@ jobs:
       - name: Check licenses
         run: |
           # stop the build if there are licensing issues
-          liccheck --sfile strategy.ini --rfile requirements.txt --level CAUTIOUS --reporting liccheck-output.txt --no-deps
+          uv venv /tmp/licensecheck-env --python ${{ matrix.python-version }}
+          uv pip install --python /tmp/licensecheck-env/bin/python "pip<24.1" licensecheck
+          /tmp/licensecheck-env/bin/licensecheck
 
       - name: Lint with flake8
         run: |
