@@ -31,6 +31,7 @@ from oaebu_workflows.ucl_discovery_telescope.ucl_discovery_telescope import (
     get_isbn_eprint_mappings,
     download_discovery_stats,
     transform_discovery_stats,
+    _rate_limited_wait,
 )
 from observatory_platform.airflow.workflow import Workflow
 from observatory_platform.dataset_api import DatasetAPI
@@ -376,9 +377,9 @@ class TestDownloadDiscoveryStats(TestCase):
 
         # Check that constructed urls are correct
         expected_calls = [
-            call(expected_countries_url, impersonate="chrome124"),
+            call(expected_countries_url, impersonate="chrome124", wait=_rate_limited_wait),
             call().json(),
-            call(expected_totals_url, impersonate="chrome124"),
+            call(expected_totals_url, impersonate="chrome124", wait=_rate_limited_wait),
             call().json(),
         ]
         mock_retry_get_url.assert_has_calls(expected_calls)
