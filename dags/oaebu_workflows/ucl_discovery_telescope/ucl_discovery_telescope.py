@@ -17,6 +17,7 @@
 
 import logging
 import os
+from time import sleep
 from typing import Union
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -26,6 +27,9 @@ from airflow.hooks.base import BaseHook
 from google.cloud.bigquery import SourceFormat, TimePartitioningType, WriteDisposition, Client
 from google.oauth2 import service_account
 from apiclient import discovery
+import limits
+from limits.storage import MemoryStorage
+from limits.strategies import MovingWindowRateLimiter
 
 from oaebu_workflows.oaebu_partners import OaebuPartner, partner_from_str
 from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
@@ -38,6 +42,9 @@ from observatory_platform.files import add_partition_date
 from observatory_platform.airflow.release import PartitionRelease, set_task_state
 from observatory_platform.airflow.workflow import CloudWorkspace, cleanup
 from observatory_platform.airflow.airflow import on_failure_callback
+
+RATE = limits.parse("30/minute")
+LIMITER = MovingWindowRateLimiter(MemoryStorage())
 
 
 class UclDiscoveryRelease(PartitionRelease):
@@ -389,6 +396,15 @@ def get_isbn_eprint_mappings(sheet_id: str, service_account_conn_id: str, cutoff
     return mappings
 
 
+def _rate_limited_wait(retry_state):
+    """Waits a bit (exponential backoff), then until the rate limiter is clear."""
+    backoff = min(5 * 2 ** (retry_state.attempt_number - 1), 300)
+    sleep(backoff)
+    while not LIMITER.hit(RATE, "discovery-api"):
+        sleep(2)
+    return 0
+
+
 def download_discovery_stats(eprint_id: str, start_date: pendulum.DateTime, end_date: pendulum.DateTime):
     """Downloads the discovery stats for a given eprint ID within a specified date range.
 
@@ -409,9 +425,18 @@ def download_discovery_stats(eprint_id: str, start_date: pendulum.DateTime, end_
         f"&irs2report=eprint&set_name=eprint&set_value={eprint_id}&datatype=downloads&graph_type=column"
         "&view=Google%3A%3AGraph&date_resolution=month&title=Download+activity+-+last+12+months&export=JSON"
     )
-    response = retry_get_url(countries_url, impersonate="chrome124")
+
+    # Rate limiter. Seems unintuitive, but 'while not' is correct.
+    while not LIMITER.hit(RATE, "discovery-api"):
+        sleep(2)
+    response = retry_get_url(countries_url, impersonate="chrome124", wait=_rate_limited_wait)
+    logging.info(f"Received response from: {countries_url}")
     country = response.json()
-    response = retry_get_url(totals_url, impersonate="chrome124")
+
+    while not LIMITER.hit(RATE, "discovery-api"):
+        sleep(2)
+    response = retry_get_url(totals_url, impersonate="chrome124", wait=_rate_limited_wait)
+    logging.info(f"Received response from: {totals_url}")
     totals = response.json()
 
     # Perform some checks on the returned data
