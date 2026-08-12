@@ -1,4 +1,4 @@
-FROM astrocrpublic.azurecr.io/runtime:3.2-5
+FROM astrocrpublic.azurecr.io/runtime:3.2-6
 
 # Root user for installations
 USER root 
