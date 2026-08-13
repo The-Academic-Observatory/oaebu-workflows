@@ -31,16 +31,14 @@ jobs:
           uv venv --python ${{ matrix.python-version }} /tmp/venv
           source /tmp/venv/bin/activate
 
-          # Install oaebu workflows
-          uv pip install -e .[tests] 
 
           # Clone protection required until fix - https://github.com/git-lfs/git-lfs/issues/5749
           export GIT_CLONE_PROTECTION_ACTIVE=false 
           git clone --depth 1 https://github.com/The-Academic-Observatory/observatory-platform.git 
           uv pip install -e observatory-platform[tests] --constraint https://raw.githubusercontent.com/apache/airflow/constraints-3.2.2/constraints-no-providers-${{ matrix.python-version }}.txt
 
-          cd oaebu-workflows
-          uv pip install -r requirements.txt --constraint https://raw.githubusercontent.com/apache/airflow/constraints-3.2.2/constraints-no-providers-${{ matrix.python-version }}.txt
+          # Install oaebu workflows
+          uv pip install -e oaebu-workflows[tests] --constraint https://raw.githubusercontent.com/apache/airflow/constraints-3.2.2/constraints-no-providers-${{ matrix.python-version }}.txt
 
           uv pip freeze --system # for debugging
 
