@@ -161,15 +161,6 @@ OAEBU_METADATA_PARTNERS = dict(
         sharded=True,
         schema_path=os.path.join(schema_folder(workflow_module="onix_telescope"), "onix.json"),
     ),
-    thoth=OaebuPartner(
-        type_id="thoth",
-        bq_dataset_id="onix",
-        bq_table_name="onix",
-        isbn_field_name="ISBN13",
-        title_field_name="TitleDetails.TitleElements.TitleText",
-        sharded=True,
-        schema_path=os.path.join(schema_folder(workflow_module="onix_telescope"), "onix.json"),
-    ),
     oapen_metadata=OaebuPartner(
         type_id="oapen_metadata",
         bq_dataset_id="onix",

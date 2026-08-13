@@ -23,7 +23,6 @@ from xml.parsers.expat import ExpatError
 
 import pendulum
 from airflow.exceptions import AirflowException
-from airflow.utils.state import State
 from tenacity import stop_after_attempt
 
 from oaebu_workflows.config import test_fixtures_folder, module_file_path
@@ -34,10 +33,9 @@ from oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope import (
     download_metadata,
     create_dag,
 )
-from observatory_platform.airflow.workflow import Workflow
+from observatory_platform.airflow.workflow import Workflow, make_workflow_folder
 from observatory_platform.dataset_api import DatasetAPI
 from observatory_platform.google.bigquery import bq_sharded_table_id
-from observatory_platform.google.gcs import gcs_blob_name_from_path
 from observatory_platform.sandbox.sandbox_environment import SandboxEnvironment
 from observatory_platform.sandbox.test_utils import SandboxTestCase, load_and_parse_json, compare_lists_of_dicts
 
@@ -59,6 +57,7 @@ class TestOapenMetadataTelescope(SandboxTestCase):
         fixtures_folder = test_fixtures_folder(workflow_module="oapen_metadata_telescope")
         self.valid_download_xml = os.path.join(fixtures_folder, "metadata_download_valid.xml")  # Valid XML
         self.test_table = os.path.join(fixtures_folder, "test_table.json")  # File for testing final table
+        self.maxDiff = None
 
     def test_dag_structure(self):
         """Test that the Oapen Metadata DAG has the correct structure"""
@@ -115,119 +114,68 @@ class TestOapenMetadataTelescope(SandboxTestCase):
                 metadata_partner=metadata_partner,
                 elevate_related_products=True,
                 api_bq_dataset_id=api_bq_dataset_id,
+                retries=0,
             )
+            env.serialize_dag(dag)
 
-            # first run
-            with env.create_dag_run(dag, logical_date=pendulum.datetime(year=2021, month=2, day=1)):
-                # Test that all dependencies are specified: no error should be thrown
-                ti = env.run_task("check_dependencies")
-                self.assertEqual(ti.state, State.SUCCESS)
-
-                # Make release task
-                ti = env.run_task("make_release")
-                self.assertEqual(ti.state, State.SUCCESS)
-                release_dict = ti.xcom_pull(task_ids="make_release", include_prior_dates=False)
-                expected_release_dict = {
-                    "dag_id": "oapen_metadata",
-                    "run_id": "scheduled__2021-02-01T00:00:00+00:00",
-                    "snapshot_date": "2021-02-07",
-                }
-                self.assertEqual(release_dict, expected_release_dict)
-                release = OapenMetadataRelease.from_dict(release_dict)
-
-                # Download task
+            logical_date = pendulum.datetime(year=2021, month=2, day=1)
+            now = pendulum.now("UTC")
+            with (
+                patch(
+                    "oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope.retry_get_url"
+                ) as mock_retry_get_url,
+                patch("oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope.pendulum.now") as mock_now,
+            ):
+                # Set the GET request's return to our test file
                 with open(self.valid_download_xml, "rb") as f:
                     content = f.read()
-                with patch(
-                    "oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope.retry_get_url"
-                ) as mock_retry_get_url:
-                    mock_retry_get_url.return_value = MagicMock(
-                        status_code=200, content=content, text=content.decode("utf-8")
-                    )
-                    ti = env.run_task("download")
-                    self.assertEqual(ti.state, State.SUCCESS)
-
-                # Transform task
-                ti = env.run_task("transform")
-                self.assertEqual(ti.state, State.SUCCESS)
-
-                # Bigquery load task
-                ti = env.run_task("bq_load")
-                self.assertEqual(ti.state, State.SUCCESS)
-
-                ### Make Assertions ###
-
-                # Test download task
-                self.assertTrue(os.path.exists(release.download_path))
-                self.assert_file_integrity(release.download_path, "c35696a6e95912e7eb6a7246f2d17c31", "md5")
-
-                # Test that download file uploaded to BQ
-                self.assert_blob_integrity(
-                    env.download_bucket, gcs_blob_name_from_path(release.download_path), release.download_path
+                mock_retry_get_url.return_value = MagicMock(
+                    status_code=200, content=content, text=content.decode("utf-8")
                 )
+                mock_now.return_value = now
 
-                # Test transform task produced the files we care about
-                invalid_products_path = os.path.join(release.transform_folder, "invalid_products.xml")
-                self.assertTrue(os.path.exists(invalid_products_path))
+                # Run the dag test
+                dagrun = dag.test(logical_date=logical_date)
+            self.assertEqual(dagrun.state, "success")
 
-                # Check file content is as expected
-                self.assert_file_integrity(invalid_products_path, "87eaba5f1d94b09bfd081b16f7680e4f", "md5")
+            # Get the release object
+            release_ti = dagrun.get_task_instance(task_id="make_release")
+            self.assertEqual(release_ti.state, "success")
+            release_dict = release_ti.xcom_pull(task_ids="make_release", include_prior_dates=False)
+            release = OapenMetadataRelease.from_dict(release_dict)
 
-                # Test that transformed files uploaded to BQ
-                self.assert_blob_integrity(
-                    env.transform_bucket, gcs_blob_name_from_path(release.transform_path), release.transform_path
-                )
-                self.assert_blob_integrity(
-                    env.transform_bucket, gcs_blob_name_from_path(invalid_products_path), invalid_products_path
-                )
+            # Test that table is loaded to BQ
+            table_id = bq_sharded_table_id(
+                env.cloud_workspace.project_id,
+                metadata_partner.bq_dataset_id,
+                metadata_partner.bq_table_name,
+                release.snapshot_date,
+            )
+            self.assert_table_integrity(table_id, expected_rows=5)
+            self.assert_table_content(table_id, load_and_parse_json(self.test_table), primary_key="ISBN13")
 
-                # Test that table is loaded to BQ
-                table_id = bq_sharded_table_id(
-                    env.cloud_workspace.project_id,
-                    metadata_partner.bq_dataset_id,
-                    metadata_partner.bq_table_name,
-                    release.snapshot_date,
-                )
-                self.assert_table_integrity(table_id, expected_rows=5)
-                self.assert_table_content(table_id, load_and_parse_json(self.test_table), primary_key="ISBN13")
-
-                # Set up the API
-                api = DatasetAPI(bq_project_id=self.project_id, bq_dataset_id=api_bq_dataset_id)
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="oapen_metadata")
-                self.assertEqual(len(dataset_releases), 0)
-
-                now = pendulum.now("UTC")
-                with patch(
-                    "oaebu_workflows.oapen_metadata_telescope.oapen_metadata_telescope.pendulum.now"
-                ) as mock_now:
-                    mock_now.return_value = now
-                    ti = env.run_task("add_new_dataset_releases")
-                    self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="oapen_metadata")
-                self.assertEqual(len(dataset_releases), 1)
-                expected_release = {
-                    "dag_id": dag_id,
-                    "entity_id": "oapen_metadata",
-                    "dag_run_id": release.run_id,
-                    "created": now.to_iso8601_string(),
-                    "modified": now.to_iso8601_string(),
-                    "data_interval_start": "2021-02-01T00:00:00Z",
-                    "data_interval_end": "2021-02-07T12:00:00Z",
-                    "snapshot_date": "2021-02-07T00:00:00Z",
-                    "partition_date": None,
-                    "changefile_start_date": None,
-                    "changefile_end_date": None,
-                    "sequence_start": None,
-                    "sequence_end": None,
-                    "extra": {},
-                }
-                self.assertEqual(expected_release, dataset_releases[0].to_dict())
-
-                # Test that all data deleted
-                workflow_folder_path = release.workflow_folder
-                ti = env.run_task("cleanup_workflow")
-                self.assertEqual(ti.state, State.SUCCESS)
-                self.assert_cleanup(workflow_folder_path)
+            # Assert API entry
+            api = DatasetAPI(bq_project_id=self.project_id, bq_dataset_id=api_bq_dataset_id)
+            dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="oapen_metadata")
+            self.assertEqual(len(dataset_releases), 1)
+            expected_release = {
+                "dag_id": dag_id,
+                "entity_id": "oapen_metadata",
+                "dag_run_id": release.run_id,
+                "created": now.to_iso8601_string(),
+                "modified": now.to_iso8601_string(),
+                "data_interval_start": "2021-02-01T00:00:00Z",
+                "data_interval_end": "2021-02-01T00:00:00Z",
+                "snapshot_date": "2021-02-01T00:00:00Z",
+                "partition_date": None,
+                "changefile_start_date": None,
+                "changefile_end_date": None,
+                "sequence_start": None,
+                "sequence_end": None,
+                "extra": {},
+            }
+            self.assertEqual(expected_release, dataset_releases[0].to_dict())
+            self.assert_cleanup(make_workflow_folder(dag_id, dagrun.run_id, make_dir=False))
 
 
 class TestDownloadMetadata(unittest.TestCase):

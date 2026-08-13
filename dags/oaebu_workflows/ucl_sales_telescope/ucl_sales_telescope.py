@@ -22,7 +22,7 @@ from typing import List, Union
 
 import pendulum
 from airflow.decorators import dag, task
-from airflow.hooks.base import BaseHook
+from airflow.sdk import BaseHook
 from google.cloud.bigquery import SourceFormat, TimePartitioningType, WriteDisposition, Client
 from google.oauth2 import service_account
 from apiclient import discovery
@@ -33,7 +33,7 @@ from observatory_platform.airflow.release import PartitionRelease, set_task_stat
 from observatory_platform.airflow.tasks import check_dependencies
 from observatory_platform.airflow.workflow import CloudWorkspace, cleanup
 from observatory_platform.dataset_api import DatasetAPI, DatasetRelease
-from observatory_platform.files import save_jsonl_gz, load_jsonl, add_partition_date
+from observatory_platform.files import save_jsonl_gz, add_partition_date
 from observatory_platform.google.bigquery import bq_load_table, bq_table_id, bq_create_dataset
 from observatory_platform.google.gcs import gcs_blob_uri, gcs_upload_files, gcs_blob_name_from_path, gcs_download_blob
 
@@ -250,7 +250,7 @@ def create_dag(
             """Delete all files, folders and XComs associated with this release."""
 
             release = UclSalesRelease.from_dict(release)
-            cleanup(dag_id=dag_id, workflow_folder=release.workflow_folder)
+            cleanup(release.workflow_folder)
 
         task_check_dependencies = check_dependencies(airflow_conns=[oaebu_service_account_conn_id])
         xcom_release = _make_release()

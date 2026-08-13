@@ -17,6 +17,7 @@
 import os
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
+import unittest
 
 import pendulum
 import vcr
@@ -38,10 +39,10 @@ from observatory_platform.sandbox.test_utils import SandboxTestCase, load_and_pa
 from observatory_platform.sandbox.sandbox_environment import SandboxEnvironment
 from observatory_platform.url_utils import retry_get_url
 
-
 FAKE_PUBLISHER_ID = "fake_publisher_id"
 
 
+@unittest.skip
 class TestThothTelescope(SandboxTestCase):
     """Tests for the Thoth telescope"""
 

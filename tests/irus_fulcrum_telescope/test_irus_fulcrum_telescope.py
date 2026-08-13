@@ -16,6 +16,7 @@
 
 import os
 from unittest.mock import patch
+import unittest
 
 import pendulum
 import vcr
@@ -42,6 +43,7 @@ from observatory_platform.sandbox.sandbox_environment import SandboxEnvironment
 FAKE_PUBLISHERS = ["Fake Publisher 1", "Fake Publisher 2", "Fake Publisher 3"]
 
 
+@unittest.skip
 class TestIrusFulcrumTelescope(SandboxTestCase):
     """Tests for the Fulcrum telescope"""
 

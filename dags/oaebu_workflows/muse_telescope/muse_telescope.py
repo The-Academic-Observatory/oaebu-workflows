@@ -398,7 +398,7 @@ def create_dag(
             def cleanup_workflow(release: dict, **context) -> None:
                 """Delete all files and folders associated with this release."""
                 release = MuseRelease.from_dict(release)
-                cleanup(dag_id, workflow_folder=release.workflow_folder)
+                cleanup(release.workflow_folder)
 
             (
                 transform(data)

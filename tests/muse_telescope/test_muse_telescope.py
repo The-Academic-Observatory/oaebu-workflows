@@ -38,7 +38,7 @@ from oaebu_workflows.muse_telescope.muse_telescope import (
     read_gzipped_report,
     MuseRelease,
 )
-from observatory_platform.airflow.workflow import Workflow
+from observatory_platform.airflow.workflow import Workflow, make_workflow_folder
 from observatory_platform.dataset_api import DatasetAPI
 from observatory_platform.google.bigquery import bq_table_id
 from observatory_platform.sandbox.sandbox_environment import SandboxEnvironment
@@ -134,15 +134,11 @@ class TestMuseTelescope(SandboxTestCase):
         http = HttpMockSequence(muse_http_mock_sequence(self.report_file))
         mock_build.return_value = build("gmail", "v1", http=http, cache_discovery=False)
 
-        # Setup Observatory environment
         env = SandboxEnvironment(self.project_id, self.data_location)
 
-        # Create the Observatory environment and run tests
         with env.create(task_logging=True):
-            # Add gmail connection
             env.add_connection(dummy_gmail_connection())
 
-            # Setup Telescope
             logical_date = pendulum.datetime(year=2024, month=3, day=1)
             country_partner = partner_from_str("muse_country")
             institution_partner = partner_from_str("muse_institution")
@@ -158,113 +154,60 @@ class TestMuseTelescope(SandboxTestCase):
                 country_data_partner=country_partner,
                 institution_data_partner=institution_partner,
                 api_bq_dataset_id=api_bq_dataset_id,
+                retries=0,
+            )
+            env.serialize_dag(dag)
+
+            now = pendulum.now("UTC")
+            with patch("oaebu_workflows.muse_telescope.muse_telescope.pendulum.now") as mock_now:
+                mock_now.return_value = now
+                dagrun = dag.test(logical_date=logical_date)
+
+            self.assertEqual(dagrun.state, "success")
+
+            # Get the release object
+            release_ti = dagrun.get_task_instance(task_id="create_releases")
+            release_dicts = release_ti.xcom_pull(task_ids="create_releases", include_prior_dates=False)
+            self.assertEqual(len(release_dicts), 1)
+
+            # Check BQ tables loaded correctly
+            country_table_id = bq_table_id(
+                env.cloud_workspace.project_id,
+                country_partner.bq_dataset_id,
+                country_partner.bq_table_name,
+            )
+            self.assert_table_integrity(country_table_id, 6)
+            expected_country_output_file = os.path.join(
+                test_fixtures_folder("muse_telescope"), "e2e_country_output.json"
+            )
+            expected_country_output = load_and_parse_json(expected_country_output_file, date_fields=["release_date"])
+            self.assert_table_content(country_table_id, expected_content=expected_country_output, primary_key="isbn")
+
+            institution_table_id = bq_table_id(
+                env.cloud_workspace.project_id,
+                institution_partner.bq_dataset_id,
+                institution_partner.bq_table_name,
+            )
+            self.assert_table_integrity(institution_table_id, 6)
+            expected_institution_output_file = os.path.join(
+                test_fixtures_folder("muse_telescope"), "e2e_institution_output.json"
+            )
+            expected_institution_output = load_and_parse_json(
+                expected_institution_output_file, date_fields=["release_date"]
+            )
+            self.assert_table_content(
+                institution_table_id, expected_content=expected_institution_output, primary_key="isbn"
             )
 
-            # Begin DAG run
-            with env.create_dag_run(dag, logical_date=logical_date):
-                # Test that all dependencies are specified: no error should be thrown
-                ti = env.run_task("check_dependencies")
-                self.assertEqual(ti.state, State.SUCCESS)
+            # Check API dataset release entries
+            api = DatasetAPI(bq_project_id=self.project_id, bq_dataset_id=api_bq_dataset_id)
+            dataset_releases_country = api.get_dataset_releases(dag_id=dag_id, entity_id="muse_country")
+            self.assertEqual(len(dataset_releases_country), 1)
+            dataset_releases_institution = api.get_dataset_releases(dag_id=dag_id, entity_id="muse_institution")
+            self.assertEqual(len(dataset_releases_institution), 1)
 
-                # Test create_releases task
-                ti = env.run_task("create_releases")
-                self.assertEqual(ti.state, State.SUCCESS)
-
-                release_dicts = ti.xcom_pull(task_ids="create_releases", include_prior_dates=False)
-                self.assertEqual(len(release_dicts), 1)
-                release = MuseRelease.from_dict(release_dicts[0])
-
-                # Check that the file was "downloaded" and uploaded to GCS
-                self.assert_blob_integrity(
-                    env.download_bucket,
-                    release.download_blob_name,
-                    self.report_file,
-                )
-
-                # Test transform task
-                ti = env.run_task("process_release.transform", map_index=0)
-                self.assertEqual(ti.state, State.SUCCESS)
-
-                # Check that transformed file was uploaded to GCS
-                self.assert_blob_integrity(
-                    env.transform_bucket,
-                    release.country_transform_blob_name,
-                    release.country_transform_path,
-                )
-                self.assert_blob_integrity(
-                    env.transform_bucket,
-                    release.institution_transform_blob_name,
-                    release.institution_transform_path,
-                )
-
-                # Test bq_load_country task
-                ti = env.run_task("process_release.bq_load_country", map_index=0)
-                self.assertEqual(ti.state, State.SUCCESS)
-
-                country_table_id = bq_table_id(
-                    env.cloud_workspace.project_id,
-                    country_partner.bq_dataset_id,
-                    country_partner.bq_table_name,
-                )
-                self.assert_table_integrity(country_table_id, 6)
-                expected_country_output_file = os.path.join(
-                    test_fixtures_folder("muse_telescope"), "e2e_country_output.json"
-                )
-                expected_country_output = load_and_parse_json(
-                    expected_country_output_file, date_fields=["release_date"]
-                )
-                self.assert_table_content(
-                    country_table_id, expected_content=expected_country_output, primary_key="isbn"
-                )
-
-                # Test bq_load_institution task
-                ti = env.run_task("process_release.bq_load_institution", map_index=0)
-                self.assertEqual(ti.state, State.SUCCESS)
-
-                institution_table_id = bq_table_id(
-                    env.cloud_workspace.project_id,
-                    institution_partner.bq_dataset_id,
-                    institution_partner.bq_table_name,
-                )
-                self.assert_table_integrity(institution_table_id, 6)
-                expected_institution_output_file = os.path.join(
-                    test_fixtures_folder("muse_telescope"), "e2e_institution_output.json"
-                )
-                expected_institution_output = load_and_parse_json(
-                    expected_institution_output_file, date_fields=["release_date"]
-                )
-                self.assert_table_content(
-                    institution_table_id, expected_content=expected_institution_output, primary_key="isbn"
-                )
-
-                # Test add_new_dataset_releases task
-                api = DatasetAPI(bq_project_id=self.project_id, bq_dataset_id=api_bq_dataset_id)
-                self.assertEqual(len(api.get_dataset_releases(dag_id=dag_id, entity_id="muse_country")), 0)
-                self.assertEqual(len(api.get_dataset_releases(dag_id=dag_id, entity_id="muse_institution")), 0)
-
-                now = pendulum.now("UTC")
-                with patch("oaebu_workflows.muse_telescope.muse_telescope.pendulum.now") as mock_now:
-                    mock_now.return_value = now
-                    ti = env.run_task("process_release.add_new_dataset_releases", map_index=0)
-                self.assertEqual(ti.state, State.SUCCESS)
-
-                dataset_releases_country = api.get_dataset_releases(dag_id=dag_id, entity_id="muse_country")
-                self.assertEqual(len(dataset_releases_country), 1)
-                dataset_releases_institution = api.get_dataset_releases(dag_id=dag_id, entity_id="muse_institution")
-                self.assertEqual(len(dataset_releases_institution), 1)
-
-                # Test add_label task
-                # with patch("observatory_platform.google.gmail.Resource") as mock_service:
-                #     mock_service.users.return_value.messages.return_value.modify.return_value.execute.return_value = http
-
-                ti = env.run_task("process_release.add_label", map_index=0)
-                self.assertEqual(ti.state, State.SUCCESS)
-
-                # Test cleanup_workflow task
-                workflow_folder_path = release.workflow_folder
-                ti = env.run_task("process_release.cleanup_workflow", map_index=0)
-                self.assertEqual(ti.state, State.SUCCESS)
-                self.assert_cleanup(workflow_folder_path)
+            # Check workflow folder cleaned up
+            self.assert_cleanup(make_workflow_folder(dag_id, dagrun.run_id, make_dir=False))
 
 
 def muse_http_mock_sequence(report_path: str) -> list:

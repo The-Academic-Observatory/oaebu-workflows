@@ -23,8 +23,7 @@ from typing import Iterable, List, Optional, Union, Dict
 
 import pendulum
 from airflow.decorators import dag, task, task_group
-from airflow.models.baseoperator import chain
-from airflow.utils.trigger_rule import TriggerRule
+from airflow.sdk import chain, TriggerRule
 from airflow.timetables.base import Timetable
 from google.cloud.bigquery import Client, SourceFormat
 from jinja2 import Environment, FileSystemLoader
@@ -32,7 +31,6 @@ from jinja2 import Environment, FileSystemLoader
 from oaebu_workflows.config import schema_folder as default_schema_folder, sql_folder
 from oaebu_workflows.oaebu_partners import DataPartner, OaebuPartner, partner_from_str, create_bespoke_data_partners
 from oaebu_workflows.onix_workflow.onix_work_aggregation import BookWorkAggregator, BookWorkFamilyAggregator
-from onix_workflow_schedule import OnixWorkflowTimetable
 from observatory_platform.airflow.airflow import on_failure_callback
 from observatory_platform.airflow.release import make_snapshot_date, set_task_state, SnapshotRelease
 from observatory_platform.airflow.sensors import DagCompleteSensor
@@ -210,13 +208,12 @@ def create_dag(
     bespoke_data_partners: List[Dict] = None,
     ga3_views_field="page_views",
     schema_folder: str = default_schema_folder(workflow_module="onix_workflow"),
-    mailto: str = "agent@observatory.academy",
     api_bq_dataset_id: str = "dataset_api",
     # Ariflow parameters
     sensor_dag_ids: List[str] = None,
     catchup: Optional[bool] = False,
     start_date: Optional[pendulum.DateTime] = pendulum.datetime(2022, 8, 1),
-    schedule: Union[str, Timetable] = OnixWorkflowTimetable(),  # Every Sunday and the 5th of the month
+    schedule: Union[str, Timetable] = "15 0 10 * *",
     max_active_runs: int = 1,
     retries: int = 3,
     retry_delay: Union[int, float] = 5,
@@ -310,52 +307,15 @@ def create_dag(
             """
 
             snapshot_date = make_snapshot_date(**context)
-            client = Client(project=cloud_workspace.project_id)
-
-            # Get ONIX table ID
-            if metadata_partner.sharded:
-                onix_source_table_id = bq_table_id(
-                    cloud_workspace.project_id, metadata_partner.bq_dataset_id, metadata_partner.bq_table_name
-                )
-                onix_snapshot_dates = bq_select_table_shard_dates(
-                    table_id=onix_source_table_id, end_date=snapshot_date, client=client
-                )
-
-                if not len(onix_snapshot_dates):
-                    raise RuntimeError("OnixWorkflow.make_release: no ONIX releases found")
-
-                onix_snapshot_date = onix_snapshot_dates[0]  # Get most recent snapshot
-                onix_table_id = bq_sharded_table_id(
-                    cloud_workspace.project_id,
-                    metadata_partner.bq_dataset_id,
-                    metadata_partner.bq_table_name,
-                    onix_snapshot_date,
-                )
-            else:
-                onix_table_id = bq_table_id(
-                    cloud_workspace.project_id, metadata_partner.bq_dataset_id, metadata_partner.bq_table_name
-                )
-
-            # Get Crossref Metadata release date
-            crossref_table_id = bq_table_id(
-                bq_master_crossref_project_id, bq_master_crossref_dataset_id, bq_master_crossref_metadata_table_name
-            )
-            crossref_metadata_snapshot_dates = bq_select_table_shard_dates(
-                table_id=crossref_table_id, end_date=snapshot_date, client=client
-            )
-
-            if not len(crossref_metadata_snapshot_dates):
-                raise RuntimeError("OnixWorkflow.make_release: no Crossref Metadata releases found")
-
-            crossref_master_snapshot_date = crossref_metadata_snapshot_dates[0]  # Get most recent snapshot
-
-            # Make the release object
-            return OnixWorkflowRelease(
+            return _make_release(
                 dag_id=dag_id,
                 run_id=context["run_id"],
                 snapshot_date=snapshot_date,
-                crossref_master_snapshot_date=crossref_master_snapshot_date,
-                onix_table_id=onix_table_id,
+                metadata_partner=metadata_partner,
+                cloud_workspace=cloud_workspace,
+                bq_master_crossref_project_id=bq_master_crossref_project_id,
+                bq_master_crossref_dataset_id=bq_master_crossref_dataset_id,
+                bq_master_crossref_metadata_table_name=bq_master_crossref_metadata_table_name,
             ).to_dict()
 
         @task()
@@ -367,62 +327,16 @@ def create_dag(
             """
 
             release = OnixWorkflowRelease.from_dict(release)
-            bq_create_dataset(
-                project_id=cloud_workspace.project_id,
-                dataset_id=bq_onix_workflow_dataset,
-                location=cloud_workspace.data_location,
-                description="Onix Workflow Aggregations",
+            status = _aggregate_works(
+                release=release,
+                cloud_workspace=cloud_workspace,
+                bq_onix_workflow_dataset=bq_onix_workflow_dataset,
+                bq_worksid_table_name=bq_worksid_table_name,
+                bq_worksid_error_table_name=bq_worksid_error_table_name,
+                bq_workfamilyid_table_name=bq_workfamilyid_table_name,
+                schema_folder=schema_folder,
             )
-
-            # Fetch ONIX data
-            client = Client(project=cloud_workspace.project_id)
-            products = get_onix_records(release.onix_table_id, client=client)
-
-            # Aggregate into works
-            agg = BookWorkAggregator(products)
-            works = agg.aggregate()
-            lookup_table = agg.get_works_lookup_table()
-            save_jsonl_gz(release.workslookup_path, lookup_table)
-
-            # Save errors from aggregation
-            error_table = [{"Error": error} for error in agg.errors]
-            save_jsonl_gz(release.workslookup_errors_path, error_table)
-
-            # Aggregate work families
-            agg = BookWorkFamilyAggregator(works)
-            agg.aggregate()
-            lookup_table = agg.get_works_family_lookup_table()
-            save_jsonl_gz(release.worksfamilylookup_path, lookup_table)
-
-            # Upload the aggregation tables and error tables to a GCP bucket in preparation for BQ loading
-            files = [release.workslookup_path, release.workslookup_errors_path, release.worksfamilylookup_path]
-            gcs_upload_files(bucket_name=cloud_workspace.transform_bucket, file_paths=files)
-
-            # Load the 'WorkID lookup', 'WorkID lookup table errors' and 'WorkFamilyID lookup' tables into BigQuery
-            aggregation_blobs = [
-                release.workslookup_blob_name,
-                release.workslookup_errors_blob_name,
-                release.worksfamilylookup_blob_name,
-            ]
-            aggregation_tables = [
-                bq_worksid_table_name,
-                bq_worksid_error_table_name,
-                bq_workfamilyid_table_name,
-            ]
-            for blob, table_name in zip(aggregation_blobs, aggregation_tables):
-                uri = gcs_blob_uri(cloud_workspace.transform_bucket, blob)
-                table_id = bq_sharded_table_id(
-                    cloud_workspace.project_id, bq_onix_workflow_dataset, table_name, release.snapshot_date
-                )
-                state = bq_load_table(
-                    uri=uri,
-                    table_id=table_id,
-                    schema_file_path=bq_find_schema(path=schema_folder, table_name=table_name),
-                    source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
-                    write_disposition="WRITE_TRUNCATE",
-                    client=client,
-                )
-                set_task_state(state, context["ti"].task_id, release=release)
+            set_task_state(status, context["ti"].task_id, release=release)
 
         @task()
         def create_crossref_metadata_table(release: dict, **context) -> None:
@@ -611,7 +525,7 @@ def create_dag(
                 bisac_table_id=bisac_table_id,
                 **dp_tables,
             )
-            logging.info(f"Book Product SQL:\n{sql}")
+            logging.debug(f"Book Product SQL:\n{sql}")
 
             # Create the table
             with open(os.path.join(default_schema_folder("onix_workflow"), "book_product.json"), "r") as f:
@@ -759,7 +673,7 @@ def create_dag(
                 bisac_table_id=bisac_table_id,
                 thema_table_id=thema_table_id,
             )
-            logging.info(f"{output_table} SQL:\n{sql}")
+            logging.debug(f"{output_table} SQL:\n{sql}")
 
             client = Client(project=cloud_workspace.project_id)
             status = bq_create_table_from_query(
@@ -925,7 +839,7 @@ def create_dag(
             """Cleanup temporary files."""
 
             release = OnixWorkflowRelease.from_dict(release)
-            cleanup(dag_id=dag_id, workflow_folder=release.workflow_folder)
+            cleanup(release.workflow_folder)
 
         # Define DAG tasks
         task_check_dependencies = check_dependencies()
@@ -957,6 +871,140 @@ def create_dag(
         )
 
     return onix_workflow()
+
+
+def _make_release(
+    *,
+    dag_id: str,
+    run_id: str,
+    snapshot_date: pendulum.DateTime,
+    metadata_partner: OaebuPartner,
+    cloud_workspace: CloudWorkspace,
+    bq_master_crossref_project_id: str,
+    bq_master_crossref_dataset_id: str,
+    bq_master_crossref_metadata_table_name: str,
+    client: Client = None,
+) -> OnixWorkflowRelease:
+    """Builds an OnixWorkflowRelease by looking up the most recent ONIX and Crossref snapshot dates.
+
+    :raises RuntimeError: if no ONIX or no Crossref Metadata releases are found.
+    """
+
+    client = Client(project=cloud_workspace.project_id)
+
+    # Get ONIX table ID
+    if metadata_partner.sharded:
+        onix_source_table_id = bq_table_id(
+            cloud_workspace.project_id, metadata_partner.bq_dataset_id, metadata_partner.bq_table_name
+        )
+        onix_snapshot_dates = bq_select_table_shard_dates(
+            table_id=onix_source_table_id, end_date=snapshot_date, client=client
+        )
+
+        if not len(onix_snapshot_dates):
+            raise RuntimeError("OnixWorkflow.make_release: no ONIX releases found")
+
+        onix_snapshot_date = onix_snapshot_dates[0]  # Get most recent snapshot
+        onix_table_id = bq_sharded_table_id(
+            cloud_workspace.project_id,
+            metadata_partner.bq_dataset_id,
+            metadata_partner.bq_table_name,
+            onix_snapshot_date,
+        )
+    else:
+        onix_table_id = bq_table_id(
+            cloud_workspace.project_id, metadata_partner.bq_dataset_id, metadata_partner.bq_table_name
+        )
+
+    # Get Crossref Metadata release date
+    crossref_table_id = bq_table_id(
+        bq_master_crossref_project_id, bq_master_crossref_dataset_id, bq_master_crossref_metadata_table_name
+    )
+    crossref_metadata_snapshot_dates = bq_select_table_shard_dates(
+        table_id=crossref_table_id, end_date=snapshot_date, client=client
+    )
+
+    if not len(crossref_metadata_snapshot_dates):
+        raise RuntimeError("OnixWorkflow.make_release: no Crossref Metadata releases found")
+
+    crossref_master_snapshot_date = crossref_metadata_snapshot_dates[0]  # Get most recent snapshot
+
+    # Make the release object
+    return OnixWorkflowRelease(
+        dag_id=dag_id,
+        run_id=run_id,
+        snapshot_date=snapshot_date,
+        crossref_master_snapshot_date=crossref_master_snapshot_date,
+        onix_table_id=onix_table_id,
+    )
+
+
+def _aggregate_works(
+    *,
+    release: OnixWorkflowRelease,
+    cloud_workspace: CloudWorkspace,
+    bq_onix_workflow_dataset: str,
+    bq_worksid_table_name: str,
+    bq_worksid_error_table_name: str,
+    bq_workfamilyid_table_name: str,
+    schema_folder: str,
+    client: Client = None,
+) -> bool:
+    """Aggregates ONIX product records into works/workfamilies, uploads and loads the lookup tables.
+
+    :return: whether all three table loads succeeded.
+    """
+    if client is None:
+        client = Client(project=cloud_workspace.project_id)
+
+    bq_create_dataset(
+        project_id=cloud_workspace.project_id,
+        dataset_id=bq_onix_workflow_dataset,
+        location=cloud_workspace.data_location,
+        description="Onix Workflow Aggregations",
+    )
+
+    products = get_onix_records(release.onix_table_id, client=client)
+
+    agg = BookWorkAggregator(products)
+    works = agg.aggregate()
+    lookup_table = agg.get_works_lookup_table()
+    save_jsonl_gz(release.workslookup_path, lookup_table)
+
+    error_table = [{"Error": error} for error in agg.errors]
+    save_jsonl_gz(release.workslookup_errors_path, error_table)
+
+    agg = BookWorkFamilyAggregator(works)
+    agg.aggregate()
+    lookup_table = agg.get_works_family_lookup_table()
+    save_jsonl_gz(release.worksfamilylookup_path, lookup_table)
+
+    files = [release.workslookup_path, release.workslookup_errors_path, release.worksfamilylookup_path]
+    gcs_upload_files(bucket_name=cloud_workspace.transform_bucket, file_paths=files)
+
+    aggregation_blobs = [
+        release.workslookup_blob_name,
+        release.workslookup_errors_blob_name,
+        release.worksfamilylookup_blob_name,
+    ]
+    aggregation_tables = [bq_worksid_table_name, bq_worksid_error_table_name, bq_workfamilyid_table_name]
+    statuses = []
+    for blob, table_name in zip(aggregation_blobs, aggregation_tables):
+        uri = gcs_blob_uri(cloud_workspace.transform_bucket, blob)
+        table_id = bq_sharded_table_id(
+            cloud_workspace.project_id, bq_onix_workflow_dataset, table_name, release.snapshot_date
+        )
+        state = bq_load_table(
+            uri=uri,
+            table_id=table_id,
+            schema_file_path=bq_find_schema(path=schema_folder, table_name=table_name),
+            source_format=SourceFormat.NEWLINE_DELIMITED_JSON,
+            write_disposition="WRITE_TRUNCATE",
+            client=client,
+        )
+        statuses.append(state)
+
+    return all(statuses)
 
 
 def create_intermediate_table(

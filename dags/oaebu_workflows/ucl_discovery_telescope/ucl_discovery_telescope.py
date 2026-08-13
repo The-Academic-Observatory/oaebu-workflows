@@ -23,7 +23,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import pendulum
 from airflow.decorators import dag, task
-from airflow.hooks.base import BaseHook
+from airflow.sdk import BaseHook
 from google.cloud.bigquery import SourceFormat, TimePartitioningType, WriteDisposition, Client
 from google.oauth2 import service_account
 from apiclient import discovery
@@ -328,7 +328,7 @@ def create_dag(
             """Delete all files, folders and XComs associated with this release."""
 
             release = UclDiscoveryRelease.from_dict(release)
-            cleanup(dag_id=dag_id, workflow_folder=release.workflow_folder)
+            cleanup(release.workflow_folder)
 
         task_check_dependencies = check_dependencies(airflow_conns=[oaebu_service_account_conn_id])
         xcom_release = make_release()

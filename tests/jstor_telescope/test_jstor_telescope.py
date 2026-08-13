@@ -20,11 +20,9 @@ import os
 import unittest
 from unittest.mock import MagicMock, Mock, patch
 
-import httpretty
 import pendulum
 from airflow.exceptions import AirflowException
-from airflow.models.connection import Connection
-from airflow.utils.state import State
+from airflow.sdk import Connection
 from click.testing import CliRunner
 from googleapiclient.discovery import build
 from googleapiclient.http import HttpMockSequence
@@ -39,10 +37,9 @@ from oaebu_workflows.jstor_telescope.jstor_telescope import (
     create_dag,
     make_jstor_api,
 )
-from observatory_platform.airflow.workflow import Workflow
+from observatory_platform.airflow.workflow import Workflow, make_workflow_folder
 from observatory_platform.dataset_api import DatasetAPI
 from observatory_platform.google.bigquery import bq_table_id
-from observatory_platform.google.gcs import gcs_blob_name_from_path, gcs_upload_files
 from observatory_platform.google.gmail import gmail_get_label_id
 from observatory_platform.sandbox.sandbox_environment import SandboxEnvironment
 from observatory_platform.sandbox.test_utils import SandboxTestCase, load_and_parse_json
@@ -51,8 +48,15 @@ from observatory_platform.sandbox.test_utils import SandboxTestCase, load_and_pa
 def dummy_gmail_connection() -> Connection:
     return Connection(
         conn_id="gmail_api",
-        uri="google-cloud-platform://?token=123&refresh_token=123"
-        "&client_id=123.apps.googleusercontent.com&client_secret=123",
+        conn_type="google_cloud_platform",
+        extra=json.dumps(
+            {
+                "token": "123",
+                "refresh_token": "123",
+                "client_id": "123.apps.googleusercontent.com",
+                "client_secret": "123",
+            }
+        ),
     )
 
 
@@ -183,15 +187,11 @@ class TestJstorTelescopePublisher(SandboxTestCase):
         )
         mock_build.return_value = build("gmail", "v1", http=http)
 
-        # Setup Observatory environment
         env = SandboxEnvironment(self.project_id, self.data_location)
 
-        # Create the Observatory environment and run tests
         with env.create(task_logging=True):
-            # Add gmail connection
             env.add_connection(dummy_gmail_connection())
 
-            # Setup Telescope
             logical_date = pendulum.datetime(year=2020, month=11, day=1)
             country_partner = partner_from_str("jstor_country")
             dataset_id = env.add_dataset()
@@ -209,191 +209,104 @@ class TestJstorTelescopePublisher(SandboxTestCase):
                 country_partner=country_partner,
                 institution_partner=institution_partner,
                 api_bq_dataset_id=api_bq_dataset_id,
+                retries=0,
             )
+            env.serialize_dag(dag)
 
-            # Begin DAG run
-            with env.create_dag_run(dag, logical_date=logical_date):
-                # Test that all dependencies are specified: no error should be thrown
-                ti = env.run_task("check_dependencies")
-                self.assertEqual(ti.state, State.SUCCESS)
+            # Build lookup tables keyed by url, replacing httpretty's socket-level mocking
+            # with call-level patches (avoids colliding with Airflow's subprocess IPC sockets)
+            head_reports = [self.country_report, self.institution_report, self.wrong_publisher_report]
+            get_reports = [self.country_report, self.institution_report]
 
-                # Test list releases task with files available
-                with httpretty.enabled():
-                    for report in [self.country_report, self.institution_report, self.wrong_publisher_report]:
-                        self.setup_mock_file_download(
-                            report["url"], report["path"], headers=report["headers"], method=httpretty.HEAD
-                        )
-                    ti = env.run_task("list_reports")
-                    self.assertEqual(ti.state, State.SUCCESS)
-                available_reports = ti.xcom_pull(task_ids="list_reports", include_prior_dates=False)
-                self.assertIsInstance(available_reports, list)
-                expected_reports_info = [
-                    {"type": "country", "url": self.country_report["url"], "id": "1788ec9e91f3de62"},
-                    {"type": "institution", "url": self.institution_report["url"], "id": "1788ebe4ecbab055"},
-                ]
-                self.assertListEqual(expected_reports_info, available_reports)
+            def make_head_response(report):
+                resp = MagicMock()
+                resp.status_code = 200
+                resp.headers = report["headers"]
+                return resp
 
-                # Test download_reports task
-                with httpretty.enabled(), patch(
-                    "oaebu_workflows.jstor_telescope.jstor_telescope.gcs_upload_files"
-                ) as mock_upload:
-                    mock_upload.return_value = True
-                    for report in [self.country_report, self.institution_report]:
-                        self.setup_mock_file_download(report["url"], report["path"], headers=report["headers"])
-                    ti = env.run_task("download")
-                    self.assertEqual(ti.state, State.SUCCESS)
+            def make_get_response(report):
+                with open(report["path"], "rb") as f:
+                    content = f.read()
+                resp = MagicMock()
+                resp.status_code = 200
+                resp.content = content
+                return resp
 
-                # use release info for other tasks
-                release_dicts = ti.xcom_pull(task_ids="download", include_prior_dates=False)
-                expected_releases = [
-                    {
-                        "dag_id": "jstor_test_telescope",
-                        "run_id": "scheduled__2020-11-01T00:00:00+00:00",
-                        "data_interval_start": "2022-07-01",
-                        "data_interval_end": "2022-08-01",
-                        "partition_date": "2022-07-31",
-                        "reports": [
-                            {
-                                "type": "country",
-                                "url": "https://www.jstor.org/admin/reports/download/249192019",
-                                "id": "1788ec9e91f3de62",
-                            },
-                            {
-                                "type": "institution",
-                                "url": "https://www.jstor.org/admin/reports/download/129518301",
-                                "id": "1788ebe4ecbab055",
-                            },
-                        ],
-                    }
-                ]
-                self.assertEqual(release_dicts, expected_releases)
-                release = JstorRelease.from_dict(release_dicts[0])
+            head_responses = {r["url"]: make_head_response(r) for r in head_reports}
+            get_responses = {r["url"]: make_get_response(r) for r in get_reports}
 
-                # Check that the files were "downloaded"
-                self.assertTrue(os.path.exists(release.download_country_path))
-                self.assertTrue(os.path.exists(release.download_institution_path))
-                self.assert_file_integrity(release.download_country_path, self.country_report["download_hash"], "md5")
-                self.assert_file_integrity(
-                    release.download_institution_path, self.institution_report["download_hash"], "md5"
-                )
+            now = pendulum.now("UTC")
+            with (
+                patch("oaebu_workflows.jstor_telescope.jstor_telescope.requests.head") as mock_head,
+                patch("oaebu_workflows.jstor_telescope.jstor_telescope.retry_get_url") as mock_retry_get_url,
+                patch("oaebu_workflows.jstor_telescope.jstor_telescope.pendulum.now") as mock_now,
+            ):
+                mock_head.side_effect = lambda url, **kwargs: head_responses[url]
+                mock_retry_get_url.side_effect = lambda url, **kwargs: get_responses[url]
+                mock_now.return_value = now
+                dagrun = dag.test(logical_date=logical_date)
 
-                # Do the upload that we patched above
-                success = gcs_upload_files(
-                    bucket_name=env.cloud_workspace.download_bucket,
-                    file_paths=[release.download_institution_path, release.download_country_path],
-                )
-                self.assertTrue(success)
+            self.assertEqual(dagrun.state, "success")
 
-                # Test that file uploaded
-                self.assert_blob_integrity(
-                    env.download_bucket,
-                    gcs_blob_name_from_path(release.download_country_path),
-                    release.download_country_path,
-                )
-                self.assert_blob_integrity(
-                    env.download_bucket,
-                    gcs_blob_name_from_path(release.download_institution_path),
-                    release.download_institution_path,
-                )
+            download_ti = dagrun.get_task_instance(task_id="download")
+            release_dicts = download_ti.xcom_pull(task_ids="download", include_prior_dates=False)
+            release = JstorRelease.from_dict(release_dicts[0])
 
-                # Test that file transformed
-                ti = env.run_task("process_release.transform", map_index=0)
-                self.assertEqual(ti.state, State.SUCCESS)
-                self.assertTrue(os.path.exists(release.transform_country_path))
-                self.assertTrue(os.path.exists(release.transform_institution_path))
-                self.assert_file_integrity(
-                    release.transform_country_path, self.country_report["transform_hash"], "gzip_crc"
-                )
-                self.assert_file_integrity(
-                    release.transform_institution_path, self.institution_report["transform_hash"], "gzip_crc"
-                )
+            country_table_id = bq_table_id(
+                env.cloud_workspace.project_id,
+                country_partner.bq_dataset_id,
+                country_partner.bq_table_name,
+            )
+            institution_table_id = bq_table_id(
+                env.cloud_workspace.project_id,
+                institution_partner.bq_dataset_id,
+                institution_partner.bq_table_name,
+            )
+            self.assert_table_integrity(country_table_id, self.country_report["table_rows"])
+            self.assert_table_integrity(institution_table_id, self.institution_report["table_rows"])
 
-                # Test that transformed file was uploaded
-                self.assertEqual(ti.state, State.SUCCESS)
-                self.assert_blob_integrity(
-                    env.transform_bucket,
-                    gcs_blob_name_from_path(release.transform_country_path),
-                    release.transform_country_path,
-                )
-                self.assert_blob_integrity(
-                    env.transform_bucket,
-                    gcs_blob_name_from_path(release.transform_institution_path),
-                    release.transform_institution_path,
-                )
+            api = DatasetAPI(bq_project_id=self.project_id, bq_dataset_id=api_bq_dataset_id)
+            dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="jstor_country")
+            self.assertEqual(len(dataset_releases), 1)
+            expected_release = {
+                "dag_id": dag_id,
+                "entity_id": "jstor_country",
+                "dag_run_id": release.run_id,
+                "created": now.to_iso8601_string(),
+                "modified": now.to_iso8601_string(),
+                "data_interval_start": "2022-07-01T00:00:00Z",
+                "data_interval_end": "2022-08-01T00:00:00Z",
+                "snapshot_date": None,
+                "partition_date": "2022-07-31T00:00:00Z",
+                "changefile_start_date": None,
+                "changefile_end_date": None,
+                "sequence_start": None,
+                "sequence_end": None,
+                "extra": {},
+            }
+            self.assertEqual(dataset_releases[0].to_dict(), expected_release)
 
-                # Test that data is loaded into BigQuery
-                ti = env.run_task("process_release.bq_load", map_index=0)
-                self.assertEqual(ti.state, State.SUCCESS)
-                country_table_id = bq_table_id(
-                    env.cloud_workspace.project_id,
-                    country_partner.bq_dataset_id,
-                    country_partner.bq_table_name,
-                )
-                institution_table_id = bq_table_id(
-                    env.cloud_workspace.project_id,
-                    institution_partner.bq_dataset_id,
-                    institution_partner.bq_table_name,
-                )
-                self.assert_table_integrity(country_table_id, self.country_report["table_rows"])
-                self.assert_table_integrity(institution_table_id, self.institution_report["table_rows"])
+            dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="jstor_institution")
+            self.assertEqual(len(dataset_releases), 1)
+            expected_release = {
+                "dag_id": dag_id,
+                "entity_id": "jstor_institution",
+                "dag_run_id": release.run_id,
+                "created": now.to_iso8601_string(),
+                "modified": now.to_iso8601_string(),
+                "data_interval_start": "2022-07-01T00:00:00Z",
+                "data_interval_end": "2022-08-01T00:00:00Z",
+                "snapshot_date": None,
+                "partition_date": "2022-07-31T00:00:00Z",
+                "changefile_start_date": None,
+                "changefile_end_date": None,
+                "sequence_start": None,
+                "sequence_end": None,
+                "extra": {},
+            }
+            self.assertEqual(dataset_releases[0].to_dict(), expected_release)
 
-                # Set up the API
-                api = DatasetAPI(bq_project_id=self.project_id, bq_dataset_id=api_bq_dataset_id)
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="jstor_country")
-                self.assertEqual(len(dataset_releases), 0)
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="jstor_institution")
-                self.assertEqual(len(dataset_releases), 0)
-
-                # Add_dataset_release_task
-                now = pendulum.now("UTC")
-                with patch("oaebu_workflows.jstor_telescope.jstor_telescope.pendulum.now") as mock_now:
-                    mock_now.return_value = now
-                    ti = env.run_task("process_release.add_new_dataset_releases", map_index=0)
-                self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="jstor_country")
-                self.assertEqual(len(dataset_releases), 1)
-                expected_release = {
-                    "dag_id": dag_id,
-                    "entity_id": "jstor_country",
-                    "dag_run_id": release.run_id,
-                    "created": now.to_iso8601_string(),
-                    "modified": now.to_iso8601_string(),
-                    "data_interval_start": "2022-07-01T00:00:00Z",
-                    "data_interval_end": "2022-08-01T00:00:00Z",
-                    "snapshot_date": None,
-                    "partition_date": "2022-07-31T00:00:00Z",
-                    "changefile_start_date": None,
-                    "changefile_end_date": None,
-                    "sequence_start": None,
-                    "sequence_end": None,
-                    "extra": {},
-                }
-                self.assertEqual(dataset_releases[0].to_dict(), expected_release)
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="jstor_institution")
-                self.assertEqual(len(dataset_releases), 1)
-                expected_release = {
-                    "dag_id": dag_id,
-                    "entity_id": "jstor_institution",
-                    "dag_run_id": release.run_id,
-                    "created": now.to_iso8601_string(),
-                    "modified": now.to_iso8601_string(),
-                    "data_interval_start": "2022-07-01T00:00:00Z",
-                    "data_interval_end": "2022-08-01T00:00:00Z",
-                    "snapshot_date": None,
-                    "partition_date": "2022-07-31T00:00:00Z",
-                    "changefile_start_date": None,
-                    "changefile_end_date": None,
-                    "sequence_start": None,
-                    "sequence_end": None,
-                    "extra": {},
-                }
-                self.assertEqual(dataset_releases[0].to_dict(), expected_release)
-
-                # Test that all telescope data deleted
-                workflow_folder_path = release.workflow_folder
-                ti = env.run_task("process_release.cleanup_workflow", map_index=0)
-                self.assertEqual(ti.state, State.SUCCESS)
-                self.assert_cleanup(workflow_folder_path)
+            self.assert_cleanup(make_workflow_folder(dag_id, dagrun.run_id, make_dir=False))
 
     def test_get_release_date(self):
         """Test that the get_release_date returns the correct release date and raises an exception when dates are
@@ -548,15 +461,11 @@ class TestJstorTelescopeCollection(SandboxTestCase):
         )
         mock_build.return_value = build("gmail", "v1", http=http)
 
-        # Setup Observatory environment
         env = SandboxEnvironment(self.project_id, self.data_location)
 
-        # Create the Observatory environment and run tests
         with env.create(task_logging=True):
-            # Add gmail connection
             env.add_connection(dummy_gmail_connection())
 
-            # Setup DAG
             logical_date = pendulum.datetime(year=2023, month=10, day=4)
             country_partner = partner_from_str("jstor_country_collection")
             dataset_id = env.add_dataset()
@@ -574,169 +483,80 @@ class TestJstorTelescopeCollection(SandboxTestCase):
                 country_partner=country_partner,
                 institution_partner=institution_partner,
                 api_bq_dataset_id=api_bq_dataset_id,
+                retries=0,
             )
+            env.serialize_dag(dag)
 
-            # Begin DAG run
-            with env.create_dag_run(dag, logical_date=logical_date):
-                # Test that all dependencies are specified: no error should be thrown
-                ti = env.run_task("check_dependencies")
-                self.assertEqual(ti.state, State.SUCCESS)
+            now = pendulum.now("UTC")
+            with patch("oaebu_workflows.jstor_telescope.jstor_telescope.pendulum.now") as mock_now:
+                mock_now.return_value = now
+                dagrun = dag.test(logical_date=logical_date)
 
-                # Test list releases task with files available
-                ti = env.run_task("list_reports")
-                self.assertEqual(ti.state, State.SUCCESS)
+            self.assertEqual(dagrun.state, "success")
 
-                available_reports = ti.xcom_pull(task_ids="list_reports", include_prior_dates=False)
-                self.assertIsInstance(available_reports, list)
-                expected_reports_info = [
-                    {"type": "country", "attachment_id": "2", "id": "18af0b40b64fe408"},
-                    {"type": "institution", "attachment_id": "3", "id": "18af0b40b64fe408"},
-                ]
-                self.assertListEqual(expected_reports_info, available_reports)
+            download_ti = dagrun.get_task_instance(task_id="download")
+            release_dicts = download_ti.xcom_pull(task_ids="download", include_prior_dates=False)
+            release = JstorRelease.from_dict(release_dicts[0])
 
-                # Test download_reports task
-                ti = env.run_task("download")
-                self.assertEqual(ti.state, State.SUCCESS)
+            country_table_id = bq_table_id(
+                env.cloud_workspace.project_id,
+                country_partner.bq_dataset_id,
+                country_partner.bq_table_name,
+            )
+            institution_table_id = bq_table_id(
+                env.cloud_workspace.project_id,
+                institution_partner.bq_dataset_id,
+                institution_partner.bq_table_name,
+            )
+            self.assert_table_integrity(country_table_id, self.country_report["table_rows"])
+            self.assert_table_integrity(institution_table_id, self.institution_report["table_rows"])
+            expected = load_and_parse_json(self.country_report["table"], date_fields=["release_date"])
+            self.assert_table_content(country_table_id, expected, primary_key="ISBN")
+            expected = load_and_parse_json(self.institution_report["table"], date_fields=["release_date"])
+            self.assert_table_content(institution_table_id, expected, primary_key="ISBN")
 
-                # use release info for other tasks
-                release_dicts = ti.xcom_pull(task_ids="download", include_prior_dates=False)
-                expected_releases = [
-                    {
-                        "dag_id": "jstor_test_telescope",
-                        "run_id": "scheduled__2023-10-04T00:00:00+00:00",
-                        "data_interval_start": "2023-09-01",
-                        "data_interval_end": "2023-10-01",
-                        "partition_date": "2023-09-30",
-                        "reports": [
-                            {"type": "country", "attachment_id": "2", "id": "18af0b40b64fe408"},
-                            {"type": "institution", "attachment_id": "3", "id": "18af0b40b64fe408"},
-                        ],
-                    }
-                ]
-                self.assertEqual(release_dicts, expected_releases)
-                release = JstorRelease.from_dict(release_dicts[0])
+            api = DatasetAPI(bq_project_id=self.project_id, bq_dataset_id=api_bq_dataset_id)
+            dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="jstor_country")
+            self.assertEqual(len(dataset_releases), 1)
+            expected_release = {
+                "dag_id": dag_id,
+                "entity_id": "jstor_country",
+                "dag_run_id": release.run_id,
+                "created": now.to_iso8601_string(),
+                "modified": now.to_iso8601_string(),
+                "data_interval_start": "2023-09-01T00:00:00Z",
+                "data_interval_end": "2023-10-01T00:00:00Z",
+                "snapshot_date": None,
+                "partition_date": "2023-09-30T00:00:00Z",
+                "changefile_start_date": None,
+                "changefile_end_date": None,
+                "sequence_start": None,
+                "sequence_end": None,
+                "extra": {},
+            }
+            self.assertEqual(dataset_releases[0].to_dict(), expected_release)
 
-                # Check that the files were "downloaded"
-                self.assertTrue(os.path.exists(release.download_country_path))
-                self.assertTrue(os.path.exists(release.download_institution_path))
-                self.assert_file_integrity(release.download_country_path, self.country_report["download_hash"], "md5")
-                self.assert_file_integrity(
-                    release.download_institution_path, self.institution_report["download_hash"], "md5"
-                )
+            dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="jstor_institution")
+            self.assertEqual(len(dataset_releases), 1)
+            expected_release = {
+                "dag_id": dag_id,
+                "entity_id": "jstor_institution",
+                "dag_run_id": release.run_id,
+                "created": now.to_iso8601_string(),
+                "modified": now.to_iso8601_string(),
+                "data_interval_start": "2023-09-01T00:00:00Z",
+                "data_interval_end": "2023-10-01T00:00:00Z",
+                "snapshot_date": None,
+                "partition_date": "2023-09-30T00:00:00Z",
+                "changefile_start_date": None,
+                "changefile_end_date": None,
+                "sequence_start": None,
+                "sequence_end": None,
+                "extra": {},
+            }
+            self.assertEqual(dataset_releases[0].to_dict(), expected_release)
 
-                # Test that file uploaded
-                self.assert_blob_integrity(
-                    env.download_bucket,
-                    gcs_blob_name_from_path(release.download_country_path),
-                    release.download_country_path,
-                )
-                self.assert_blob_integrity(
-                    env.download_bucket,
-                    gcs_blob_name_from_path(release.download_institution_path),
-                    release.download_institution_path,
-                )
-
-                # Test that file transformed
-                ti = env.run_task("process_release.transform", map_index=0)
-                self.assertEqual(ti.state, State.SUCCESS)
-                self.assertTrue(os.path.exists(release.transform_country_path))
-                self.assertTrue(os.path.exists(release.transform_institution_path))
-                self.assert_file_integrity(
-                    release.transform_country_path, self.country_report["transform_hash"], "gzip_crc"
-                )
-                self.assert_file_integrity(
-                    release.transform_institution_path, self.institution_report["transform_hash"], "gzip_crc"
-                )
-
-                # Test that transformed file uploaded
-                self.assert_blob_integrity(
-                    env.transform_bucket,
-                    gcs_blob_name_from_path(release.transform_country_path),
-                    release.transform_country_path,
-                )
-                self.assert_blob_integrity(
-                    env.transform_bucket,
-                    gcs_blob_name_from_path(release.transform_institution_path),
-                    release.transform_institution_path,
-                )
-
-                # Test that data loaded into BigQuery
-                ti = env.run_task("process_release.bq_load", map_index=0)
-                self.assertEqual(ti.state, State.SUCCESS)
-                country_table_id = bq_table_id(
-                    env.cloud_workspace.project_id,
-                    country_partner.bq_dataset_id,
-                    country_partner.bq_table_name,
-                )
-                institution_table_id = bq_table_id(
-                    env.cloud_workspace.project_id,
-                    institution_partner.bq_dataset_id,
-                    institution_partner.bq_table_name,
-                )
-                self.assert_table_integrity(country_table_id, self.country_report["table_rows"])
-                self.assert_table_integrity(institution_table_id, self.institution_report["table_rows"])
-                expected = load_and_parse_json(self.country_report["table"], date_fields=["release_date"])
-                self.assert_table_content(country_table_id, expected, primary_key="ISBN")
-                expected = load_and_parse_json(self.institution_report["table"], date_fields=["release_date"])
-                self.assert_table_content(institution_table_id, expected, primary_key="ISBN")
-
-                # Set up the API
-                api = DatasetAPI(bq_project_id=self.project_id, bq_dataset_id=api_bq_dataset_id)
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="jstor_country")
-                self.assertEqual(len(dataset_releases), 0)
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="jstor_institution")
-                self.assertEqual(len(dataset_releases), 0)
-
-                # Add_dataset_release_task
-                now = pendulum.now("UTC")
-                with patch("oaebu_workflows.jstor_telescope.jstor_telescope.pendulum.now") as mock_now:
-                    mock_now.return_value = now
-                    ti = env.run_task("process_release.add_new_dataset_releases", map_index=0)
-                self.assertEqual(ti.state, State.SUCCESS)
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="jstor_country")
-                self.assertEqual(len(dataset_releases), 1)
-                expected_release = {
-                    "dag_id": dag_id,
-                    "entity_id": "jstor_country",
-                    "dag_run_id": release.run_id,
-                    "created": now.to_iso8601_string(),
-                    "modified": now.to_iso8601_string(),
-                    "data_interval_start": "2023-09-01T00:00:00Z",
-                    "data_interval_end": "2023-10-01T00:00:00Z",
-                    "snapshot_date": None,
-                    "partition_date": "2023-09-30T00:00:00Z",
-                    "changefile_start_date": None,
-                    "changefile_end_date": None,
-                    "sequence_start": None,
-                    "sequence_end": None,
-                    "extra": {},
-                }
-                self.assertEqual(dataset_releases[0].to_dict(), expected_release)
-                dataset_releases = api.get_dataset_releases(dag_id=dag_id, entity_id="jstor_institution")
-                self.assertEqual(len(dataset_releases), 1)
-                expected_release = {
-                    "dag_id": dag_id,
-                    "entity_id": "jstor_institution",
-                    "dag_run_id": release.run_id,
-                    "created": now.to_iso8601_string(),
-                    "modified": now.to_iso8601_string(),
-                    "data_interval_start": "2023-09-01T00:00:00Z",
-                    "data_interval_end": "2023-10-01T00:00:00Z",
-                    "snapshot_date": None,
-                    "partition_date": "2023-09-30T00:00:00Z",
-                    "changefile_start_date": None,
-                    "changefile_end_date": None,
-                    "sequence_start": None,
-                    "sequence_end": None,
-                    "extra": {},
-                }
-                self.assertEqual(dataset_releases[0].to_dict(), expected_release)
-
-                # Test that all telescope data deleted
-                workflow_folder_path = release.workflow_folder
-                ti = env.run_task("process_release.cleanup_workflow", map_index=0)
-                self.assertEqual(ti.state, State.SUCCESS)
-                self.assert_cleanup(workflow_folder_path)
+            self.assert_cleanup(make_workflow_folder(dag_id, dagrun.run_id, make_dir=False))
 
     def test_get_release_date(self):
         """Test that the get_release_date returns the correct release date and raises an exception when dates are

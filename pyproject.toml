@@ -1,0 +1,56 @@
+[tool.licensecheck]
+only_licenses = [
+    # Unencumbered licenses: https://opensource.google/docs/thirdparty/licenses/#unencumbered
+    "public domain <http://unlicense.org>",
+    "cc0 1.0 universal (cc0 1.0) public domain dedication",
+    # Notice licenses: https://opensource.google/docs/thirdparty/licenses/#notice
+    "artistic",
+    "apache software license 2.0",
+    "apache license version 2.0",
+    "apache license, version 2.0",
+    "apache license 2.0",
+    "apache 2.0",
+    "apache-2.0",
+    "apache software",
+    "apache 2",
+    "apache-2",
+    "bsd",
+    "bsd-2-clause",
+    "bsd-3-clause",
+    "3-clause bsd",
+    "new bsd",
+    "bsd or apache license, version 2.0",
+    "bsd-2-clause or apache-2.0",
+    "isc license (iscl)",
+    "isc",
+    "mit",
+    "python software foundation",
+    "psf-2.0",
+    "psfl",
+    "zpl 2.1",
+    # Reciprocal licenses: https://opensource.google/docs/thirdparty/licenses/#reciprocal
+    "mozilla public license 1.1 (mpl 1.1)",
+    "mozilla public license 2.0 (mpl 2.0)",
+    "mpl-2.0",
+    # LGPL
+    "lgpl",
+    "gnu library or lesser general public license (lgpl)",
+    "gnu lesser general public license v3 or later (lgplv3+)",
+    "lgplv3+",
+    "the unlicense (unlicense)",
+    "apache-2.0 and mit",
+    "mit and psf-2.0",
+]
+fail_licenses = [
+    # Banned licenses: https://opensource.google/docs/thirdparty/licenses/#banned
+    "agpl",
+    "affero gpl",
+    "agpl (affero gpl)",
+    "sspl"
+]
+zero = true
+ignore_packages=[
+    "text-unidecode", # perl artistic
+    "certifi", # mozilla
+    "isbnlib" # not ours
+]
