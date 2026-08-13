@@ -8,6 +8,10 @@ RUN apt-get update && apt-get install git -y
 
 USER astro
 
+# Install oaebu workflows
+
+
 # Install Observatory Platform
-RUN git clone https://github.com/The-Academic-Observatory/observatory-platform.git && \
+RUN pip install . && \
+    git clone https://github.com/The-Academic-Observatory/observatory-platform.git && \
     pip install ./observatory-platform 
