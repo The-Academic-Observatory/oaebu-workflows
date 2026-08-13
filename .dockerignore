@@ -6,3 +6,4 @@ dist
 .github
 *.pkrvars.hcl
 *.tfvars
+*.egg-info

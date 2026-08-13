@@ -31,19 +31,16 @@ jobs:
           uv venv --python ${{ matrix.python-version }} /tmp/venv
           source /tmp/venv/bin/activate
 
+
           # Clone protection required until fix - https://github.com/git-lfs/git-lfs/issues/5749
           export GIT_CLONE_PROTECTION_ACTIVE=false 
-          git clone https://github.com/The-Academic-Observatory/observatory-platform.git 
+          git clone --depth 1 https://github.com/The-Academic-Observatory/observatory-platform.git 
           uv pip install -e observatory-platform[tests] --constraint https://raw.githubusercontent.com/apache/airflow/constraints-3.2.2/constraints-no-providers-${{ matrix.python-version }}.txt
 
-          cd oaebu-workflows
-          uv pip install -r requirements.txt --constraint https://raw.githubusercontent.com/apache/airflow/constraints-3.2.2/constraints-no-providers-${{ matrix.python-version }}.txt
+          # Install oaebu workflows
+          uv pip install -e oaebu-workflows[tests] --constraint https://raw.githubusercontent.com/apache/airflow/constraints-3.2.2/constraints-no-providers-${{ matrix.python-version }}.txt
 
           uv pip freeze --system # for debugging
-
-      - name: Add dag folder to PYTHONPATH
-        run: |
-          echo "PYTHONPATH=$HOME/work/oaebu-workflows/oaebu-workflows/dags:$HOME/work/oaebu-workflows/oaebu-workflows/plugins" >> "$GITHUB_ENV"
 
       # Required for testing ONIX Telescope
       - name: Set up JDK 11
@@ -57,7 +54,7 @@ jobs:
           # stop the build if there are licensing issues
           uv venv /tmp/licensecheck-env --python ${{ matrix.python-version }}
           uv pip install --python /tmp/licensecheck-env/bin/python "pip<24.1" licensecheck
-          /tmp/licensecheck-env/bin/licensecheck --requirements-paths requirements.txt
+          /tmp/licensecheck-env/bin/licensecheck --zero
 
       - name: Lint with flake8
         run: |

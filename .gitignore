@@ -16,6 +16,7 @@ docs/schemas
 __pycache__
 /oaebu-workflows/build
 pyrightconfig.json
+*.egg-info
 
 # Astronomer
 airflow_settings.yaml
