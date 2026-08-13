@@ -1,2 +1,2 @@
 # ONIX Telescope
-openjdk-17-jre
+openjdk-21-jre
