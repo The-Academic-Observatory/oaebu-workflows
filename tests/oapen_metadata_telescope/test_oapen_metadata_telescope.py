@@ -269,7 +269,5 @@ class TestFilterApplication(unittest.TestCase):
             actual_output = transformer.transform()
             with open(actual_output, "r") as f:
                 actual_output = json.load(f)
-            with open("/home/keegan/test_output.json", "w") as f:
-                json.dump(actual_output, f)
 
         self.assertEqual(compare_lists_of_dicts(expected_output, actual_output, primary_key="ISBN13"), True)
