@@ -26,7 +26,6 @@ from oaebu_workflows.oaebu_partners import partner_from_str
 from oaebu_workflows.config import test_fixtures_folder, module_file_path
 from observatory_platform.dataset_api import DatasetAPI
 from observatory_platform.google.bigquery import bq_sharded_table_id
-from observatory_platform.google.gcs import gcs_blob_name_from_path
 from observatory_platform.sftp import SftpFolders
 from observatory_platform.airflow.workflow import Workflow, make_workflow_folder
 from observatory_platform.sandbox.test_utils import SandboxTestCase, find_free_port, load_and_parse_json
