@@ -46,8 +46,8 @@ class OnixParser:
     :param bash template: The path to the bash template "onix_parser.sh.jinja2"
     """
 
-    filename = "coki-onix-parser-1.2-SNAPSHOT-shaded.jar"
-    url = "https://github.com/The-Academic-Observatory/onix-parser/releases/download/v1.3.0/coki-onix-parser-1.2-SNAPSHOT-shaded.jar"
+    filename = "coki-onix-parser-1.4-SNAPSHOT-shaded.jar"
+    url = "https://github.com/The-Academic-Observatory/onix-parser/releases/download/v1.4.0/coki-onix-parser-1.4-SNAPSHOT-shaded.jar"
     cmd = "java -jar {parser_path} {input_dir} {output_dir}"
 
 
