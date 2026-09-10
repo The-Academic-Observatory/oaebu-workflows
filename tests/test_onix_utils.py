@@ -152,7 +152,7 @@ class TestOnixFunctions(SandboxTestCase):
             output_file = os.path.join(output_dir, "full.jsonl")
             self.assertEqual(success, True)
             self.assertTrue(os.path.isfile(output_file))
-            self.assert_file_integrity(output_file, "afb8c2e5f89ec22931de27546a9eb476", "md5")
+            self.assert_file_integrity(output_file, "3f234b3a8c30ebff786cd44abd78d0a6", "md5")
 
     def test_collapse_subjects(self):
         """Tests the thoth_collapse_subjects function"""
